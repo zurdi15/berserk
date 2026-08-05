@@ -18,3 +18,5 @@ export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 export const me = () => api<UserOut>('/auth/me')
 export const updateSettings = (partial: Partial<Pick<UserOut, 'locale' | 'units' | 'timezone'>>) =>
   api<UserOut>('/users/me', { method: 'PATCH', body: partial })
+export const changePassword = (current_password: string, new_password: string) =>
+  api<void>('/auth/password', { method: 'POST', body: { current_password, new_password } })
