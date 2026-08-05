@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -9,6 +9,7 @@ import BkButton from '@/lib/BkButton.vue'
 import SettingsCard from '@/components/profile/SettingsCard.vue'
 import PasswordCard from '@/components/profile/PasswordCard.vue'
 import SharingCard from '@/components/profile/SharingCard.vue'
+import AdminCard from '@/components/profile/AdminCard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
@@ -17,15 +18,19 @@ const auth = useAuthStore()
 
 const activeTab = ref('profile')
 
-const tabs = [
-  { value: 'profile', label: t('profile.tab') },
-  { value: 'routines', label: t('profile.routinesTab') },
-]
+// Compute tabs based on user role
+const tabs = computed(() => {
+  const baseTabs = [
+    { value: 'profile', label: t('profile.tab') },
+    { value: 'routines', label: t('profile.routinesTab') },
+  ]
 
-// Add admin tab if user is admin
-if (auth.user?.is_admin) {
-  tabs.push({ value: 'admin', label: t('profile.adminTab') })
-}
+  if (auth.user?.is_admin) {
+    baseTabs.push({ value: 'admin', label: t('profile.adminTab') })
+  }
+
+  return baseTabs
+})
 
 async function handleLogout() {
   try {
@@ -61,7 +66,7 @@ async function handleLogout() {
       </template>
 
       <template v-if="activeTab === 'admin' && auth.user?.is_admin">
-        <div class="text-ink-muted">{{ $t('app.placeholder') }}</div>
+        <AdminCard />
       </template>
     </BkTabs>
   </div>
