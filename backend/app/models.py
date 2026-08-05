@@ -252,6 +252,8 @@ class ScheduledSession(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     date: Mapped[date] = mapped_column(Date, index=True)
+    # nullable explícito: el nombre del campo colisiona con datetime.time en su
+    # propia anotación y SQLAlchemy no infiere Optional del Mapped[time | None]
     time: Mapped[time | None] = mapped_column(Time, nullable=True, default=None)
     routine_id: Mapped[int | None] = mapped_column(
         ForeignKey("routines.id", ondelete="SET NULL"), default=None
