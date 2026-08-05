@@ -1,5 +1,8 @@
 import { api } from './client'
 
+// Shared types
+export type Measurement = 'strength' | 'bodyweight' | 'timed' | 'cardio'
+
 // Catalog types
 export interface MuscleGroupOut {
   id: number
@@ -18,7 +21,7 @@ export interface ExerciseOut {
   id: number
   name_es: string
   name_en: string
-  measurement: 'strength' | 'bodyweight' | 'timed' | 'cardio'
+  measurement: Measurement
   owner_id: number | null
   muscle_groups: ExerciseMuscleLink[]
 }
@@ -224,7 +227,7 @@ export const listExercises = (params: {
 export const createExercise = (body: {
   name_es: string
   name_en: string
-  measurement: string
+  measurement: Measurement
   muscle_groups: ExerciseMuscleLink[]
 }) =>
   api<ExerciseOut>('/exercises', { method: 'POST', body })
@@ -263,7 +266,7 @@ export const deleteRoutine = (id: number) =>
   api<void>(`/routines/${id}`, { method: 'DELETE' })
 
 export const replaceRoutineExercises = (id: number, items: RoutineExerciseIn[]) =>
-  api<RoutineOut>(`/routines/${id}/exercises`, { method: 'PUT', body: { exercises: items } })
+  api<RoutineOut>(`/routines/${id}/exercises`, { method: 'PUT', body: items })
 
 // Workout endpoints
 export const startWorkout = (body: {
@@ -319,7 +322,7 @@ export const reorderWorkoutExercises = (wid: number, ids: number[]) =>
   api<WorkoutOut>(`/workouts/${wid}/exercises-order`, { method: 'PUT', body: { workout_exercise_ids: ids } })
 
 export const setWorkoutMuscleTags = (wid: number, ids: number[]) =>
-  api<WorkoutOut>(`/workouts/${wid}/muscle-tags`, { method: 'PUT', body: { muscle_group_ids: ids } })
+  api<WorkoutOut>(`/workouts/${wid}/muscle-groups`, { method: 'PUT', body: { muscle_group_ids: ids } })
 
 export const logSet = (wid: number, weid: number, body: SetIn) =>
   api<SetLogOut>(`/workouts/${wid}/exercises/${weid}/sets`, { method: 'POST', body })
@@ -371,7 +374,7 @@ export const getStreak = (userId?: number) =>
   api<{ weeks: number }>(`/progress/streak${qs({ userId })}`)
 
 export const getDistribution = (weeks?: number, userId?: number) =>
-  api<DistributionItem[]>(`/progress/distribution${qs({ weeks, userId })}`)
+  api<DistributionItem[]>(`/progress/muscle-distribution${qs({ weeks, userId })}`)
 
 // Body endpoints
 export const listBody = (userId?: number) =>

@@ -53,4 +53,30 @@ describe('domain api paths', () => {
       ['/api/v1/body/2026-08-05', 'PUT'],
     ])
   })
+
+  it('replaceRoutineExercises sends bare array', async () => {
+    const spy = spyFetch()
+    const items = [{ exercise_id: 1, target_sets: 3 }]
+    await domain.replaceRoutineExercises(5, items)
+    const [url, opts] = spy.mock.calls[0] as any
+    expect(url).toBe('/api/v1/routines/5/exercises')
+    expect(opts.method).toBe('PUT')
+    expect(JSON.parse(opts.body as string)).toEqual(items)
+  })
+
+  it('setWorkoutMuscleTags uses muscle-groups path', async () => {
+    const spy = spyFetch()
+    await domain.setWorkoutMuscleTags(4, [1, 2])
+    const [url, opts] = spy.mock.calls[0] as any
+    expect(url).toBe('/api/v1/workouts/4/muscle-groups')
+    expect(opts.method).toBe('PUT')
+    expect(JSON.parse(opts.body as string)).toEqual({ muscle_group_ids: [1, 2] })
+  })
+
+  it('getDistribution uses muscle-distribution path', async () => {
+    const spy = spyFetch()
+    await domain.getDistribution(12, 7)
+    const url = (spy.mock.calls[0] as any)?.[0] as string
+    expect(url).toBe('/api/v1/progress/muscle-distribution?weeks=12&user_id=7')
+  })
 })
