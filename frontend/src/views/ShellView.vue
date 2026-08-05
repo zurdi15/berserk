@@ -13,15 +13,37 @@ const items: { name: string; label: string; rune: RuneName }[] = [
 
 <template>
   <div class="min-h-dvh flex flex-col">
-    <header class="flex items-center gap-2 px-4 py-3 border-b border-line sm:justify-center">
+    <!-- Desktop navbar: una sola barra superior con identidad + destinos -->
+    <header class="hidden sm:flex items-center gap-6 px-6 py-3 border-b border-line">
+      <div class="flex items-center gap-2">
+        <BkRune name="berserk" :size="22" tone="aurora" />
+        <span class="font-display font-bold tracking-widest uppercase text-sm">{{ $t('app.name') }}</span>
+      </div>
+      <nav class="ml-auto" :aria-label="$t('app.nav.label')">
+        <ul class="flex gap-1">
+          <li v-for="item in items" :key="item.name">
+            <RouterLink
+              :to="{ name: item.name }"
+              class="flex items-center gap-2 px-3 py-1.5 rounded-sm text-ink-faint hover:text-ink"
+              active-class="text-aurora bg-stone"
+            >
+              <BkRune :name="item.rune" :size="16" />
+              <span class="text-sm uppercase tracking-wide">{{ $t(item.label) }}</span>
+            </RouterLink>
+          </li>
+        </ul>
+      </nav>
+    </header>
+    <!-- Mobile identity header: cabecera fina + identidad -->
+    <header class="sm:hidden flex items-center gap-2 px-4 py-3 border-b border-line justify-center">
       <BkRune name="berserk" :size="20" tone="aurora" />
       <span class="font-display font-bold tracking-widest uppercase text-sm">
         {{ $t('app.name') }}
       </span>
     </header>
-    <!-- en móvil barra inferior fija; en desktop fluye bajo la cabecera como fila de pestañas (la nav de escritorio definitiva puede refinarse en fase 4) -->
+    <!-- Mobile bottom nav: barra inferior fija en móvil; oculta en desktop -->
     <nav
-      class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:border-b sm:bg-transparent sm:pb-0"
+      class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:hidden"
       :aria-label="$t('app.nav.label')"
     >
       <ul class="flex justify-around max-w-3xl mx-auto">
@@ -32,7 +54,7 @@ const items: { name: string; label: string; rune: RuneName }[] = [
             active-class="text-aurora"
           >
             <span
-              :class="item.name === 'workout' && 'bk-slab -mt-5 p-2.5 border-aurora text-aurora sm:mt-0'"
+              :class="item.name === 'workout' && 'bk-slab -mt-5 p-2.5 border-aurora text-aurora'"
             >
               <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" />
             </span>
