@@ -24,8 +24,8 @@ const items: { name: string; label: string; rune: RuneName }[] = [
               active-class="text-aurora"
             >
               <span class="text-[0.65rem] uppercase tracking-wide">{{ $t(item.label) }}</span>
-              <span :class="item.name === 'workout' && 'bk-slab -mb-5 p-2.5 border-aurora text-aurora'">
-                <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" />
+              <span :class="item.name === 'workout' && 'bk-slab -mb-5 p-2.5 border-aurora text-aurora bk-breathe shadow-(--bk-shadow-aurora)'">
+                <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" />
               </span>
             </RouterLink>
           </li>
@@ -52,9 +52,9 @@ const items: { name: string; label: string; rune: RuneName }[] = [
             active-class="text-aurora"
           >
             <span
-              :class="item.name === 'workout' && 'bk-slab -mt-5 p-2.5 border-aurora text-aurora'"
+              :class="item.name === 'workout' && 'bk-slab -mt-5 p-2.5 border-aurora text-aurora bk-breathe shadow-(--bk-shadow-aurora)'"
             >
-              <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" />
+              <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" />
             </span>
             <span class="text-[0.65rem] uppercase tracking-wide">{{ $t(item.label) }}</span>
           </RouterLink>

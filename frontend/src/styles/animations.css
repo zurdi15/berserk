@@ -27,6 +27,13 @@
   to { transform: translateX(100%); }
 }
 
+/* Breathe ambiental: como shimmer, bucle ambiental sancionado reservado para la CTA
+   del entrenamiento; el guard de reduced-motion ya lo neutraliza */
+@keyframes bk-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 /* transiciones de Vue: <Transition name="bk-rise"> etc. — solo entrada */
 .bk-fade-enter-active { animation: bk-fade var(--bk-dur-2) var(--bk-ease-out); }
 .bk-rise-enter-active { animation: bk-rise var(--bk-dur-3) var(--bk-ease-out); }
@@ -53,6 +60,10 @@
   inset: 0;
   background: linear-gradient(90deg, transparent, var(--bk-line), transparent);
   animation: bk-shimmer var(--bk-dur-5) var(--bk-ease-out) infinite;
+}
+
+.bk-breathe {
+  animation: bk-breathe 2.8s var(--bk-ease-out) infinite;
 }
 
 .bk-press {
