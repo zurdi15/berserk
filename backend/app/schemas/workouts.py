@@ -61,3 +61,34 @@ class PersonalRecordOut(BaseModel):
     achieved_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class WorkoutExerciseIn(BaseModel):
+    exercise_id: int
+    note: str | None = Field(None, max_length=300)
+
+
+class WorkoutExercisePatchIn(BaseModel):
+    note: str | None = Field(None, max_length=300)
+
+
+class ExerciseOrderIn(BaseModel):
+    workout_exercise_ids: list[int] = Field(min_length=1)
+
+
+class MuscleTagsIn(BaseModel):
+    muscle_group_ids: list[int]
+
+
+class SetIn(BaseModel):
+    reps: int | None = Field(None, ge=1, le=500)
+    weight_kg: float | None = Field(None, gt=0, le=1000)
+    duration_seconds: int | None = Field(None, ge=1, le=86400)
+    distance_m: float | None = Field(None, gt=0, le=1000000)
+    is_warmup: bool = False
+    rpe: int | None = Field(None, ge=1, le=10)
+
+
+class SetLogOut(BaseModel):
+    set: SetOut
+    new_records: list[PersonalRecordOut]
