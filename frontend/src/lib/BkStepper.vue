@@ -27,6 +27,15 @@ function release() {
   timer = null
 }
 
+function onClick(direction: 1 | -1, event: MouseEvent) {
+  // detail === 0 delata una activación por teclado (Enter/Space sintetizan el
+  // click sin pointerdown/pointerup previos); los clicks de puntero real ya
+  // quedaron aplicados por press()/release(), así que aquí no hacemos nada.
+  if (event.detail !== 0) return
+  current = props.modelValue
+  apply(direction)
+}
+
 onBeforeUnmount(release)
 </script>
 
@@ -34,11 +43,13 @@ onBeforeUnmount(release)
   <div class="flex items-center gap-3">
     <button
       type="button"
-      class="bk-press bk-slab w-12 h-12 text-xl text-ink-muted hover:text-ink"
-      aria-label="-"
+      class="bk-press bk-slab select-none w-12 h-12 text-xl text-ink-muted hover:text-ink"
+      style="touch-action: manipulation"
+      :aria-label="$t('common.decrease')"
       @pointerdown="press(-1)"
       @pointerup="release"
       @pointerleave="release"
+      @click="onClick(-1, $event)"
     >
       −
     </button>
@@ -47,11 +58,13 @@ onBeforeUnmount(release)
     </span>
     <button
       type="button"
-      class="bk-press bk-slab w-12 h-12 text-xl text-aurora"
-      aria-label="+"
+      class="bk-press bk-slab select-none w-12 h-12 text-xl text-aurora"
+      style="touch-action: manipulation"
+      :aria-label="$t('common.increase')"
       @pointerdown="press(1)"
       @pointerup="release"
       @pointerleave="release"
+      @click="onClick(1, $event)"
     >
       +
     </button>

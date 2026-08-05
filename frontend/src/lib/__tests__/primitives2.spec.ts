@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
+import { createI18nInstance } from '../../i18n'
 import BkRing from '../BkRing.vue'
 import BkRune from '../BkRune.vue'
 import BkStepper from '../BkStepper.vue'
@@ -29,6 +30,7 @@ describe('BkStepper', () => {
   it('increments and clamps to bounds', async () => {
     const wrapper = mount(BkStepper, {
       props: { modelValue: 99, step: 1, max: 100, min: 0 },
+      global: { plugins: [createI18nInstance()] },
     })
     const [minus, plus] = wrapper.findAll('button')
     await plus.trigger('pointerdown')
@@ -41,6 +43,39 @@ describe('BkStepper', () => {
     await minus.trigger('pointerdown')
     await minus.trigger('pointerup')
     expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([99])
+  })
+
+  it('applies a single step on keyboard activation (click with detail 0)', async () => {
+    const wrapper = mount(BkStepper, {
+      props: { modelValue: 5 },
+      global: { plugins: [createI18nInstance()] },
+    })
+    const [, plus] = wrapper.findAll('button')
+    // Enter/Space sintetizan un click con detail 0: sin pointerdown/up de por medio
+    await plus.trigger('click', { detail: 0 })
+    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([6])
+  })
+
+  it('does not double-apply a real pointer click (detail > 0)', async () => {
+    const wrapper = mount(BkStepper, {
+      props: { modelValue: 5 },
+      global: { plugins: [createI18nInstance()] },
+    })
+    const [, plus] = wrapper.findAll('button')
+    await plus.trigger('pointerdown')
+    await plus.trigger('pointerup')
+    await plus.trigger('click', { detail: 1 })
+    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([6])
+  })
+
+  it('labels the buttons via i18n', () => {
+    const wrapper = mount(BkStepper, {
+      props: { modelValue: 5 },
+      global: { plugins: [createI18nInstance()] },
+    })
+    const [minus, plus] = wrapper.findAll('button')
+    expect(minus.attributes('aria-label')).toBe('Reducir')
+    expect(plus.attributes('aria-label')).toBe('Aumentar')
   })
 })
 

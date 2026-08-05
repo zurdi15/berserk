@@ -30,5 +30,14 @@ export const en = {
     password_too_long: 'Password is too long (max 72 bytes).',
     generic: 'Something went wrong. Try again.',
   },
-  common: { save: 'Save', cancel: 'Cancel', delete: 'Delete', close: 'Close', loading: 'Loading…', retry: 'Retry' },
+  common: {
+    save: 'Save',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    close: 'Close',
+    loading: 'Loading…',
+    retry: 'Retry',
+    decrease: 'Decrease',
+    increase: 'Increase',
+  },
 } as const
