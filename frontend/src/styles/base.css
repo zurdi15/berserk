@@ -52,7 +52,10 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* losa tallada: borde fino y brillo interior superior, sin sombras blandas */
+/* losa tallada: borde fino y brillo interior superior, sin sombras blandas.
+   Ojo con los niveles: la clase nombra el ACABADO (losa), no el nivel de
+   elevación — las superficies base van en stone; el token slab es el nivel
+   realzado para elementos que sobresalen (CTA de entreno, stepper). */
 .bk-slab {
   background: var(--bk-bg-stone);
   border: 1px solid var(--bk-line);
