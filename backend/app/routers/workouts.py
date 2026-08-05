@@ -180,6 +180,17 @@ def delete_workout(workout_id: int, user: CurrentUser, db: Session = Depends(get
         WorkoutExercise.workout_id == workout.id
     )
     db.execute(delete(PersonalRecord).where(PersonalRecord.set_id.in_(set_ids)))
+    # borrar el entreno devuelve la sesión a planificada: un "done" colgando
+    # (con workout_id a NULL por el SET NULL de la FK) bloquearía reutilizarla
+    linked_sessions = db.scalars(
+        select(ScheduledSession).where(
+            ScheduledSession.workout_id == workout.id,
+            ScheduledSession.owner_id == user.id,
+        )
+    ).all()
+    for linked in linked_sessions:
+        linked.status = "planned"
+        linked.workout_id = None
     db.delete(workout)
     db.commit()
 

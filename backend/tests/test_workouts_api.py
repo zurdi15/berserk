@@ -71,6 +71,29 @@ def test_start_from_scheduled_session(client: TestClient, db_session):
     assert resp.status_code == 409 and resp.json()["detail"] == "session_already_done"
 
 
+def test_delete_workout_frees_its_scheduled_session(client: TestClient, db_session):
+    from sqlalchemy import select
+
+    from app import models
+
+    rid = make_routine(client)
+    admin = db_session.scalar(select(models.User).where(models.User.username == "admin"))
+    session = models.ScheduledSession(owner_id=admin.id, date=date.today(), routine_id=rid)
+    db_session.add(session)
+    db_session.commit()
+
+    workout = client.post(
+        "/api/v1/workouts", json={"scheduled_session_id": session.id}
+    ).json()
+
+    assert client.delete(f"/api/v1/workouts/{workout['id']}").status_code == 204
+
+    db_session.expire_all()
+    refreshed = db_session.get(models.ScheduledSession, session.id)
+    # un "done" colgando sin workout bloquearía reutilizar la sesión
+    assert refreshed.status == "planned" and refreshed.workout_id is None
+
+
 def test_patch_and_delete(client: TestClient, app):
     workout = client.post("/api/v1/workouts", json={"date": "2026-08-01"}).json()
     wid = workout["id"]

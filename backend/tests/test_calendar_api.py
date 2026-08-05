@@ -55,6 +55,29 @@ def test_month_view_includes_workout_muscle_groups(client: TestClient):
     assert set(summary["muscle_group_ids"]) == {primary, core}  # derivado ∪ manual
 
 
+def test_patch_status_away_from_done_clears_workout_link(client: TestClient, db_session):
+    from sqlalchemy import select
+
+    from app import models
+
+    rid = client.post("/api/v1/routines", json={"name": "Push"}).json()["id"]
+    admin = db_session.scalar(select(models.User).where(models.User.username == "admin"))
+    session = models.ScheduledSession(owner_id=admin.id, date=date(2026, 8, 10), routine_id=rid)
+    db_session.add(session)
+    db_session.commit()
+
+    workout = client.post(
+        "/api/v1/workouts", json={"scheduled_session_id": session.id}
+    ).json()
+
+    # al salir de done el enlace al workout deja de ser cierto
+    resp = client.patch(f"/api/v1/calendar/{session.id}", json={"status": "skipped"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "skipped" and body["workout_id"] is None
+    assert workout["id"] is not None
+
+
 def test_patch_explicit_null_detaches_routine(client: TestClient):
     rid = client.post("/api/v1/routines", json={"name": "Push"}).json()["id"]
     sid = client.post(

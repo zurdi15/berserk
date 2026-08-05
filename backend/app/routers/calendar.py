@@ -90,8 +90,12 @@ def update_schedule(
             del data[field]
     if data.get("routine_id") is not None:
         _check_routine(db, user.id, data["routine_id"])
+    was_done = session.status == "done"
     for field, value in data.items():
         setattr(session, field, value)
+    # al salir de done el enlace al workout deja de ser cierto
+    if was_done and session.status != "done":
+        session.workout_id = None
     db.commit()
     return session
 
