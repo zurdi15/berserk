@@ -23,6 +23,8 @@ export const router = createRouter({
         { path: 'profile', name: 'profile', component: PlaceholderView },
       ],
     },
+    // cualquier ruta desconocida cae en today en vez de una pantalla en blanco
+    { path: '/:pathMatch(.*)*', redirect: { name: 'today' } },
   ],
 })
 
