@@ -18,6 +18,8 @@ Sharpened from the approved spec — these exact values go into the tokens and M
 - **Signature element**: the carved rune — `BkRune` renders SVG strokes that draw themselves (stroke-dashoffset) on entry. Ember flash is Phase 4 (PR celebration); the primitive and its carve animation land here.
 - **Texture**: one subtle noise layer on the page background only (inline SVG feTurbulence data-URI at ~3% opacity), nothing else textured.
 - **Motion**: durations 120/200/320/600/1200 ms, easings `--bk-ease-out cubic-bezier(0.2, 0.8, 0.2, 1)`, `--bk-ease-spring cubic-bezier(0.34, 1.4, 0.44, 1)`, `--bk-ease-carve cubic-bezier(0.7, 0, 0.2, 1)`. Entry animations only; transform/opacity only; single reduced-motion guard in `animations.css`.
+- **Amendment (final review, 2026-08-05)**: the bootstrap screen is the SOLE sanctioned non-achievement use of ember — a once-per-instance "forge" ritual, not a precedent for using ember elsewhere outside PR/streak celebrations.
+- **Amendment (final review, 2026-08-05)**: desktop navigation is deliberately deferred to Phase 4. The mobile bottom bar plus `sm:hidden` is the phase-3 truth; the interface note elsewhere in this doc about "desktop ≥sm: top bar nav" is superseded — desktop uses the same routes via URL for now, with no top nav yet.
 
 ## Global Constraints
 
