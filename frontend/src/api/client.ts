@@ -7,6 +7,12 @@ export class ApiError extends Error {
   }
 }
 
+let unauthorizedHandler: (() => void) | null = null
+
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  unauthorizedHandler = fn
+}
+
 const BASE = '/api/v1'
 
 // los 422 de pydantic traen detail como lista de objetos: para el usuario son
@@ -27,7 +33,11 @@ export async function api<T = unknown>(
   })
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}))
-    throw new ApiError(response.status, toSlug((payload as { detail?: unknown }).detail))
+    const slug = toSlug((payload as { detail?: unknown }).detail)
+    if (response.status === 401 && slug === 'not_authenticated') {
+      unauthorizedHandler?.()
+    }
+    throw new ApiError(response.status, slug)
   }
   if (response.status === 204) return undefined as T
   return (await response.json()) as T

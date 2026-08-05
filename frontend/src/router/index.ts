@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import { toastApiError } from '@/utils/apiErrors'
 import BootstrapView from '@/views/BootstrapView.vue'
 import LoginView from '@/views/LoginView.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
@@ -30,7 +31,13 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  await auth.init()
+  try {
+    await auth.init()
+  } catch (error) {
+    toastApiError(error)
+    // backend caído: el login es estático y es el único destino con sentido
+    return to.name === 'login' ? true : { name: 'login' }
+  }
   const isPublic = to.name === 'login' || to.name === 'bootstrap'
   if (!auth.bootstrapped && to.name !== 'bootstrap') return { name: 'bootstrap' }
   if (auth.bootstrapped && to.name === 'bootstrap') return auth.isAuthenticated ? { name: 'today' } : { name: 'login' }

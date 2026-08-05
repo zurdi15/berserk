@@ -44,4 +44,25 @@ describe('auth store', () => {
     await store.login('thor', 'secret123')
     expect(store.isAuthenticated).toBe(true)
   })
+
+  it('applies the user locale on session resolution', async () => {
+    vi.mocked(authApi.getStatus).mockResolvedValue({ bootstrapped: true })
+    vi.mocked(authApi.me).mockResolvedValue({ ...user, locale: 'en' })
+    const store = useAuthStore()
+    await store.init()
+    const { i18n } = await import('@/i18n')
+    expect(i18n.global.locale.value).toBe('en')
+  })
+
+  it('does not cache ready on non-401 init failure', async () => {
+    vi.mocked(authApi.getStatus).mockRejectedValue(new ApiError(500, 'generic'))
+    const store = useAuthStore()
+    await expect(store.init()).rejects.toBeInstanceOf(ApiError)
+    expect(store.ready).toBe(false)
+    // recuperación: el siguiente init reintenta de verdad
+    vi.mocked(authApi.getStatus).mockResolvedValue({ bootstrapped: true })
+    vi.mocked(authApi.me).mockResolvedValue(user)
+    await store.init()
+    expect(store.ready).toBe(true)
+  })
 })

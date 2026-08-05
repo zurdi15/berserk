@@ -9,12 +9,23 @@ import './styles/animations.css'
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 
+import { setUnauthorizedHandler } from './api/client'
 import App from './App.vue'
-import { createI18nInstance } from './i18n'
+import { i18n } from './i18n'
 import { router } from './router'
+import { useAuthStore } from './stores/auth'
 
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
-app.use(createI18nInstance())
+app.use(i18n)
+
+setUnauthorizedHandler(() => {
+  // sesión muerta a mitad de uso: fuera al login sin bucles (el guard haría
+  // lo mismo, pero solo en navegación; esto cubre cualquier fetch)
+  const auth = useAuthStore()
+  auth.user = null
+  router.push({ name: 'login' })
+})
+
 app.mount('#app')
