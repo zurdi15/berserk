@@ -1,0 +1,8 @@
+pyproject.toml
+app/__init__.py
+berserk_backend.egg-info/PKG-INFO
+berserk_backend.egg-info/SOURCES.txt
+berserk_backend.egg-info/dependency_links.txt
+berserk_backend.egg-info/requires.txt
+berserk_backend.egg-info/top_level.txt
+tests/test_config.py
