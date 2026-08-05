@@ -83,8 +83,13 @@ def update_schedule(
     session = db.get(ScheduledSession, session_id)
     if session is None or session.owner_id != user.id:
         raise HTTPException(status_code=404, detail="not_found")
-    data = payload.model_dump(exclude_none=True)
-    _check_routine(db, user.id, data.get("routine_id"))
+    data = payload.model_dump(exclude_unset=True)
+    # date y status no son anulables: un null explícito no debe machacarlos
+    for field in ("date", "status"):
+        if field in data and data[field] is None:
+            del data[field]
+    if data.get("routine_id") is not None:
+        _check_routine(db, user.id, data["routine_id"])
     for field, value in data.items():
         setattr(session, field, value)
     db.commit()

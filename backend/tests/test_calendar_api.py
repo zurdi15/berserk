@@ -53,3 +53,16 @@ def test_month_view_includes_workout_muscle_groups(client: TestClient):
     month = client.get("/api/v1/calendar/2026/8").json()
     summary = next(w for w in month["workouts"] if w["id"] == workout["id"])
     assert set(summary["muscle_group_ids"]) == {primary, core}  # derivado ∪ manual
+
+
+def test_patch_explicit_null_detaches_routine(client: TestClient):
+    rid = client.post("/api/v1/routines", json={"name": "Push"}).json()["id"]
+    sid = client.post(
+        "/api/v1/calendar", json={"date": "2026-08-12", "routine_id": rid, "note": "x"}
+    ).json()["id"]
+    resp = client.patch(f"/api/v1/calendar/{sid}", json={"routine_id": None, "note": None})
+    assert resp.status_code == 200
+    assert resp.json()["routine_id"] is None and resp.json()["note"] is None
+    # null explícito sobre un campo no anulable no lo machaca
+    resp = client.patch(f"/api/v1/calendar/{sid}", json={"date": None})
+    assert resp.status_code == 200 and resp.json()["date"] == "2026-08-12"
