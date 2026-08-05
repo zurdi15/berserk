@@ -5,11 +5,10 @@
     "moduleResolution": "bundler",
     "strict": true,
     "jsx": "preserve",
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
     "skipLibCheck": true,
     "noEmit": true,
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "scripts/**/*.mjs"],
-  "exclude": ["**/__tests__", "**/*.spec.ts"]
+  "include": ["src/**/*.ts", "src/**/*.vue", "scripts/**/*.mjs"]
 }
