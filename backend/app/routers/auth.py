@@ -24,7 +24,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.get("/status", response_model=StatusOut)
-def status(db: Session = Depends(get_db)):
+def auth_status(db: Session = Depends(get_db)):
     return StatusOut(bootstrapped=bool(db.scalar(select(func.count(User.id)))))
 
 
