@@ -1,15 +1,26 @@
 from datetime import datetime
 from typing import Literal
+from zoneinfo import available_timezones
 
 from pydantic import BaseModel, Field, field_validator
 
-from .auth import Credentials, _validate_password_bytes
+from .auth import Credentials, UserOut, _validate_password_bytes
+
+# se materializa una vez: available_timezones() lee el disco en cada llamada
+_TIMEZONES = frozenset(available_timezones())
 
 
 class SettingsIn(BaseModel):
     locale: Literal["es", "en"] | None = None
     units: Literal["kg", "lb"] | None = None
     timezone: str | None = Field(None, max_length=50)
+
+    @field_validator("timezone")
+    @classmethod
+    def _timezone_is_iana(cls, value: str | None) -> str | None:
+        if value is not None and value not in _TIMEZONES:
+            raise ValueError("timezone_invalid")
+        return value
 
 
 class UserCreateIn(Credentials):
@@ -41,3 +52,12 @@ class InviteOut(BaseModel):
 
 class RedeemIn(Credentials):
     token: str
+
+
+class GrantIn(BaseModel):
+    username: str
+
+
+class SharingOut(BaseModel):
+    given: list[UserOut]
+    received: list[UserOut]

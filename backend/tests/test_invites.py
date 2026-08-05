@@ -58,3 +58,28 @@ def test_list_and_delete_invites(client: TestClient):
     assert "token" not in invites[0]  # el token en claro solo se enseña al crear
     assert client.delete(f"/api/v1/admin/invites/{invites[0]['id']}").status_code == 204
     assert client.get("/api/v1/admin/invites").json() == []
+
+
+def test_deleting_admin_cascades_pending_and_nulls_redeemed(client: TestClient, app, db_session):
+    from tests.conftest import make_user, login
+
+    other_admin = make_user(client, "odin", is_admin=True)
+    odin = login(app, "odin")
+    odin.post("/api/v1/admin/invites")                       # pendiente de odin: cae con él
+    token = client.post("/api/v1/admin/invites").json()["token"]  # del admin superviviente
+    fresh = TestClient(app)
+    resp = fresh.post(
+        "/api/v1/auth/invites/redeem",
+        json={"token": token, "username": "loki", "password": "secret123"},
+    )
+    assert resp.status_code == 201
+    loki_id = resp.json()["id"]
+
+    assert client.delete(f"/api/v1/admin/users/{other_admin['id']}").status_code == 204
+    invites = db_session.scalars(select(models.Invite)).all()
+    assert len(invites) == 1
+    assert invites[0].used_by == loki_id
+
+    assert client.delete(f"/api/v1/admin/users/{loki_id}").status_code == 204
+    db_session.expire_all()
+    assert db_session.scalar(select(models.Invite)).used_by is None
