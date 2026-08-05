@@ -1,0 +1,9 @@
+services:
+  berserk:
+    image: ghcr.io/zurdi15/berserk:latest
+    container_name: berserk
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
