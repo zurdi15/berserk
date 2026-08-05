@@ -79,3 +79,19 @@ def anon(app):
     """Cliente sin sesión."""
     with TestClient(app) as client:
         yield client
+
+
+def make_user(
+    admin_client: TestClient,
+    username: str,
+    *,
+    password: str = "secret123",
+    is_admin: bool = False,
+) -> dict:
+    """Crea un usuario vía la API de admin."""
+    resp = admin_client.post(
+        "/api/v1/admin/users",
+        json={"username": username, "password": password, "is_admin": is_admin},
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()

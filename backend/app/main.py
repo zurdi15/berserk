@@ -1,13 +1,14 @@
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.engine import Engine
 
+from .auth import get_current_user, require_admin
 from .config import get_settings
 from .db import make_engine, make_sessionmaker
-from .routers import auth
+from .routers import admin, auth, users
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 API_PREFIX = "/api/v1"
@@ -28,6 +29,14 @@ def create_app(engine: Engine | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
 
+    # protegidos: cualquier usuario con sesión
+    app.include_router(
+        users.router, prefix=API_PREFIX, dependencies=[Depends(get_current_user)]
+    )
+    # solo admin: gestión de usuarios e invitaciones
+    app.include_router(
+        admin.router, prefix=API_PREFIX, dependencies=[Depends(require_admin)]
+    )
     # públicos: auth gestiona su propia protección endpoint a endpoint
     app.include_router(auth.router, prefix=API_PREFIX)
 
