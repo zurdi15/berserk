@@ -5,6 +5,8 @@
 #   ./dev.sh back      → solo backend
 #   ./dev.sh front     → solo frontend
 #   ./dev.sh --open    → además abre el navegador en :5173
+#   ./dev.sh --seed    → siembra datos sintéticos de desarrollo antes de arrancar
+#                        (no-op si el usuario objetivo ya tiene entrenos)
 #
 # Los datos de dev se guardan en ./data (ignorado por git). La app se usa
 # desde http://localhost:5173 (Vite proxya /api al backend y recarga en
@@ -16,12 +18,14 @@ DATA_DIR="${BK_DATA_DIR:-$ROOT/data}"
 
 MODE="all"
 OPEN=0
+SEED=0
 for arg in "$@"; do
   case "$arg" in
     back | front | all) MODE="$arg" ;;
     --open) OPEN=1 ;;
+    --seed) SEED=1 ;;
     *)
-      echo "Uso: ./dev.sh [back|front] [--open]" >&2
+      echo "Uso: ./dev.sh [back|front] [--open] [--seed]" >&2
       exit 1
       ;;
   esac
@@ -47,6 +51,10 @@ start_back() {
   uv sync
   BK_DATA_DIR="$DATA_DIR" uv run alembic upgrade head
   check_migrations
+  if [ "$SEED" = 1 ]; then
+    echo "▸ Sembrando datos sintéticos de desarrollo…"
+    BK_DATA_DIR="$DATA_DIR" uv run python -m app.dev_seed
+  fi
   # BK_SERVE_STATIC=0: que :8000 no sirva una SPA compilada obsoleta en dev
   BK_DATA_DIR="$DATA_DIR" BK_SERVE_STATIC=0 exec uv run uvicorn app.asgi:app --reload --port 8000
 }
