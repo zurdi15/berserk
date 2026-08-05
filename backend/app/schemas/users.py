@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from .auth import Credentials
+from .auth import Credentials, _validate_password_bytes
 
 
 class SettingsIn(BaseModel):
@@ -19,6 +19,11 @@ class UserCreateIn(Credentials):
 class UserUpdateIn(BaseModel):
     password: str | None = Field(None, min_length=8, max_length=100)
     is_admin: bool | None = None
+
+    @field_validator("password")
+    @classmethod
+    def _password_byte_limit(cls, value: str | None) -> str | None:
+        return _validate_password_bytes(value) if value is not None else value
 
 
 class InviteTokenOut(BaseModel):
