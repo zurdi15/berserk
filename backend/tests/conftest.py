@@ -51,6 +51,16 @@ def bootstrap(client: TestClient) -> dict:
     return resp.json()
 
 
+def login(app, username: str, password: str = "secret123") -> TestClient:
+    """Cliente nuevo con su propia cookie jar, logueado como `username`."""
+    client = TestClient(app)
+    resp = client.post(
+        "/api/v1/auth/login", json={"username": username, "password": password}
+    )
+    assert resp.status_code == 200, resp.text
+    return client
+
+
 @pytest.fixture
 def app(engine):
     return create_app(engine=engine)
