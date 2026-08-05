@@ -99,11 +99,17 @@ def resolve_session_user(db: Session, raw_token: str) -> User | None:
     return db.get(User, session.user_id)
 
 
-def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+def get_current_user(
+    request: Request, response: Response, db: Session = Depends(get_db)
+) -> User:
     token = request.cookies.get(SESSION_COOKIE)
     user = resolve_session_user(db, token) if token else None
     if user is None:
         raise HTTPException(status_code=401, detail="not_authenticated")
+    # la renovación de expires_at en DB era inobservable para el navegador si
+    # no se reemitía la cookie: reemitirla en cada request autenticado la hace
+    # deslizante de verdad (max_age fresco), no solo en la DB
+    set_session_cookie(response, token)
     return user
 
 

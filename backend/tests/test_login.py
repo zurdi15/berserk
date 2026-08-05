@@ -34,6 +34,15 @@ def test_me_requires_session(anon: TestClient):
     assert anon.get("/api/v1/auth/me").status_code == 401
 
 
+def test_me_renews_session_cookie(client: TestClient):
+    # sesión deslizante: cada request autenticado debe reemitir la cookie con
+    # max_age fresco, si no el navegador la expira a los 30 días del login
+    # pase lo que pase en la DB
+    resp = client.get("/api/v1/auth/me")
+    assert resp.status_code == 200
+    assert "bk_session" in resp.headers.get("set-cookie", "")
+
+
 def test_logout_revokes_session(client: TestClient):
     assert client.get("/api/v1/auth/me").status_code == 200
     assert client.post("/api/v1/auth/logout").status_code == 204
