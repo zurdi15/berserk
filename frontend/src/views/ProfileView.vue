@@ -3,7 +3,6 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
-import { logout } from '@/api/auth'
 import { toastApiError } from '@/utils/apiErrors'
 import BkTabs from '@/lib/BkTabs.vue'
 import BkButton from '@/lib/BkButton.vue'
@@ -30,8 +29,7 @@ if (auth.user?.is_admin) {
 
 async function handleLogout() {
   try {
-    await logout()
-    auth.user = null
+    await auth.logout()
     router.push({ name: 'login' })
   } catch (error) {
     toastApiError(error)
@@ -49,19 +47,21 @@ async function handleLogout() {
           <SharingCard />
 
           <BkButton
-            :label="$t('profile.logout')"
+            variant="ghost"
             data-testid="logout-btn"
             @click="handleLogout"
-          />
+          >
+            {{ $t('profile.logout') }}
+          </BkButton>
         </div>
       </template>
 
       <template v-if="activeTab === 'routines'">
-        <div class="text-neutral-500">{{ $t('app.placeholder') }}</div>
+        <div class="text-ink-muted">{{ $t('app.placeholder') }}</div>
       </template>
 
       <template v-if="activeTab === 'admin' && auth.user?.is_admin">
-        <div class="text-neutral-500">{{ $t('app.placeholder') }}</div>
+        <div class="text-ink-muted">{{ $t('app.placeholder') }}</div>
       </template>
     </BkTabs>
   </div>

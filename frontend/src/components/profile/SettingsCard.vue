@@ -21,8 +21,9 @@ const timezones = Intl.supportedValuesOf('timeZone')
 
 async function save(partial: Parameters<typeof updateSettings>[0]) {
   try {
-    auth.user = await updateSettings(partial)
+    // aplicar locale al instante para feedback inmediato; la persistencia viene después
     if (partial.locale) applyLocale(partial.locale)
+    auth.user = await updateSettings(partial)
     toast.push('info', t('common.saved'))
   } catch (error) {
     toastApiError(error)

@@ -95,19 +95,20 @@ function handleViewUser(user: UserOut) {
       <!-- Given sharing -->
       <div>
         <h3 class="text-sm font-medium mb-3">{{ $t('profile.sharingGiven') }}</h3>
-        <div v-if="givenUsers.length === 0" class="text-sm text-neutral-500">
+        <div v-if="givenUsers.length === 0" class="text-sm text-ink-muted">
           {{ $t('profile.noSharingGiven') }}
         </div>
         <div v-else class="space-y-2">
-          <div v-for="user in givenUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-neutral-200 dark:border-neutral-700">
+          <div v-for="user in givenUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
             <span>{{ user.username }}</span>
             <BkButton
-              :label="$t('common.delete')"
               variant="ghost"
               size="sm"
               data-testid="revoke-btn"
               @click="handleRevoke(user.id)"
-            />
+            >
+              {{ $t('common.delete') }}
+            </BkButton>
           </div>
         </div>
       </div>
@@ -115,25 +116,26 @@ function handleViewUser(user: UserOut) {
       <!-- Received sharing -->
       <div>
         <h3 class="text-sm font-medium mb-3">{{ $t('profile.sharingReceived') }}</h3>
-        <div v-if="receivedUsers.length === 0" class="text-sm text-neutral-500">
+        <div v-if="receivedUsers.length === 0" class="text-sm text-ink-muted">
           {{ $t('profile.noSharingReceived') }}
         </div>
         <div v-else class="space-y-2">
-          <div v-for="user in receivedUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-neutral-200 dark:border-neutral-700">
+          <div v-for="user in receivedUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
             <span>{{ user.username }}</span>
             <BkButton
-              :label="$t('profile.view')"
               variant="ghost"
               size="sm"
               data-testid="view-user-btn"
               @click="handleViewUser(user)"
-            />
+            >
+              {{ $t('profile.view') }}
+            </BkButton>
           </div>
         </div>
       </div>
 
       <!-- Grant sharing -->
-      <div class="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+      <div class="space-y-3 pt-4 border-t border-line">
         <h3 class="text-sm font-medium">{{ $t('profile.grantSharing') }}</h3>
         <div class="flex gap-2">
           <BkField
@@ -145,11 +147,12 @@ function handleViewUser(user: UserOut) {
           />
           <div class="flex items-end">
             <BkButton
-              :label="$t('common.save')"
-              :is-loading="isLoading"
+              :loading="isLoading"
               data-testid="grant-btn"
               @click="handleGrant"
-            />
+            >
+              {{ $t('common.save') }}
+            </BkButton>
           </div>
         </div>
       </div>
@@ -157,21 +160,24 @@ function handleViewUser(user: UserOut) {
 
     <!-- Revoke confirmation sheet -->
     <BkSheet
-      v-model:open="revokeConfirmOpen"
+      :open="revokeConfirmOpen"
       :title="$t('profile.confirmRevoke')"
+      @close="revokeConfirmOpen = false"
     >
       <div class="space-y-4 p-4">
         <p>{{ $t('profile.confirmRevokeMessage') }}</p>
         <div class="flex gap-2">
           <BkButton
-            :label="$t('common.cancel')"
             variant="ghost"
             @click="revokeConfirmOpen = false"
-          />
+          >
+            {{ $t('common.cancel') }}
+          </BkButton>
           <BkButton
-            :label="$t('common.delete')"
             @click="confirmRevoke"
-          />
+          >
+            {{ $t('common.delete') }}
+          </BkButton>
         </div>
       </div>
     </BkSheet>

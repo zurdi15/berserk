@@ -58,11 +58,12 @@ async function handleChangePassword() {
       />
 
       <BkButton
-        :label="$t('common.save')"
-        :is-loading="isLoading"
+        :loading="isLoading"
         data-testid="change-password-btn"
         @click="handleChangePassword"
-      />
+      >
+        {{ $t('common.save') }}
+      </BkButton>
     </div>
   </BkCard>
 </template>

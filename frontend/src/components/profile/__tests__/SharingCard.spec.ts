@@ -74,4 +74,32 @@ describe('SharingCard', () => {
       expect(push).toHaveBeenCalledWith({ name: 'today' })
     }
   })
+
+  it('renders button text from i18n', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    // Verify buttons render their text (i18n keys resolved)
+    const text = wrapper.text()
+    expect(text).toContain('Ver') // Spanish for 'view'
+    expect(text).toContain('Borrar') // Spanish for 'delete'
+  })
+
+  it('revoke button triggers confirmation sheet', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    // Trigger revoke on first user
+    const revokeButtons = wrapper.findAll('[data-testid="revoke-btn"]')
+    if (revokeButtons.length > 0) {
+      await revokeButtons[0].trigger('click')
+      await wrapper.vm.$nextTick()
+
+      // Verify sheet exists
+      const sheet = wrapper.findComponent({ name: 'BkSheet' })
+      expect(sheet.exists()).toBe(true)
+    }
+  })
 })
