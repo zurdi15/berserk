@@ -25,7 +25,10 @@ describe('TimerPill', () => {
     expect(wrapper.find('[data-testid="timer-pill"]').exists()).toBe(false)
     useRestTimerStore().start(90)
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('[data-testid="timer-pill"]').text()).toContain('1:30')
+    const pill = wrapper.find('[data-testid="timer-pill"]')
+    expect(pill.text()).toContain('1:30')
+    // assert safe-area offset for mobile nav
+    expect(pill.attributes('class')).toContain('bottom-[calc(4rem+env(safe-area-inset-bottom))]')
   })
 
   it('click navigates to the workout tab', async () => {
@@ -34,5 +37,14 @@ describe('TimerPill', () => {
     await wrapper.vm.$nextTick()
     await wrapper.find('[data-testid="timer-pill"]').trigger('click')
     expect(push).toHaveBeenCalledWith({ name: 'workout' })
+  })
+
+  it('aria-label includes remaining time', async () => {
+    useRestTimerStore().start(75)
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    const pill = wrapper.find('[data-testid="timer-pill"]')
+    // default locale is es: "Descanso"
+    expect(pill.attributes('aria-label')).toMatch(/Descanso.*75s/)
   })
 })

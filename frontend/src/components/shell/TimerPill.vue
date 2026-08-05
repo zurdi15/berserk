@@ -21,10 +21,11 @@ const label = computed(() => {
       v-if="timer.active"
       data-testid="timer-pill"
       type="button"
-      class="bk-press bk-slab fixed bottom-16 sm:bottom-4 left-1/2 -translate-x-1/2 z-(--bk-z-timer) flex items-center gap-2 px-4 py-2 border-aurora text-aurora"
-      :aria-label="$t('timer.rest')"
+      class="bk-press bk-slab fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] sm:bottom-4 left-1/2 -translate-x-1/2 z-(--bk-z-timer) flex items-center gap-2 px-4 py-2 border-aurora text-aurora"
+      :aria-label="`${$t('timer.rest')} ${timer.remaining}s`"
       @click="router.push({ name: 'workout' })"
     >
+      <!-- la nav crece con el safe-area; la pill debe crecer con ella o la tapa -->
       <BkRing :value="timer.progress" :size="28" :stroke="3" />
       <span class="bk-metric text-lg">{{ label }}</span>
     </button>
