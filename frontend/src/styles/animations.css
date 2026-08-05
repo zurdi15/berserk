@@ -27,11 +27,12 @@
   to { transform: translateX(100%); }
 }
 
-/* Breathe ambiental: como shimmer, bucle ambiental sancionado reservado para la CTA
-   del entrenamiento; el guard de reduced-motion ya lo neutraliza */
+/* Respira el aura, no la runa: glow ambiental sancionado para la CTA
+   del entrenamiento; una runa que se apaga enseña la línea de la barra tras la losa.
+   El guard de reduced-motion ya lo neutraliza */
 @keyframes bk-breathe {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
 }
 
 /* transiciones de Vue: <Transition name="bk-rise"> etc. — solo entrada */

@@ -13,8 +13,8 @@ describe('ShellView nav', () => {
       },
     })
     const headers = wrapper.findAll('header')
-    expect(headers).toHaveLength(2)
-    // desktop header: centered nav bar, no identity block (por ahora)
+    expect(headers).toHaveLength(1)
+    // desktop header: centered nav bar only (identity removed por ahora)
     const desktopHeader = headers[0]
     expect(desktopHeader.classes()).toContain('hidden')
     expect(desktopHeader.classes()).toContain('sm:block')
@@ -28,21 +28,16 @@ describe('ShellView nav', () => {
     expect(listItems.length).toBeGreaterThan(0)
   })
 
-  it('has mobile identity header and fixed bottom nav', () => {
+  it('has mobile fixed bottom nav (no identity header)', () => {
     const wrapper = mount(ShellView, {
       global: {
         plugins: [createI18nInstance()],
         stubs: { RouterView: true, RouterLink: true },
       },
     })
-    const headers = wrapper.findAll('header')
-    expect(headers).toHaveLength(2)
-    // mobile identity header: rune + wordmark
-    const mobileHeader = headers[1]
-    expect(mobileHeader.classes()).toContain('sm:hidden')
     const navs = wrapper.findAll('nav')
     expect(navs).toHaveLength(2)
-    // mobile bottom nav: fixed, sm:hidden, icon on top label below
+    // mobile bottom nav: fixed, sm:hidden, icon on top label below (por ahora sin cabecera)
     const mobileNav = navs[1]
     expect(mobileNav.attributes('aria-label')).toBe('Navegación principal')
     expect(mobileNav.classes()).toContain('sm:hidden')

@@ -24,22 +24,16 @@ const items: { name: string; label: string; rune: RuneName }[] = [
               active-class="text-aurora"
             >
               <span class="text-[0.65rem] uppercase tracking-wide">{{ $t(item.label) }}</span>
-              <span :class="item.name === 'workout' && 'bk-slab -mb-5 p-2.5 border-aurora text-aurora bk-breathe shadow-(--bk-shadow-aurora)'">
-                <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" />
+              <span :class="item.name === 'workout' && 'bk-slab relative -mb-5 p-2.5 border-aurora text-aurora'">
+                <span v-if="item.name === 'workout'" class="bk-breathe absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)" aria-hidden="true" />
+                <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
               </span>
             </RouterLink>
           </li>
         </ul>
       </nav>
     </header>
-    <!-- Mobile identity header: cabecera fina + identidad -->
-    <header class="sm:hidden flex items-center gap-2 px-4 py-3 border-b border-line justify-center">
-      <BkRune name="berserk" :size="20" tone="aurora" />
-      <span class="font-display font-bold tracking-widest uppercase text-sm">
-        {{ $t('app.name') }}
-      </span>
-    </header>
-    <!-- Mobile bottom nav: barra inferior fija en móvil; oculta en desktop -->
+    <!-- Mobile bottom nav: barra inferior fija en móvil; oculta en desktop (por ahora sin cabecera de identidad) -->
     <nav
       class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:hidden"
       :aria-label="$t('app.nav.label')"
@@ -52,16 +46,17 @@ const items: { name: string; label: string; rune: RuneName }[] = [
             active-class="text-aurora"
           >
             <span
-              :class="item.name === 'workout' && 'bk-slab -mt-5 p-2.5 border-aurora text-aurora bk-breathe shadow-(--bk-shadow-aurora)'"
+              :class="item.name === 'workout' && 'bk-slab relative -mt-5 p-2.5 border-aurora text-aurora'"
             >
-              <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" />
+              <span v-if="item.name === 'workout'" class="bk-breathe absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)" aria-hidden="true" />
+              <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
             </span>
             <span class="text-[0.65rem] uppercase tracking-wide">{{ $t(item.label) }}</span>
           </RouterLink>
         </li>
       </ul>
     </nav>
-    <main class="flex-1 px-4 py-4 pb-24 sm:pb-4 max-w-3xl w-full mx-auto">
+    <main class="flex-1 px-4 py-4 pb-24 max-w-3xl w-full mx-auto">
       <RouterView v-slot="{ Component }">
         <Transition name="bk-rise" mode="out-in">
           <component :is="Component" />
