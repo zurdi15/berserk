@@ -7,10 +7,12 @@ os.environ["BK_DATA_DIR"] = tempfile.mkdtemp(prefix="bk-test-")
 os.environ["BK_BCRYPT_ROUNDS"] = "4"
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.pool import StaticPool
 
 from app.db import Base, make_sessionmaker
+from app.main import create_app
 
 
 @pytest.fixture
@@ -36,3 +38,34 @@ def db_session(engine):
     session = maker()
     yield session
     session.close()
+
+
+# credenciales del admin que crea el fixture `client` vía bootstrap
+ADMIN = {"username": "admin", "password": "admin1234"}
+
+
+def bootstrap(client: TestClient) -> dict:
+    """Crea la cuenta admin inicial; la cookie de sesión queda en el client."""
+    resp = client.post("/api/v1/auth/bootstrap", json=ADMIN)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+@pytest.fixture
+def app(engine):
+    return create_app(engine=engine)
+
+
+@pytest.fixture
+def client(app):
+    """Cliente logueado como el admin inicial."""
+    with TestClient(app) as client:
+        bootstrap(client)
+        yield client
+
+
+@pytest.fixture
+def anon(app):
+    """Cliente sin sesión."""
+    with TestClient(app) as client:
+        yield client
