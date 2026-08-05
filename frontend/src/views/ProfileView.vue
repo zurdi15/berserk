@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -15,14 +16,16 @@ const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 
+const activeTab = ref('profile')
+
 const tabs = [
-  { id: 'profile', label: t('profile.tab') },
-  { id: 'routines', label: t('profile.routinesTab') },
+  { value: 'profile', label: t('profile.tab') },
+  { value: 'routines', label: t('profile.routinesTab') },
 ]
 
 // Add admin tab if user is admin
 if (auth.user?.is_admin) {
-  tabs.push({ id: 'admin', label: t('profile.adminTab') })
+  tabs.push({ value: 'admin', label: t('profile.adminTab') })
 }
 
 async function handleLogout() {
@@ -38,8 +41,8 @@ async function handleLogout() {
 
 <template>
   <div class="space-y-4">
-    <BkTabs :tabs="tabs" :active="'profile'">
-      <template #profile>
+    <BkTabs v-model="activeTab" :tabs="tabs">
+      <template v-if="activeTab === 'profile'">
         <div class="space-y-4">
           <SettingsCard />
           <PasswordCard />
@@ -53,11 +56,11 @@ async function handleLogout() {
         </div>
       </template>
 
-      <template #routines>
+      <template v-if="activeTab === 'routines'">
         <div class="text-neutral-500">{{ $t('app.placeholder') }}</div>
       </template>
 
-      <template v-if="auth.user?.is_admin" #admin>
+      <template v-if="activeTab === 'admin' && auth.user?.is_admin">
         <div class="text-neutral-500">{{ $t('app.placeholder') }}</div>
       </template>
     </BkTabs>

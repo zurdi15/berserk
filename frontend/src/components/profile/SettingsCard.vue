@@ -33,41 +33,35 @@ async function save(partial: Parameters<typeof updateSettings>[0]) {
 <template>
   <BkCard :title="$t('profile.settings')">
     <div class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium mb-2">{{ $t('profile.locale') }}</label>
-        <BkSelect
-          v-model="locale"
-          :options="[
-            { value: 'es', label: 'Español' },
-            { value: 'en', label: 'English' },
-          ]"
-          data-testid="locale-select"
-          @update:model-value="(val) => save({ locale: val })"
-        />
-      </div>
+      <BkSelect
+        v-model="locale"
+        :label="$t('profile.locale')"
+        :options="[
+          { value: 'es', label: 'Español' },
+          { value: 'en', label: 'English' },
+        ]"
+        data-testid="locale-select"
+        @update:model-value="(val) => save({ locale: val })"
+      />
 
-      <div>
-        <label class="block text-sm font-medium mb-2">{{ $t('profile.units') }}</label>
-        <BkSelect
-          v-model="units"
-          :options="[
-            { value: 'kg', label: 'kg' },
-            { value: 'lb', label: 'lb' },
-          ]"
-          data-testid="units-select"
-          @update:model-value="(val) => save({ units: val })"
-        />
-      </div>
+      <BkSelect
+        v-model="units"
+        :label="$t('profile.units')"
+        :options="[
+          { value: 'kg', label: 'kg' },
+          { value: 'lb', label: 'lb' },
+        ]"
+        data-testid="units-select"
+        @update:model-value="(val) => save({ units: val })"
+      />
 
-      <div>
-        <label class="block text-sm font-medium mb-2">{{ $t('profile.timezone') }}</label>
-        <BkSelect
-          v-model="timezone"
-          :options="timezones.map(tz => ({ value: tz, label: tz }))"
-          data-testid="timezone-select"
-          @update:model-value="(val) => save({ timezone: val })"
-        />
-      </div>
+      <BkSelect
+        v-model="timezone"
+        :label="$t('profile.timezone')"
+        :options="timezones.map(tz => ({ value: tz, label: tz }))"
+        data-testid="timezone-select"
+        @update:model-value="(val) => save({ timezone: val })"
+      />
     </div>
   </BkCard>
 </template>
