@@ -5,6 +5,7 @@ export const RUNES = {
   chest: 'M10 4 L10 28 M10 6 L24 14 M10 22 L24 14',
   back: 'M22 4 L22 28 M22 6 L8 14 M22 22 L8 14',
   biceps: 'M12 28 L12 4 L24 12 L12 18',
+  triceps: 'M20 28 L20 4 L8 12 L20 18',
   shoulders: 'M6 28 L16 4 L26 28 M11 16 L21 16',
   legs: 'M16 4 L16 28 M16 16 L7 28 M16 16 L25 28',
   core: 'M16 4 L26 16 L16 28 L6 16 Z',

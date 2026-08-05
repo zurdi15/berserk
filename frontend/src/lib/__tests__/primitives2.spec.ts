@@ -9,7 +9,7 @@ import { RUNES } from '../runes'
 describe('runes catalog', () => {
   it('has the logo, the 7 muscle groups and the achievement runes', () => {
     expect(Object.keys(RUNES).sort()).toEqual(
-      ['back', 'berserk', 'biceps', 'chest', 'core', 'legs', 'pr', 'shoulders', 'streak'].sort(),
+      ['back', 'berserk', 'biceps', 'chest', 'core', 'legs', 'pr', 'shoulders', 'streak', 'triceps'].sort(),
     )
     for (const d of Object.values(RUNES)) {
       expect(d).toMatch(/^M[\d\s.]/) // path data válido que empieza con moveto
