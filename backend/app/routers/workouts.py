@@ -2,6 +2,7 @@ from datetime import date as date_type
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser
@@ -107,7 +108,13 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
     if session is not None:
         session.status = "done"
         session.workout_id = workout.id
-    db.commit()
+    # el chequeo de arriba es el camino feliz; el índice único parcial es el
+    # árbitro real ante dos requests concurrentes ganando la carrera del CTA
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="workout_already_active") from None
     db.refresh(workout)
     return workout_out(workout)
 

@@ -1,6 +1,16 @@
 from datetime import UTC, date, datetime, time
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, String, Time, UniqueConstraint
+from sqlalchemy import (
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    String,
+    Time,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -155,6 +165,17 @@ class RoutineExercise(Base):
 
 class Workout(Base):
     __tablename__ = "workouts"
+    # los endpoints sync corren en threadpool: el doble-tap del CTA de
+    # "empezar entreno" es una carrera real entre dos requests; la DB,
+    # no el chequeo previo en Python, es el árbitro final
+    __table_args__ = (
+        Index(
+            "ix_workouts_single_active",
+            "owner_id",
+            unique=True,
+            sqlite_where=text("ended_at IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(

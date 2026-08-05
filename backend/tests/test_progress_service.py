@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import select
 
@@ -22,7 +22,11 @@ def seed_user_with_workouts(db_session):
         (date(2026, 8, 3), [(5, 105)]),              # lunes semana 32
     ]
     for day, sets in days_and_sets:
-        workout = models.Workout(owner_id=user.id, date=day)
+        # terminados: el índice único parcial de workouts activos no admite
+        # dos entrenos abiertos (ended_at NULL) a la vez para el mismo dueño
+        workout = models.Workout(
+            owner_id=user.id, date=day, ended_at=datetime.combine(day, datetime.min.time())
+        )
         db_session.add(workout)
         db_session.flush()
         wex = models.WorkoutExercise(workout_id=workout.id, exercise_id=bench.id, position=1)

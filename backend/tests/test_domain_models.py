@@ -71,6 +71,17 @@ def test_body_entry_unique_per_day(db_session):
         db_session.commit()
 
 
+def test_only_one_active_workout_per_owner(db_session):
+    # el índice parcial es el árbitro de la carrera de un doble-tap concurrente
+    # en el CTA de "empezar entreno": aquí se pincha directo por ORM
+    user = make_user_row(db_session)
+    db_session.add(models.Workout(owner_id=user.id, date=date(2026, 8, 5)))
+    db_session.commit()
+    db_session.add(models.Workout(owner_id=user.id, date=date(2026, 8, 5)))
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+
 def test_scheduled_session_defaults(db_session):
     user = make_user_row(db_session)
     session = models.ScheduledSession(owner_id=user.id, date=date(2026, 8, 7))
