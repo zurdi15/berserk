@@ -53,4 +53,13 @@ describe('active workout store', () => {
     expect(finished.ended_at).toBe('x')
     expect(store.workout).toBeNull()
   })
+
+  it('reset clears workout and lastRecords (for logout)', () => {
+    const store = useActiveWorkoutStore()
+    store.workout = workout as any
+    store.lastRecords = [{ id: 9, kind: 'max_weight', value: 100 }] as any
+    store.reset()
+    expect(store.workout).toBeNull()
+    expect(store.lastRecords).toHaveLength(0)
+  })
 })

@@ -47,6 +47,12 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     await authApi.logout()
     user.value = null
+    // cerrar sesión no puede dejar el "viendo a X" ni el entreno cacheado del usuario anterior
+    // se importan aquí para evitar problemas con el orden de inicialización
+    const { useAthleteStore } = await import('./athlete')
+    const { useActiveWorkoutStore } = await import('./activeWorkout')
+    useAthleteStore().clear()
+    useActiveWorkoutStore().reset()
   }
 
   return { user, bootstrapped, ready, isAuthenticated, init, login, bootstrapAccount, logout }

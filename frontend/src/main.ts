@@ -14,6 +14,8 @@ import App from './App.vue'
 import { i18n } from './i18n'
 import { router } from './router'
 import { useAuthStore } from './stores/auth'
+import { useAthleteStore } from './stores/athlete'
+import { useActiveWorkoutStore } from './stores/activeWorkout'
 
 const app = createApp(App)
 app.use(createPinia())
@@ -23,6 +25,9 @@ app.use(i18n)
 setUnauthorizedHandler(() => {
   const auth = useAuthStore()
   auth.user = null
+  // cerrar sesión no puede dejar el "viendo a X" ni el entreno cacheado del usuario anterior
+  useAthleteStore().clear()
+  useActiveWorkoutStore().reset()
   const current = router.currentRoute.value.name
   // durante el arranque (ready aún false) el guard resuelve el destino él
   // mismo; y si ya estamos en una ruta pública no hay nada que redirigir.

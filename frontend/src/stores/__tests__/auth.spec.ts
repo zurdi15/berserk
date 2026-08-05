@@ -65,4 +65,24 @@ describe('auth store', () => {
     await store.init()
     expect(store.ready).toBe(true)
   })
+
+  it('logout clears athlete and activeWorkout stores to prevent cross-user state bleed', async () => {
+    vi.mocked(authApi.logout).mockResolvedValue(undefined)
+    const authStore = useAuthStore()
+    authStore.user = user
+    // Set up other stores with stale data
+    const { useAthleteStore } = await import('../athlete')
+    const { useActiveWorkoutStore } = await import('../activeWorkout')
+    const athleteStore = useAthleteStore()
+    const workoutStore = useActiveWorkoutStore()
+    athleteStore.view({ id: 77, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
+    workoutStore.workout = { id: 4, date: '2026-08-06', ended_at: null, exercises: [], muscle_tag_ids: [] } as any
+    workoutStore.lastRecords = [{ id: 9, kind: 'max_weight', value: 100 }] as any
+    // Logout should clear all stores
+    await authStore.logout()
+    expect(authStore.user).toBeNull()
+    expect(athleteStore.viewing).toBeNull()
+    expect(workoutStore.workout).toBeNull()
+    expect(workoutStore.lastRecords).toHaveLength(0)
+  })
 })

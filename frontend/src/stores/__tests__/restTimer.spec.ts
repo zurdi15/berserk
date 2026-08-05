@@ -43,4 +43,25 @@ describe('rest timer store', () => {
     expect(timer.remaining).toBe(30)
     expect(timer.total).toBe(30)
   })
+
+  it('cancels stale grace-window timeout on restart (avoids wiping new timer)', () => {
+    const vibrate = vi.fn()
+    vi.stubGlobal('navigator', { vibrate })
+    const timer = useRestTimerStore()
+    // First timer: 10 seconds
+    timer.start(10)
+    // Jump past expiration + grace window threshold
+    vi.setSystemTime(1_000_000 + 10_500)
+    vi.advanceTimersByTime(600)
+    expect(vibrate).toHaveBeenCalledTimes(1)
+    expect(timer.active).toBe(true) // still active during grace period
+    // Re-start new timer within grace window (1s into grace period)
+    timer.start(60)
+    // Advance 4 seconds (past original grace window end)
+    vi.advanceTimersByTime(4_000)
+    // New timer should still be running, not wiped by stale grace timeout
+    expect(timer.active).toBe(true)
+    expect(timer.remaining).toBeGreaterThan(50) // 60 - 4 - 5 ≈ 50+
+    vi.unstubAllGlobals()
+  })
 })

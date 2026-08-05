@@ -9,6 +9,7 @@ export const useRestTimerStore = defineStore('restTimer', () => {
   const now = ref(Date.now())
   let ticker: ReturnType<typeof setInterval> | null = null
   let vibrated = false
+  let graceTimeout: ReturnType<typeof setTimeout> | null = null
 
   const remaining = computed(() =>
     endsAt.value === null ? 0 : Math.max(0, Math.round((endsAt.value - now.value) / 1000)),
@@ -22,12 +23,15 @@ export const useRestTimerStore = defineStore('restTimer', () => {
       if (!vibrated) {
         vibrated = true
         navigator.vibrate?.([200, 100, 200])
-        setTimeout(clear, 3000)
+        // el timeout de gracia sobrevivía a un restart y borraba el timer nuevo
+        graceTimeout = setTimeout(clear, 3000)
       }
     }
   }
 
   function start(seconds: number) {
+    // cancelar timeout de gracia anterior si existe
+    if (graceTimeout) clearTimeout(graceTimeout)
     total.value = seconds
     endsAt.value = Date.now() + seconds * 1000
     now.value = Date.now()
@@ -37,11 +41,14 @@ export const useRestTimerStore = defineStore('restTimer', () => {
   }
 
   function clear() {
+    // cancelar timeout de gracia si existe
+    if (graceTimeout) clearTimeout(graceTimeout)
     endsAt.value = null
     total.value = 0
     vibrated = false
     if (ticker) clearInterval(ticker)
     ticker = null
+    graceTimeout = null
   }
 
   return { endsAt, total, remaining, progress, active, start, clear }

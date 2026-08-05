@@ -69,5 +69,10 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     await refresh()
   }
 
-  return { workout, loading, lastRecords, resume, refresh, start, finish, addExercise, removeExercise, reorder, logSet, updateSet, deleteSet }
+  function reset() {
+    workout.value = null
+    lastRecords.value = []
+  }
+
+  return { workout, loading, lastRecords, resume, refresh, start, finish, addExercise, removeExercise, reorder, logSet, updateSet, deleteSet, reset }
 })
