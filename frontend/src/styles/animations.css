@@ -64,7 +64,7 @@
 }
 
 .bk-breathe {
-  animation: bk-breathe 2.8s var(--bk-ease-out) infinite;
+  animation: bk-breathe 3.2s var(--bk-ease-inout) infinite;
 }
 
 .bk-press {

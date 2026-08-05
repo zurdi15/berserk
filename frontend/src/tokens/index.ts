@@ -51,6 +51,7 @@ export const core = {
     out: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
     spring: 'cubic-bezier(0.34, 1.4, 0.44, 1)',
     carve: 'cubic-bezier(0.7, 0, 0.2, 1)',
+    inout: 'cubic-bezier(0.45, 0, 0.55, 1)',
   },
   z: { nav: '40', sheet: '50', toast: '60', timer: '70' },
   shadow: {

@@ -42,6 +42,7 @@
   --bk-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --bk-ease-spring: cubic-bezier(0.34, 1.4, 0.44, 1);
   --bk-ease-carve: cubic-bezier(0.7, 0, 0.2, 1);
+  --bk-ease-inout: cubic-bezier(0.45, 0, 0.55, 1);
   --bk-z-nav: 40;
   --bk-z-sheet: 50;
   --bk-z-toast: 60;
