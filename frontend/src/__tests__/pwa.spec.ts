@@ -21,4 +21,9 @@ describe('pwa config', () => {
     // el proxy de dev legítimamente contiene '/api'; lo prohibido es cachearlo
     expect(config).not.toMatch(/urlPattern.*api/)
   })
+
+  it('excludes /api from the navigation fallback so the SW never swallows API calls', () => {
+    expect(config).toContain('navigateFallbackDenylist')
+    expect(config).toContain('navigateFallbackDenylist: [/^\\/api\\//]')
+  })
 })

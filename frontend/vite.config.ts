@@ -11,6 +11,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       // shell precacheado, datos siempre online: sin cache de runtime del API
+      workbox: {
+        // el fallback de navegación del SW no debe interceptar /api/*: si no,
+        // una petición fetch a la API que falle de red cae al index.html
+        navigateFallbackDenylist: [/^\/api\//],
+      },
       manifest: {
         name: 'berserk',
         short_name: 'berserk',
