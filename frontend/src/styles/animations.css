@@ -1,0 +1,71 @@
+/* Sistema de animación: solo entradas, solo transform/opacity (y el trazo de
+   la runa). Un único guard de reduced-motion cubre todo el sistema. */
+
+@keyframes bk-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bk-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bk-pop {
+  0% { opacity: 0; transform: scale(0.85); }
+  70% { transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bk-carve {
+  from { stroke-dashoffset: var(--bk-carve-length, 200); opacity: 0.4; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes bk-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* transiciones de Vue: <Transition name="bk-rise"> etc. — solo entrada */
+.bk-fade-enter-active { animation: bk-fade var(--bk-dur-2) var(--bk-ease-out); }
+.bk-rise-enter-active { animation: bk-rise var(--bk-dur-3) var(--bk-ease-out); }
+.bk-pop-enter-active { animation: bk-pop var(--bk-dur-3) var(--bk-ease-spring); }
+
+/* stagger: el contenedor asigna --bk-stagger-i por hijo */
+.bk-stagger > * {
+  animation: bk-rise var(--bk-dur-3) var(--bk-ease-out) backwards;
+  animation-delay: calc(var(--bk-stagger-i, 0) * 40ms);
+}
+
+.bk-carve-stroke {
+  stroke-dasharray: var(--bk-carve-length, 200);
+  animation: bk-carve var(--bk-dur-5) var(--bk-ease-carve) backwards;
+}
+
+.bk-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.bk-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--bk-line), transparent);
+  animation: bk-shimmer var(--bk-dur-5) var(--bk-ease-out) infinite;
+}
+
+.bk-press {
+  transition: transform var(--bk-dur-1) var(--bk-ease-out);
+}
+.bk-press:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
