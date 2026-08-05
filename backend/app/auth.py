@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db import get_db
-from .models import AuthSession, User, utcnow
+from .models import AuthSession, Invite, User, utcnow
 
 SESSION_COOKIE = "bk_session"
 
@@ -131,3 +131,27 @@ def set_session_cookie(response: Response, token: str) -> None:
 
 def clear_session_cookie(response: Response) -> None:
     response.delete_cookie(SESSION_COOKIE, path="/")
+
+
+def create_invite(db: Session, admin: User) -> str:
+    """Invitación de un solo uso; devuelve el token en claro (se enseña una vez)."""
+    now = utcnow()
+    # barre las caducadas sin usar (las usadas se conservan como histórico)
+    db.execute(delete(Invite).where(Invite.expires_at < now, Invite.used_at.is_(None)))
+    token = secrets.token_urlsafe(32)
+    db.add(
+        Invite(
+            token_hash=_token_hash(token),
+            created_by=admin.id,
+            expires_at=now + timedelta(hours=get_settings().invite_ttl_hours),
+        )
+    )
+    db.commit()
+    return token
+
+
+def resolve_invite(db: Session, raw_token: str) -> Invite | None:
+    invite = db.scalar(select(Invite).where(Invite.token_hash == _token_hash(raw_token)))
+    if invite is None or invite.used_at is not None or invite.expires_at < utcnow():
+        return None
+    return invite

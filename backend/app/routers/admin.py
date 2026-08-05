@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth import AdminUser, hash_password, revoke_other_sessions
+from ..auth import AdminUser, create_invite, hash_password, revoke_other_sessions
 from ..db import get_db
-from ..models import User
+from ..models import Invite, User
 from ..schemas.auth import UserOut
-from ..schemas.users import UserCreateIn, UserUpdateIn
+from ..schemas.users import InviteOut, UserCreateIn, UserUpdateIn
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -57,4 +57,23 @@ def delete_user(user_id: int, admin: AdminUser, db: Session = Depends(get_db)):
     if user is None:
         raise HTTPException(status_code=404, detail="user_not_found")
     db.delete(user)
+    db.commit()
+
+
+@router.post("/invites", status_code=201)
+def new_invite(admin: AdminUser, db: Session = Depends(get_db)):
+    return {"token": create_invite(db, admin)}
+
+
+@router.get("/invites", response_model=list[InviteOut])
+def list_invites(db: Session = Depends(get_db)):
+    return db.scalars(select(Invite).order_by(Invite.created_at.desc())).all()
+
+
+@router.delete("/invites/{invite_id}", status_code=204)
+def delete_invite(invite_id: int, db: Session = Depends(get_db)):
+    invite = db.get(Invite, invite_id)
+    if invite is None:
+        raise HTTPException(status_code=404, detail="invite_not_found")
+    db.delete(invite)
     db.commit()

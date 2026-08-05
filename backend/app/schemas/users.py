@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -18,3 +19,16 @@ class UserCreateIn(Credentials):
 class UserUpdateIn(BaseModel):
     password: str | None = Field(None, min_length=8, max_length=100)
     is_admin: bool | None = None
+
+
+class InviteOut(BaseModel):
+    id: int
+    created_at: datetime
+    expires_at: datetime
+    used_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class RedeemIn(Credentials):
+    token: str
