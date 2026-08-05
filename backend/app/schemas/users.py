@@ -4,7 +4,7 @@ from zoneinfo import available_timezones
 
 from pydantic import BaseModel, Field, field_validator
 
-from .auth import Credentials, _validate_password_bytes
+from .auth import Credentials, UserOut, _validate_password_bytes
 
 # se materializa una vez: available_timezones() lee el disco en cada llamada
 _TIMEZONES = frozenset(available_timezones())
@@ -52,3 +52,12 @@ class InviteOut(BaseModel):
 
 class RedeemIn(Credentials):
     token: str
+
+
+class GrantIn(BaseModel):
+    username: str
+
+
+class SharingOut(BaseModel):
+    given: list[UserOut]
+    received: list[UserOut]
