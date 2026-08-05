@@ -103,6 +103,38 @@ def test_delete_set_removes_its_prs(client: TestClient, db_session):
     assert db_session.scalars(select(models.PersonalRecord)).all() == []
 
 
+def test_delete_workout_removes_all_its_prs(client: TestClient, db_session):
+    from sqlalchemy import select
+
+    from app import models
+
+    workout, wex = start_with_exercise(client)
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+    client.post(url, json={"reps": 5, "weight_kg": 100})
+    assert db_session.scalars(select(models.PersonalRecord)).all() != []
+
+    assert client.delete(f"/api/v1/workouts/{workout['id']}").status_code == 204
+    db_session.expire_all()
+    assert db_session.scalars(select(models.PersonalRecord)).all() == []
+
+
+def test_delete_workout_exercise_removes_its_prs(client: TestClient, db_session):
+    from sqlalchemy import select
+
+    from app import models
+
+    workout, wex = start_with_exercise(client)
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+    client.post(url, json={"reps": 5, "weight_kg": 100})
+    assert db_session.scalars(select(models.PersonalRecord)).all() != []
+
+    assert client.delete(
+        f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}"
+    ).status_code == 204
+    db_session.expire_all()
+    assert db_session.scalars(select(models.PersonalRecord)).all() == []
+
+
 def test_reorder_and_manual_tags(client: TestClient):
     workout, wex1 = start_with_exercise(client)
     wex2 = client.post(
