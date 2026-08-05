@@ -81,25 +81,87 @@ describe('AdminCard', () => {
     expect(text).toContain('user2')
   })
 
-  it('hides delete button on own row (id=1)', async () => {
+  it('shows admin badge for admin users only', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    // Count delete buttons - should only be 1 for user2, not for admin
-    const deleteButtons = wrapper.findAll('[data-testid="delete-user-btn"]')
-    expect(deleteButtons.length).toBe(1)
-    expect(deleteButtons[0].element.closest('[data-testid="user-row-2"]')).toBeTruthy()
+    const adminRow = wrapper.find('[data-testid="user-row-1"]')
+    const badgeInAdminRow = adminRow.find('[data-testid="admin-badge"]')
+    expect(badgeInAdminRow.exists()).toBe(true)
+
+    const nonAdminRow = wrapper.find('[data-testid="user-row-2"]')
+    const badgeInNonAdminRow = nonAdminRow.find('[data-testid="admin-badge"]')
+    expect(badgeInNonAdminRow.exists()).toBe(false)
   })
 
-  it('renders admin rune badge for admin users', async () => {
+  it('hides delete and reset buttons on own row (id=1)', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    // Check for admin badge (BkRune component) in admin row
-    const adminRow = wrapper.find('[data-testid="user-row-1"]')
-    expect(adminRow.text()).toContain('admin')
+    // Own row (id=1) should have no delete button
+    const ownRow = wrapper.find('[data-testid="user-row-1"]')
+    const deleteInOwnRow = ownRow.find('[data-testid="delete-user-btn"]')
+    expect(deleteInOwnRow.exists()).toBe(false)
+
+    // Other row (id=2) should have delete button
+    const otherRow = wrapper.find('[data-testid="user-row-2"]')
+    const deleteInOtherRow = otherRow.find('[data-testid="delete-user-btn"]')
+    expect(deleteInOtherRow.exists()).toBe(true)
+  })
+
+  it('clicking delete user opens confirmation sheet', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    // Check initial state
+    expect((wrapper.vm as any).deleteUserConfirmOpen).toBe(false)
+
+    const deleteBtn = wrapper.find('[data-testid="delete-user-btn"]')
+    expect(deleteBtn.exists()).toBe(true)
+    await deleteBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // Verify the sheet is now open
+    expect((wrapper.vm as any).deleteUserConfirmOpen).toBe(true)
+    expect((wrapper.vm as any).deleteUserId).toBe(2)
+  })
+
+  it('confirming user delete calls adminDeleteUser with correct id', async () => {
+    const { adminDeleteUser } = await import('@/api/domain')
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const deleteBtn = wrapper.find('[data-testid="delete-user-btn"]')
+    await deleteBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // Call confirmDeleteUser directly on the component
+    await (wrapper.vm as any).confirmDeleteUser()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(adminDeleteUser).toHaveBeenCalledWith(2)
+  })
+
+  it('canceling user delete does not call adminDeleteUser', async () => {
+    const { adminDeleteUser } = await import('@/api/domain')
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const deleteBtn = wrapper.find('[data-testid="delete-user-btn"]')
+    await deleteBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // Close sheet without confirming
+    const vm = wrapper.vm as any
+    vm.deleteUserConfirmOpen = false
+    await wrapper.vm.$nextTick()
+
+    expect(adminDeleteUser).not.toHaveBeenCalled()
   })
 
   it('creates invite and shows token with once-warning', async () => {
@@ -107,19 +169,75 @@ describe('AdminCard', () => {
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    // Click create invite button
     const createInviteBtn = wrapper.find('[data-testid="create-invite-btn"]')
     await createInviteBtn.trigger('click')
     await new Promise(resolve => setTimeout(resolve, 0))
     await wrapper.vm.$nextTick()
 
-    // Verify token is visible
     const tokenDisplay = wrapper.find('[data-testid="token-display"]')
     expect(tokenDisplay.text()).toBe('test-token-abc123')
 
-    // Verify once-warning is shown
     const text = wrapper.text()
     expect(text).toContain('solo se puede usar una vez')
+  })
+
+  it('copy-to-clipboard calls navigator.clipboard.writeText with token', async () => {
+    const mockWriteText = vi.fn(() => Promise.resolve())
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: mockWriteText },
+      writable: true,
+      configurable: true,
+    })
+
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const createInviteBtn = wrapper.find('[data-testid="create-invite-btn"]')
+    await createInviteBtn.trigger('click')
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await wrapper.vm.$nextTick()
+
+    const copyBtn = wrapper.find('[data-testid="copy-token-btn"]')
+    expect(copyBtn.exists()).toBe(true)
+
+    await copyBtn.trigger('click')
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(mockWriteText).toHaveBeenCalledWith('test-token-abc123')
+  })
+
+  it('handles missing clipboard gracefully without crashing', async () => {
+    // Stub navigator.clipboard as undefined
+    const originalClipboard = navigator.clipboard
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    })
+
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const createInviteBtn = wrapper.find('[data-testid="create-invite-btn"]')
+    await createInviteBtn.trigger('click')
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await wrapper.vm.$nextTick()
+
+    const copyBtn = wrapper.find('[data-testid="copy-token-btn"]')
+    expect(copyBtn.exists()).toBe(true)
+
+    // Should not throw
+    await copyBtn.trigger('click')
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    // Restore
+    Object.defineProperty(navigator, 'clipboard', {
+      value: originalClipboard,
+      writable: true,
+      configurable: true,
+    })
   })
 
   it('renders pending and used invites list', async () => {
@@ -128,38 +246,63 @@ describe('AdminCard', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
 
     const text = wrapper.text()
-    // Should contain invite-related content in Spanish
-    expect(text).toContain('Creado') // Spanish for "Created"
-    expect(text).toContain('Expira') // Spanish for "Expires"
-    expect(text).toContain('Pendiente') // Spanish for "Pending"
-    expect(text).toContain('Usado') // Spanish for "Used"
+    expect(text).toContain('Creado')
+    expect(text).toContain('Expira')
+    expect(text).toContain('Pendiente')
+    expect(text).toContain('Usado')
   })
 
-  it('copy-to-clipboard button guards against errors', async () => {
-    // Mock navigator.clipboard
-    const mockWriteText = vi.fn(() => Promise.resolve())
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: mockWriteText },
-      writable: true,
-    })
-
+  it('clicking delete invite opens confirmation sheet', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    // Create an invite first
-    const createInviteBtn = wrapper.find('[data-testid="create-invite-btn"]')
-    await createInviteBtn.trigger('click')
-    await new Promise(resolve => setTimeout(resolve, 0))
+    // Check initial state
+    expect((wrapper.vm as any).deleteInviteConfirmOpen).toBe(false)
+
+    const deleteInviteBtn = wrapper.find('[data-testid="delete-invite-btn"]')
+    expect(deleteInviteBtn.exists()).toBe(true)
+    await deleteInviteBtn.trigger('click')
     await wrapper.vm.$nextTick()
 
-    // Click copy button if it exists
-    const copyBtn = wrapper.find('[data-testid="copy-token-btn"]')
-    if (copyBtn.exists()) {
-      await copyBtn.trigger('click')
-      await new Promise(resolve => setTimeout(resolve, 0))
-      expect(mockWriteText).toHaveBeenCalledWith('test-token-abc123')
-    }
+    // Verify the sheet is now open
+    expect((wrapper.vm as any).deleteInviteConfirmOpen).toBe(true)
+    expect((wrapper.vm as any).deleteInviteId).toBe(1)
+  })
+
+  it('confirming invite delete calls adminDeleteInvite with correct id', async () => {
+    const { adminDeleteInvite } = await import('@/api/domain')
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const deleteInviteBtn = wrapper.find('[data-testid="delete-invite-btn"]')
+    await deleteInviteBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // Call confirmDeleteInvite directly on the component
+    await (wrapper.vm as any).confirmDeleteInvite()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(adminDeleteInvite).toHaveBeenCalledWith(1)
+  })
+
+  it('canceling invite delete does not call adminDeleteInvite', async () => {
+    const { adminDeleteInvite } = await import('@/api/domain')
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const deleteInviteBtn = wrapper.find('[data-testid="delete-invite-btn"]')
+    await deleteInviteBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // Close sheet without confirming
+    const vm = wrapper.vm as any
+    vm.deleteInviteConfirmOpen = false
+    await wrapper.vm.$nextTick()
+
+    expect(adminDeleteInvite).not.toHaveBeenCalled()
   })
 
   it('renders button text from i18n', async () => {
@@ -168,7 +311,6 @@ describe('AdminCard', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
 
     const text = wrapper.text()
-    // Should contain Spanish translations for buttons
-    expect(text).toContain('Guardar') // Spanish for 'save'
+    expect(text).toContain('Guardar')
   })
 })

@@ -33,6 +33,9 @@ vi.mock('@/components/profile/PasswordCard.vue', () => ({
 vi.mock('@/components/profile/SharingCard.vue', () => ({
   default: { name: 'SharingCard', template: '<div data-testid="sharing-card">Sharing</div>' },
 }))
+vi.mock('@/components/profile/AdminCard.vue', () => ({
+  default: { name: 'AdminCard', template: '<div data-testid="admin-card">Admin</div>' },
+}))
 
 describe('ProfileView', () => {
   beforeEach(() => {
@@ -106,5 +109,41 @@ describe('ProfileView', () => {
     // Verify the first tab is profile
     const tabsText = wrapper.text()
     expect(tabsText).toContain('Perfil') // First tab should be Perfil
+  })
+
+  it('shows admin tab when user is admin', async () => {
+    const auth = useAuthStore()
+    auth.user = {
+      id: 1,
+      username: 'admin',
+      is_admin: true,
+      locale: 'es',
+      units: 'kg',
+      timezone: 'UTC',
+    }
+
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+
+    const tabsText = wrapper.text()
+    expect(tabsText).toContain('Administración') // Spanish for 'Admin'
+  })
+
+  it('hides admin tab when user is not admin', async () => {
+    const auth = useAuthStore()
+    auth.user = {
+      id: 2,
+      username: 'user',
+      is_admin: false,
+      locale: 'es',
+      units: 'kg',
+      timezone: 'UTC',
+    }
+
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+
+    const tabsText = wrapper.text()
+    expect(tabsText).not.toContain('Administración')
   })
 })

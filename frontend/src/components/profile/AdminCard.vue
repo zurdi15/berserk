@@ -39,11 +39,15 @@ const resetNewPassword = ref('')
 const resetError = ref('')
 const isResettingPassword = ref(false)
 
+// Delete user confirmation
+const deleteUserConfirmOpen = ref(false)
+const deleteUserId = ref<number | null>(null)
+
 // Invites section
 const invites = ref<InviteOut[]>([])
 const newToken = ref<string | null>(null)
 const isCreatingInvite = ref(false)
-const deleteConfirmOpen = ref(false)
+const deleteInviteConfirmOpen = ref(false)
 const deleteInviteId = ref<number | null>(null)
 
 onMounted(async () => {
@@ -120,9 +124,17 @@ async function confirmResetPassword() {
   }
 }
 
-async function handleDeleteUser(userId: number) {
+function handleDeleteUser(userId: number) {
+  deleteUserId.value = userId
+  deleteUserConfirmOpen.value = true
+}
+
+async function confirmDeleteUser() {
+  if (deleteUserId.value === null) return
+
+  deleteUserConfirmOpen.value = false
   try {
-    await adminDeleteUser(userId)
+    await adminDeleteUser(deleteUserId.value)
     await loadUsers()
     toast.push('info', t('common.saved'))
   } catch (error) {
@@ -154,15 +166,15 @@ async function handleCopyToken() {
   }
 }
 
-async function handleDeleteInvite(inviteId: number) {
+function handleDeleteInvite(inviteId: number) {
   deleteInviteId.value = inviteId
-  deleteConfirmOpen.value = true
+  deleteInviteConfirmOpen.value = true
 }
 
 async function confirmDeleteInvite() {
   if (deleteInviteId.value === null) return
 
-  deleteConfirmOpen.value = false
+  deleteInviteConfirmOpen.value = false
   try {
     await adminDeleteInvite(deleteInviteId.value)
     await loadInvites()
@@ -204,7 +216,7 @@ function isInviteUsed(invite: InviteOut): boolean {
               <tr v-for="user in users" :key="user.id" :data-testid="`user-row-${user.id}`" class="border-b border-line hover:bg-stone/30">
                 <td class="py-2 px-2">{{ user.username }}</td>
                 <td class="py-2 px-2">
-                  <span v-if="user.is_admin" class="text-aurora font-semibold">✦</span>
+                  <span v-if="user.is_admin" class="text-aurora font-semibold" data-testid="admin-badge">✦</span>
                 </td>
                 <td class="py-2 px-2">
                   <div class="flex gap-2">
@@ -384,24 +396,55 @@ function isInviteUsed(invite: InviteOut): boolean {
       </div>
     </BkSheet>
 
-    <!-- Delete invite confirmation sheet -->
+    <!-- Delete user confirmation sheet -->
     <BkSheet
-      :open="deleteConfirmOpen"
+      :open="deleteUserConfirmOpen"
       :title="$t('admin.confirmDeleteUser')"
-      @close="deleteConfirmOpen = false"
+      @close="deleteUserConfirmOpen = false"
+      data-testid="delete-user-confirm-sheet"
     >
       <div class="space-y-4 p-4">
         <p>{{ $t('admin.confirmDeleteUserMessage') }}</p>
         <div class="flex gap-2">
           <BkButton
             variant="ghost"
-            @click="deleteConfirmOpen = false"
+            @click="deleteUserConfirmOpen = false"
+            data-testid="delete-user-cancel-btn"
+          >
+            {{ $t('common.cancel') }}
+          </BkButton>
+          <BkButton
+            variant="danger"
+            @click="confirmDeleteUser"
+            data-testid="delete-user-confirm-btn"
+          >
+            {{ $t('common.delete') }}
+          </BkButton>
+        </div>
+      </div>
+    </BkSheet>
+
+    <!-- Delete invite confirmation sheet -->
+    <BkSheet
+      :open="deleteInviteConfirmOpen"
+      :title="$t('admin.confirmDeleteInvite')"
+      @close="deleteInviteConfirmOpen = false"
+      data-testid="delete-invite-confirm-sheet"
+    >
+      <div class="space-y-4 p-4">
+        <p>{{ $t('admin.confirmDeleteInviteMessage') }}</p>
+        <div class="flex gap-2">
+          <BkButton
+            variant="ghost"
+            @click="deleteInviteConfirmOpen = false"
+            data-testid="delete-invite-cancel-btn"
           >
             {{ $t('common.cancel') }}
           </BkButton>
           <BkButton
             variant="danger"
             @click="confirmDeleteInvite"
+            data-testid="delete-invite-confirm-btn"
           >
             {{ $t('common.delete') }}
           </BkButton>
