@@ -65,6 +65,30 @@ def test_edit_and_delete_set(client: TestClient):
     assert client.delete(f"{url}/{sid}").status_code == 204
 
 
+def test_update_set_sweeps_and_redetects_prs(client: TestClient, db_session):
+    from sqlalchemy import select
+
+    from app import models
+
+    workout, wex = start_with_exercise(client)
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+    sid = client.post(url, json={"reps": 5, "weight_kg": 1000}).json()["set"]["id"]
+
+    # corregir el fat-finger: 1000kg -> 100kg no debe dejar récords fantasma
+    resp = client.patch(f"{url}/{sid}", json={"reps": 5, "weight_kg": 100})
+    assert resp.status_code == 200
+    # sin celebración: la respuesta sigue siendo solo la serie (SetOut)
+    assert "new_records" not in resp.json()
+
+    db_session.expire_all()
+    records = db_session.scalars(select(models.PersonalRecord)).all()
+    assert records != []
+    assert all(r.value < 1000 for r in records)
+    values = {r.kind: r.value for r in records}
+    assert values["max_weight"] == 100
+    assert values["max_volume"] == 500
+
+
 def test_delete_set_removes_its_prs(client: TestClient, db_session):
     from sqlalchemy import select
 

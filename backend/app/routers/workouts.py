@@ -318,9 +318,11 @@ def update_set(
     user: CurrentUser,
     db: Session = Depends(get_db),
 ):
-    """Edita una serie ya registrada. No re-detecta PRs: los récords se
-    detectan al registrar en vivo; una corrección posterior no celebra nada."""
-    _, wex = _own_workout_exercise(db, user.id, workout_id, workout_exercise_id)
+    """Edita una serie ya registrada. No re-detecta PRs para celebrar: los
+    récords se celebran al registrar en vivo, una corrección posterior no
+    celebra nada. Pero sí hay que mantenerlos honestos: se barren los PRs de
+    esta serie y se re-detectan en silencio contra el valor corregido."""
+    workout, wex = _own_workout_exercise(db, user.id, workout_id, workout_exercise_id)
     wset = db.get(WorkoutSet, set_id)
     if wset is None or wset.workout_exercise_id != wex.id:
         raise HTTPException(status_code=404, detail="not_found")
@@ -331,6 +333,14 @@ def update_set(
         raise HTTPException(status_code=422, detail="invalid_set_fields") from None
     for field in (*SET_VALUE_FIELDS, "is_warmup", "rpe"):
         setattr(wset, field, getattr(payload, field))
+    # el volumen se calcula con una query aparte (autoflush está desactivado):
+    # sin este flush leería el peso/reps viejos de la serie que se acaba de editar
+    db.flush()
+    # una corrección no celebra nada, pero tampoco puede dejar récords
+    # fantasma: se barren los PRs de la serie y se re-detectan en silencio
+    db.execute(delete(PersonalRecord).where(PersonalRecord.set_id == wset.id))
+    volume = session_volume(db, workout_id, exercise.id)
+    detect_prs(db, user.id, exercise, wset, volume)
     db.commit()
     return wset
 
