@@ -32,6 +32,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - run: npm run guard:tokens
+      - run: npm run test
       - run: npm run build
 
   docker:
