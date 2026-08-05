@@ -5,7 +5,7 @@ import { createI18nInstance } from '../../i18n'
 import BkRing from '../BkRing.vue'
 import BkRune from '../BkRune.vue'
 import BkStepper from '../BkStepper.vue'
-import { RUNES } from '../runes'
+import { RUNES, RUNE_SEQUENCES } from '../runes'
 
 describe('runes catalog', () => {
   it('has the logo, the 7 muscle groups and the achievement runes', () => {
@@ -23,6 +23,27 @@ describe('BkRune', () => {
     const wrapper = mount(BkRune, { props: { name: 'chest', carve: true } })
     expect(wrapper.find('path').attributes('d')).toBe(RUNES.chest)
     expect(wrapper.find('path').classes()).toContain('bk-carve-stroke')
+  })
+
+  it('renders sequenced berserk carve with 3 phases and staggered animation delays', () => {
+    const wrapper = mount(BkRune, { props: { name: 'berserk', carve: true } })
+    const paths = wrapper.findAll('path')
+    expect(paths).toHaveLength(3)
+    // Each phase should have bk-carve-stroke, staggered delays, and split duration
+    paths.forEach((path, i) => {
+      expect(path.classes()).toContain('bk-carve-stroke')
+      expect(path.attributes('d')).toBe(RUNE_SEQUENCES.berserk![i])
+      expect(path.attributes('style')).toContain(`animation-delay: calc(${i} * var(--bk-dur-5) / 3)`)
+      expect(path.attributes('style')).toContain('animation-duration: calc(var(--bk-dur-5) / 3)')
+    })
+  })
+
+  it('renders non-sequenced runes with carve as a single path', () => {
+    const wrapper = mount(BkRune, { props: { name: 'shoulders', carve: true } })
+    const paths = wrapper.findAll('path')
+    expect(paths).toHaveLength(1)
+    expect(paths[0].attributes('d')).toBe(RUNES.shoulders)
+    expect(paths[0].classes()).toContain('bk-carve-stroke')
   })
 })
 

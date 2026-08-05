@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
-import { RUNES, type RuneName } from './runes'
+import { RUNES, RUNE_SEQUENCES, type RuneName } from './runes'
 
 const props = withDefaults(
   defineProps<{ name: RuneName; size?: number; carve?: boolean; tone?: 'ink' | 'aurora' | 'ember' }>(),
@@ -10,11 +10,24 @@ const props = withDefaults(
 
 const path = ref<SVGPathElement | null>(null)
 const carveLength = ref(200)
+const phaseLengths = ref<number[]>([])
+
+const isSequenced = computed(() => props.carve && props.name in RUNE_SEQUENCES)
 
 onMounted(() => {
   // longitud real del trazo para que el tallado dure lo mismo en toda runa
   if (props.carve && path.value?.getTotalLength) {
     carveLength.value = Math.ceil(path.value.getTotalLength())
+  }
+
+  // para el tallado secuencial, medir cada fase
+  if (isSequenced.value) {
+    const phases = RUNE_SEQUENCES[props.name]!
+    phaseLengths.value = phases.map((_, i) => {
+      const svgPath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      svgPath.setAttribute('d', phases[i])
+      return Math.ceil(svgPath.getTotalLength())
+    })
   }
 })
 </script>
@@ -28,14 +41,34 @@ onMounted(() => {
     aria-hidden="true"
     :class="{ 'text-aurora': tone === 'aurora', 'text-ember': tone === 'ember' }"
   >
-    <path
-      ref="path"
-      :d="RUNES[name]"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="square"
-      :class="carve && 'bk-carve-stroke'"
-      :style="carve ? { '--bk-carve-length': String(carveLength) } : undefined"
-    />
+    <!-- Tallado secuencial: cada fase dibuja en orden con retraso escalonado -->
+    <template v-if="isSequenced">
+      <path
+        v-for="(phasePath, i) in RUNE_SEQUENCES[name]"
+        :key="`phase-${i}`"
+        :d="phasePath"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="square"
+        class="bk-carve-stroke"
+        :style="{
+          '--bk-carve-length': String(phaseLengths[i] || 200),
+          'animation-duration': `calc(var(--bk-dur-5) / 3)`,
+          'animation-delay': `calc(${i} * var(--bk-dur-5) / 3)`,
+        }"
+      />
+    </template>
+    <!-- Tallado simple o renderizado estático -->
+    <template v-else>
+      <path
+        ref="path"
+        :d="RUNES[name]"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="square"
+        :class="carve && 'bk-carve-stroke'"
+        :style="carve ? { '--bk-carve-length': String(carveLength) } : undefined"
+      />
+    </template>
   </svg>
 </template>

@@ -16,3 +16,13 @@ export const RUNES = {
 } as const
 
 export type RuneName = keyof typeof RUNES
+
+// fases de tallado: cada entrada se dibuja completa antes de la siguiente;
+// los subtrazos de una misma fase se tallan a la vez (simetría izquierda/derecha)
+export const RUNE_SEQUENCES: Partial<Record<RuneName, string[]>> = {
+  berserk: [
+    'M11 5 L8.5 7.5 L16 15 M21 5 L23.5 7.5 L16 15',
+    'M16 15 L8.5 22.5 L16 30 M16 15 L23.5 22.5 L16 30',
+    'M16 1.5 L16 30 M16 5 L13.5 2 M16 5 L18.5 2',
+  ],
+}
