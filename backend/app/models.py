@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -55,3 +55,61 @@ class Invite(Base):
         ForeignKey("users.id", ondelete="SET NULL"), default=None, index=True
     )
     used_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+
+
+MEASUREMENTS = ("strength", "bodyweight", "timed", "cardio")
+
+
+class MuscleGroup(Base):
+    __tablename__ = "muscle_groups"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(30))
+    name_es: Mapped[str] = mapped_column(String(50))
+    name_en: Mapped[str] = mapped_column(String(50))
+    # NULL = grupo global del seed; con owner = grupo privado del usuario
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), default=None, index=True
+    )
+
+
+class Exercise(Base):
+    __tablename__ = "exercises"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name_es: Mapped[str] = mapped_column(String(80))
+    name_en: Mapped[str] = mapped_column(String(80))
+    measurement: Mapped[str] = mapped_column(String(10))
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), default=None, index=True
+    )
+
+    muscle_links: Mapped[list["ExerciseMuscleGroup"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class ExerciseMuscleGroup(Base):
+    __tablename__ = "exercise_muscle_groups"
+
+    exercise_id: Mapped[int] = mapped_column(
+        ForeignKey("exercises.id", ondelete="CASCADE"), primary_key=True
+    )
+    muscle_group_id: Mapped[int] = mapped_column(
+        ForeignKey("muscle_groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    is_primary: Mapped[bool] = mapped_column(default=False)
+
+
+class ShareGrant(Base):
+    __tablename__ = "share_grants"
+    __table_args__ = (UniqueConstraint("owner_id", "viewer_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    viewer_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
