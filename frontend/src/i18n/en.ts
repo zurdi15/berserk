@@ -1,7 +1,14 @@
 export const en = {
   app: {
     name: 'berserk',
-    nav: { today: 'Today', calendar: 'Calendar', workout: 'Workout', progress: 'Progress', profile: 'Profile' },
+    nav: {
+      today: 'Today',
+      calendar: 'Calendar',
+      workout: 'Workout',
+      progress: 'Progress',
+      profile: 'Profile',
+      label: 'Main navigation',
+    },
     placeholder: 'Coming soon',
   },
   auth: {

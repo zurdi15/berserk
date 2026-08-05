@@ -27,8 +27,8 @@ const items: { name: string; label: string; rune: RuneName }[] = [
       </RouterView>
     </main>
     <nav
-      class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:bg-transparent sm:pb-0 sm:order-first sm:hidden"
-      :aria-label="$t('app.name')"
+      class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:hidden"
+      :aria-label="$t('app.nav.label')"
     >
       <ul class="flex justify-around max-w-3xl mx-auto">
         <li v-for="item in items" :key="item.name" class="flex-1">
