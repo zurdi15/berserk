@@ -1,0 +1,37 @@
+import { createRouter, createWebHistory } from 'vue-router'
+
+import { useAuthStore } from '@/stores/auth'
+import BootstrapView from '@/views/BootstrapView.vue'
+import LoginView from '@/views/LoginView.vue'
+import PlaceholderView from '@/views/PlaceholderView.vue'
+import ShellView from '@/views/ShellView.vue'
+
+export const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/login', name: 'login', component: LoginView },
+    { path: '/bootstrap', name: 'bootstrap', component: BootstrapView },
+    {
+      path: '/',
+      component: ShellView,
+      redirect: { name: 'today' },
+      children: [
+        { path: 'today', name: 'today', component: PlaceholderView },
+        { path: 'calendar', name: 'calendar', component: PlaceholderView },
+        { path: 'workout', name: 'workout', component: PlaceholderView },
+        { path: 'progress', name: 'progress', component: PlaceholderView },
+        { path: 'profile', name: 'profile', component: PlaceholderView },
+      ],
+    },
+  ],
+})
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+  await auth.init()
+  const isPublic = to.name === 'login' || to.name === 'bootstrap'
+  if (!auth.bootstrapped && to.name !== 'bootstrap') return { name: 'bootstrap' }
+  if (auth.bootstrapped && to.name === 'bootstrap') return auth.isAuthenticated ? { name: 'today' } : { name: 'login' }
+  if (!auth.isAuthenticated && !isPublic) return { name: 'login' }
+  if (auth.isAuthenticated && isPublic) return { name: 'today' }
+})
