@@ -26,8 +26,9 @@ const items: { name: string; label: string; rune: RuneName }[] = [
         </Transition>
       </RouterView>
     </main>
+    <!-- barra inferior también en desktop de forma interina: la nav superior de escritorio llega en la fase 4 -->
     <nav
-      class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:hidden"
+      class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)]"
       :aria-label="$t('app.nav.label')"
     >
       <ul class="flex justify-around max-w-3xl mx-auto">

@@ -14,9 +14,8 @@ describe('ShellView nav', () => {
     })
     const nav = wrapper.find('nav')
     expect(nav.attributes('aria-label')).toBe('Navegación principal')
-    // sm:hidden se queda (el nav de escritorio es un entregable de fase 4);
-    // el resto era CSS inalcanzable detrás de ese mismo sm:hidden
-    expect(nav.classes()).toContain('sm:hidden')
+    // sm:hidden se quitó (la nav inferior ahora es visible también en desktop de forma interina)
+    expect(nav.classes()).not.toContain('sm:hidden')
     expect(nav.classes()).not.toContain('sm:static')
     expect(nav.classes()).not.toContain('sm:border-t-0')
     expect(nav.classes()).not.toContain('sm:bg-transparent')

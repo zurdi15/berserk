@@ -3,7 +3,7 @@
 // Excepto berserk, que es el bindrune del berserker (lanza + aspa astada + rombo),
 // calcada de la referencia del usuario.
 export const RUNES = {
-  berserk: 'M16 2.5 L16 29.5 M13.5 5 L16 2.5 M18.5 5 L16 2.5 M9.5 5.5 L10 8.5 L23.5 21.5 L16 29.5 M22.5 5.5 L22 8.5 L8.5 21.5 L16 29.5',
+  berserk: 'M16 2.5 L16 29.5 M16 6.5 L13 3 M16 6.5 L19 3 M9.5 5.5 L10 8.5 L23.5 21.5 L16 29.5 M22.5 5.5 L22 8.5 L8.5 21.5 L16 29.5',
   chest: 'M10 4 L10 28 M10 6 L24 14 M10 22 L24 14',
   back: 'M22 4 L22 28 M22 6 L8 14 M22 22 L8 14',
   biceps: 'M12 28 L12 4 L24 12 L12 18',
