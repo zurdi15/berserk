@@ -14,6 +14,22 @@ const phaseLengths = ref<number[]>([])
 
 const isSequenced = computed(() => props.carve && props.name in RUNE_SEQUENCES)
 
+// velocidad constante: cada fase dura en proporción a su longitud de trazo,
+// y arranca exactamente cuando termina la anterior — sin pausas ni acelerones
+const totalLength = computed(() => phaseLengths.value.reduce((a, b) => a + b, 0) || 1)
+
+const phaseDuration = computed(() => (i: number) => {
+  if (!phaseLengths.value[i]) return `calc(var(--bk-dur-5) * 0.3333)`
+  const ratio = phaseLengths.value[i] / totalLength.value
+  return `calc(var(--bk-dur-5) * ${ratio.toFixed(4)})`
+})
+
+const phaseDelay = computed(() => (i: number) => {
+  const delayLength = phaseLengths.value.slice(0, i).reduce((a, b) => a + b, 0)
+  const ratio = delayLength / totalLength.value
+  return `calc(var(--bk-dur-5) * ${ratio.toFixed(4)})`
+})
+
 onMounted(() => {
   // longitud real del trazo para que el tallado dure lo mismo en toda runa
   if (props.carve && path.value?.getTotalLength) {
@@ -41,7 +57,7 @@ onMounted(() => {
     aria-hidden="true"
     :class="{ 'text-aurora': tone === 'aurora', 'text-ember': tone === 'ember' }"
   >
-    <!-- Tallado secuencial: cada fase dibuja en orden con retraso escalonado -->
+    <!-- Tallado secuencial: cada fase dibuja en orden con retraso escalonado a velocidad constante -->
     <template v-if="isSequenced">
       <path
         v-for="(phasePath, i) in RUNE_SEQUENCES[name]"
@@ -53,8 +69,9 @@ onMounted(() => {
         class="bk-carve-stroke"
         :style="{
           '--bk-carve-length': String(phaseLengths[i] || 200),
-          'animation-duration': `calc(var(--bk-dur-5) / 3)`,
-          'animation-delay': `calc(${i} * var(--bk-dur-5) / 3)`,
+          'animation-duration': phaseDuration(i),
+          'animation-delay': phaseDelay(i),
+          'animation-timing-function': 'var(--bk-ease-linear)',
         }"
       />
     </template>
