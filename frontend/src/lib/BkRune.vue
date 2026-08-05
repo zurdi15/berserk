@@ -19,15 +19,15 @@ const isSequenced = computed(() => props.carve && props.name in RUNE_SEQUENCES)
 const totalLength = computed(() => phaseLengths.value.reduce((a, b) => a + b, 0) || 1)
 
 const phaseDuration = computed(() => (i: number) => {
-  if (!phaseLengths.value[i]) return `calc(var(--bk-dur-5) * 0.3333)`
+  if (!phaseLengths.value[i]) return `calc(var(--bk-dur-5) / 2 * 0.3333)`
   const ratio = phaseLengths.value[i] / totalLength.value
-  return `calc(var(--bk-dur-5) * ${ratio.toFixed(4)})`
+  return `calc(var(--bk-dur-5) / 2 * ${ratio.toFixed(4)})`
 })
 
 const phaseDelay = computed(() => (i: number) => {
   const delayLength = phaseLengths.value.slice(0, i).reduce((a, b) => a + b, 0)
   const ratio = delayLength / totalLength.value
-  return `calc(var(--bk-dur-5) * ${ratio.toFixed(4)})`
+  return `calc(var(--bk-dur-5) / 2 * ${ratio.toFixed(4)})`
 })
 
 onMounted(() => {

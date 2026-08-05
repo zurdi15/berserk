@@ -25,19 +25,19 @@ describe('BkRune', () => {
     expect(wrapper.find('path').classes()).toContain('bk-carve-stroke')
   })
 
-  it('renders sequenced berserk carve with 3 phases at constant speed (linear, proportional duration)', () => {
+  it('renders sequenced berserk carve with 3 phases at constant speed (linear, halved duration, proportional)', () => {
     const wrapper = mount(BkRune, { props: { name: 'berserk', carve: true } })
     const paths = wrapper.findAll('path')
     expect(paths).toHaveLength(3)
-    // Each phase should have bk-carve-stroke, proportional duration/delay, and linear easing
+    // Each phase should have bk-carve-stroke, proportional duration/delay (halved), and linear easing
     paths.forEach((path, i) => {
       expect(path.classes()).toContain('bk-carve-stroke')
       expect(path.attributes('d')).toBe(RUNE_SEQUENCES.berserk![i])
       const style = path.attributes('style') || ''
-      // Proportional durations: calc(var(--bk-dur-5) * <ratio>)
-      expect(style).toMatch(/animation-duration:\s*calc\(var\(--bk-dur-5\)\s*\*\s*[\d.]+\)/)
-      // Staggered delays: calc(var(--bk-dur-5) * <cumulative-ratio>)
-      expect(style).toMatch(/animation-delay:\s*calc\(var\(--bk-dur-5\)\s*\*\s*[\d.]+\)/)
+      // Proportional durations at half speed: calc(var(--bk-dur-5) / 2 * <ratio>)
+      expect(style).toMatch(/animation-duration:\s*calc\(var\(--bk-dur-5\)\s*\/\s*2\s*\*\s*[\d.]+\)/)
+      // Staggered delays at half speed: calc(var(--bk-dur-5) / 2 * <cumulative-ratio>)
+      expect(style).toMatch(/animation-delay:\s*calc\(var\(--bk-dur-5\)\s*\/\s*2\s*\*\s*[\d.]+\)/)
       // Constant speed: linear easing
       expect(style).toContain('animation-timing-function: var(--bk-ease-linear)')
     })
