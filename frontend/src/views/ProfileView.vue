@@ -10,6 +10,7 @@ import SettingsCard from '@/components/profile/SettingsCard.vue'
 import PasswordCard from '@/components/profile/PasswordCard.vue'
 import SharingCard from '@/components/profile/SharingCard.vue'
 import AdminCard from '@/components/profile/AdminCard.vue'
+import RoutineList from '@/components/routines/RoutineList.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
@@ -62,7 +63,7 @@ async function handleLogout() {
       </template>
 
       <template v-if="activeTab === 'routines'">
-        <div class="text-ink-muted">{{ $t('app.placeholder') }}</div>
+        <RoutineList />
       </template>
 
       <template v-if="activeTab === 'admin' && auth.user?.is_admin">
