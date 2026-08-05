@@ -13,22 +13,20 @@ const items: { name: string; label: string; rune: RuneName }[] = [
 
 <template>
   <div class="min-h-dvh flex flex-col">
-    <!-- Desktop navbar: una sola barra superior con identidad + destinos -->
-    <header class="hidden sm:flex items-center gap-6 px-6 py-3 border-b border-line">
-      <div class="flex items-center gap-2">
-        <BkRune name="berserk" :size="22" tone="aurora" />
-        <span class="font-display font-bold tracking-widest uppercase text-sm">{{ $t('app.name') }}</span>
-      </div>
-      <nav class="ml-auto" :aria-label="$t('app.nav.label')">
-        <ul class="flex gap-1">
+    <!-- Desktop navbar: barra superior centrada con destinos (identidad por ahora en móvil) -->
+    <header class="hidden sm:block border-b border-line">
+      <nav :aria-label="$t('app.nav.label')">
+        <ul class="flex justify-center gap-2">
           <li v-for="item in items" :key="item.name">
             <RouterLink
               :to="{ name: item.name }"
-              class="flex items-center gap-2 px-3 py-1.5 rounded-sm text-ink-faint hover:text-ink"
-              active-class="text-aurora bg-stone"
+              class="flex flex-col items-center gap-1 px-3 py-2 text-ink-faint hover:text-ink"
+              active-class="text-aurora"
             >
-              <BkRune :name="item.rune" :size="16" />
-              <span class="text-sm uppercase tracking-wide">{{ $t(item.label) }}</span>
+              <span class="text-[0.65rem] uppercase tracking-wide">{{ $t(item.label) }}</span>
+              <span :class="item.name === 'workout' && 'bk-slab -mb-5 p-2.5 border-aurora text-aurora'">
+                <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" />
+              </span>
             </RouterLink>
           </li>
         </ul>
