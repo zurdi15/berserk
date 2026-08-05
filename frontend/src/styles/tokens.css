@@ -1,0 +1,69 @@
+/* GENERADO por scripts/build-tokens.mjs — no editar a mano. */
+:root {
+  --bk-bg-void: #0A0C0F;
+  --bk-bg-stone: #12151A;
+  --bk-bg-slab: #1A1E25;
+  --bk-line: #262B33;
+  --bk-line-strong: #333A44;
+  --bk-ink: #E8EDF2;
+  --bk-ink-muted: #9AA4B2;
+  --bk-ink-faint: #5C6672;
+  --bk-accent-aurora: #4FD8C4;
+  --bk-accent-aurora-deep: #2BA893;
+  --bk-accent-ember: #FF8A3D;
+  --bk-accent-ember-deep: #E8734A;
+  --bk-danger: #E5604F;
+  --bk-aurora-glow: rgba(79, 216, 196, 0.25);
+  --bk-ember-glow: rgba(255, 138, 61, 0.30);
+  --bk-space-1: 4px;
+  --bk-space-2: 8px;
+  --bk-space-3: 12px;
+  --bk-space-4: 16px;
+  --bk-space-5: 20px;
+  --bk-space-6: 24px;
+  --bk-space-7: 32px;
+  --bk-space-8: 40px;
+  --bk-space-9: 48px;
+  --bk-space-10: 64px;
+  --bk-space-11: 80px;
+  --bk-space-12: 96px;
+  --bk-radius-xs: 2px;
+  --bk-radius-sm: 6px;
+  --bk-radius-md: 10px;
+  --bk-radius-full: 9999px;
+  --bk-font-display: 'Chakra Petch', system-ui, sans-serif;
+  --bk-font-body: 'Inter Variable', system-ui, sans-serif;
+  --bk-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --bk-dur-1: 120ms;
+  --bk-dur-2: 200ms;
+  --bk-dur-3: 320ms;
+  --bk-dur-4: 600ms;
+  --bk-dur-5: 1200ms;
+  --bk-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --bk-ease-spring: cubic-bezier(0.34, 1.4, 0.44, 1);
+  --bk-ease-carve: cubic-bezier(0.7, 0, 0.2, 1);
+  --bk-z-nav: 40;
+  --bk-z-sheet: 50;
+  --bk-z-toast: 60;
+  --bk-z-timer: 70;
+  --bk-shadow-aurora: 0 0 20px var(--bk-aurora-glow);
+  --bk-shadow-ember: 0 0 24px var(--bk-ember-glow);
+}
+
+html.bk-light {
+  --bk-bg-void: #F2F4F6;
+  --bk-bg-stone: #FFFFFF;
+  --bk-bg-slab: #E9ECEF;
+  --bk-line: #D5DAE0;
+  --bk-line-strong: #B9C0C9;
+  --bk-ink: #1A2028;
+  --bk-ink-muted: #5A6472;
+  --bk-ink-faint: #8B95A1;
+  --bk-accent-aurora: #1F9C8A;
+  --bk-accent-aurora-deep: #157A6C;
+  --bk-accent-ember: #D97A2E;
+  --bk-accent-ember-deep: #C05F1F;
+  --bk-danger: #C74436;
+  --bk-aurora-glow: rgba(31, 156, 138, 0.20);
+  --bk-ember-glow: rgba(217, 122, 46, 0.25);
+}

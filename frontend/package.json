@@ -4,9 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "npm run guard:tokens && vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:tokens": "vite-node scripts/build-tokens.mjs",
+    "guard:tokens": "bash scripts/guard-tokens.sh"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.5",
@@ -25,6 +27,7 @@
     "tailwindcss": "^4.1.7",
     "typescript": "~5.8.3",
     "vite": "^7.0.0",
+    "vite-node": "^3.1.3",
     "vite-plugin-pwa": "^1.0.0",
     "vitest": "^3.1.3",
     "vue-tsc": "^3.0.0"
