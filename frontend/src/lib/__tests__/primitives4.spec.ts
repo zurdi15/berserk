@@ -1,11 +1,17 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import BkChart from '../BkChart.vue'
 import BkHeatmap from '../BkHeatmap.vue'
 import BkSelect from '../BkSelect.vue'
 import BkTabs from '../BkTabs.vue'
 import { cellsFor } from '../heatmap'
+
+// Mock uPlot module
+vi.mock('uplot', () => ({
+  default: vi.fn(),
+  tzDate: vi.fn((date: Date) => date),
+}))
 
 describe('BkTabs', () => {
   const tabs = [
@@ -50,26 +56,35 @@ describe('BkHeatmap', () => {
     expect(cells.length).toBe(365)
   })
 
-  it('applies correct opacity tiers for counts', () => {
+  it('applies all four opacity tiers for counts 0-4', () => {
     const wrapper = mount(BkHeatmap, {
       props: {
         year: 2026,
         data: [
-          { date: '2026-01-01', count: 0 },
-          { date: '2026-01-02', count: 1 },
-          { date: '2026-01-03', count: 2 },
-          { date: '2026-01-04', count: 3 },
-          { date: '2026-01-05', count: 4 },
+          { date: '2026-01-01', count: 0 }, // opacity: 0.08
+          { date: '2026-01-02', count: 1 }, // opacity: 0.15 (levels[0])
+          { date: '2026-01-03', count: 2 }, // opacity: 0.4 (levels[1])
+          { date: '2026-01-04', count: 3 }, // opacity: 0.7 (levels[2])
+          { date: '2026-01-05', count: 4 }, // opacity: 1 (levels[3])
         ],
       },
     })
-    // Verify cells have inline style with opacity
     const cells = wrapper.findAll('[style*="opacity"]')
-    expect(cells.length).toBeGreaterThan(0)
-    // Check that different opacity values are applied (0.08 for zero, then levels)
-    const styles = cells.map((c) => c.attributes('style'))
-    const opacities = styles.filter((s) => s && s.includes('0.08'))
-    expect(opacities.length).toBeGreaterThan(0) // at least one zero-count cell has 0.08
+    // Find cells matching our test dates
+    const findCell = (date: string) =>
+      cells.find((c) => c.attributes('title')?.startsWith(date))
+
+    const cell0 = findCell('2026-01-01')!
+    const cell1 = findCell('2026-01-02')!
+    const cell2 = findCell('2026-01-03')!
+    const cell3 = findCell('2026-01-04')!
+    const cell4 = findCell('2026-01-05')!
+
+    expect(cell0.attributes('style')).toContain('opacity: 0.08')
+    expect(cell1.attributes('style')).toContain('opacity: 0.15')
+    expect(cell2.attributes('style')).toContain('opacity: 0.4')
+    expect(cell3.attributes('style')).toContain('opacity: 0.7')
+    expect(cell4.attributes('style')).toContain('opacity: 1')
   })
 })
 
@@ -93,12 +108,19 @@ describe('BkSelect', () => {
 })
 
 describe('BkChart', () => {
-  it('mounts and creates chart with UTC tzDate anchor', async () => {
-    // Mock uPlot to verify options without needing canvas
-    const mockUPlot = vi.fn() as any
-    mockUPlot.tzDate = (date: Date, tz: string) => date
-    vi.stubGlobal('uPlot', mockUPlot)
+  let mockUPlot: any
+  let mockInstance: any
 
+  beforeEach(async () => {
+    // Get the mocked uPlot module and set up instance mock
+    const uplotModule = await import('uplot')
+    mockUPlot = uplotModule.default
+    mockInstance = { destroy: vi.fn(), setSize: vi.fn() } as any
+    mockUPlot.mockImplementation(() => mockInstance)
+    mockUPlot.mockClear()
+  })
+
+  it('mounts and creates chart with UTC tzDate anchor', async () => {
     const wrapper = mount(BkChart, {
       props: {
         points: [
@@ -115,19 +137,14 @@ describe('BkChart', () => {
     })
 
     await wrapper.vm.$nextTick()
-    // Verify tzDate was set in options
-    if (mockUPlot.mock.calls.length > 0) {
-      const options = mockUPlot.mock.calls[0][0]
-      expect(options.tzDate).toBeDefined()
-      expect(typeof options.tzDate).toBe('function')
-    }
+    // Hard assertion: verify uPlot was called exactly once
+    expect(mockUPlot).toHaveBeenCalledTimes(1)
+    const options = mockUPlot.mock.calls[0][0]
+    expect(options.tzDate).toBeDefined()
+    expect(typeof options.tzDate).toBe('function')
   })
 
   it('applies suffix to y-axis values', async () => {
-    const mockUPlot = vi.fn() as any
-    mockUPlot.tzDate = (date: Date) => date
-    vi.stubGlobal('uPlot', mockUPlot)
-
     mount(BkChart, {
       props: {
         points: [{ date: '2026-08-05', value: 10 }],
@@ -141,13 +158,31 @@ describe('BkChart', () => {
     })
 
     await new Promise((resolve) => setTimeout(resolve, 10))
-    if (mockUPlot.mock.calls.length > 0) {
-      const options = mockUPlot.mock.calls[0][0]
-      expect(options.axes[1].values).toBeDefined()
-      if (options.axes[1].values) {
-        const formatted = options.axes[1].values({}, [10, 20])
-        expect(formatted[0]).toContain(' kg')
-      }
-    }
+    // Hard assertion: verify uPlot was called
+    expect(mockUPlot).toHaveBeenCalledTimes(1)
+    const options = mockUPlot.mock.calls[0][0]
+    expect(options.axes[1].values).toBeDefined()
+    const formatted = options.axes[1].values({}, [10, 20])
+    expect(formatted[0]).toContain(' kg')
+  })
+
+  it('destroys chart on unmount', async () => {
+    const wrapper = mount(BkChart, {
+      props: {
+        points: [{ date: '2026-08-05', value: 10 }],
+      },
+      global: {
+        stubs: {
+          teleport: true,
+        },
+      },
+    })
+
+    await wrapper.vm.$nextTick()
+    expect(mockUPlot).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+    // Hard assertion: destroy was called exactly once on unmount
+    expect(mockInstance.destroy).toHaveBeenCalledTimes(1)
   })
 })
