@@ -5,7 +5,7 @@ import { createI18nInstance } from '../../i18n'
 import ShellView from '../ShellView.vue'
 
 describe('ShellView nav', () => {
-  it('labels the bottom nav with a dedicated i18n key and drops the dead desktop classes', () => {
+  it('labels the nav with a dedicated i18n key and applies responsive desktop layout classes', () => {
     const wrapper = mount(ShellView, {
       global: {
         plugins: [createI18nInstance()],
@@ -14,12 +14,13 @@ describe('ShellView nav', () => {
     })
     const nav = wrapper.find('nav')
     expect(nav.attributes('aria-label')).toBe('Navegación principal')
-    // sm:hidden se quitó (la nav inferior ahora es visible también en desktop de forma interina)
+    // la nav fluye bajo la cabecera como fila de pestañas en desktop
+    expect(nav.classes()).toContain('sm:static')
+    expect(nav.classes()).toContain('sm:border-t-0')
+    expect(nav.classes()).toContain('sm:border-b')
+    expect(nav.classes()).toContain('sm:bg-transparent')
+    expect(nav.classes()).toContain('sm:pb-0')
     expect(nav.classes()).not.toContain('sm:hidden')
-    expect(nav.classes()).not.toContain('sm:static')
-    expect(nav.classes()).not.toContain('sm:border-t-0')
-    expect(nav.classes()).not.toContain('sm:bg-transparent')
-    expect(nav.classes()).not.toContain('sm:pb-0')
     expect(nav.classes()).not.toContain('sm:order-first')
   })
 })

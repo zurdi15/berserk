@@ -19,16 +19,9 @@ const items: { name: string; label: string; rune: RuneName }[] = [
         {{ $t('app.name') }}
       </span>
     </header>
-    <main class="flex-1 px-4 py-4 pb-24 sm:pb-4 max-w-3xl w-full mx-auto">
-      <RouterView v-slot="{ Component }">
-        <Transition name="bk-rise" mode="out-in">
-          <component :is="Component" />
-        </Transition>
-      </RouterView>
-    </main>
-    <!-- barra inferior también en desktop de forma interina: la nav superior de escritorio llega en la fase 4 -->
+    <!-- en móvil barra inferior fija; en desktop fluye bajo la cabecera como fila de pestañas (la nav de escritorio definitiva puede refinarse en fase 4) -->
     <nav
-      class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)]"
+      class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:border-b sm:bg-transparent sm:pb-0"
       :aria-label="$t('app.nav.label')"
     >
       <ul class="flex justify-around max-w-3xl mx-auto">
@@ -39,7 +32,7 @@ const items: { name: string; label: string; rune: RuneName }[] = [
             active-class="text-aurora"
           >
             <span
-              :class="item.name === 'workout' && 'bk-slab -mt-5 p-2.5 border-aurora text-aurora'"
+              :class="item.name === 'workout' && 'bk-slab -mt-5 p-2.5 border-aurora text-aurora sm:mt-0'"
             >
               <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" />
             </span>
@@ -48,5 +41,12 @@ const items: { name: string; label: string; rune: RuneName }[] = [
         </li>
       </ul>
     </nav>
+    <main class="flex-1 px-4 py-4 pb-24 sm:pb-4 max-w-3xl w-full mx-auto">
+      <RouterView v-slot="{ Component }">
+        <Transition name="bk-rise" mode="out-in">
+          <component :is="Component" />
+        </Transition>
+      </RouterView>
+    </main>
   </div>
 </template>
