@@ -16,6 +16,13 @@ def test_settings_reject_unknown_locale(client: TestClient):
     assert client.patch("/api/v1/users/me", json={"locale": "fr"}).status_code == 422
 
 
+def test_settings_explicit_null_is_ignored(client: TestClient):
+    before = client.get("/api/v1/auth/me").json()["locale"]
+    # ninguno de los tres campos de settings es anulable: un null explícito se ignora
+    resp = client.patch("/api/v1/users/me", json={"locale": None})
+    assert resp.status_code == 200 and resp.json()["locale"] == before
+
+
 def test_admin_creates_user_who_can_login(client: TestClient, app):
     created = make_user(client, "freyja")
     assert created["is_admin"] is False

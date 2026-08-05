@@ -43,7 +43,11 @@ def update_routine(
     routine_id: int, payload: RoutinePatchIn, user: CurrentUser, db: Session = Depends(get_db)
 ):
     routine = _own_routine(db, user.id, routine_id)
-    for field, value in payload.model_dump(exclude_none=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    # name no es anulable: un null explícito no debe machacarlo
+    if "name" in data and data["name"] is None:
+        del data["name"]
+    for field, value in data.items():
         setattr(routine, field, value)
     db.commit()
     return routine

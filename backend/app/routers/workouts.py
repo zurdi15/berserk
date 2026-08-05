@@ -172,7 +172,11 @@ def update_workout(
     workout_id: int, payload: WorkoutPatchIn, user: CurrentUser, db: Session = Depends(get_db)
 ):
     workout = _own_workout(db, user.id, workout_id)
-    for field, value in payload.model_dump(exclude_none=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    # date no es anulable: un null explícito no debe machacarla
+    if "date" in data and data["date"] is None:
+        del data["date"]
+    for field, value in data.items():
         setattr(workout, field, value)
     db.commit()
     return workout_out(workout)
@@ -240,7 +244,9 @@ def update_exercise_note(
     db: Session = Depends(get_db),
 ):
     _, wex = _own_workout_exercise(db, user.id, workout_id, workout_exercise_id)
-    wex.note = payload.note
+    # cuerpo vacío = no-op; {"note": null} sí limpia la nota (es anulable)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(wex, field, value)
     db.commit()
     return wex
 

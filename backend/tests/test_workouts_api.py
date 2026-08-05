@@ -110,6 +110,29 @@ def test_patch_and_delete(client: TestClient, app):
     assert client.get(f"/api/v1/workouts/{wid}").status_code == 404
 
 
+def test_patch_workout_explicit_null_semantics(client: TestClient):
+    workout = client.post("/api/v1/workouts", json={"date": "2026-08-01"}).json()
+    wid = workout["id"]
+    client.patch(f"/api/v1/workouts/{wid}", json={"note": "duro"})
+    resp = client.patch(f"/api/v1/workouts/{wid}", json={"note": None})
+    assert resp.status_code == 200 and resp.json()["note"] is None
+    # date no es anulable: un null explícito no lo machaca
+    resp = client.patch(f"/api/v1/workouts/{wid}", json={"date": None})
+    assert resp.status_code == 200 and resp.json()["date"] == "2026-08-01"
+
+
+def test_patch_exercise_note_is_noop_on_empty_body(client: TestClient):
+    from tests.test_sets_api import start_with_exercise
+
+    workout, wex = start_with_exercise(client)
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}"
+    client.patch(url, json={"note": "custom"})
+    resp = client.patch(url, json={})
+    assert resp.status_code == 200 and resp.json()["note"] == "custom"
+    resp = client.patch(url, json={"note": None})
+    assert resp.status_code == 200 and resp.json()["note"] is None
+
+
 def test_list_with_date_filters(client: TestClient):
     for day in ("2026-07-01", "2026-07-15", "2026-08-01"):
         wid = client.post("/api/v1/workouts", json={"date": day}).json()["id"]

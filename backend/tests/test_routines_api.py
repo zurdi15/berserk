@@ -48,6 +48,17 @@ def test_routine_crud_and_exercise_replacement(client: TestClient):
     assert client.get(f"/api/v1/routines/{rid}").status_code == 404
 
 
+def test_patch_explicit_null_semantics(client: TestClient):
+    rid = client.post(
+        "/api/v1/routines", json={"name": "Push", "rune": "ᚦ", "color": "ember"}
+    ).json()["id"]
+    resp = client.patch(f"/api/v1/routines/{rid}", json={"rune": None})
+    assert resp.status_code == 200 and resp.json()["rune"] is None
+    # name no es anulable: un null explícito no lo machaca
+    resp = client.patch(f"/api/v1/routines/{rid}", json={"name": None})
+    assert resp.status_code == 200 and resp.json()["name"] == "Push"
+
+
 def test_routines_are_private(client: TestClient, app):
     rid = client.post("/api/v1/routines", json={"name": "Secreta"}).json()["id"]
     make_user(client, "freyja")
