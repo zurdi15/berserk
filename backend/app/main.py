@@ -9,6 +9,7 @@ from .auth import get_current_user, require_admin
 from .config import get_settings
 from .db import make_engine, make_sessionmaker
 from .routers import admin, auth, users
+from .seed import ensure_catalog
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 API_PREFIX = "/api/v1"
@@ -28,6 +29,10 @@ def create_app(engine: Engine | None = None) -> FastAPI:
     )
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
+
+    # sembrar el catálogo global (idempotente)
+    with app.state.sessionmaker() as session:
+        ensure_catalog(session)
 
     # protegidos: cualquier usuario con sesión
     app.include_router(
