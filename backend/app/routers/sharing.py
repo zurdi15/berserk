@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser
@@ -39,7 +40,12 @@ def grant(payload: GrantIn, user: CurrentUser, db: Session = Depends(get_db)):
     if exists:
         raise HTTPException(status_code=409, detail="already_shared")
     db.add(ShareGrant(owner_id=user.id, viewer_id=viewer.id))
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # dos POST idénticos en paralelo: la unique constraint es el árbitro
+        db.rollback()
+        raise HTTPException(status_code=409, detail="already_shared") from None
     return viewer
 
 

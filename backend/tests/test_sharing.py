@@ -52,6 +52,11 @@ def test_resolve_target_user(client: TestClient, db_session):
         resolve_target_user(user=admin, db=db_session, user_id=freyja.id)
     assert exc.value.status_code == 404 and exc.value.detail == "not_found"
 
+    # user_id inexistente: mismo 404 que sin grant (no filtra existencia)
+    with pytest.raises(HTTPException) as exc:
+        resolve_target_user(user=admin, db=db_session, user_id=99999)
+    assert exc.value.status_code == 404 and exc.value.detail == "not_found"
+
     db_session.add(models.ShareGrant(owner_id=freyja.id, viewer_id=admin.id))
     db_session.commit()
     assert resolve_target_user(user=admin, db=db_session, user_id=freyja.id).id == freyja.id
