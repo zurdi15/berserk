@@ -32,6 +32,12 @@ describe('animation system', () => {
     expect(css).not.toMatch(/cubic-bezier\(/)
     expect(css).toContain('var(--bk-ease-')
   })
+
+  it('reduced-motion guard also neutralizes stagger/entry delays', () => {
+    // sin esto, bk-stagger sigue escalonando entradas aunque dure 0.01ms
+    const guard = css.slice(css.indexOf('@media (prefers-reduced-motion'))
+    expect(guard).toContain('animation-delay: 0s !important')
+  })
 })
 
 describe('base styles', () => {
