@@ -123,3 +123,28 @@ def test_custom_exercise_lifecycle(client: TestClient, app):
     assert all(e["id"] != eid for e in freyja.get("/api/v1/exercises").json())
     assert freyja.delete(f"/api/v1/exercises/{eid}").status_code == 404
     assert client.delete(f"/api/v1/exercises/{eid}").status_code == 204
+
+
+def test_delete_exercise_in_use_conflict(client: TestClient, db_session):
+    from datetime import date as date_cls
+
+    from sqlalchemy import select
+
+    from app import models
+
+    chest = group_id(client, "chest")
+    eid = client.post(
+        "/api/v1/exercises",
+        json={
+            "name_es": "Press raro", "name_en": "Weird press", "measurement": "strength",
+            "muscle_groups": [{"muscle_group_id": chest, "is_primary": True}],
+        },
+    ).json()["id"]
+    admin = db_session.scalar(select(models.User).where(models.User.username == "admin"))
+    workout = models.Workout(owner_id=admin.id, date=date_cls(2026, 8, 5))
+    db_session.add(workout)
+    db_session.flush()
+    db_session.add(models.WorkoutExercise(workout_id=workout.id, exercise_id=eid, position=1))
+    db_session.commit()
+    resp = client.delete(f"/api/v1/exercises/{eid}")
+    assert resp.status_code == 409 and resp.json()["detail"] == "exercise_in_use"

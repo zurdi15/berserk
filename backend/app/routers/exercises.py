@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser
 from ..db import get_db
-from ..models import Exercise, ExerciseMuscleGroup, MuscleGroup
+from ..models import Exercise, ExerciseMuscleGroup, MuscleGroup, RoutineExercise, WorkoutExercise
 from ..permissions import TargetUser
 from ..schemas.catalog import (
     ExerciseIn,
@@ -162,6 +162,12 @@ def delete_exercise(exercise_id: int, user: CurrentUser, db: Session = Depends(g
     exercise = db.get(Exercise, exercise_id)
     if exercise is None or exercise.owner_id != user.id:
         raise HTTPException(status_code=404, detail="not_found")
-    # el guard exercise_in_use (rutinas/workouts que lo referencian) llega en Task 6
+    in_use = db.scalar(
+        select(RoutineExercise).where(RoutineExercise.exercise_id == exercise_id)
+    ) or db.scalar(
+        select(WorkoutExercise).where(WorkoutExercise.exercise_id == exercise_id)
+    )
+    if in_use:
+        raise HTTPException(status_code=409, detail="exercise_in_use")
     db.delete(exercise)
     db.commit()
