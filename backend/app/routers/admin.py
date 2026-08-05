@@ -6,7 +6,7 @@ from ..auth import AdminUser, create_invite, hash_password, revoke_other_session
 from ..db import get_db
 from ..models import Invite, User
 from ..schemas.auth import UserOut
-from ..schemas.users import InviteOut, UserCreateIn, UserUpdateIn
+from ..schemas.users import InviteOut, InviteTokenOut, UserCreateIn, UserUpdateIn
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -60,7 +60,7 @@ def delete_user(user_id: int, admin: AdminUser, db: Session = Depends(get_db)):
     db.commit()
 
 
-@router.post("/invites", status_code=201)
+@router.post("/invites", response_model=InviteTokenOut, status_code=201)
 def new_invite(admin: AdminUser, db: Session = Depends(get_db)):
     return {"token": create_invite(db, admin)}
 

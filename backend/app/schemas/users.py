@@ -21,6 +21,10 @@ class UserUpdateIn(BaseModel):
     is_admin: bool | None = None
 
 
+class InviteTokenOut(BaseModel):
+    token: str
+
+
 class InviteOut(BaseModel):
     id: int
     created_at: datetime
