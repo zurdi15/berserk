@@ -21,10 +21,14 @@ app.use(router)
 app.use(i18n)
 
 setUnauthorizedHandler(() => {
-  // sesión muerta a mitad de uso: fuera al login sin bucles (el guard haría
-  // lo mismo, pero solo en navegación; esto cubre cualquier fetch)
   const auth = useAuthStore()
   auth.user = null
+  const current = router.currentRoute.value.name
+  // durante el arranque (ready aún false) el guard resuelve el destino él
+  // mismo; y si ya estamos en una ruta pública no hay nada que redirigir.
+  // sesión muerta a mitad de uso: fuera al login sin bucles (el guard haría
+  // lo mismo, pero solo en navegación; esto cubre cualquier fetch).
+  if (!auth.ready || current === 'login' || current === 'bootstrap') return
   router.push({ name: 'login' })
 })
 

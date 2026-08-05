@@ -34,7 +34,10 @@ router.beforeEach(async (to) => {
   try {
     await auth.init()
   } catch (error) {
-    toastApiError(error)
+    // solo toastear si no estamos ya navegando al login (evitar doble toast)
+    if (to.name !== 'login') {
+      toastApiError(error)
+    }
     // backend caído: el login es estático y es el único destino con sentido
     return to.name === 'login' ? true : { name: 'login' }
   }

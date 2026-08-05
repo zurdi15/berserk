@@ -34,6 +34,8 @@ export async function api<T = unknown>(
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}))
     const slug = toSlug((payload as { detail?: unknown }).detail)
+    // solo not_authenticated dispara el handler: invalid_credentials (login fallido)
+    // es un error de usuario, no una sesión muerta a mitad de uso
     if (response.status === 401 && slug === 'not_authenticated') {
       unauthorizedHandler?.()
     }

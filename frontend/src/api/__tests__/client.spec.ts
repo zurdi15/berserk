@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { api, ApiError } from '../client'
+import { api, ApiError, setUnauthorizedHandler } from '../client'
 
 function mockFetch(status: number, body?: unknown) {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(
@@ -34,5 +34,31 @@ describe('api client', () => {
     mockFetch(422, { detail: [{ msg: 'password_too_long' }] })
     const error: unknown = await api('/auth/bootstrap', { method: 'POST', body: {} }).catch((e) => e)
     expect((error as ApiError).slug).toBe('generic')
+  })
+
+  it('calls handler on 401 with not_authenticated slug', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    mockFetch(401, { detail: 'not_authenticated' })
+    try {
+      await api('/auth/me')
+    } catch {
+      // ignore error
+    }
+    expect(handler).toHaveBeenCalledOnce()
+    setUnauthorizedHandler(null)
+  })
+
+  it('does not call handler on 401 with invalid_credentials slug', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    mockFetch(401, { detail: 'invalid_credentials' })
+    try {
+      await api('/auth/login', { method: 'POST', body: {} })
+    } catch {
+      // ignore error
+    }
+    expect(handler).not.toHaveBeenCalled()
+    setUnauthorizedHandler(null)
   })
 })
