@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import BkRune from '@/lib/BkRune.vue'
 import type { RuneName } from '@/lib/runes'
+import AthleteBanner from '@/components/shell/AthleteBanner.vue'
+import TimerPill from '@/components/shell/TimerPill.vue'
 
 const items: { name: string; label: string; rune: RuneName }[] = [
   { name: 'today', label: 'app.nav.today', rune: 'streak' },
@@ -33,6 +35,7 @@ const items: { name: string; label: string; rune: RuneName }[] = [
         </ul>
       </nav>
     </header>
+    <AthleteBanner />
     <!-- Mobile bottom nav: barra inferior fija en móvil; oculta en desktop (por ahora sin cabecera de identidad) -->
     <nav
       class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:hidden"
@@ -63,5 +66,6 @@ const items: { name: string; label: string; rune: RuneName }[] = [
         </Transition>
       </RouterView>
     </main>
+    <TimerPill />
   </div>
 </template>

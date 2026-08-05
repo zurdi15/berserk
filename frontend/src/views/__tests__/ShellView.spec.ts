@@ -1,10 +1,15 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { describe, expect, it, beforeEach } from 'vitest'
 
 import { createI18nInstance } from '../../i18n'
 import ShellView from '../ShellView.vue'
 
 describe('ShellView nav', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
   it('has desktop nav bar (hidden sm:block) centered with vertical-stack items', () => {
     const wrapper = mount(ShellView, {
       global: {
@@ -45,5 +50,16 @@ describe('ShellView nav', () => {
     const ul = mobileNav.find('ul')
     const listItems = ul.findAll('li')
     expect(listItems.length).toBeGreaterThan(0)
+  })
+
+  it('renders TimerPill and AthleteBanner components', () => {
+    const wrapper = mount(ShellView, {
+      global: {
+        plugins: [createI18nInstance()],
+        stubs: { RouterView: true, RouterLink: true, TimerPill: true, AthleteBanner: true },
+      },
+    })
+    expect(wrapper.findComponent({ name: 'TimerPill' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'AthleteBanner' }).exists()).toBe(true)
   })
 })

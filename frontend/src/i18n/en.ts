@@ -47,4 +47,11 @@ export const en = {
     decrease: 'Decrease',
     increase: 'Increase',
   },
+  athlete: {
+    viewing: 'Viewing {name}',
+    stop: 'Stop viewing',
+  },
+  timer: {
+    rest: 'Rest',
+  },
 } as const
