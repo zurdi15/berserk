@@ -310,11 +310,6 @@ export const addWorkoutExercise = (id: number, body: {
 }) =>
   api<WorkoutExerciseOut>(`/workouts/${id}/exercises`, { method: 'POST', body })
 
-export const updateWorkoutExercise = (wid: number, weid: number, body: {
-  note?: string | null
-}) =>
-  api<WorkoutExerciseOut>(`/workouts/${wid}/exercises/${weid}`, { method: 'PATCH', body })
-
 export const removeWorkoutExercise = (wid: number, weid: number) =>
   api<void>(`/workouts/${wid}/exercises/${weid}`, { method: 'DELETE' })
 

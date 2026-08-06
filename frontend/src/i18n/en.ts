@@ -265,5 +265,9 @@ export const en = {
     feeling: 'How did it feel?',
     note: 'Note',
     finishClose: 'Close',
+    discard: 'Discard',
+    discardTitle: 'Discard this workout?',
+    discardHint: 'The workout and its sets will be deleted. Records will be recalculated.',
+    muscleTags: 'Muscle groups',
   },
 } as const

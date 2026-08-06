@@ -15,6 +15,7 @@ import FinishSummary from '@/components/workout/FinishSummary.vue'
 import WorkoutExerciseCard from '@/components/workout/WorkoutExerciseCard.vue'
 import BkCelebration from '@/components/celebration/BkCelebration.vue'
 import BkButton from '@/lib/BkButton.vue'
+import BkSheet from '@/lib/BkSheet.vue'
 import type { RuneName } from '@/lib/runes'
 
 const { t, locale } = useI18n()
@@ -27,6 +28,7 @@ const routines = ref<RoutineOut[]>([])
 const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
 const addSheetOpen = ref(false)
+const discardConfirmOpen = ref(false)
 const finishedWorkout = ref<WorkoutOut | null>(null)
 const sessionRecords = ref<PersonalRecordOut[]>([])
 const now = ref(Date.now())
@@ -107,6 +109,36 @@ function onRecorded(records: PersonalRecordOut[]) {
   sessionRecords.value.push(...records)
 }
 
+async function confirmDiscard() {
+  discardConfirmOpen.value = false
+  try {
+    await activeWorkout.discard()
+    router.push({ name: 'today' })
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
+// misma etiqueta bilingüe que MuscleGroupManager: el nombre viene del catálogo,
+// no de i18n, así que se elige por locale en vez de traducirse
+function muscleTagLabel(group: MuscleGroupOut): string {
+  return locale.value === 'en' ? group.name_en : group.name_es
+}
+
+function isMuscleTagActive(id: number): boolean {
+  return activeWorkout.workout?.muscle_tag_ids.includes(id) ?? false
+}
+
+async function toggleMuscleTag(id: number) {
+  const current = activeWorkout.workout?.muscle_tag_ids ?? []
+  const next = current.includes(id) ? current.filter((tagId) => tagId !== id) : [...current, id]
+  try {
+    await activeWorkout.setMuscleTags(next)
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
 // la celebración solo sale del logueo en vivo (logSet rellena lastRecords);
 // al cerrarse, limpiamos para que no reaparezca en el siguiente render
 function onCelebrationDone() {
@@ -169,13 +201,40 @@ onBeforeUnmount(() => {
           <p class="text-sm text-ink-muted capitalize">{{ dateLabel }}</p>
           <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
         </div>
-        <BkButton variant="primary" @click="onFinish">{{ t('workout.finish') }}</BkButton>
+        <div class="flex items-center gap-2">
+          <BkButton
+            variant="danger"
+            data-testid="discard-workout"
+            @click="discardConfirmOpen = true"
+          >
+            {{ t('workout.discard') }}
+          </BkButton>
+          <BkButton variant="primary" @click="onFinish">{{ t('workout.finish') }}</BkButton>
+        </div>
+      </div>
+
+      <div v-if="muscleGroups.length" class="bk-slab p-4 space-y-2" :style="{ '--bk-stagger-i': 1 }">
+        <p class="text-sm text-ink-muted">{{ t('workout.muscleTags') }}</p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="group in muscleGroups"
+            :key="group.id"
+            type="button"
+            :data-testid="`muscle-tag-${group.id}`"
+            class="bk-press px-3 py-1.5 rounded-sm border text-sm"
+            :class="isMuscleTagActive(group.id) ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+            :aria-pressed="isMuscleTagActive(group.id) ? 'true' : 'false'"
+            @click="toggleMuscleTag(group.id)"
+          >
+            {{ muscleTagLabel(group) }}
+          </button>
+        </div>
       </div>
 
       <WorkoutExerciseCard
         v-for="(we, i) in activeWorkout.workout.exercises"
         :key="we.id"
-        :style="{ '--bk-stagger-i': i + 1 }"
+        :style="{ '--bk-stagger-i': i + 2 }"
         :workout-exercise="we"
         :exercise="exerciseMap.get(we.exercise_id)"
         :muscle-groups="muscleGroups"
@@ -189,13 +248,39 @@ onBeforeUnmount(() => {
       <BkButton
         variant="ghost"
         block
-        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 1 }"
+        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 2 }"
         @click="addSheetOpen = true"
       >
         {{ t('workout.addExercise') }}
       </BkButton>
 
       <AddExerciseSheet :open="addSheetOpen" @close="addSheetOpen = false" />
+
+      <BkSheet
+        :open="discardConfirmOpen"
+        :title="t('workout.discardTitle')"
+        @close="discardConfirmOpen = false"
+      >
+        <div class="space-y-4 p-4" data-testid="discard-confirm-sheet">
+          <p>{{ t('workout.discardHint') }}</p>
+          <div class="flex gap-2">
+            <BkButton
+              variant="ghost"
+              data-testid="discard-cancel-btn"
+              @click="discardConfirmOpen = false"
+            >
+              {{ t('common.cancel') }}
+            </BkButton>
+            <BkButton
+              variant="danger"
+              data-testid="discard-confirm-btn"
+              @click="confirmDiscard"
+            >
+              {{ t('workout.discard') }}
+            </BkButton>
+          </div>
+        </div>
+      </BkSheet>
     </div>
 
     <div v-else class="space-y-4">

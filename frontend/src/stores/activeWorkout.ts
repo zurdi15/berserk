@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { ApiError } from '@/api/client'
 import * as domain from '@/api/domain'
 import type { PersonalRecordOut, SetIn, SetLogOut, WorkoutOut } from '@/api/domain'
+import { useRestTimerStore } from '@/stores/restTimer'
 
 export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   const workout = ref<WorkoutOut | null>(null)
@@ -69,10 +70,23 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     await refresh()
   }
 
+  async function discard() {
+    await domain.deleteWorkout(workout.value!.id)
+    workout.value = null
+    lastRecords.value = []
+    // el descarte cierra el entreno, así que un descanso en marcha ya no aplica
+    useRestTimerStore().clear()
+  }
+
+  async function setMuscleTags(ids: number[]) {
+    // el endpoint devuelve el entreno completo actualizado: no hace falta un refresh aparte
+    workout.value = await domain.setWorkoutMuscleTags(workout.value!.id, ids)
+  }
+
   function reset() {
     workout.value = null
     lastRecords.value = []
   }
 
-  return { workout, loading, lastRecords, resume, refresh, start, finish, addExercise, removeExercise, reorder, logSet, updateSet, deleteSet, reset }
+  return { workout, loading, lastRecords, resume, refresh, start, finish, addExercise, removeExercise, reorder, logSet, updateSet, deleteSet, discard, setMuscleTags, reset }
 })

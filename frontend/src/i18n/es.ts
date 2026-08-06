@@ -265,5 +265,9 @@ export const es = {
     feeling: '¿Cómo te has sentido?',
     note: 'Nota',
     finishClose: 'Cerrar',
+    discard: 'Descartar',
+    discardTitle: '¿Descartar el entreno?',
+    discardHint: 'Se borra el entreno y sus series. Los récords se recalculan.',
+    muscleTags: 'Grupos musculares',
   },
 } as const

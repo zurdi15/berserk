@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -17,6 +17,8 @@ vi.mock('@/api/domain', () => ({
   listRoutines: vi.fn(async () => routines),
   listExercises: vi.fn(async () => []),
   listMuscleGroups: vi.fn(async () => []),
+  deleteWorkout: vi.fn(),
+  setWorkoutMuscleTags: vi.fn(),
 }))
 
 import * as domain from '@/api/domain'
@@ -274,6 +276,106 @@ describe('WorkoutView', () => {
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'BkCelebration' }).props('units')).toBe('lb')
+    })
+  })
+
+  describe('discard workout', () => {
+    const workoutFixture = {
+      id: 1,
+      date: '2026-08-06',
+      started_at: '2026-08-06T09:00:00Z',
+      ended_at: null,
+      routine_id: null,
+      note: null,
+      feeling: null,
+      exercises: [],
+      muscle_tag_ids: [],
+    }
+
+    // BkSheet usa <Teleport to="body">: hay que montar sobre document.body,
+    // buscar ahí dentro y desmontar tras cada prueba (ver library.spec.ts)
+    let wrapper: VueWrapper | null = null
+
+    afterEach(() => {
+      wrapper?.unmount()
+      wrapper = null
+    })
+
+    function byTestId(id: string): DOMWrapper<Element> {
+      return new DOMWrapper(document.body.querySelector(`[data-testid="${id}"]`) as Element | null)
+    }
+
+    it('opens the discard confirm sheet on click, and confirming calls deleteWorkout and navigates to today', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+      vi.mocked(domain.deleteWorkout).mockResolvedValue(undefined as never)
+
+      wrapper = mount(WorkoutView, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await flushPromises()
+
+      await wrapper.find('[data-testid="discard-workout"]').trigger('click')
+      await flushPromises()
+
+      expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('¿Descartar el entreno?')
+
+      await byTestId('discard-confirm-btn').trigger('click')
+      await flushPromises()
+
+      expect(domain.deleteWorkout).toHaveBeenCalledWith(1)
+      expect(push).toHaveBeenCalledWith({ name: 'today' })
+    })
+  })
+
+  describe('muscle tag chips', () => {
+    const workoutFixture = {
+      id: 1,
+      date: '2026-08-06',
+      started_at: '2026-08-06T09:00:00Z',
+      ended_at: null,
+      routine_id: null,
+      note: null,
+      feeling: null,
+      exercises: [],
+      muscle_tag_ids: [],
+    }
+    const muscleGroupsFixture = [
+      { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+      { id: 2, slug: 'back', name_es: 'Espalda', name_en: 'Back', owner_id: null },
+    ]
+
+    let wrapper: VueWrapper | null = null
+
+    afterEach(() => {
+      wrapper?.unmount()
+      wrapper = null
+    })
+
+    it('toggles the chest chip: calls setWorkoutMuscleTags with the new full array and marks it selected', async () => {
+      vi.mocked(domain.listMuscleGroups).mockResolvedValue(muscleGroupsFixture as never)
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+      vi.mocked(domain.setWorkoutMuscleTags).mockResolvedValue({ ...workoutFixture, muscle_tag_ids: [1] } as never)
+
+      wrapper = mount(WorkoutView, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="muscle-tag-1"]').attributes('aria-pressed')).toBe('false')
+
+      await wrapper.find('[data-testid="muscle-tag-1"]').trigger('click')
+      await flushPromises()
+
+      expect(domain.setWorkoutMuscleTags).toHaveBeenCalledWith(1, [1])
+      expect(wrapper.find('[data-testid="muscle-tag-1"]').attributes('aria-pressed')).toBe('true')
     })
   })
 })

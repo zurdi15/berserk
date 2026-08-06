@@ -12,11 +12,13 @@ vi.mock('@/api/domain', () => ({
   reorderWorkoutExercises: vi.fn(),
   updateSet: vi.fn(),
   deleteSet: vi.fn(),
+  deleteWorkout: vi.fn(),
 }))
 
 import * as domain from '@/api/domain'
 import { ApiError } from '@/api/client'
 import { useActiveWorkoutStore } from '../activeWorkout'
+import { useRestTimerStore } from '../restTimer'
 
 const workout = { id: 4, date: '2026-08-05', ended_at: null, exercises: [], muscle_tag_ids: [] }
 
@@ -66,6 +68,39 @@ describe('active workout store', () => {
     const finished = await store.finish()
     expect(finished.ended_at).toBe('x')
     expect(store.workout).toBeNull()
+  })
+
+  it('discard resets workout and lastRecords and stops the rest timer when the API resolves', async () => {
+    vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+    const store = useActiveWorkoutStore()
+    await store.resume()
+    store.lastRecords = [{ id: 9, kind: 'max_weight', value: 100 }] as any
+    const restTimer = useRestTimerStore()
+    restTimer.start(60)
+    vi.mocked(domain.deleteWorkout).mockResolvedValue(undefined as never)
+
+    await store.discard()
+
+    expect(domain.deleteWorkout).toHaveBeenCalledWith(4)
+    expect(store.workout).toBeNull()
+    expect(store.lastRecords).toEqual([])
+    expect(restTimer.active).toBe(false)
+  })
+
+  it('discard propagates the API error without clearing workout, lastRecords or the rest timer', async () => {
+    vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+    const store = useActiveWorkoutStore()
+    await store.resume()
+    store.lastRecords = [{ id: 9, kind: 'max_weight', value: 100 }] as any
+    const restTimer = useRestTimerStore()
+    restTimer.start(60)
+    vi.mocked(domain.deleteWorkout).mockRejectedValue(new Error('boom'))
+
+    await expect(store.discard()).rejects.toThrow('boom')
+
+    expect(store.workout).toEqual(workout)
+    expect(store.lastRecords).toEqual([{ id: 9, kind: 'max_weight', value: 100 }])
+    expect(restTimer.active).toBe(true)
   })
 
   it('reset clears workout and lastRecords (for logout)', () => {
