@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+
 import BkRune from '@/lib/BkRune.vue'
 import type { RuneName } from '@/lib/runes'
 import AthleteBanner from '@/components/shell/AthleteBanner.vue'
@@ -11,6 +14,16 @@ const items: { name: string; label: string; rune: RuneName }[] = [
   { name: 'progress', label: 'app.nav.progress', rune: 'pr' },
   { name: 'profile', label: 'app.nav.profile', rune: 'shoulders' },
 ]
+
+const route = useRoute()
+
+// índice de la sección activa, para el indicador deslizante del bottom bar
+// (móvil): -1 (sin match) cae a 0 en vez de esconder la barra en una posición
+// rara — dentro de este shell siempre hay una ruta hija activa
+const activeIndex = computed(() => {
+  const idx = items.findIndex((item) => item.name === route.name)
+  return idx === -1 ? 0 : idx
+})
 </script>
 
 <template>
@@ -22,7 +35,7 @@ const items: { name: string; label: string; rune: RuneName }[] = [
           <li v-for="item in items" :key="item.name">
             <RouterLink
               :to="{ name: item.name }"
-              class="flex flex-col items-center gap-1 px-3 py-2 text-ink-faint hover:text-ink"
+              class="relative flex flex-col items-center gap-1 px-3 py-2 text-ink-faint hover:text-ink"
               active-class="text-aurora"
             >
               <span class="text-xs uppercase tracking-wide">{{ $t(item.label) }}</span>
@@ -30,6 +43,14 @@ const items: { name: string; label: string; rune: RuneName }[] = [
                 <span v-if="item.name === 'workout'" class="bk-breathe absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)" aria-hidden="true" />
                 <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
               </span>
+              <!-- subrayado por item: entra con scale-in cuando la sección está activa -->
+              <span
+                class="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-aurora"
+                :class="route.name === item.name ? 'scale-x-100' : 'scale-x-0'"
+                style="transition: transform var(--bk-dur-2) var(--bk-ease-out); transform-origin: center"
+                aria-hidden="true"
+                data-testid="nav-underline"
+              />
             </RouterLink>
           </li>
         </ul>
@@ -41,23 +62,32 @@ const items: { name: string; label: string; rune: RuneName }[] = [
       class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:hidden"
       :aria-label="$t('app.nav.label')"
     >
-      <ul class="flex justify-around max-w-3xl mx-auto">
-        <li v-for="item in items" :key="item.name" class="flex-1">
-          <RouterLink
-            :to="{ name: item.name }"
-            class="flex flex-col items-center gap-1 py-2 text-ink-faint"
-            active-class="text-aurora"
-          >
-            <span
-              :class="item.name === 'workout' && 'bk-slab relative -mt-5 p-2.5 border-aurora text-aurora'"
+      <div class="relative max-w-3xl mx-auto">
+        <!-- indicador deslizante: una barra por cada 1/5 del ancho, se traslada al índice activo -->
+        <div
+          class="absolute top-0 left-0 h-0.5 w-1/5 rounded-full bg-aurora"
+          :style="{ transform: `translateX(${activeIndex * 100}%)`, transition: 'transform var(--bk-dur-3) var(--bk-ease-out)' }"
+          aria-hidden="true"
+          data-testid="nav-indicator"
+        />
+        <ul class="flex justify-around">
+          <li v-for="item in items" :key="item.name" class="flex-1">
+            <RouterLink
+              :to="{ name: item.name }"
+              class="flex flex-col items-center gap-1 py-2 text-ink-faint"
+              active-class="text-aurora"
             >
-              <span v-if="item.name === 'workout'" class="bk-breathe absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)" aria-hidden="true" />
-              <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
-            </span>
-            <span class="text-xs uppercase tracking-wide">{{ $t(item.label) }}</span>
-          </RouterLink>
-        </li>
-      </ul>
+              <span
+                :class="item.name === 'workout' && 'bk-slab relative -mt-5 p-2.5 border-aurora text-aurora'"
+              >
+                <span v-if="item.name === 'workout'" class="bk-breathe absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)" aria-hidden="true" />
+                <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
+              </span>
+              <span class="text-xs uppercase tracking-wide">{{ $t(item.label) }}</span>
+            </RouterLink>
+          </li>
+        </ul>
+      </div>
     </nav>
     <main class="flex-1 px-4 py-4 pb-24 max-w-3xl w-full mx-auto">
       <RouterView v-slot="{ Component }">
