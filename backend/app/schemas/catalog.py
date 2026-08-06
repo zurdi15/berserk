@@ -20,6 +20,14 @@ class MuscleGroupIn(BaseModel):
     is_global: bool = False
 
 
+class MuscleGroupPatchIn(BaseModel):
+    # slug dobla como identificador de runa (ver runeResolve.ts): editarlo es
+    # lo que el picker de runas de grupos predefinidos (item 5) acaba enviando
+    slug: str | None = Field(None, min_length=2, max_length=30, pattern=r"^[a-z0-9-]+$")
+    name_es: str | None = Field(None, min_length=1, max_length=50)
+    name_en: str | None = Field(None, min_length=1, max_length=50)
+
+
 class ExerciseMuscleLink(BaseModel):
     muscle_group_id: int
     is_primary: bool = False
@@ -36,6 +44,9 @@ class ExerciseIn(BaseModel):
     name_en: str = Field(min_length=1, max_length=80)
     measurement: Literal["strength", "bodyweight", "timed", "cardio"]
     muscle_groups: list[ExerciseMuscleLink] = Field(min_length=1)
+    # item 3: ejercicio global (owner_id null, visible a todo el mundo) —
+    # solo un admin puede pedirlo, igual que MuscleGroupIn.is_global
+    is_global: bool = False
 
     @field_validator("muscle_groups")
     @classmethod

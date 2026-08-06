@@ -9,11 +9,15 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import BkCard from '@/lib/BkCard.vue'
+import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
+import BkRune from '@/lib/BkRune.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
+import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
+import type { RuneName } from '@/lib/runes'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -22,9 +26,12 @@ const toast = useToastStore()
 const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
 
-// el catálogo global (owner_id null) es de solo lectura aquí: esta pantalla
-// gestiona únicamente los ejercicios propios del usuario
 const ownExercises = computed(() => exercises.value.filter((e) => e.owner_id !== null))
+// item 4: catálogo predefinido (owner_id null) en su propia sección,
+// colapsada por defecto — de solo lectura para un usuario normal; item 5
+// añade edición/borrado ahí mismo para un admin
+const catalogExercises = computed(() => exercises.value.filter((e) => e.owner_id === null))
+const catalogOpen = ref(false)
 
 const measurementValues: Measurement[] = ['strength', 'bodyweight', 'timed', 'cardio']
 const measurementOptions = computed(() =>
@@ -35,6 +42,13 @@ function groupLabel(group: MuscleGroupOut): string {
   return auth.user?.locale === 'en' ? group.name_en : group.name_es
 }
 
+// item 6: tag runa+nombre del grupo muscular primario, en cada fila de
+// ejercicio (propio o del catálogo) — mismo resolver que AddExerciseSheet/
+// ExercisePicker, un único punto de verdad para "qué grupo es el primario"
+function primaryGroup(exercise: ExerciseOut): MuscleGroupOut | undefined {
+  return primaryMuscleGroup(exercise, muscleGroups.value)
+}
+
 const formOpen = ref(false)
 const editingId = ref<number | null>(null)
 const nameEs = ref('')
@@ -42,6 +56,9 @@ const nameEn = ref('')
 const measurement = ref<Measurement>('strength')
 const checkedGroupIds = ref<number[]>([])
 const primaryGroupId = ref<number | null>(null)
+// item 3: solo en creación (igual que measurement arriba) — is_global no es
+// patchable en el backend, así que no tiene sentido mostrarlo al editar
+const isGlobal = ref(false)
 const saving = ref(false)
 
 const deleteConfirmOpen = ref(false)
@@ -72,6 +89,7 @@ function openCreate() {
   measurement.value = 'strength'
   checkedGroupIds.value = []
   primaryGroupId.value = null
+  isGlobal.value = false
   formOpen.value = true
 }
 
@@ -118,6 +136,7 @@ async function submitForm() {
         name_en: nameEn.value,
         measurement: measurement.value,
         muscle_groups,
+        is_global: isGlobal.value,
       })
     }
     formOpen.value = false
@@ -158,26 +177,38 @@ async function confirmDelete() {
             v-for="exercise in ownExercises"
             :key="exercise.id"
             :data-testid="`exercise-row-${exercise.id}`"
-            class="flex items-center justify-between p-2 rounded border border-line text-sm"
+            class="flex items-center justify-between gap-2 p-2 rounded border border-line text-sm"
           >
-            <span>{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
-            <div class="flex gap-2">
-              <BkButton
-                variant="ghost"
-                size="sm"
-                data-testid="edit-exercise-btn"
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
+              <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
+              <span
+                v-if="primaryGroup(exercise)"
+                class="inline-flex items-center gap-1 text-ink-faint shrink-0"
+                :data-testid="`exercise-group-tag-${exercise.id}`"
+              >
+                <BkRune
+                  v-if="isValidRuneName(primaryGroup(exercise)!.slug)"
+                  :name="(primaryGroup(exercise)!.slug as RuneName)"
+                  :size="14"
+                />
+                <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
+              </span>
+            </span>
+            <!-- item 1: icon-only, como en RoutineList/AdminCard -->
+            <div class="flex items-center gap-2 shrink-0">
+              <BkActionBtn
+                icon="edit"
+                :data-testid="`edit-exercise-${exercise.id}`"
+                :aria-label="$t('common.edit')"
                 @click="openEdit(exercise)"
-              >
-                {{ $t('common.edit') }}
-              </BkButton>
-              <BkButton
-                variant="danger"
-                size="sm"
-                data-testid="delete-exercise-btn"
+              />
+              <BkActionBtn
+                icon="delete"
+                :data-testid="`delete-exercise-${exercise.id}`"
+                :aria-label="$t('common.delete')"
                 @click="askDelete(exercise.id)"
-              >
-                {{ $t('common.delete') }}
-              </BkButton>
+              />
             </div>
           </div>
         </div>
@@ -187,6 +218,80 @@ async function confirmDelete() {
         <BkButton data-testid="new-exercise-btn" @click="openCreate">
           {{ $t('library.newExercise') }}
         </BkButton>
+      </div>
+    </BkCard>
+
+    <!-- item 4: catálogo predefinido, colapsado por defecto — mismo patrón
+         de expandir/colapsar que las rutinas de RoutineList -->
+    <BkCard>
+      <div class="space-y-4">
+        <button
+          type="button"
+          class="bk-press flex w-full items-center justify-between text-left"
+          :aria-expanded="catalogOpen ? 'true' : 'false'"
+          data-testid="toggle-catalog"
+          @click="catalogOpen = !catalogOpen"
+        >
+          <h2 class="font-display font-semibold text-ink uppercase tracking-wider text-sm">
+            {{ $t('library.catalog') }}
+          </h2>
+          <svg
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"
+            class="w-4 h-4 shrink-0 text-ink-muted transition-transform"
+            :class="{ 'rotate-180': catalogOpen }"
+            aria-hidden="true"
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+
+        <div v-if="catalogOpen" :data-testid="'catalog-list'" class="space-y-2">
+          <div v-if="ready && catalogExercises.length > 0" class="space-y-2">
+            <div
+              v-for="exercise in catalogExercises"
+              :key="exercise.id"
+              :data-testid="`catalog-exercise-row-${exercise.id}`"
+              class="flex items-center justify-between gap-2 p-2 rounded border border-line text-sm"
+            >
+              <span class="flex items-center gap-2 min-w-0">
+                <span class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
+                <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
+                <span
+                  v-if="primaryGroup(exercise)"
+                  class="inline-flex items-center gap-1 text-ink-faint shrink-0"
+                  :data-testid="`exercise-group-tag-${exercise.id}`"
+                >
+                  <BkRune
+                    v-if="isValidRuneName(primaryGroup(exercise)!.slug)"
+                    :name="(primaryGroup(exercise)!.slug as RuneName)"
+                    :size="14"
+                  />
+                  <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
+                </span>
+              </span>
+              <!-- item 5: un admin puede editar/borrar filas predefinidas —
+                   reutiliza el mismo sheet/flow que los ejercicios propios,
+                   el backend ya lo permite sobre owner_id null -->
+              <div v-if="auth.user?.is_admin" class="flex items-center gap-2 shrink-0">
+                <BkActionBtn
+                  icon="edit"
+                  :data-testid="`edit-exercise-${exercise.id}`"
+                  :aria-label="$t('common.edit')"
+                  @click="openEdit(exercise)"
+                />
+                <BkActionBtn
+                  icon="delete"
+                  :data-testid="`delete-exercise-${exercise.id}`"
+                  :aria-label="$t('common.delete')"
+                  @click="askDelete(exercise.id)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <BkEmpty v-else-if="ready" :message="$t('library.noCatalog')" />
+        </div>
       </div>
     </BkCard>
 
@@ -213,6 +318,20 @@ async function confirmDelete() {
           :options="measurementOptions"
           data-testid="exercise-measurement-select"
         />
+        <!-- item 3: global (owner_id null, visible a todos) — solo admin,
+             y solo al crear (no es patchable, mismo criterio que measurement) -->
+        <label
+          v-if="editingId === null && auth.user?.is_admin"
+          class="flex items-center gap-2 cursor-pointer"
+        >
+          <input
+            v-model="isGlobal"
+            type="checkbox"
+            class="rounded border border-line"
+            data-testid="exercise-is-global-checkbox"
+          />
+          <span class="text-sm text-ink-muted">{{ $t('library.isGlobal') }}</span>
+        </label>
 
         <div class="space-y-2">
           <span class="block text-sm text-ink-muted">{{ $t('library.muscleGroups') }}</span>

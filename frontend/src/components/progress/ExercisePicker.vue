@@ -2,12 +2,15 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { ExerciseOut } from '@/api/domain'
-import { getTrainedExercises, listExercises } from '@/api/domain'
+import type { ExerciseOut, MuscleGroupOut } from '@/api/domain'
+import { getTrainedExercises, listExercises, listMuscleGroups } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { useAthleteStore } from '@/stores/athlete'
 import BkField from '@/lib/BkField.vue'
+import BkRune from '@/lib/BkRune.vue'
+import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
+import type { RuneName } from '@/lib/runes'
 
 const props = defineProps<{ modelValue: number | null }>()
 const emit = defineEmits<{ 'update:modelValue': [value: number | null] }>()
@@ -16,6 +19,9 @@ const { t, locale } = useI18n()
 const athlete = useAthleteStore()
 
 const allExercises = ref<ExerciseOut[]>([])
+// item 6: catálogo de grupos, mismo hilo de atleta que el resto — para
+// resolver el tag de runa+nombre de cada opción
+const muscleGroups = ref<MuscleGroupOut[]>([])
 const query = ref('')
 // controla el esqueleto (item 3a), no un gating tipo TodayView: mientras
 // carga se muestran filas shimmer con el mismo hueco que la lista real, para
@@ -30,12 +36,14 @@ async function load() {
   try {
     // catálogo completo con hilo de atleta: buscamos entre los ejercicios de
     // quien se está viendo, no siempre los propios — luego se filtra en cliente
-    const [list, trained] = await Promise.all([
+    const [list, trained, groups] = await Promise.all([
       listExercises({ userId: athlete.userId }),
       getTrainedExercises(athlete.userId),
+      listMuscleGroups(athlete.userId),
     ])
     allExercises.value = list
     trainedIds.value = new Set(trained.exercise_ids)
+    muscleGroups.value = groups
   } catch (error) {
     toastApiError(error)
   } finally {
@@ -51,6 +59,14 @@ const filtered = computed(() => {
 
 function select(id: number | null) {
   emit('update:modelValue', id)
+}
+
+function primaryGroup(exercise: ExerciseOut): MuscleGroupOut | undefined {
+  return primaryMuscleGroup(exercise, muscleGroups.value)
+}
+
+function groupLabel(group: MuscleGroupOut): string {
+  return locale.value === 'en' ? group.name_en : group.name_es
 }
 
 onMounted(load)
@@ -85,21 +101,36 @@ watch(() => athlete.userId, load)
         :key="exercise.id"
         type="button"
         :data-testid="`exercise-option-${exercise.id}`"
-        class="w-full text-left p-2 rounded-sm hover:bg-stone transition-colors text-sm border border-transparent hover:border-line flex items-center gap-1.5"
+        class="w-full text-left p-2 rounded-sm hover:bg-stone transition-colors text-sm border border-transparent hover:border-line flex items-center justify-between gap-1.5"
         :class="modelValue === exercise.id ? 'text-aurora' : 'text-ink'"
         @click="select(exercise.id)"
       >
-        <span>{{ exerciseName(exercise, locale) }}</span>
-        <!-- punto aurora (item 5): mismo visual que los dots "done" del
-             calendario (w-1.5 h-1.5 rounded-full bg-aurora, ver MonthGrid.vue)
-             — señal de que este ejercicio ya tiene series registradas -->
-        <span
-          v-if="trainedIds.has(exercise.id)"
-          class="w-1.5 h-1.5 rounded-full bg-aurora shrink-0"
-          data-testid="trained-dot"
-          :title="t('progress.hasData')"
-        >
-          <span class="sr-only">{{ t('progress.hasData') }}</span>
+        <span class="truncate">{{ exerciseName(exercise, locale) }}</span>
+        <span class="flex items-center gap-1.5 shrink-0">
+          <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
+          <span
+            v-if="primaryGroup(exercise)"
+            class="inline-flex items-center gap-1 text-ink-faint"
+            :data-testid="`exercise-group-tag-${exercise.id}`"
+          >
+            <BkRune
+              v-if="isValidRuneName(primaryGroup(exercise)!.slug)"
+              :name="(primaryGroup(exercise)!.slug as RuneName)"
+              :size="14"
+            />
+            <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
+          </span>
+          <!-- punto aurora (item 5): mismo visual que los dots "done" del
+               calendario (w-1.5 h-1.5 rounded-full bg-aurora, ver MonthGrid.vue)
+               — señal de que este ejercicio ya tiene series registradas -->
+          <span
+            v-if="trainedIds.has(exercise.id)"
+            class="w-1.5 h-1.5 rounded-full bg-aurora shrink-0"
+            data-testid="trained-dot"
+            :title="t('progress.hasData')"
+          >
+            <span class="sr-only">{{ t('progress.hasData') }}</span>
+          </span>
         </span>
       </button>
     </div>

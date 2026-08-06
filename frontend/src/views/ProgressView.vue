@@ -22,7 +22,9 @@ import { toastApiError } from '@/utils/apiErrors'
 const { t } = useI18n()
 const athlete = useAthleteStore()
 
-const tab = ref<'training' | 'records' | 'stats' | 'body'>('training')
+// item 8 (v0.3.0): orden totales → cuerpo → entreno → récords, con
+// Totales como pestaña activa por defecto (antes era Entrenos)
+const tab = ref<'training' | 'records' | 'stats' | 'body'>('stats')
 const metric = ref<MetricKey>('top_weight')
 const exerciseId = ref<number | null>(null)
 
@@ -40,15 +42,15 @@ const statsReady = ref(false)
 
 const units = useDisplayUnits()
 
-// Récords (PrList) y Distribución (DistributionBars) tienen su propia pestaña
-// (item 3b) — "Récords" reutiliza progress.records, ya es exactamente ese
-// texto en los dos idiomas (antes era solo el título de la card). Estadísticas
-// (round 8) va justo después de Récords, antes de Cuerpo.
+// item 8 (v0.3.0): orden totales → cuerpo → entreno → récords (antes era
+// entreno → récords → totales → cuerpo) — feedback de gimnasio real: lo
+// primero que se quiere ver al abrir Progresión es el resumen, no la lista
+// de ejercicios a filtrar
 const mainTabs = computed(() => [
-  { value: 'training', label: t('progress.tabs.training') },
-  { value: 'records', label: t('progress.records') },
   { value: 'stats', label: t('progress.stats.title') },
   { value: 'body', label: t('progress.tabs.body') },
+  { value: 'training', label: t('progress.tabs.training') },
+  { value: 'records', label: t('progress.records') },
 ])
 
 const metricTabs = computed(() => [

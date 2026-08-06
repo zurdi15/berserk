@@ -112,11 +112,14 @@ def test_custom_exercise_lifecycle(client: TestClient, app):
               "muscle_groups": [{"muscle_group_id": group_id(client, "back"), "is_primary": True}]},
     )
     assert resp.status_code == 200 and resp.json()["name_en"] == "Weirder press"
-    # los globales son inmutables (404: no son tuyos)
+    # los globales son inmutables para un usuario normal (404: no son tuyos)
+    # — un admin SÍ puede (item 5, ver test_admin_can_edit_global_exercise)
     exercises = client.get("/api/v1/exercises").json()
     bench = next(e for e in exercises if e["name_en"] == "Bench press")
-    assert client.patch(f"/api/v1/exercises/{bench['id']}", json={"name_en": "Nope"}).status_code == 404
-    assert client.delete(f"/api/v1/exercises/{bench['id']}").status_code == 404
+    make_user(client, "loki")
+    loki = login(app, "loki")
+    assert loki.patch(f"/api/v1/exercises/{bench['id']}", json={"name_en": "Nope"}).status_code == 404
+    assert loki.delete(f"/api/v1/exercises/{bench['id']}").status_code == 404
     # otro usuario no ve ni toca mi custom
     make_user(client, "freyja")
     freyja = login(app, "freyja")
@@ -148,3 +151,106 @@ def test_delete_exercise_in_use_conflict(client: TestClient, db_session):
     db_session.commit()
     resp = client.delete(f"/api/v1/exercises/{eid}")
     assert resp.status_code == 409 and resp.json()["detail"] == "exercise_in_use"
+
+
+def test_create_global_exercise_admin_only(client: TestClient, app):
+    # item 3: is_global=True crea owner_id NULL, visible a todos — solo admin
+    chest = group_id(client, "chest")
+    resp = client.post(
+        "/api/v1/exercises",
+        json={
+            "name_es": "Press del clan", "name_en": "Clan press", "measurement": "strength",
+            "muscle_groups": [{"muscle_group_id": chest, "is_primary": True}],
+            "is_global": True,
+        },
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["owner_id"] is None
+
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    # freyja lo ve (global) pese a no haberlo creado
+    assert any(e["id"] == body["id"] for e in freyja.get("/api/v1/exercises").json())
+    resp = freyja.post(
+        "/api/v1/exercises",
+        json={
+            "name_es": "X", "name_en": "X", "measurement": "strength",
+            "muscle_groups": [{"muscle_group_id": chest, "is_primary": True}],
+            "is_global": True,
+        },
+    )
+    assert resp.status_code == 403 and resp.json()["detail"] == "admin_only"
+
+
+def test_admin_can_edit_and_delete_global_exercise(client: TestClient, app):
+    # item 5: un admin puede editar/borrar filas del catálogo predefinido
+    # (owner_id NULL); un usuario normal sigue viendo 404 (no son suyas)
+    exercises = client.get("/api/v1/exercises").json()
+    bench = next(e for e in exercises if e["name_en"] == "Bench press")
+
+    resp = client.patch(f"/api/v1/exercises/{bench['id']}", json={"name_en": "Bench press v2"})
+    assert resp.status_code == 200 and resp.json()["name_en"] == "Bench press v2"
+    assert resp.json()["owner_id"] is None
+
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    assert freyja.patch(f"/api/v1/exercises/{bench['id']}", json={"name_en": "Nope"}).status_code == 404
+    assert freyja.delete(f"/api/v1/exercises/{bench['id']}").status_code == 404
+
+    assert client.delete(f"/api/v1/exercises/{bench['id']}").status_code == 204
+    assert all(e["id"] != bench["id"] for e in client.get("/api/v1/exercises").json())
+
+
+def test_admin_can_update_and_delete_global_muscle_group(client: TestClient, app):
+    # item 5: PATCH no existía para grupos musculares; admin puede editar
+    # nombre y "runa" (slug) de un grupo predefinido, y borrarlo (con la
+    # guarda de uso 409 intacta) — un usuario normal ve 404 en ambos casos
+    legs = group_id(client, "legs")
+
+    resp = client.patch(
+        f"/api/v1/muscle-groups/{legs}",
+        json={"name_es": "Piernas y glúteos", "name_en": "Legs and glutes"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["name_es"] == "Piernas y glúteos"
+    assert resp.json()["owner_id"] is None
+
+    # slug libre -> aceptado (esto es lo que hace el picker de runas: cambia
+    # el slug a otro nombre de runa válido)
+    resp = client.patch(f"/api/v1/muscle-groups/{legs}", json={"slug": "quads"})
+    assert resp.status_code == 200 and resp.json()["slug"] == "quads"
+
+    # slug ya usado por otro grupo global -> 409
+    chest = group_id(client, "chest")
+    resp = client.patch(f"/api/v1/muscle-groups/{chest}", json={"slug": "quads"})
+    assert resp.status_code == 409 and resp.json()["detail"] == "slug_taken"
+
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    assert freyja.patch(f"/api/v1/muscle-groups/{legs}", json={"name_es": "Nope"}).status_code == 404
+    assert freyja.delete(f"/api/v1/muscle-groups/{legs}").status_code == 404
+
+    # "legs" (ahora "quads") está en uso por el catálogo sembrado, así que
+    # para probar el borrado admin de una fila global se usa un grupo global
+    # nuevo y vacío, no "legs" (eso ya cubre el 409 en el test siguiente)
+    empty_global = client.post(
+        "/api/v1/muscle-groups",
+        json={"slug": "forearms", "name_es": "Antebrazos", "name_en": "Forearms", "is_global": True},
+    ).json()
+    assert freyja.delete(f"/api/v1/muscle-groups/{empty_global['id']}").status_code == 404
+    assert client.delete(f"/api/v1/muscle-groups/{empty_global['id']}").status_code == 204
+    remaining = client.get("/api/v1/muscle-groups").json()
+    assert all(g["id"] != empty_global["id"] for g in remaining)
+    assert any(g["slug"] == "quads" for g in remaining)
+
+
+def test_admin_delete_global_muscle_group_in_use_conflict(client: TestClient):
+    # la guarda 409 sigue aplicando incluso para un admin sobre una fila global
+    chest = group_id(client, "chest")
+    exercises = client.get("/api/v1/exercises").json()
+    assert any(
+        l["muscle_group_id"] == chest for e in exercises for l in e["muscle_groups"]
+    )
+    resp = client.delete(f"/api/v1/muscle-groups/{chest}")
+    assert resp.status_code == 409 and resp.json()["detail"] == "muscle_group_in_use"
