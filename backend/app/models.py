@@ -31,6 +31,8 @@ class User(Base):
     locale: Mapped[str] = mapped_column(String(5), default="es")
     units: Mapped[str] = mapped_column(String(2), default="kg")
     timezone: Mapped[str] = mapped_column(String(50), default="Europe/Madrid")
+    # NULL = sin color propio; el frontend cae al aurora del tema como default
+    color: Mapped[str | None] = mapped_column(String(7), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     sessions: Mapped[list["AuthSession"]] = relationship(

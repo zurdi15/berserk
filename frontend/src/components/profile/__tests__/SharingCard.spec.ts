@@ -15,7 +15,7 @@ vi.mock('@/api/domain', () => ({
       { id: 2, username: 'freyja', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' },
     ],
     received: [
-      { id: 3, username: 'freyr', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' },
+      { id: 3, username: 'freyr', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC', color: '#7C8FFF' },
     ],
   })),
   revokeSharing: vi.fn(() => Promise.resolve()),
@@ -94,9 +94,20 @@ describe('SharingCard', () => {
     const athlete = useAthleteStore()
     expect(athlete.viewing).not.toBeNull()
     expect(athlete.viewing?.username).toBe('freyr')
+    expect(athlete.viewing?.color).toBe('#7C8FFF')
 
     // Verify router navigation
     expect(push).toHaveBeenCalledWith({ name: 'today' })
+  })
+
+  it('shows a color dot next to each user shared with me', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const dots = wrapper.findAll('[data-testid="sharing-user-dot"]')
+    expect(dots).toHaveLength(1)
+    expect((dots[0].element as HTMLElement).style.backgroundColor).toBe('#7C8FFF')
   })
 
   it('renders button text from i18n', async () => {

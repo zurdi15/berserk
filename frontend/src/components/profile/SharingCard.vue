@@ -133,7 +133,18 @@ function handleViewUser(user: UserOut) {
           </div>
           <div v-else class="space-y-2">
             <div v-for="user in receivedUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
-              <span>{{ user.username }}</span>
+              <span class="flex items-center gap-2">
+                <!-- el color de usuario es DATO, no un token del sistema de
+                     diseño (mismo criterio que los datos de gráficas): style
+                     inline en vez de clase, exento del guard de hex crudo -->
+                <span
+                  class="w-2.5 h-2.5 rounded-full shrink-0"
+                  :style="{ backgroundColor: user.color || 'var(--bk-accent-aurora)' }"
+                  data-testid="sharing-user-dot"
+                  aria-hidden="true"
+                />
+                {{ user.username }}
+              </span>
               <BkButton
                 variant="ghost"
                 size="sm"
