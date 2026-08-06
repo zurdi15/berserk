@@ -7,7 +7,7 @@ import { updateWorkout } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { useAnimatedNumber } from '@/composables/useAnimatedNumber'
 import { useAuthStore } from '@/stores/auth'
-import { formatWeight } from '@/utils/units'
+import { formatWeight, formatWeightInt } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -51,14 +51,19 @@ const totalVolume = computed(() =>
 )
 
 const animatedTotalSets = useAnimatedNumber(() => totalSets.value)
-// decimals=1: formatWeight no redondea en modo kg (solo lb) — el tween tiene
-// que llegar ya a 1 decimal o pintaría colas de flotante a media animación
-const animatedTotalVolume = useAnimatedNumber(() => totalVolume.value, { decimals: 1 })
+// totalVolume es una magnitud DERIVADA (suma agregada de reps×kg): zurdi
+// pidió sin decimales — decimals:0 (default) para el tween, formatWeightInt
+// para el valor final
+const animatedTotalVolume = useAnimatedNumber(() => totalVolume.value)
 
-// los 3 kinds de PR son magnitudes en kg: todos pasan por formatWeight (ver
-// PrList/RecentPrs/BkCelebration — antes max_volume se mostraba sin convertir)
+// los 3 kinds de PR son magnitudes en kg: todos pasan por formatWeight/Int
+// (ver PrList/RecentPrs/BkCelebration — antes max_volume se mostraba sin
+// convertir). max_weight es un peso REAL registrado: conserva su precisión.
+// est_1rm/max_volume son DERIVADOS: sin decimales
 function formatRecordValue(record: PersonalRecordOut): string {
-  return formatWeight(record.value, units.value)
+  return record.kind === 'max_weight'
+    ? formatWeight(record.value, units.value)
+    : formatWeightInt(record.value, units.value)
 }
 
 async function pickFeeling(value: number) {
@@ -102,7 +107,7 @@ watch(note, () => {
       </div>
       <div class="col-span-2">
         <p class="text-ink-muted text-sm">{{ t('workout.totalVolume') }}</p>
-        <p class="bk-metric text-xl text-ink" data-testid="summary-volume">{{ formatWeight(animatedTotalVolume ?? 0, units) }}</p>
+        <p class="bk-metric text-xl text-ink" data-testid="summary-volume">{{ formatWeightInt(animatedTotalVolume ?? 0, units) }}</p>
       </div>
     </div>
 

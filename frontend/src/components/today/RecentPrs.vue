@@ -7,7 +7,7 @@ import BkCard from '@/lib/BkCard.vue'
 import type { PersonalRecordOut, ExerciseOut } from '@/api/domain'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import { parseUtc } from '@/utils/datetime'
-import { formatWeight } from '@/utils/units'
+import { formatWeight, formatWeightInt } from '@/utils/units'
 
 const props = withDefaults(
   defineProps<{
@@ -33,10 +33,13 @@ function getExerciseName(exerciseId: number): string {
   return locale.value === 'es' ? ex.name_es : ex.name_en
 }
 
-// los 3 kinds de PR son magnitudes en kg: todos pasan por formatWeight (ver
-// PrList/BkCelebration — antes max_volume se mostraba sin convertir)
-function formatRecordValue(value: number): string {
-  return formatWeight(value, units.value)
+// los 3 kinds de PR son magnitudes en kg: todos pasan por formatWeight/Int
+// (ver PrList/BkCelebration — antes max_volume se mostraba sin convertir).
+// max_weight es un peso REAL registrado: conserva su precisión. est_1rm y
+// max_volume son magnitudes DERIVADAS (estimación / suma agregada): zurdi
+// pidió sin decimales para esas — ver formatWeightInt en utils/units.ts
+function formatRecordValue(value: number, kind: string): string {
+  return kind === 'max_weight' ? formatWeight(value, units.value) : formatWeightInt(value, units.value)
 }
 
 function formatAchievedDate(dateStr: string): string {
@@ -56,11 +59,11 @@ function formatAchievedDate(dateStr: string): string {
           <p class="font-medium text-ink">{{ getExerciseName(record.exercise_id) }}</p>
         </div>
         <div class="text-right">
-          <!-- decimals=1: formatWeight NO redondea en modo kg (solo lb), así
-               que el propio tween tiene que llegar ya a 1 decimal o pintaría
-               colas de flotante (67.4972637 kg) a media animación -->
-          <BkAnimatedNumber :value="record.value" :decimals="1" v-slot="{ value }">
-            <p class="text-lg font-semibold text-ember tabular-nums">{{ formatRecordValue(value ?? 0) }}</p>
+          <!-- decimals: max_weight es peso real (1 decimal, formatWeight no
+               redondea en kg y el tween pintaría colas de flotante sin esto);
+               est_1rm/max_volume son derivados y van a entero (0) -->
+          <BkAnimatedNumber :value="record.value" :decimals="record.kind === 'max_weight' ? 1 : 0" v-slot="{ value }">
+            <p class="text-lg font-semibold text-ember tabular-nums">{{ formatRecordValue(value ?? 0, record.kind) }}</p>
           </BkAnimatedNumber>
           <p class="text-xs text-ink-muted">{{ formatAchievedDate(record.achieved_at) }}</p>
         </div>

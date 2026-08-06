@@ -184,6 +184,22 @@ describe('PrList', () => {
     expect(rows[1].find('[data-testid="pr-value"]').text()).toBe('1200 kg')
   })
 
+  it('item 6: max_weight (real, logged) keeps its decimal; est_1rm/max_volume (derived) round to whole kg', () => {
+    const fractionalRecords = [
+      { id: 20, exercise_id: 1, kind: 'max_weight', value: 47.5, achieved_at: '2026-08-01T00:00:00Z' },
+      { id: 21, exercise_id: 1, kind: 'est_1rm', value: 61.75, achieved_at: '2026-08-01T00:00:00Z' },
+      { id: 22, exercise_id: 1, kind: 'max_volume', value: 1567.5, achieved_at: '2026-08-01T00:00:00Z' },
+    ]
+    const wrapper = mount(PrList, {
+      props: { records: fractionalRecords as never, exercises: fixtures.exercises as never },
+      ...withI18n(),
+    })
+    const rows = wrapper.findAll('[data-testid^="pr-row-"]')
+    expect(rows[0].find('[data-testid="pr-value"]').text()).toBe('47.5 kg') // real: conserva el decimal
+    expect(rows[1].find('[data-testid="pr-value"]').text()).toBe('62 kg') // derivado: 61.75 → 62
+    expect(rows[2].find('[data-testid="pr-value"]').text()).toBe('1568 kg') // derivado: 1567.5 → 1568
+  })
+
   it('shows the empty state when there are no records', () => {
     const wrapper = mount(PrList, { props: { records: [], exercises: [] }, ...withI18n() })
     expect(wrapper.text()).toContain('Sin récords aún')

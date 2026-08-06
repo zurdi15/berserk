@@ -12,3 +12,13 @@ export function displayToKg(value: number, units: 'kg' | 'lb'): number {
 export function formatWeight(kg: number, units: 'kg' | 'lb'): string {
   return `${kgToDisplay(kg, units)} ${units}`
 }
+
+// para magnitudes DERIVADAS/agregadas (est. 1RM, volumen) — zurdi: "los kg...
+// no pueden tener decimales". Los pesos REALES (registrados/objetivo) NUNCA
+// pasan por aquí, conservan su precisión real (formatWeight de arriba).
+// Redondea el valor YA CONVERTIDO a la unidad de salida (no el kg crudo):
+// en kg da un entero exacto; en lb redondea el lb ya convertido a entero,
+// mismo criterio "sin decimales" en las dos unidades, no solo en kg.
+export function formatWeightInt(kg: number, units: 'kg' | 'lb'): string {
+  return `${Math.round(kgToDisplay(kg, units))} ${units}`
+}

@@ -69,6 +69,41 @@ describe('FinishSummary', () => {
     expect(wrapper.text()).toContain('1200 kg')
   })
 
+  it('item 6: max_weight record (real) keeps its decimal; est_1rm/max_volume records (derived) round to whole kg', () => {
+    const wrapper = build([
+      { id: 3, exercise_id: 5, kind: 'max_weight', value: 47.5, achieved_at: 'x' },
+      { id: 4, exercise_id: 5, kind: 'est_1rm', value: 61.75, achieved_at: 'x' },
+    ])
+    const text = wrapper.text()
+    expect(text).toContain('47.5 kg')
+    expect(text).toContain('62 kg')
+    expect(text).not.toContain('61.75')
+  })
+
+  it('item 6: totalVolume (derived, sum of reps×kg) rounds to whole kg even when the sum is fractional', () => {
+    const fractionalWorkout = {
+      ...workout,
+      exercises: [
+        {
+          id: 20,
+          exercise_id: 5,
+          position: 0,
+          note: null,
+          sets: [
+            { id: 1, set_number: 1, reps: 5, weight_kg: 47.5, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+          ],
+        },
+      ],
+    }
+    setActivePinia(createPinia())
+    const wrapper = mount(FinishSummary, {
+      props: { workout: fractionalWorkout as never, records: [] },
+      global: { plugins: [createI18nInstance()] },
+    })
+    // 47.5 kg × 5 reps = 237.5 → redondeado a 238 (era "237.5 kg" antes de item 6)
+    expect(wrapper.find('[data-testid="summary-volume"]').text()).toBe('238 kg')
+  })
+
   it('picking a feeling rune calls updateWorkout with the feeling value', async () => {
     const wrapper = build()
     await wrapper.find('[data-testid="feeling-4"]').trigger('click')
