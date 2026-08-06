@@ -109,6 +109,61 @@ describe('WorkoutView', () => {
     expect(wrapper.find('[data-testid="start-routine-7"]').exists()).toBe(true)
   })
 
+  describe('item 5: idle state separator and routine runes', () => {
+    it('renders the "o" separator between the free-workout button and the routines list', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+
+      const wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="or-separator"]').text()).toBe('o')
+    })
+
+    it('shows a BkRune next to a routine name when the routine has a valid rune', async () => {
+      vi.mocked(domain.listRoutines).mockResolvedValueOnce([
+        { id: 7, name: 'Push day', description: null, rune: 'chest', color: null, exercises: [] },
+      ] as never)
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+
+      const wrapper = build()
+      await flushPromises()
+
+      const rune = wrapper.get('[data-testid="start-routine-7"]').findComponent({ name: 'BkRune' })
+      expect(rune.exists()).toBe(true)
+      expect(rune.props('name')).toBe('chest')
+    })
+
+    it('renders no rune next to a routine name when the routine has no rune', async () => {
+      vi.mocked(domain.listRoutines).mockResolvedValueOnce([
+        { id: 7, name: 'Push day', description: null, rune: null, color: null, exercises: [] },
+      ] as never)
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+
+      const wrapper = build()
+      await flushPromises()
+
+      const routineButton = wrapper.get('[data-testid="start-routine-7"]')
+      expect(routineButton.findComponent({ name: 'BkRune' }).exists()).toBe(false)
+    })
+
+    it('renders no rune next to a routine name when the routine rune is not a valid rune name', async () => {
+      vi.mocked(domain.listRoutines).mockResolvedValueOnce([
+        { id: 7, name: 'Push day', description: null, rune: 'not-a-rune', color: null, exercises: [] },
+      ] as never)
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+
+      const wrapper = build()
+      await flushPromises()
+
+      const routineButton = wrapper.get('[data-testid="start-routine-7"]')
+      expect(routineButton.findComponent({ name: 'BkRune' }).exists()).toBe(false)
+    })
+  })
+
   it('auto-starts from the ?session= query when there is no active workout (start({scheduled_session_id}))', async () => {
     routeQuery.session = '42'
     const activeWorkout = useActiveWorkoutStore()

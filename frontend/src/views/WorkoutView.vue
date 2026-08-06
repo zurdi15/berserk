@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutOut } from '@/api/domain'
 import { listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
-import { primaryRune } from '@/lib/runeResolve'
+import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
 import { parseUtc } from '@/utils/datetime'
 import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
@@ -15,6 +15,7 @@ import FinishSummary from '@/components/workout/FinishSummary.vue'
 import WorkoutExerciseCard from '@/components/workout/WorkoutExerciseCard.vue'
 import BkCelebration from '@/components/celebration/BkCelebration.vue'
 import BkButton from '@/lib/BkButton.vue'
+import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import type { RuneName } from '@/lib/runes'
 
@@ -124,6 +125,13 @@ async function confirmDiscard() {
   } catch (error) {
     toastApiError(error)
   }
+}
+
+// runa de la rutina: mismo criterio de resolución que el calendario
+// (isValidRuneName sobre el slug), null si no tiene o no mapea a una runa
+// conocida — nunca se inventa una runa que no está en el catálogo
+function routineRune(routine: RoutineOut): RuneName | null {
+  return routine.rune && isValidRuneName(routine.rune) ? routine.rune : null
 }
 
 // misma etiqueta bilingüe que MuscleGroupManager: el nombre viene del catálogo,
@@ -306,7 +314,13 @@ onBeforeUnmount(() => {
       </BkButton>
 
       <div v-if="catalogReady && routines.length" class="space-y-2" :style="{ '--bk-stagger-i': 1 }">
-        <p class="text-sm text-ink-muted">{{ t('workout.startFromRoutine') }}</p>
+        <!-- separador "o" entre el CTA de entreno libre y la lista de
+             rutinas, en vez del párrafo plano que había antes -->
+        <div class="flex items-center gap-3" aria-hidden="true">
+          <span class="h-px flex-1 bg-line" />
+          <span data-testid="or-separator" class="text-ink-faint text-sm">{{ t('workout.or') }}</span>
+          <span class="h-px flex-1 bg-line" />
+        </div>
         <BkButton
           v-for="routine in routines"
           :key="routine.id"
@@ -315,7 +329,8 @@ onBeforeUnmount(() => {
           :data-testid="`start-routine-${routine.id}`"
           @click="startFromRoutine(routine.id)"
         >
-          {{ routine.name }}
+          <BkRune v-if="routineRune(routine)" :name="routineRune(routine) as RuneName" :size="16" />
+          <span>{{ routine.name }}</span>
         </BkButton>
       </div>
     </div>

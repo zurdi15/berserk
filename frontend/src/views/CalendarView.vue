@@ -172,7 +172,7 @@ watch(() => athlete.userId, () => {
     <!-- Heatmap: siempre visible, incluso con datos vacíos (BkHeatmap ya
          tolera [] y dibuja la rejilla del año en blanco) -->
     <div class="mt-8">
-      <h3 class="text-sm font-medium text-ink-muted mb-3">{{ $t('calendar.yearActivity') }}</h3>
+      <h3 class="text-sm font-medium text-ink-muted mb-3 text-center">{{ $t('calendar.yearActivity') }}</h3>
       <BkHeatmap :data="heatmapData" :year="year" />
     </div>
 

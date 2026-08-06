@@ -239,7 +239,7 @@ export const es = {
   },
   workout: {
     freeWorkout: 'Entreno libre',
-    startFromRoutine: 'O empieza desde una rutina',
+    or: 'o',
     finish: 'Terminar',
     addExercise: 'Añadir ejercicio',
     searchExercise: 'Buscar ejercicio',
