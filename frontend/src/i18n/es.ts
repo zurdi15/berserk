@@ -156,6 +156,7 @@ export const es = {
     moveDown: 'Abajo',
     remove: 'Quitar',
     noRoutines: 'Sin rutinas aún',
+    noExercisesInRoutine: 'Sin ejercicios en esta rutina aún',
     nameRequired: 'El nombre de la rutina es obligatorio',
     confirm: 'Confirmar',
   },

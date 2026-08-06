@@ -156,6 +156,7 @@ export const en = {
     moveDown: 'Down',
     remove: 'Remove',
     noRoutines: 'No routines yet',
+    noExercisesInRoutine: 'No exercises in this routine yet',
     nameRequired: 'Routine name is required',
     confirm: 'Confirm',
   },

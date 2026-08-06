@@ -31,6 +31,11 @@ vi.mock('@/api/domain', () => ({
     },
   ])),
   deleteRoutine: vi.fn((id: number) => Promise.resolve(void 0)),
+  listExercises: vi.fn(() => Promise.resolve([
+    { id: 1, name_es: 'Press de banca', name_en: 'Bench Press', measurement: 'strength', owner_id: null, muscle_groups: [] },
+    { id: 2, name_es: 'Aperturas', name_en: 'Flyes', measurement: 'strength', owner_id: null, muscle_groups: [] },
+    { id: 3, name_es: 'Dominadas', name_en: 'Pull-ups', measurement: 'strength', owner_id: null, muscle_groups: [] },
+  ])),
 }))
 
 describe('RoutineList', () => {
@@ -211,6 +216,64 @@ describe('RoutineList', () => {
     // Should show empty message
     const text = wrapper.text()
     expect(text).toContain('Sin rutinas aún')
+  })
+
+  describe('expandable exercise list (side-quest 1 follow-up)', () => {
+    async function buildReady() {
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await wrapper.vm.$nextTick()
+      return wrapper
+    }
+
+    it('is collapsed by default: aria-expanded is false and no exercise list renders', async () => {
+      const wrapper = await buildReady()
+
+      const toggle = wrapper.get('[data-testid="toggle-routine-1"]')
+      expect(toggle.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.find('[data-testid="exercise-list-1"]').exists()).toBe(false)
+    })
+
+    it('clicking the card body reveals the exercise list with resolved names, sets×reps, weight and rest', async () => {
+      const wrapper = await buildReady()
+
+      await wrapper.get('[data-testid="toggle-routine-1"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      const toggle = wrapper.get('[data-testid="toggle-routine-1"]')
+      expect(toggle.attributes('aria-expanded')).toBe('true')
+
+      const list = wrapper.get('[data-testid="exercise-list-1"]')
+      expect(list.text()).toContain('Press de banca')
+      expect(list.text()).toContain('4×8')
+      expect(list.text()).toContain('120s')
+    })
+
+    it('clicking the card body a second time collapses the exercise list again', async () => {
+      const wrapper = await buildReady()
+
+      const toggle = wrapper.get('[data-testid="toggle-routine-1"]')
+      await toggle.trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="exercise-list-1"]').exists()).toBe(true)
+
+      await toggle.trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="exercise-list-1"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="toggle-routine-1"]').attributes('aria-expanded')).toBe('false')
+    })
+
+    it('clicking the edit button does NOT toggle the exercise list expansion', async () => {
+      const wrapper = await buildReady()
+
+      await wrapper.get('[data-testid="edit-routine-1"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.get('[data-testid="toggle-routine-1"]').attributes('aria-expanded')).toBe('false')
+      expect(wrapper.find('[data-testid="exercise-list-1"]').exists()).toBe(false)
+    })
   })
 
   it('gates the list on readiness: neither the list nor the empty state show while listRoutines is pending, both possibilities appear once it resolves', async () => {
