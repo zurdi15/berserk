@@ -51,6 +51,10 @@ export const es = {
     muscle_group_invalid: 'Ese grupo muscular no es válido.',
     muscle_group_in_use: 'Ese grupo muscular está en uso y no se puede borrar.',
     slug_taken: 'Ese identificador ya está en uso.',
+    backup_busy: 'Ya hay una restauración en curso.',
+    backup_invalid: 'El fichero de copia no es válido.',
+    backup_too_large: 'La copia supera el tamaño máximo permitido.',
+    restore_failed: 'No se pudo restaurar la copia; se conservan los datos anteriores.',
     generic: 'Algo ha fallado. Inténtalo de nuevo.',
   },
   common: {
@@ -119,6 +123,15 @@ export const es = {
     noUsers: 'Sin usuarios aún',
     noInvites: 'Sin invitaciones aún',
     actions: 'Acciones',
+    backup: {
+      title: 'Copia de seguridad',
+      export: 'Descargar copia',
+      restore: 'Restaurar copia',
+      confirmTitle: 'Restaurar copia de seguridad',
+      confirmHint:
+        'Esto reemplaza todos los datos actuales por los de la copia. Puede cerrar tu sesión; si ocurre, vuelve a entrar.',
+      restoreSuccess: 'Copia restaurada. Recargando…',
+    },
   },
   routines: {
     newRoutine: 'Nueva rutina',

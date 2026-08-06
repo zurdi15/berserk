@@ -51,6 +51,10 @@ export const en = {
     muscle_group_invalid: 'That muscle group is invalid.',
     muscle_group_in_use: 'That muscle group is in use and cannot be deleted.',
     slug_taken: 'That identifier is already taken.',
+    backup_busy: 'A restore is already in progress.',
+    backup_invalid: 'The backup file is not valid.',
+    backup_too_large: 'The backup exceeds the maximum allowed size.',
+    restore_failed: 'Could not restore the backup; previous data is kept.',
     generic: 'Something went wrong. Try again.',
   },
   common: {
@@ -119,6 +123,15 @@ export const en = {
     noUsers: 'No users yet',
     noInvites: 'No invites yet',
     actions: 'Actions',
+    backup: {
+      title: 'Backup',
+      export: 'Download backup',
+      restore: 'Restore backup',
+      confirmTitle: 'Restore backup',
+      confirmHint:
+        'This replaces all current data with the backup. Your session may close; if it does, sign in again.',
+      restoreSuccess: 'Backup restored. Reloading…',
+    },
   },
   routines: {
     newRoutine: 'New routine',
