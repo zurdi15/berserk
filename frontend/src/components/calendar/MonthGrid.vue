@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { monthGrid, weekdayHeaders, todayIso } from '@/utils/dates'
-import { isValidRuneName } from './groupRune'
+import { isValidRuneName } from '@/lib/runeResolve'
 import { statusClasses } from './statusClasses'
 import BkRune from '@/lib/BkRune.vue'
 import type { CalendarMonthOut } from '@/api/domain'

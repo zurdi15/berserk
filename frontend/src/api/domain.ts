@@ -1,4 +1,7 @@
 import { api } from './client'
+import type { UserOut } from './auth'
+
+export type { UserOut }
 
 // Shared types
 export type Measurement = 'strength' | 'bodyweight' | 'timed' | 'cardio'
@@ -21,6 +24,10 @@ export interface ExerciseOut {
   id: number
   name_es: string
   name_en: string
+  // el Out del backend serializa measurement como str suelto (ver
+  // backend/app/schemas/catalog.py ExerciseOut), pero ExerciseIn solo acepta
+  // estos 4 valores vía Literal: narrower a propósito para que el resto del
+  // frontend discrimine por union
   measurement: Measurement
   owner_id: number | null
   muscle_groups: ExerciseMuscleLink[]
@@ -115,7 +122,7 @@ export interface ScheduledOut {
   date: string
   time: string | null
   routine_id: number | null
-  status: string
+  status: 'planned' | 'done' | 'skipped'
   workout_id: number | null
   note: string | null
 }
@@ -169,16 +176,6 @@ export interface BodyIn {
   arm_cm?: number | null
   thigh_cm?: number | null
   hip_cm?: number | null
-}
-
-// User types
-export interface UserOut {
-  id: number
-  username: string
-  is_admin: boolean
-  locale: string
-  units: string
-  timezone: string
 }
 
 export interface SharingOut {
@@ -345,7 +342,7 @@ export const updateSchedule = (id: number, body: {
   time?: string | null
   routine_id?: number | null
   note?: string | null
-  status?: string
+  status?: 'planned' | 'skipped'
 }) =>
   api<ScheduledOut>(`/calendar/${id}`, { method: 'PATCH', body })
 

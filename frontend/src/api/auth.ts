@@ -4,8 +4,8 @@ export interface UserOut {
   id: number
   username: string
   is_admin: boolean
-  locale: string
-  units: string
+  locale: 'es' | 'en'
+  units: 'kg' | 'lb'
   timezone: string
 }
 

@@ -42,7 +42,7 @@ async function save(partial: Parameters<typeof updateSettings>[0]) {
           { value: 'en', label: 'English' },
         ]"
         data-testid="locale-select"
-        @update:model-value="(val) => save({ locale: val })"
+        @update:model-value="(val) => save({ locale: val as 'es' | 'en' })"
       />
 
       <BkSelect
@@ -53,7 +53,7 @@ async function save(partial: Parameters<typeof updateSettings>[0]) {
           { value: 'lb', label: 'lb' },
         ]"
         data-testid="units-select"
-        @update:model-value="(val) => save({ units: val })"
+        @update:model-value="(val) => save({ units: val as 'kg' | 'lb' })"
       />
 
       <BkSelect

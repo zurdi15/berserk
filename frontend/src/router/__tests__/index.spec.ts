@@ -10,11 +10,12 @@ vi.mock('@/api/auth', () => ({
   updateSettings: vi.fn(),
 }))
 
+import type { UserOut } from '@/api/auth'
 import * as authApi from '@/api/auth'
 
 import { router } from '../index'
 
-const user = { id: 1, username: 'thor', is_admin: true, locale: 'es', units: 'kg', timezone: 'Europe/Madrid' }
+const user: UserOut = { id: 1, username: 'thor', is_admin: true, locale: 'es', units: 'kg', timezone: 'Europe/Madrid' }
 
 describe('router catch-all', () => {
   beforeEach(() => {

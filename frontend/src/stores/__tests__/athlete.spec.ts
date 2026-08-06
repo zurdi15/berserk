@@ -1,9 +1,10 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import type { UserOut } from '@/api/auth'
 import { useAthleteStore } from '../athlete'
 
-const freyja = { id: 7, username: 'freyja', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' }
+const freyja: UserOut = { id: 7, username: 'freyja', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' }
 
 describe('athlete store', () => {
   beforeEach(() => setActivePinia(createPinia()))

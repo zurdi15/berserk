@@ -42,7 +42,7 @@ vi.mock('@/utils/apiErrors', () => ({
   toastApiError: vi.fn(),
 }))
 
-import { isValidRuneName, primaryRune } from '@/components/calendar/groupRune'
+import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
 import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
 import * as domain from '@/api/domain'

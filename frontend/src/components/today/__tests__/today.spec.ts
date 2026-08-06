@@ -16,6 +16,7 @@ vi.mock('@/api/domain', () => ({
 }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
+import type { ScheduledOut } from '@/api/domain'
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
@@ -45,7 +46,7 @@ describe('TodaySessionCard status dots', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
   it('renders planned session with aurora border dot', async () => {
-    const schedules = [
+    const schedules: ScheduledOut[] = [
       { id: 1, date: '2026-08-06', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
     ]
     const wrapper = mount(TodaySessionCard, {
@@ -58,7 +59,7 @@ describe('TodaySessionCard status dots', () => {
   })
 
   it('renders done session with solid aurora dot', async () => {
-    const schedules = [
+    const schedules: ScheduledOut[] = [
       { id: 2, date: '2026-08-06', time: '10:00', routine_id: 2, status: 'done', workout_id: 5, note: null },
     ]
     const wrapper = mount(TodaySessionCard, {
@@ -71,7 +72,7 @@ describe('TodaySessionCard status dots', () => {
   })
 
   it('renders skipped session with faint dot', async () => {
-    const schedules = [
+    const schedules: ScheduledOut[] = [
       { id: 3, date: '2026-08-06', time: null, routine_id: 3, status: 'skipped', workout_id: null, note: 'Too busy' },
     ]
     const wrapper = mount(TodaySessionCard, {

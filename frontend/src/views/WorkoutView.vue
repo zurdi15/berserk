@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutOut } from '@/api/domain'
 import { listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
-import { primaryRune } from '@/components/calendar/groupRune'
+import { primaryRune } from '@/lib/runeResolve'
 import { parseUtc } from '@/utils/datetime'
 import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'

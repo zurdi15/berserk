@@ -11,7 +11,7 @@ import type {
   SetOut,
   WorkoutExerciseOut,
 } from '@/api/domain'
-import { primaryRune as resolvePrimaryRune } from '@/components/calendar/groupRune'
+import { primaryRune as resolvePrimaryRune } from '@/lib/runeResolve'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'

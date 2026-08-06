@@ -41,6 +41,7 @@ vi.mock('@/api/domain', () => ({
   deleteBody: vi.fn(async () => undefined),
 }))
 
+import type { UserOut } from '@/api/domain'
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
@@ -50,7 +51,7 @@ import ProgressView from '@/views/ProgressView.vue'
 import TodayView from '@/views/TodayView.vue'
 import WorkoutView from '@/views/WorkoutView.vue'
 
-const ATHLETE = { id: 7, username: 'freyja', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' }
+const ATHLETE: UserOut = { id: 7, username: 'freyja', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' }
 
 function withI18n() {
   return { global: { plugins: [createI18nInstance()] } }

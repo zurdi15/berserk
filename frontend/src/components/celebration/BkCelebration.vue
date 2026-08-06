@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import type { PersonalRecordOut } from '@/api/domain'
 import BkRune from '@/lib/BkRune.vue'
 import type { RuneName } from '@/lib/runes'
+import { core } from '@/tokens'
 import { formatWeight } from '@/utils/units'
 
 const props = withDefaults(
@@ -18,10 +19,9 @@ const titleId = useId()
 const panel = ref<HTMLElement | null>(null)
 let lastFocused: HTMLElement | null = null
 
-// duración del conteo en ms: refleja --bk-dur-4 (600ms). No se puede leer una
-// custom property calculada de forma fiable en jsdom/happy-dom, así que el
-// valor vive también aquí, en sincronía con tokens.css
-const COUNT_UP_MS = 600
+// duración del conteo: tomada directamente de los tokens (única fuente de
+// verdad), en vez de un número hardcodeado que puede desincronizarse
+const COUNT_UP_MS = parseInt(core.dur[4], 10)
 const AUTO_DISMISS_MS = 3000
 
 // cada valor arranca en 0 y cuenta hasta el real; con reduced-motion se salta

@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import type { DistributionItem, MuscleGroupOut } from '@/api/domain'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkRune from '@/lib/BkRune.vue'
-import { isValidRuneName } from '@/components/calendar/groupRune'
+import { isValidRuneName } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 import { barWidth } from './distribution'
 

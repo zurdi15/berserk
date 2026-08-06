@@ -6,5 +6,6 @@
 const HAS_OFFSET = /(Z|[+-]\d{2}:?\d{2})$/
 
 export function parseUtc(value: string): Date {
+  if (!value.includes('T')) return new Date(value) // fecha sin hora: ya es UTC-medianoche por spec
   return new Date(HAS_OFFSET.test(value) ? value : `${value}Z`)
 }

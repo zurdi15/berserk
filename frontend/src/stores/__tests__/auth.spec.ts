@@ -10,11 +10,12 @@ vi.mock('@/api/auth', () => ({
   updateSettings: vi.fn(),
 }))
 
+import type { UserOut } from '@/api/auth'
 import * as authApi from '@/api/auth'
 import { ApiError } from '@/api/client'
 import { useAuthStore } from '../auth'
 
-const user = { id: 1, username: 'thor', is_admin: true, locale: 'es', units: 'kg', timezone: 'Europe/Madrid' }
+const user: UserOut = { id: 1, username: 'thor', is_admin: true, locale: 'es', units: 'kg', timezone: 'Europe/Madrid' }
 
 describe('auth store', () => {
   beforeEach(() => setActivePinia(createPinia()))

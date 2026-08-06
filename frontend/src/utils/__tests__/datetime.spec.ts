@@ -40,4 +40,11 @@ describe('parseUtc', () => {
     const naive = '2026-08-06T03:21:17.685240'
     expect(parseUtc(naive).getTime()).not.toBe(new Date(naive).getTime())
   })
+
+  it('parses a date-only string (no time component) instead of producing an Invalid Date', () => {
+    // 'YYYY-MM-DD' no lleva 'T': appendear 'Z' a ciegas da 'YYYY-MM-DDZ',
+    // que Date() no puede parsear (Invalid Date). Una fecha sin hora ya es
+    // UTC-medianoche por spec de Date(), así que no necesita el sufijo.
+    expect(parseUtc('2026-08-06').getUTCDate()).toBe(6)
+  })
 })

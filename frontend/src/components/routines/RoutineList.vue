@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 import type { RoutineOut } from '@/api/domain'
 import { deleteRoutine, listRoutines } from '@/api/domain'
-import { isValidRuneName } from '@/components/calendar/groupRune'
+import { isValidRuneName } from '@/lib/runeResolve'
 import { toastApiError } from '@/utils/apiErrors'
 import BkButton from '@/lib/BkButton.vue'
 import BkRune from '@/lib/BkRune.vue'
