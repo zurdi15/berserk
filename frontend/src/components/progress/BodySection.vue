@@ -9,6 +9,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { todayIso } from '@/utils/dates'
 import { displayToKg, formatWeight, kgToDisplay } from '@/utils/units'
 import { useAthleteStore } from '@/stores/athlete'
+import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkChart from '@/lib/BkChart.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
@@ -241,24 +242,21 @@ watch(() => athlete.userId, load, { immediate: true })
             {{ entry.weight_kg != null ? formatWeight(entry.weight_kg, units) : '–' }}
           </span>
           <template v-if="isViewingSelf">
-            <button
-              type="button"
+            <!-- BkActionBtn (item 7): icon-only unificado, mismos
+                 testid/aria-label que antes para no romper progress.spec -->
+            <BkActionBtn
+              icon="edit"
               :data-testid="`edit-body-${entry.date}`"
-              class="text-ink-faint hover:text-aurora text-xs px-2"
+              :aria-label="t('common.edit')"
               @click="openEdit(entry)"
-            >
-              {{ t('common.edit') }}
-            </button>
-            <button
+            />
+            <BkActionBtn
               v-if="deleteConfirming !== entry.date"
-              type="button"
+              icon="delete"
               :data-testid="`delete-body-${entry.date}`"
-              class="text-ink-faint hover:text-danger text-sm px-2"
               :aria-label="t('common.delete')"
               @click="deleteConfirming = entry.date"
-            >
-              ×
-            </button>
+            />
             <span v-else class="flex items-center gap-1">
               <button
                 type="button"

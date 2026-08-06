@@ -59,14 +59,14 @@ watch(
 
 <template>
   <Teleport to="body">
-    <Transition name="bk-fade">
+    <Transition name="bk-sheet-backdrop">
       <div
         v-if="open"
         class="fixed inset-0 z-(--bk-z-sheet) bg-void/70"
         @click="emit('close')"
       />
     </Transition>
-    <Transition name="bk-rise">
+    <Transition name="bk-sheet-panel">
       <div
         v-if="open"
         ref="panel"
@@ -85,3 +85,41 @@ watch(
     </Transition>
   </Teleport>
 </template>
+
+<style scoped>
+/* Excepción documentada al doctrine "solo entrada" del resto de la app
+   (ver animations.css): zurdi quiere explícitamente que el sheet (cajón
+   inferior) también anime al cerrarse — un modal que desaparece de golpe
+   rompe la sensación física de "cajón que se desliza" que sí tiene al abrir.
+   Vive aquí, scoped, en vez de en animations.css a propósito: ese archivo es
+   solo-entrada por diseño (ver su cabecera) y el guard de reduced-motion de
+   ahí es universal (*, *::before, *::after), así que sigue neutralizando
+   estas animaciones sin tocar ese archivo ni duplicar el guard. */
+@keyframes bk-sheet-backdrop-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bk-sheet-panel-rise {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.bk-sheet-backdrop-enter-active {
+  animation: bk-sheet-backdrop-fade var(--bk-dur-3) var(--bk-ease-out);
+}
+/* leave: mismo keyframe en reversa (to → from) para no duplicar la
+   definición, pero con su propia duración/easing (dur-2/ease-in) — más
+   corta y de arranque brusco, como corresponde a una salida en vez de una
+   entrada */
+.bk-sheet-backdrop-leave-active {
+  animation: bk-sheet-backdrop-fade var(--bk-dur-2) ease-in reverse;
+}
+
+.bk-sheet-panel-enter-active {
+  animation: bk-sheet-panel-rise var(--bk-dur-3) var(--bk-ease-out);
+}
+.bk-sheet-panel-leave-active {
+  animation: bk-sheet-panel-rise var(--bk-dur-2) ease-in reverse;
+}
+</style>
