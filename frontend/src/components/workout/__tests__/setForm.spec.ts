@@ -234,6 +234,29 @@ describe('SetForm', () => {
       expect(grid.classes()).toEqual(expect.arrayContaining(['grid', 'grid-cols-2']))
     })
 
+    it('item 2 (post-0.3.0): the strength/bodyweight/cardio steppers render compact (fits two columns from 360px, no overlap)', () => {
+      // ambos steppers de la rejilla pasan size="compact" — sin esto, los
+      // botones a tamaño "md" (3rem) + el gap por defecto no caben dos
+      // columnas en un móvil real (ver la aritmética en SetForm.vue)
+      for (const measurement of ['strength', 'bodyweight', 'cardio'] as const) {
+        wrapper = build(measurement)
+        const gridButtons = wrapper.get('.bk-set-grid').findAll('button')
+        expect(gridButtons.length).toBeGreaterThan(0)
+        for (const button of gridButtons) {
+          expect(button.classes()).toEqual(expect.arrayContaining(['w-8', 'h-8']))
+          expect(button.classes()).not.toContain('w-12')
+        }
+        wrapper.unmount()
+      }
+    })
+
+    it('item 2 (post-0.3.0): the strength grid uses the tighter gap-2 (not the old gap-3) between columns', () => {
+      wrapper = build('strength')
+      const grid = wrapper.get('.bk-set-grid')
+      expect(grid.classes()).toContain('gap-2')
+      expect(grid.classes()).not.toContain('gap-3')
+    })
+
     it('item 4c: the warmup toggle sits on its own row, not sharing a flex row with the rpe select', () => {
       wrapper = build('strength')
       const toggle = wrapper.get('[data-testid="warmup-toggle"]')

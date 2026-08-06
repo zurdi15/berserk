@@ -144,6 +144,26 @@ describe('BkStepper', () => {
     expect(minus.attributes('aria-label')).toBe('Reducir')
     expect(plus.attributes('aria-label')).toBe('Aumentar')
   })
+
+  it('defaults to size "md" (unchanged footprint for existing consumers like RoutineEditorSheet)', () => {
+    const wrapper = mount(BkStepper, {
+      props: { modelValue: 5 },
+      global: { plugins: [createI18nInstance()] },
+    })
+    const [minus] = wrapper.findAll('button')
+    expect(minus.classes()).toEqual(expect.arrayContaining(['w-12', 'h-12']))
+  })
+
+  it('item 2 (post-0.3.0): size="compact" shrinks the buttons (fits two steppers side by side in the set drawer)', () => {
+    const wrapper = mount(BkStepper, {
+      props: { modelValue: 5, size: 'compact' },
+      global: { plugins: [createI18nInstance()] },
+    })
+    const [minus, plus] = wrapper.findAll('button')
+    expect(minus.classes()).toEqual(expect.arrayContaining(['w-8', 'h-8']))
+    expect(plus.classes()).toEqual(expect.arrayContaining(['w-8', 'h-8']))
+    expect(minus.classes()).not.toContain('w-12')
+  })
 })
 
 describe('BkRing', () => {
