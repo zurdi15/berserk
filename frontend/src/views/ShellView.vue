@@ -186,7 +186,7 @@ const activeIndex = computed(() => {
         </ul>
       </div>
     </nav>
-    <main class="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-24 max-w-3xl w-full mx-auto">
+    <main class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable px-4 py-4 pb-24 max-w-3xl w-full mx-auto">
       <!-- sin Transition aquí a propósito (item 4): esto envolvía la vista
            ENTERA en un fade bk-rise MIENTRAS su propio bk-stagger interno
            corría con su propio delay — dos sistemas de animación a la vez,

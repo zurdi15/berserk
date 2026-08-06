@@ -51,6 +51,16 @@ describe('RedeemView', () => {
     expect(push).toHaveBeenCalledWith({ name: 'today' })
   })
 
+  // item 6 (post-0.3.0): mismo ajuste que LoginView.vue — ver ese archivo
+  it('item 6: the root fits one viewport (min-h-dvh) with the tightened gap-6, and never opts out of scroll via overflow-hidden', () => {
+    const wrapper = build()
+    const root = wrapper.get('main')
+    expect(root.classes()).toContain('min-h-dvh')
+    expect(root.classes()).toContain('gap-6')
+    expect(root.classes()).not.toContain('gap-8')
+    expect(root.classes()).not.toContain('overflow-hidden')
+  })
+
   it('shows the invite_invalid error message when the token is dead', async () => {
     vi.mocked(authApi.redeemInvite).mockRejectedValue(new ApiError(410, 'invite_invalid'))
 

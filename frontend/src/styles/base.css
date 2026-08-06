@@ -34,25 +34,38 @@
   --text-2xs--line-height: 0.9rem;
 }
 
-/* scrollbar siempre presente (gutter reservado) en vez de aparecer solo
-   cuando la vista es más alta que el viewport: sin esto, navegar de una
-   vista corta a una larga ensancha/estrecha el contenido en el ancho exacto
-   de la scrollbar — un salto de layout en cada cambio de vista. No pelea con
-   el flex min-h-dvh del shell (ShellView.vue): el gutter vive en el html,
-   fuera del árbol flex. Mismo patrón que turtletrips (style.css). */
+/* item 6 (post-0.3.0): el html YA NO fuerza scrollbar/gutter propios. Desde
+   que ShellView pasó a h-dvh con el scroll viviendo DENTRO de su <main>
+   (flex-1 min-h-0 overflow-y-auto — ver el comentario en ShellView.vue), el
+   documento nunca vuelve a desbordar mientras se está autenticado: el html
+   forzando overflow-y:scroll quedó vestigial para ese caso y su único efecto
+   visible hoy era pintar un scrollbar permanente en las tres pantallas
+   públicas que SÍ siguen scrolleando a nivel de documento (login/bootstrap/
+   invite, min-h-dvh sin contenedor interno) — aunque su contenido cabe de
+   sobra en un móvil real, zurdi veía "scroll" ahí porque el hueco/scrollbar
+   se mostraba igual. El gutter estable (anti-salto-de-layout al cambiar de
+   vista corta a larga) se mueve a .bk-scroll-stable, aplicado solo donde el
+   scroll ocurre de verdad ahora: el <main> del shell. */
 html {
   background: var(--bk-bg-void);
   color-scheme: dark;
-  overflow-y: scroll;
-  scrollbar-gutter: stable;
-  /* Firefox: más fina y en aurora — hereda a los scrollers internos sin
-     repetir la regla en cada uno, salvo que .no-scrollbar diga lo contrario */
+  overflow-y: auto;
+  /* Firefox: más fina y en aurora — hereda a los scrollers internos (incluido
+     el <main> del shell) sin repetir la regla en cada uno */
   scrollbar-width: thin;
   scrollbar-color: var(--bk-accent-aurora-deep) transparent;
 }
 
 html.bk-light {
   color-scheme: light;
+}
+
+/* ver el comentario de arriba de "html {": reserva el hueco del scrollbar en
+   el contenedor que de verdad scrollea, para que cambiar de una vista corta
+   (Hoy) a una larga (Progresión) no ensanche/estreche el contenido en el
+   ancho exacto de la barra */
+.bk-scroll-stable {
+  scrollbar-gutter: stable;
 }
 
 body {

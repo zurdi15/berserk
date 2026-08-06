@@ -8,6 +8,9 @@ import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
 import { useAuthStore } from '@/stores/auth'
 
+// item 6 (post-0.3.0): mismo ajuste que LoginView.vue — ver ese archivo para
+// la aritmética completa y el porqué real del "scroll" (gutter del html, no
+// un desbordamiento de contenido)
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
@@ -33,7 +36,7 @@ async function submit() {
 </script>
 
 <template>
-  <main class="min-h-dvh flex flex-col items-center justify-center gap-8 px-6">
+  <main class="min-h-dvh flex flex-col items-center justify-center gap-6 px-6">
     <Transition name="bk-pop" appear>
       <BkRune name="berserk" :size="64" carve tone="aurora" />
     </Transition>

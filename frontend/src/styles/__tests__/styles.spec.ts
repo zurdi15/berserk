@@ -92,4 +92,17 @@ describe('base styles', () => {
     // modo de alto contraste forzado (ver why-comment en base.css)
     expect(overrideRule).not.toMatch(/outline:\s*none/)
   })
+
+  it('item 6 (post-0.3.0): html no longer forces a permanent scrollbar/gutter — that was leaking onto the public auth screens, which have no internal scroller', () => {
+    const htmlRule = css.slice(css.indexOf('html {'), css.indexOf('html.bk-light'))
+    expect(htmlRule).not.toContain('overflow-y: scroll')
+    expect(htmlRule).not.toContain('scrollbar-gutter')
+    expect(htmlRule).toContain('overflow-y: auto')
+  })
+
+  it('item 6 (post-0.3.0): the stable gutter moved to .bk-scroll-stable, applied where scrolling actually happens now (ShellView\'s <main>)', () => {
+    expect(css).toContain('.bk-scroll-stable')
+    const rule = css.slice(css.indexOf('.bk-scroll-stable'))
+    expect(rule).toContain('scrollbar-gutter: stable')
+  })
 })

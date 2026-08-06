@@ -8,6 +8,13 @@ import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
 import { useAuthStore } from '@/stores/auth'
 
+// item 6 (post-0.3.0): la causa real del "scroll" que veía zurdi era el html
+// forzando un scrollbar/gutter permanente (ver base.css) — el contenido de
+// por sí cabe con margen de sobra incluso en un móvil bajo (~112px rune+
+// título + 32px de gap + ~254px del form ≈ 400px, frente a los ~640-850px
+// típicos). gap-6 (antes gap-8, ver <template>) es un margen extra de
+// seguridad para viewports realmente cortos (apaisado, teclado abierto), no
+// una respuesta a un desbordamiento real medido.
 const auth = useAuthStore()
 const router = useRouter()
 
@@ -31,7 +38,7 @@ async function submit() {
 </script>
 
 <template>
-  <main class="min-h-dvh flex flex-col items-center justify-center gap-8 px-6">
+  <main class="min-h-dvh flex flex-col items-center justify-center gap-6 px-6">
     <Transition name="bk-pop" appear>
       <div class="flex flex-col items-center gap-3">
         <BkRune name="berserk" :size="64" carve tone="aurora" />

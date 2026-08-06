@@ -246,7 +246,9 @@ describe('WorkoutExerciseCard', () => {
       await byTestId('edit-set-1').trigger('click')
       await flushPromises()
 
-      const weightDisplay = document.body.querySelector('.bk-metric.text-2xl')
+      // item 2 (post-0.3.0): el stepper del cajón ahora es size="compact"
+      // (text-lg, no el text-2xl de "md") — ver SetForm.vue
+      const weightDisplay = document.body.querySelector('.bk-metric.text-lg')
       expect(weightDisplay?.textContent).toContain('100')
 
       await drawerForm().trigger('submit')
@@ -335,7 +337,7 @@ describe('WorkoutExerciseCard', () => {
       // LUEGO reps 5/40kg (set 2, calentamiento) — el último set SIN MÁS es
       // el calentamiento, pero el prefill debe ignorarlo y usar el 100kg de
       // la serie de trabajo (ver setDefaults.ts::resolveNewSetDefaults)
-      const weightDisplay = document.body.querySelector('.bk-metric.text-2xl')
+      const weightDisplay = document.body.querySelector('.bk-metric.text-lg')
       expect(weightDisplay?.textContent).toContain('100')
     })
 
@@ -344,8 +346,8 @@ describe('WorkoutExerciseCard', () => {
       mountCard({ workoutExercise: emptyExercise, routines, routineId: 1 })
       await openDrawer(20)
 
-      const weightDisplay = document.body.querySelector('.bk-metric.text-2xl')
-      const repsDisplay = document.body.querySelectorAll('.bk-metric.text-2xl')[1]
+      const weightDisplay = document.body.querySelector('.bk-metric.text-lg')
+      const repsDisplay = document.body.querySelectorAll('.bk-metric.text-lg')[1]
       // target_weight_kg es null en el fixture de rutina, así que cae al
       // default de medición (20kg); target_reps sí está fijado (8)
       expect(weightDisplay?.textContent).toContain('20')
@@ -364,7 +366,7 @@ describe('WorkoutExerciseCard', () => {
       mountCard({ workoutExercise: emptyExercise, actions })
       await openDrawer(20)
 
-      const weightDisplay = document.body.querySelector('.bk-metric.text-2xl')
+      const weightDisplay = document.body.querySelector('.bk-metric.text-lg')
       expect(weightDisplay?.textContent).toContain('82.5')
     })
   })

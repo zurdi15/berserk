@@ -109,6 +109,22 @@ describe('ShellView nav', () => {
     expect(wrapper.findComponent({ name: 'AthleteBanner' }).exists()).toBe(true)
     expect(wrapper.findComponent({ name: 'TimerPill' }).exists()).toBe(false)
   })
+
+  // item 6 (post-0.3.0): el gutter estable se movió del html (global, ver
+  // base.css) a este <main>, que es donde el scroll ocurre de verdad ahora
+  it('item 6: the scrolling <main> carries bk-scroll-stable, so switching between a short and a tall view does not shift content width', async () => {
+    const router = buildRouter('today')
+    await router.isReady()
+    const wrapper = mount(ShellView, {
+      global: {
+        plugins: [router, createI18nInstance()],
+        stubs: { RouterView: true, RouterLink: true, AthleteBanner: true },
+      },
+    })
+    const main = wrapper.get('main')
+    expect(main.classes()).toContain('bk-scroll-stable')
+    expect(main.classes()).toContain('overflow-y-auto')
+  })
 })
 
 describe('ShellView active section indicator (item 3, round 9)', () => {
