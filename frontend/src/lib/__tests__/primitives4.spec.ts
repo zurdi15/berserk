@@ -84,8 +84,28 @@ describe('BkHeatmap', () => {
       },
       global: { plugins: [createI18nInstance()] },
     })
-    const cells = wrapper.findAll('[class*="w-2.5"]')
+    // .bk-cascade (no el tamaño): con el side-fix 2 el tamaño de celda pasa a
+    // ser responsive (w-2/sm:w-2.5), así que ya no es un selector estable
+    // para contar celdas — .bk-cascade sí lo es (todas las celdas lo llevan)
+    const cells = wrapper.findAll('.bk-cascade')
     expect(cells.length).toBe(365)
+  })
+
+  it('side-fix 2: cell size and gap are responsive (small below sm, original size from sm) so the widest 6-column month block fits down to 360px', () => {
+    const wrapper = mount(BkHeatmap, {
+      props: {
+        year: 2026,
+        data: [{ date: '2026-08-05', count: 2 }],
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    const cell = wrapper.find('.bk-cascade')
+    expect(cell.classes()).toEqual(
+      expect.arrayContaining(['w-2', 'h-2', 'sm:w-2.5', 'sm:h-2.5']),
+    )
+    const cellGrid = wrapper.findAll('.grid.gap-0\\.5')
+    expect(cellGrid.length).toBeGreaterThan(0)
+    expect(cellGrid[0].classes()).toContain('sm:gap-1')
   })
 
   it('applies all four color-opacity tiers for counts 0-4 (bg-aurora/N, not element opacity — see item 1/2 why-comment)', () => {

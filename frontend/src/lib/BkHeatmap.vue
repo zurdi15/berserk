@@ -66,6 +66,19 @@ function monthName(month: number): string {
 // comentario HTML como primer hijo del template lo convierte en fragmento
 // de dos raíces y rompe wrapper.classes()/fallthrough de atributos de un
 // solo elemento raíz.)
+//
+// round-7 re-review (side-fix 2): grid-cols-4 reparte el ancho en 4 columnas
+// de igual fracción (1fr), pero cada mini-rejilla interna usa columnas "auto"
+// (no se encoge). El bloque más ancho posible tiene 6 columnas (un mes de 31
+// días que empieza en domingo: firstRow=6, floor((6+31-1)/7)+1=6 — ver
+// heatmap.ts). Con el tamaño ORIGINAL (celda 10px + gap 4px) ese bloque mide
+// 6*10 + 5*4 = 80px. <main> pone px-4 (32px totales) y el grid exterior
+// gap-3 (12px × 3 huecos = 36px): a 375px de viewport solo quedan
+// (375-32-36)/4 ≈ 76.75px por columna — menos que los 80px que el bloque más
+// ancho necesita, así que desborda (y peor aún a 360px). Por debajo de `sm`
+// (640px) la celda baja a 8px + gap 2px: 6*8 + 5*2 = 58px, que cabe con
+// margen incluso a 360px ((360-32-36)/4 = 73px). Desde `sm` hay de sobra para
+// volver al tamaño original (10px/4px, 80px de bloque máximo).
 </script>
 
 <template>
@@ -73,14 +86,14 @@ function monthName(month: number): string {
     <div v-for="(block, blockIdx) in blocks" :key="`month-${block.month}`" class="flex flex-col items-center gap-1">
       <span class="text-xs text-ink-faint text-center whitespace-nowrap">{{ monthName(block.month) }}</span>
       <div
-        class="grid gap-1"
+        class="grid gap-0.5 sm:gap-1"
         :style="{ gridTemplateColumns: `repeat(${block.columnCount}, auto)`, gridTemplateRows: 'repeat(7, 1fr)' }"
       >
         <div
           v-for="cell in block.cells"
           :key="cell.date"
           :title="`${cell.date}: ${cell.count}`"
-          :class="['w-2.5 h-2.5 rounded-xs bk-cascade', heatClass(cell.count)]"
+          :class="['w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-xs bk-cascade', heatClass(cell.count)]"
           :style="{
             gridColumn: cell.column + 1,
             gridRow: cell.day + 1,
