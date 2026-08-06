@@ -39,6 +39,7 @@ from ..services.workout_sets import (
     validate_set_fields,
     SET_VALUE_FIELDS,
 )
+from ..services.workouts import sync_derived_muscle_groups
 from .exercises import get_visible_exercise, visible_muscle_group_ids
 
 router = APIRouter(prefix="/workouts", tags=["workouts"])
@@ -126,6 +127,13 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
                     position=item.position,
                 )
             )
+        db.flush()
+        # item 4: los grupos musculares del entreno se derivan desde el
+        # instante en que trae ejercicios de la rutina, no solo al añadirlos
+        # uno a uno luego
+        sync_derived_muscle_groups(
+            db, workout.id, [item.exercise_id for item in routine.exercises]
+        )
     if session is not None:
         session.status = "done"
         session.workout_id = workout.id
@@ -252,6 +260,11 @@ def add_exercise(
         note=payload.note,
     )
     db.add(wex)
+    db.flush()
+    exercise_ids = db.scalars(
+        select(WorkoutExercise.exercise_id).where(WorkoutExercise.workout_id == workout.id)
+    ).all()
+    sync_derived_muscle_groups(db, workout.id, exercise_ids)
     db.commit()
     return wex
 
@@ -284,6 +297,11 @@ def remove_exercise(
         [e for e in workout.exercises if e.id != wex.id], start=1
     ):
         item.position = position
+    db.flush()
+    remaining_ids = db.scalars(
+        select(WorkoutExercise.exercise_id).where(WorkoutExercise.workout_id == workout.id)
+    ).all()
+    sync_derived_muscle_groups(db, workout.id, remaining_ids)
     db.commit()
 
 
@@ -309,6 +327,12 @@ def reorder_exercises(
 def set_muscle_tags(
     workout_id: int, payload: MuscleTagsIn, user: CurrentUser, db: Session = Depends(get_db)
 ):
+    """Etiquetado MANUAL, superseded por el derivado del item 4 (round
+    v0.3.0): el frontend ya no lo llama (los chips de WorkoutView/
+    WorkoutEditView pasaron a ser de solo lectura, derivados de los
+    ejercicios del entreno — ver sync_derived_muscle_groups). Se conserva el
+    endpoint por si algún consumidor externo lo usa, pero cualquier alta/baja
+    de ejercicio posterior recalcula y PISA lo que se fije aquí."""
     workout = _own_workout(db, user.id, workout_id)
     if not set(payload.muscle_group_ids) <= visible_muscle_group_ids(db, user.id):
         raise HTTPException(status_code=422, detail="muscle_group_invalid")

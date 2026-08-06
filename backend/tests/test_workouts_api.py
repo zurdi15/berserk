@@ -11,6 +11,16 @@ def bench_id(client) -> int:
     )
 
 
+def exercise_id(client, name_en: str) -> int:
+    return next(
+        e["id"] for e in client.get("/api/v1/exercises").json() if e["name_en"] == name_en
+    )
+
+
+def muscle_group_id(client, slug: str) -> int:
+    return next(g["id"] for g in client.get("/api/v1/muscle-groups").json() if g["slug"] == slug)
+
+
 def make_routine(client) -> int:
     rid = client.post("/api/v1/routines", json={"name": "Push"}).json()["id"]
     client.put(
@@ -170,3 +180,56 @@ def test_list_with_date_filters(client: TestClient):
         client.post(f"/api/v1/workouts/{wid}/finish")
     july = client.get("/api/v1/workouts?from_date=2026-07-01&to_date=2026-07-31").json()
     assert [w["date"] for w in july] == ["2026-07-15", "2026-07-01"]
+
+
+# item 4 (round v0.3.0): grupos musculares derivados, ya no elegidos a mano
+def test_muscle_tags_derive_from_exercises_and_recompute_on_add_remove(client: TestClient):
+    chest = muscle_group_id(client, "chest")
+    legs = muscle_group_id(client, "legs")
+    workout = client.post("/api/v1/workouts", json={}).json()
+    wid = workout["id"]
+    assert workout["muscle_tag_ids"] == []
+
+    bench_wex = client.post(
+        f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": bench_id(client)}
+    ).json()
+    assert client.get(f"/api/v1/workouts/{wid}").json()["muscle_tag_ids"] == [chest]
+
+    client.post(
+        f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": exercise_id(client, "Squat")}
+    )
+    assert sorted(client.get(f"/api/v1/workouts/{wid}").json()["muscle_tag_ids"]) == sorted(
+        [chest, legs]
+    )
+
+    # quitar el press banca deja solo el grupo del ejercicio que queda (legs)
+    assert (
+        client.delete(f"/api/v1/workouts/{wid}/exercises/{bench_wex['id']}").status_code == 204
+    )
+    assert client.get(f"/api/v1/workouts/{wid}").json()["muscle_tag_ids"] == [legs]
+
+
+def test_muscle_tags_derived_immediately_from_routine_exercises(client: TestClient):
+    chest = muscle_group_id(client, "chest")
+    rid = make_routine(client)  # rutina "Push" con solo el press banca
+    workout = client.post("/api/v1/workouts", json={"routine_id": rid}).json()
+    assert workout["muscle_tag_ids"] == [chest]
+
+
+def test_manual_muscle_tags_endpoint_superseded_by_next_exercise_change(client: TestClient):
+    """El endpoint PUT .../muscle-groups sigue existiendo (compatibilidad),
+    pero cualquier alta/baja de ejercicio posterior lo pisa con el derivado —
+    deja de ser una fuente de verdad independiente."""
+    chest = muscle_group_id(client, "chest")
+    legs = muscle_group_id(client, "legs")
+    workout = client.post("/api/v1/workouts", json={}).json()
+    wid = workout["id"]
+
+    manual = client.put(
+        f"/api/v1/workouts/{wid}/muscle-groups", json={"muscle_group_ids": [legs]}
+    ).json()
+    assert manual["muscle_tag_ids"] == [legs]
+
+    client.post(f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": bench_id(client)})
+    # el alta de un ejercicio de pecho reemplaza el tag manual de piernas
+    assert client.get(f"/api/v1/workouts/{wid}").json()["muscle_tag_ids"] == [chest]
