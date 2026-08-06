@@ -11,14 +11,25 @@ const store = useToastStore()
         <output
           v-for="toast in store.toasts"
           :key="toast.id"
-          class="bk-slab pointer-events-auto px-4 py-2.5 text-sm max-w-md w-fit"
+          class="bk-slab pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-sm max-w-md w-fit"
           :class="{
             'border-danger text-danger': toast.kind === 'error',
             'border-ember text-ember': toast.kind === 'ember',
           }"
-          @click="store.dismiss(toast.id)"
+          @mouseenter="store.pause(toast.id)"
+          @mouseleave="store.resume(toast.id)"
+          @focusin="store.pause(toast.id)"
+          @focusout="store.resume(toast.id)"
         >
-          {{ toast.message }}
+          <span>{{ toast.message }}</span>
+          <button
+            type="button"
+            class="shrink-0 leading-none text-ink-muted hover:text-ink"
+            :aria-label="$t('common.dismiss')"
+            @click="store.dismiss(toast.id)"
+          >
+            ✕
+          </button>
         </output>
       </TransitionGroup>
     </div>

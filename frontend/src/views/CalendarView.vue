@@ -140,8 +140,9 @@ watch(() => athlete.userId, () => {
       @select="selectDay"
     />
 
-    <!-- Heatmap -->
-    <div v-if="heatmapData.length > 0" class="mt-8">
+    <!-- Heatmap: siempre visible, incluso con datos vacíos (BkHeatmap ya
+         tolera [] y dibuja la rejilla del año en blanco) -->
+    <div class="mt-8">
       <h3 class="text-sm font-medium text-ink-muted mb-3">{{ $t('calendar.yearActivity') }}</h3>
       <BkHeatmap :data="heatmapData" :year="year" />
     </div>

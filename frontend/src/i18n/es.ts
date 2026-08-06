@@ -62,6 +62,7 @@ export const es = {
     saved: 'Guardado',
     edit: 'Editar',
     confirm: 'Confirmar',
+    dismiss: 'Cerrar aviso',
   },
   athlete: {
     viewing: 'Viendo a {name}',

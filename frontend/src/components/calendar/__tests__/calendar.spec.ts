@@ -232,6 +232,50 @@ describe('MonthGrid', () => {
     await dayCell.trigger('click')
     expect(wrapper.emitted('select')).toBeTruthy()
   })
+
+  it('renders duplicate-group runes on a double-session day without a Vue duplicate-key warning and caps at 3', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // arranca con un solo rune ('back') para que el update de abajo NO pueda
+    // resolverse por el fast-path de sync delantero/trasero de Vue (que se
+    // salta la detección de duplicados cuando las claves ya encajaban); así
+    // se fuerza el diff completo donde Vue sí compara claves repetidas
+    const wrapper = mount(MonthGrid, {
+      props: {
+        month: {
+          scheduled: [],
+          workouts: [{ id: 9, date: '2026-08-05', feeling: 3, muscle_group_ids: [2] }],
+        },
+        year: 2026,
+        monthNum: 8,
+        groupMap: createGroupMap(),
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    // dos entrenamientos del mismo día comparten el grupo "chest": la lista
+    // combinada de runas trae un duplicado real (chest, back, chest)
+    await wrapper.setProps({
+      month: {
+        scheduled: [],
+        workouts: [
+          { id: 1, date: '2026-08-05', feeling: 4, muscle_group_ids: [1, 2] },
+          { id: 2, date: '2026-08-05', feeling: 3, muscle_group_ids: [1, 3] },
+        ],
+      },
+    })
+    await flushPromises()
+
+    const duplicateKeyWarning = warnSpy.mock.calls.some((call) =>
+      call.some((arg) => typeof arg === 'string' && arg.includes('Duplicate keys')),
+    )
+    expect(duplicateKeyWarning).toBe(false)
+
+    const runes = wrapper.findAllComponents({ name: 'BkRune' })
+    expect(runes.length).toBe(3)
+
+    warnSpy.mockRestore()
+  })
 })
 
 describe('ScheduleSheet', () => {
@@ -421,5 +465,20 @@ describe('CalendarView locale (I2)', () => {
     const headers = wrapper.findAll('.grid.grid-cols-7 > div').map((h) => h.text())
     expect(headers).toContain('W')
     expect(headers).not.toContain('X')
+  })
+})
+
+describe('CalendarView heatmap empty state', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('still renders the heatmap section heading when getHeatmap resolves an empty array', async () => {
+    vi.mocked(domain.getHeatmap).mockResolvedValueOnce([])
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Actividad del año')
+    expect(wrapper.findComponent({ name: 'BkHeatmap' }).exists()).toBe(true)
   })
 })

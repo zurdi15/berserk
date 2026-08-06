@@ -103,8 +103,8 @@ function selectDay(date: string) {
         <!-- Muscle group runes (max 3 per day) -->
         <div v-if="runesByDate.has(cell.date)" class="flex gap-0.5">
           <BkRune
-            v-for="runeName in runesByDate.get(cell.date)!"
-            :key="`rune-${runeName}`"
+            v-for="(runeName, i) in runesByDate.get(cell.date)!"
+            :key="`rune-${cell.date}-${i}`"
             :name="runeName"
             :size="12"
           />

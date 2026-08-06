@@ -62,6 +62,7 @@ export const en = {
     saved: 'Saved',
     edit: 'Edit',
     confirm: 'Confirm',
+    dismiss: 'Dismiss',
   },
   athlete: {
     viewing: 'Viewing {name}',
