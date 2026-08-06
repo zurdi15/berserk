@@ -9,6 +9,7 @@ import BkCard from '@/lib/BkCard.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
+import { USER_COLOR_SWATCHES } from '@/tokens/userColors'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -18,6 +19,8 @@ const locale = ref(auth.user!.locale)
 const units = ref(auth.user!.units)
 const timezone = ref(auth.user!.timezone)
 const timezones = Intl.supportedValuesOf('timeZone')
+// null = sin color propio, cae al aurora del tema (ver USER_COLOR_SWATCHES)
+const color = ref<string | null>(auth.user!.color ?? null)
 
 async function save(partial: Parameters<typeof updateSettings>[0]) {
   try {
@@ -28,6 +31,11 @@ async function save(partial: Parameters<typeof updateSettings>[0]) {
   } catch (error) {
     toastApiError(error)
   }
+}
+
+function pickColor(value: string | null) {
+  color.value = value
+  save({ color: value })
 }
 </script>
 
@@ -63,6 +71,33 @@ async function save(partial: Parameters<typeof updateSettings>[0]) {
         data-testid="timezone-select"
         @update:model-value="(val) => save({ timezone: val })"
       />
+
+      <div class="space-y-2">
+        <span class="block text-sm text-ink-muted">{{ $t('profile.color') }}</span>
+        <div class="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            class="w-9 h-9 rounded-full border-2 bg-aurora transition-transform hover:scale-105"
+            :class="color === null ? 'border-aurora' : 'border-line'"
+            :aria-pressed="color === null"
+            :aria-label="$t('profile.colorDefault')"
+            data-testid="color-swatch-default"
+            @click="pickColor(null)"
+          />
+          <button
+            v-for="swatch in USER_COLOR_SWATCHES"
+            :key="swatch"
+            type="button"
+            class="w-9 h-9 rounded-full border-2 transition-transform hover:scale-105"
+            :class="color === swatch ? 'border-aurora' : 'border-line'"
+            :style="{ backgroundColor: swatch }"
+            :aria-pressed="color === swatch"
+            :aria-label="swatch"
+            data-testid="color-swatch"
+            @click="pickColor(swatch)"
+          />
+        </div>
+      </div>
     </div>
   </BkCard>
 </template>

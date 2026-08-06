@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createI18nInstance } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
+import { USER_COLOR_SWATCHES } from '@/tokens/userColors'
 import SettingsCard from '../SettingsCard.vue'
 
 vi.mock('@/api/auth', () => ({
@@ -15,6 +16,7 @@ vi.mock('@/api/auth', () => ({
     locale: partial.locale || 'es',
     units: partial.units || 'kg',
     timezone: partial.timezone || 'UTC',
+    color: 'color' in partial ? partial.color : null,
   })),
 }))
 
@@ -31,6 +33,7 @@ describe('SettingsCard', () => {
       locale: 'es',
       units: 'kg',
       timezone: 'UTC',
+      color: null,
     }
   })
 
@@ -118,5 +121,34 @@ describe('SettingsCard', () => {
     await flushPromises()
 
     expect(updateSettings).toHaveBeenCalledWith({ timezone: 'Europe/Madrid' })
+  })
+
+  it('renders the default swatch plus one per curated color', () => {
+    build()
+
+    expect(wrapper!.find('[data-testid="color-swatch-default"]').exists()).toBe(true)
+    expect(wrapper!.findAll('[data-testid="color-swatch"]')).toHaveLength(USER_COLOR_SWATCHES.length)
+  })
+
+  it('picking a preset swatch calls updateSettings with that hex', async () => {
+    const { updateSettings } = await import('@/api/auth')
+    vi.mocked(updateSettings).mockClear()
+    build()
+
+    await wrapper!.findAll('[data-testid="color-swatch"]')[0].trigger('click')
+    await flushPromises()
+
+    expect(updateSettings).toHaveBeenCalledWith({ color: USER_COLOR_SWATCHES[0] })
+  })
+
+  it('picking the default option clears the color back to null (the theme aurora)', async () => {
+    const { updateSettings } = await import('@/api/auth')
+    vi.mocked(updateSettings).mockClear()
+    build()
+
+    await wrapper!.get('[data-testid="color-swatch-default"]').trigger('click')
+    await flushPromises()
+
+    expect(updateSettings).toHaveBeenCalledWith({ color: null })
   })
 })

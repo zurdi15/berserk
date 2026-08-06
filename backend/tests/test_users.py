@@ -88,3 +88,38 @@ def test_settings_accept_iana_timezone(client: TestClient):
     resp = client.patch("/api/v1/users/me", json={"timezone": "America/Bogota"})
     assert resp.status_code == 200
     assert resp.json()["timezone"] == "America/Bogota"
+
+
+def test_new_user_color_defaults_to_none(client: TestClient):
+    assert client.get("/api/v1/auth/me").json()["color"] is None
+
+
+def test_update_own_color(client: TestClient):
+    resp = client.patch("/api/v1/users/me", json={"color": "#7C8FFF"})
+    assert resp.status_code == 200
+    assert resp.json()["color"] == "#7C8FFF"
+    assert client.get("/api/v1/auth/me").json()["color"] == "#7C8FFF"
+
+
+def test_settings_reject_invalid_color_word(client: TestClient):
+    resp = client.patch("/api/v1/users/me", json={"color": "blue"})
+    assert resp.status_code == 422
+
+
+def test_settings_reject_short_hex_color(client: TestClient):
+    resp = client.patch("/api/v1/users/me", json={"color": "#fff"})
+    assert resp.status_code == 422
+
+
+def test_settings_reject_hex_without_hash(client: TestClient):
+    resp = client.patch("/api/v1/users/me", json={"color": "7C8FFF"})
+    assert resp.status_code == 422
+
+
+def test_settings_color_explicit_null_clears_it(client: TestClient):
+    # a diferencia de locale/units/timezone, color sí acepta null explícito:
+    # es la forma de volver al aurora del tema por defecto
+    client.patch("/api/v1/users/me", json={"color": "#7C8FFF"})
+    resp = client.patch("/api/v1/users/me", json={"color": None})
+    assert resp.status_code == 200
+    assert resp.json()["color"] is None

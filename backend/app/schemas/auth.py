@@ -40,6 +40,7 @@ class UserOut(BaseModel):
     locale: str
     units: str
     timezone: str
+    color: str | None
 
     model_config = {"from_attributes": True}
 
