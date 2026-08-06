@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -115,7 +115,13 @@ function onRecorded(records: PersonalRecordOut[]) {
 
 // item 9: aquí SIEMPRE dispara (nunca hay celebración de PR con la que
 // competir en este editor retroactivo, ver onRecorded arriba)
-function onLogged() {
+//
+// fix M4 (revisión, mismo criterio que WorkoutView.vue): ciclo false→true
+// real vía nextTick para que un segundo logueo mientras el pulso anterior
+// seguía animándose SÍ remonte NeonPulse y reinicie la animación
+async function onLogged() {
+  neonPulse.value = false
+  await nextTick()
   neonPulse.value = true
 }
 

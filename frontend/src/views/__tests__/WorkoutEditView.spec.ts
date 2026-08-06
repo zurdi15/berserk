@@ -35,6 +35,7 @@ vi.mock('@/api/domain', () => ({
   getExerciseHistory: vi.fn(async () => null),
   updateWorkout: vi.fn(),
   createRoutine: vi.fn(),
+  deleteRoutine: vi.fn(),
   replaceRoutineExercises: vi.fn(),
 }))
 
@@ -174,6 +175,31 @@ describe('WorkoutEditView', () => {
     await flushPromises()
 
     expect(document.body.querySelector('[data-testid="neon-pulse"]')).not.toBeNull()
+  })
+
+  it('fix M4: a second log while the first pulse is still "animating" retriggers a fresh pulse (new DOM node)', async () => {
+    vi.mocked(domain.logSet).mockResolvedValue({
+      set: { id: 101, set_number: 1, reps: 8, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+      new_records: [],
+    } as never)
+
+    wrapper = build()
+    await flushPromises()
+    let form = await openDrawerAndGetForm(wrapper)
+    await form.trigger('submit')
+    await flushPromises()
+
+    const firstPulseEl = document.body.querySelector('[data-testid="neon-pulse"]')
+    expect(firstPulseEl).not.toBeNull()
+
+    // segundo logueo sin que el primer pulso haya emitido 'done' todavía
+    form = await openDrawerAndGetForm(wrapper)
+    await form.trigger('submit')
+    await flushPromises()
+
+    const secondPulseEl = document.body.querySelector('[data-testid="neon-pulse"]')
+    expect(secondPulseEl).not.toBeNull()
+    expect(secondPulseEl).not.toBe(firstPulseEl)
   })
 
   it('edits the workout date through BkDateField, calling workoutEditor.patch', async () => {

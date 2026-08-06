@@ -10,6 +10,15 @@ const emit = defineEmits<{ done: [] }>()
 
 <template>
   <Teleport to="body">
+    <!-- M10b (revisión), verificado a propósito: z-(--bk-z-timer)=70, por
+         ENCIMA del drawer (--bk-z-sheet=50) y de los toasts (--bk-z-toast=60)
+         — intencional, no un descuido. "Registrar y otra" deja el cajón
+         ABIERTO mientras el pulso dispara, así que tiene que pintarse por
+         encima para que se vea; al ser solo un box-shadow INSET
+         pointer-events-none (sin fondo sólido, sin bloquear nada), no tapa
+         el contenido del cajón ni la lectura de un toast en curso — mismo
+         z-index que BkCelebration (nunca compiten a la vez: la celebración
+         de PR siempre gana, ver WorkoutView.vue::onLogged) -->
     <div
       v-if="show"
       class="fixed inset-0 z-(--bk-z-timer) pointer-events-none bk-neon-pulse"

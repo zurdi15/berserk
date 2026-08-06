@@ -373,6 +373,41 @@ describe('WorkoutView', () => {
     })
   })
 
+  describe('item 10 (fix M7): header wraps at narrow viewports instead of overflowing', () => {
+    const workoutFixture = {
+      id: 1,
+      date: '2026-08-06',
+      started_at: '2026-08-06T09:00:00Z',
+      ended_at: null,
+      routine_id: null,
+      note: null,
+      feeling: null,
+      exercises: [],
+      muscle_tag_ids: [],
+    }
+
+    let wrapper: VueWrapper | null = null
+    afterEach(() => {
+      wrapper?.unmount()
+      wrapper = null
+    })
+
+    it('pins flex-wrap (plus items-center/justify-between/gap-3) on the elapsed+discard+finish row', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+
+      wrapper = build()
+      await flushPromises()
+
+      const header = wrapper.get('[data-testid="workout-header"]')
+      expect(header.classes()).toEqual(
+        expect.arrayContaining(['flex', 'flex-wrap', 'items-center', 'justify-between', 'gap-3']),
+      )
+    })
+  })
+
   describe('discard workout', () => {
     const workoutFixture = {
       id: 1,
@@ -555,6 +590,41 @@ describe('WorkoutView', () => {
       )
       expect(document.body.querySelector('[role="dialog"]')).toBeNull()
       expect(document.body.querySelector('[data-testid="neon-pulse"]')).not.toBeNull()
+    })
+
+    it('fix M4: a second log while the first pulse is still "animating" (no done yet) retriggers a fresh pulse instead of staying inert', async () => {
+      vi.mocked(domain.logSet).mockResolvedValue({
+        set: { id: 101, set_number: 1, reps: 8, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+        new_records: [],
+      } as never)
+
+      wrapper = mountLive()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="add-set-20"]').trigger('click')
+      await flushPromises()
+      let form = new DOMWrapper(document.body.querySelector('form') as Element)
+      await form.trigger('submit')
+      await flushPromises()
+
+      const firstPulseEl = document.body.querySelector('[data-testid="neon-pulse"]')
+      expect(firstPulseEl).not.toBeNull()
+
+      // segundo logueo SIN que el pulso anterior haya emitido 'done' (como si
+      // la animación CSS del primero siguiera en curso) — antes del fix,
+      // show ya estaba en `true` y una segunda asignación a `true` no
+      // remontaba el nodo, así que el pulso no se reiniciaba visualmente
+      await wrapper.find('[data-testid="add-set-20"]').trigger('click')
+      await flushPromises()
+      form = new DOMWrapper(document.body.querySelector('form') as Element)
+      await form.trigger('submit')
+      await flushPromises()
+
+      const secondPulseEl = document.body.querySelector('[data-testid="neon-pulse"]')
+      expect(secondPulseEl).not.toBeNull()
+      // nodo DOM distinto: se desmontó y remontó de verdad (ciclo
+      // false→true real), no el mismo elemento que se quedó ahí sin más
+      expect(secondPulseEl).not.toBe(firstPulseEl)
     })
 
     it('skips the neon pulse when the log produces a new PR — the ember celebration wins instead', async () => {

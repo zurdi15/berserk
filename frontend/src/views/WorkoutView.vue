@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -152,9 +152,21 @@ function muscleTagLabel(group: MuscleGroupOut): string {
 // item 9: el pulso neón es para series ORDINARIAS — cuando la misma serie
 // también dispara la celebración de PR (ember, ver BkCelebration arriba),
 // esa celebración gana siempre y el pulso se salta
+//
+// fix M4 (revisión): un segundo logueo mientras el pulso anterior seguía
+// animándose (neonPulse ya en `true`) no disparaba nada — v-if="show" con
+// show ya en true no remonta el nodo, así que la animación no reinicia. Se
+// fuerza un ciclo false→true real (NeonPulse solo se desmonta con `false`,
+// respetando su propio contrato de "done" para cerrar el ciclo anterior)
+async function triggerNeonPulse() {
+  neonPulse.value = false
+  await nextTick()
+  neonPulse.value = true
+}
+
 function onLogged(hasNewRecords: boolean) {
   if (hasNewRecords) return
-  neonPulse.value = true
+  triggerNeonPulse()
 }
 
 // la celebración solo sale del logueo en vivo (logSet rellena lastRecords);
@@ -216,12 +228,20 @@ onBeforeUnmount(() => {
     />
 
     <div v-else-if="activeWorkout.workout" class="space-y-4 bk-stagger">
-      <!-- item 10: en 328px de contenido (360px de viewport - p-4), un bloque
-           de fecha+cronómetro más dos botones de texto uppercase (~150px +
-           ~140px + 8px de gap ≈ 300px) ya no cabían en una fila junto al
-           bloque de fecha (~150px más) — flex-wrap deja que el bloque de
-           botones baje a su propia línea en vez de desbordar o solaparse -->
-      <div class="bk-slab p-4 flex flex-wrap items-center justify-between gap-3" :style="{ '--bk-stagger-i': 0 }">
+      <!-- item 10 (fix M7: comentario corregido, el gap-3 exterior es 12px,
+           no 8px — ese 8px es el gap-2 INTERIOR entre los dos botones):
+           en 328px de contenido (360px de viewport − 2×16px de p-4), el
+           bloque fecha+cronómetro (~150px) más el bloque de botones
+           (Descartar ~135px + gap-2/8px + Terminar ~125px ≈ 268px) suman
+           ~430px con el gap-3/12px exterior que los separa — no caben en
+           una sola fila. flex-wrap deja que el bloque de botones baje a su
+           propia línea (268px < 328px, sobra sitio de sobra ahí) en vez de
+           desbordar o solaparse -->
+      <div
+        class="bk-slab p-4 flex flex-wrap items-center justify-between gap-3"
+        data-testid="workout-header"
+        :style="{ '--bk-stagger-i': 0 }"
+      >
         <div>
           <p class="text-sm text-ink-muted capitalize">{{ dateLabel }}</p>
           <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
