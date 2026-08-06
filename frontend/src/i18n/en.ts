@@ -196,6 +196,8 @@ export const en = {
     confirmSkipMessage: 'Are you sure you want to skip this session?',
     confirmDelete: 'Delete session',
     confirmDeleteMessage: 'Are you sure you want to delete this session?',
+    runeLegend: 'Rune legend',
+    runeLegendHint: 'Each rune marks the main muscle group trained that day.',
   },
   progress: {
     kinds: {

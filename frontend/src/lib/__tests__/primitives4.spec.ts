@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createI18nInstance } from '@/i18n'
 import BkChart from '../BkChart.vue'
 import BkHeatmap from '../BkHeatmap.vue'
 import BkSelect from '../BkSelect.vue'
@@ -51,6 +52,7 @@ describe('BkHeatmap', () => {
         year: 2026,
         data: [{ date: '2026-08-05', count: 2 }],
       },
+      global: { plugins: [createI18nInstance()] },
     })
     const cells = wrapper.findAll('[class*="w-2.5"]')
     expect(cells.length).toBe(365)
@@ -68,6 +70,7 @@ describe('BkHeatmap', () => {
           { date: '2026-01-05', count: 4 }, // opacity: 1 (levels[3])
         ],
       },
+      global: { plugins: [createI18nInstance()] },
     })
     const cells = wrapper.findAll('[style*="opacity"]')
     // Find cells matching our test dates
@@ -85,6 +88,22 @@ describe('BkHeatmap', () => {
     expect(cell2.attributes('style')).toContain('opacity: 0.4')
     expect(cell3.attributes('style')).toContain('opacity: 0.7')
     expect(cell4.attributes('style')).toContain('opacity: 1')
+  })
+
+  it('renders a month-label row (item 6), one span per kept label, sharing the grid column of its day 1 cell', () => {
+    const wrapper = mount(BkHeatmap, {
+      props: { year: 2026, data: [] },
+      global: { plugins: [createI18nInstance()] },
+    })
+    // 2026: jan=col0, feb=col4 (ver src/lib/__tests__/heatmap.spec.ts) — ninguna
+    // colisión ese año, así que se conservan los 12 labels
+    const labels = wrapper.findAll('span.text-ink-faint')
+    expect(labels).toHaveLength(12)
+    expect(labels[0].text()).toBe('ene')
+    expect(labels[0].classes()).toContain('text-xs')
+    expect(labels[0].attributes('style')).toContain('grid-column: 1')
+    expect(labels[1].text()).toBe('feb')
+    expect(labels[1].attributes('style')).toContain('grid-column: 5')
   })
 })
 

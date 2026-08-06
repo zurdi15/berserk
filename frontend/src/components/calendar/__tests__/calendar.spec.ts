@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -505,5 +505,35 @@ describe('CalendarView heatmap empty state', () => {
 
     expect(wrapper.text()).toContain('Actividad del año')
     expect(wrapper.findComponent({ name: 'BkHeatmap' }).exists()).toBe(true)
+  })
+})
+
+describe('CalendarView rune legend (item 7)', () => {
+  // BkSheet teletransporta a document.body: cada test desmonta el suyo o el
+  // siguiente hereda un sheet huérfano (mismo motivo que en BodySection)
+  let wrapper: VueWrapper | null = null
+
+  beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
+  })
+
+  it('clicking the info button opens a sheet listing a muscle group name with its rune', async () => {
+    wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const infoButton = document.querySelector('[data-testid="rune-legend-btn"]') as HTMLElement
+    expect(infoButton).not.toBeNull()
+    infoButton.click()
+    await flushPromises()
+
+    const sheet = document.querySelector('[role="dialog"]') as HTMLElement
+    expect(sheet).not.toBeNull()
+    expect(sheet.textContent).toContain('Pecho')
+    expect(sheet.querySelector('svg')).not.toBeNull()
   })
 })

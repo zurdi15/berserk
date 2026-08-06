@@ -6,9 +6,12 @@ import { getMonth, getHeatmap, listMuscleGroups } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import BkHeatmap from '@/lib/BkHeatmap.vue'
 import BkButton from '@/lib/BkButton.vue'
+import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
 import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
+import { isValidRuneName } from '@/lib/runeResolve'
+import type { RuneName } from '@/lib/runes'
 import { useAthleteStore } from '@/stores/athlete'
 import type { CalendarMonthOut, MuscleGroupOut } from '@/api/domain'
 
@@ -36,6 +39,19 @@ const groupMap = computed(() => {
   }
   return map
 })
+
+// leyenda de runas: mismo criterio de resolución que MonthGrid (isValidRuneName
+// sobre el slug), pero listando el catálogo completo en vez de solo lo usado
+const runeLegendOpen = ref(false)
+const legendGroups = computed(() =>
+  muscleGroups.value
+    .filter((group) => isValidRuneName(group.slug))
+    .map((group) => ({
+      id: group.id,
+      rune: group.slug as RuneName,
+      name: locale.value === 'es' ? group.name_es : group.name_en,
+    })),
+)
 
 async function loadMuscleGroups() {
   try {
@@ -118,6 +134,16 @@ watch(() => athlete.userId, () => {
     <!-- Header with month navigation -->
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-bold text-ink">{{ $t('app.nav.calendar') }}</h1>
+      <!-- las runas de los squares no se autoexplican: leyenda a un toque -->
+      <button
+        type="button"
+        class="bk-press flex items-center justify-center w-6 h-6 rounded-full border border-line-strong text-xs text-ink-muted hover:text-ink hover:border-aurora"
+        :aria-label="$t('calendar.runeLegend')"
+        data-testid="rune-legend-btn"
+        @click="runeLegendOpen = true"
+      >
+        i
+      </button>
     </div>
 
     <!-- Month navigation: icon-only en móvil (el texto largo con flecha
@@ -158,6 +184,19 @@ watch(() => athlete.userId, () => {
         :scheduled="monthData.scheduled.filter(s => s.date === selectedDate)"
         @updated="loadMonth"
       />
+    </BkSheet>
+
+    <!-- Rune legend sheet -->
+    <BkSheet :open="runeLegendOpen" :title="$t('calendar.runeLegend')" @close="runeLegendOpen = false">
+      <div class="space-y-3 p-4">
+        <p class="text-sm text-ink-muted">{{ $t('calendar.runeLegendHint') }}</p>
+        <ul class="space-y-2">
+          <li v-for="group in legendGroups" :key="group.id" class="flex items-center gap-3">
+            <BkRune :name="group.rune" :size="20" />
+            <span class="text-sm text-ink">{{ group.name }}</span>
+          </li>
+        </ul>
+      </div>
     </BkSheet>
   </div>
 </template>

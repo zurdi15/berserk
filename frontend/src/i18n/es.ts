@@ -196,6 +196,8 @@ export const es = {
     confirmSkipMessage: '¿Seguro que quieres omitir esta sesión?',
     confirmDelete: 'Borrar sesión',
     confirmDeleteMessage: '¿Estás seguro de que quieres borrar esta sesión?',
+    runeLegend: 'Leyenda de runas',
+    runeLegendHint: 'Cada runa marca el grupo muscular principal trabajado ese día.',
   },
   progress: {
     kinds: {
