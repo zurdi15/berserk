@@ -17,6 +17,17 @@ vi.mock('@/api/domain', () => ({
     },
     new_records: [],
   })),
+  updateSet: vi.fn(async () => ({
+    id: 1,
+    set_number: 1,
+    reps: 5,
+    weight_kg: 102.5,
+    duration_seconds: null,
+    distance_m: null,
+    is_warmup: false,
+    rpe: null,
+    completed_at: 'x',
+  })),
   getWorkout: vi.fn(async () => freeWorkout),
   deleteSet: vi.fn(async () => {}),
   removeWorkoutExercise: vi.fn(async () => {}),
@@ -114,6 +125,7 @@ describe('WorkoutExerciseCard', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.mocked(domain.logSet).mockClear()
+    vi.mocked(domain.updateSet).mockClear()
     vi.mocked(domain.deleteSet).mockClear()
     vi.mocked(domain.removeWorkoutExercise).mockClear()
     vi.mocked(domain.reorderWorkoutExercises).mockClear()
@@ -198,6 +210,45 @@ describe('WorkoutExerciseCard', () => {
     expect(domain.deleteSet).not.toHaveBeenCalled()
     // el cancelar debe devolver el botón de borrar, no dejar la fila colgada en confirmación
     expect(wrapper.find('[data-testid="delete-set-1"]').exists()).toBe(true)
+  })
+
+  it('edits a set via activeWorkout.updateSet with the full SetIn payload after a real click-through (I5)', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    activeWorkout.workout = freeWorkout as never
+    const wrapper = mountCard()
+
+    await wrapper.find('[data-testid="edit-set-1"]').trigger('click')
+    await flushPromises()
+
+    // el set 1 del fixture: reps 5, weight_kg 100, is_warmup false, sin rpe
+    const setRow = wrapper.find('[data-testid="set-row-1"]')
+    const weightPlus = setRow.findAll('button[aria-label="Aumentar"]')[0]
+    await weightPlus.trigger('click', { detail: 0 })
+    await setRow.find('form').trigger('submit')
+    await flushPromises()
+
+    // payload COMPLETO (footgun del full-replace del backend): reps y
+    // is_warmup viajan aunque solo se haya tocado el peso
+    expect(domain.updateSet).toHaveBeenCalledWith(7, 20, 1, {
+      is_warmup: false,
+      reps: 5,
+      weight_kg: 102.5,
+    })
+  })
+
+  it('cancelling a set edit never calls activeWorkout.updateSet and restores the static row', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    activeWorkout.workout = freeWorkout as never
+    const wrapper = mountCard()
+
+    await wrapper.find('[data-testid="edit-set-1"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('[data-testid="cancel-edit-set-1"]').trigger('click')
+    await flushPromises()
+
+    expect(domain.updateSet).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="edit-set-1"]').exists()).toBe(true)
   })
 
   it('removes the exercise via activeWorkout.removeExercise after confirming with a real click', async () => {

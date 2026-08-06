@@ -2,15 +2,23 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { Measurement, SetIn } from '@/api/domain'
-import { displayToKg } from '@/utils/units'
+import type { Measurement, SetIn, SetOut } from '@/api/domain'
+import { displayToKg, kgToDisplay } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkStepper from '@/lib/BkStepper.vue'
 
 const props = withDefaults(
-  defineProps<{ measurement: Measurement; units?: 'kg' | 'lb' }>(),
-  { units: 'kg' },
+  defineProps<{
+    measurement: Measurement
+    units?: 'kg' | 'lb'
+    // precarga desde una serie existente (edición); si no se pasa, valores
+    // por defecto de registro en vivo (ver I5: reutilizar el mismo formulario
+    // para editar en vez de duplicar la lógica de armado del SetIn)
+    initialSet?: SetOut | null
+    editing?: boolean
+  }>(),
+  { units: 'kg', initialSet: null, editing: false },
 )
 const emit = defineEmits<{ submit: [value: SetIn] }>()
 
@@ -19,13 +27,18 @@ const { t } = useI18n()
 const units = computed(() => props.units)
 
 // valores por defecto razonables; se mantienen entre series del mismo bloque
-// (no se resetean tras cada submit) para no repetir el mismo tecleo en cada serie
-const reps = ref(8)
-const weightDisplay = ref(props.measurement === 'strength' ? 20 : 0)
-const durationSeconds = ref(props.measurement === 'cardio' ? 60 : 30)
-const distanceM = ref(0)
-const isWarmup = ref(false)
-const rpe = ref('')
+// (no se resetean tras cada submit) para no repetir el mismo tecleo en cada serie.
+// En modo edición, el punto de partida es la serie que se está corrigiendo.
+const reps = ref(props.initialSet?.reps ?? 8)
+const weightDisplay = ref(
+  props.initialSet?.weight_kg != null
+    ? kgToDisplay(props.initialSet.weight_kg, props.units)
+    : (props.measurement === 'strength' ? 20 : 0),
+)
+const durationSeconds = ref(props.initialSet?.duration_seconds ?? (props.measurement === 'cardio' ? 60 : 30))
+const distanceM = ref(props.initialSet?.distance_m ?? 0)
+const isWarmup = ref(props.initialSet?.is_warmup ?? false)
+const rpe = ref(props.initialSet?.rpe != null ? String(props.initialSet.rpe) : '')
 
 const rpeOptions = computed(() => [
   { value: '', label: '—' },
@@ -131,6 +144,6 @@ function submit() {
       </div>
     </div>
 
-    <BkButton type="submit" variant="primary" block>{{ t('workout.logSet') }}</BkButton>
+    <BkButton type="submit" variant="primary" block>{{ editing ? t('common.save') : t('workout.logSet') }}</BkButton>
   </form>
 </template>

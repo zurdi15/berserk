@@ -50,6 +50,7 @@ const restTimer = useRestTimerStore()
 
 const removeConfirming = ref(false)
 const deleteConfirming = ref<number | null>(null)
+const editingSetId = ref<number | null>(null)
 
 const name = computed(() => exerciseName(props.exercise, props.locale))
 
@@ -103,6 +104,18 @@ async function onDeleteSet(setId: number) {
   deleteConfirming.value = null
   try {
     await activeWorkout.deleteSet(props.workoutExercise.id, setId)
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
+// el backend hace full-replace de la serie (PATCH .../sets/{id}): SetForm ya
+// arma un SetIn completo para el tipo de medición (mismo buildValue que logSet),
+// así que reutilizarlo aquí evita mandar un payload parcial por error
+async function onUpdateSet(setId: number, value: SetIn) {
+  editingSetId.value = null
+  try {
+    await activeWorkout.updateSet(props.workoutExercise.id, setId, value)
   } catch (error) {
     toastApiError(error)
   }
@@ -178,42 +191,71 @@ async function moveDown() {
         v-for="set in workoutExercise.sets"
         :key="set.id"
         :data-testid="`set-row-${set.id}`"
-        class="flex items-center justify-between"
         :class="set.is_warmup && 'text-ink-faint'"
       >
-        <span class="bk-metric text-sm">
-          {{ set.set_number }}. {{ formatSetValue(set) }}
-          <span v-if="set.rpe"> · RPE {{ set.rpe }}</span>
-        </span>
-
-        <div v-if="deleteConfirming !== set.id">
-          <button
-            type="button"
-            :data-testid="`delete-set-${set.id}`"
-            class="text-ink-faint hover:text-danger text-sm px-2"
-            :aria-label="t('workout.deleteSet')"
-            @click="deleteConfirming = set.id"
-          >
-            ×
-          </button>
-        </div>
-        <div v-else class="flex items-center gap-1">
-          <button
-            type="button"
-            :data-testid="`confirm-delete-set-${set.id}`"
-            class="text-danger text-xs px-2 py-1 border border-danger rounded-sm"
-            @click="onDeleteSet(set.id)"
-          >
-            {{ t('common.confirm') }}
-          </button>
-          <button
-            type="button"
-            :data-testid="`cancel-delete-set-${set.id}`"
-            class="text-ink-faint text-xs px-2 py-1"
-            @click="deleteConfirming = null"
+        <div v-if="editingSetId === set.id && exercise" class="space-y-2 py-2">
+          <SetForm
+            :measurement="exercise.measurement"
+            :units="units"
+            :initial-set="set"
+            editing
+            @submit="(value) => onUpdateSet(set.id, value)"
+          />
+          <BkButton
+            variant="ghost"
+            size="sm"
+            :data-testid="`cancel-edit-set-${set.id}`"
+            @click="editingSetId = null"
           >
             {{ t('common.cancel') }}
-          </button>
+          </BkButton>
+        </div>
+
+        <div v-else class="flex items-center justify-between">
+          <span class="bk-metric text-sm">
+            {{ set.set_number }}. {{ formatSetValue(set) }}
+            <span v-if="set.rpe"> · RPE {{ set.rpe }}</span>
+          </span>
+
+          <div v-if="deleteConfirming !== set.id" class="flex items-center gap-1">
+            <button
+              v-if="exercise"
+              type="button"
+              :data-testid="`edit-set-${set.id}`"
+              class="text-ink-faint hover:text-aurora text-xs px-2"
+              :aria-label="t('common.edit')"
+              @click="editingSetId = set.id"
+            >
+              {{ t('common.edit') }}
+            </button>
+            <button
+              type="button"
+              :data-testid="`delete-set-${set.id}`"
+              class="text-ink-faint hover:text-danger text-sm px-2"
+              :aria-label="t('workout.deleteSet')"
+              @click="deleteConfirming = set.id"
+            >
+              ×
+            </button>
+          </div>
+          <div v-else class="flex items-center gap-1">
+            <button
+              type="button"
+              :data-testid="`confirm-delete-set-${set.id}`"
+              class="text-danger text-xs px-2 py-1 border border-danger rounded-sm"
+              @click="onDeleteSet(set.id)"
+            >
+              {{ t('common.confirm') }}
+            </button>
+            <button
+              type="button"
+              :data-testid="`cancel-delete-set-${set.id}`"
+              class="text-ink-faint text-xs px-2 py-1"
+              @click="deleteConfirming = null"
+            >
+              {{ t('common.cancel') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
