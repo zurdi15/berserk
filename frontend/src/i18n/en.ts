@@ -106,6 +106,7 @@ export const en = {
     noSharingGiven: 'You are not sharing with anyone',
     noSharingReceived: 'Nobody is sharing with you',
     grantSharing: 'Grant access',
+    noUsersToGrant: 'No other users to grant access to',
     username: 'Username',
     view: 'View',
     confirmRevoke: 'Revoke access',
@@ -167,7 +168,6 @@ export const en = {
     confirm: 'Confirm',
   },
   library: {
-    title: 'Library',
     exercises: 'Exercises',
     muscleGroups: 'Muscle groups',
     newExercise: 'New exercise',
@@ -253,7 +253,7 @@ export const en = {
     records: 'Records',
     noRecords: 'No records yet',
     distribution: 'Muscle distribution',
-    distributionSubtitle: 'Effective sets by primary group — last 4 weeks',
+    distributionSubtitle: 'Effective sets by primary group, last 4 weeks',
     distributionSetsTitle: '{count} effective sets',
     noDistribution: 'No distribution data yet',
     stats: {
