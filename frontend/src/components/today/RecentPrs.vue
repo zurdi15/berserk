@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import BkCard from '@/lib/BkCard.vue'
 import type { PersonalRecordOut, ExerciseOut } from '@/api/domain'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
+import { parseUtc } from '@/utils/datetime'
 import { formatWeight } from '@/utils/units'
 
 const props = withDefaults(
@@ -38,7 +39,7 @@ function formatRecordValue(record: PersonalRecordOut): string {
 }
 
 function formatAchievedDate(dateStr: string): string {
-  const date = new Date(dateStr)
+  const date = parseUtc(dateStr)
   return new Intl.DateTimeFormat(locale.value, { month: 'short', day: 'numeric' }).format(date)
 }
 </script>

@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutOut } from '@/api/domain'
 import { listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
 import { primaryRune } from '@/components/calendar/groupRune'
+import { parseUtc } from '@/utils/datetime'
 import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
@@ -48,7 +49,7 @@ const elapsedLabel = computed(() => {
   if (!activeWorkout.workout?.started_at) return '0:00'
   const totalSeconds = Math.max(
     0,
-    Math.floor((now.value - new Date(activeWorkout.workout.started_at).getTime()) / 1000),
+    Math.floor((now.value - parseUtc(activeWorkout.workout.started_at).getTime()) / 1000),
   )
   const h = Math.floor(totalSeconds / 3600)
   const m = Math.floor((totalSeconds % 3600) / 60)

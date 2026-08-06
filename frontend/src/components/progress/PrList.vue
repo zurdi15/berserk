@@ -7,6 +7,7 @@ import { exerciseName } from '@/components/routines/exerciseName'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkRune from '@/lib/BkRune.vue'
+import { parseUtc } from '@/utils/datetime'
 import { formatWeight } from '@/utils/units'
 
 const props = withDefaults(
@@ -31,7 +32,7 @@ function formatRecordValue(record: PersonalRecordOut): string {
 
 function formatAchievedDate(dateStr: string): string {
   return new Intl.DateTimeFormat(locale.value, { month: 'short', day: 'numeric', year: 'numeric' }).format(
-    new Date(dateStr),
+    parseUtc(dateStr),
   )
 }
 </script>

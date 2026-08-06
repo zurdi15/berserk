@@ -14,6 +14,7 @@ import {
   type InviteOut,
 } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
+import { parseUtc } from '@/utils/datetime'
 import { ApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
@@ -189,7 +190,7 @@ function isOwnUser(userId: number): boolean {
 }
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString()
+  return parseUtc(dateString).toLocaleDateString()
 }
 
 function isInviteUsed(invite: InviteOut): boolean {

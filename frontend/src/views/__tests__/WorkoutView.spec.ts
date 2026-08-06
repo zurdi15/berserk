@@ -112,6 +112,48 @@ describe('WorkoutView', () => {
     expect(startSpy).not.toHaveBeenCalled()
   })
 
+  describe('elapsed ticker (naive UTC started_at)', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    // ledger T11 — este es exactamente el sitio donde vivía el bug de C2: un
+    // started_at naive del backend se interpretaba como hora LOCAL del
+    // navegador (+2h en Europe/Madrid) en vez de UTC, así que el elapsed de
+    // un entreno recién empezado mostraba +2h en lugar de segundos.
+    it('ticks the elapsed label from a backend-naive started_at parsed as UTC, not shifted by local offset', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-08-06T09:00:00Z'))
+
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = {
+          id: 1,
+          date: '2026-08-06',
+          started_at: '2026-08-06T09:00:00', // naive, sin offset — mismo instante que "now" arriba
+          ended_at: null,
+          routine_id: null,
+          note: null,
+          feeling: null,
+          exercises: [],
+          muscle_tag_ids: [],
+        } as never
+      })
+
+      const wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="elapsed"]').text()).toBe('0:00')
+
+      vi.advanceTimersByTime(5000)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="elapsed"]').text()).toBe('0:05')
+
+      wrapper.unmount()
+    })
+  })
+
   describe('PR celebration', () => {
     const exerciseFixture = {
       id: 5,
@@ -127,7 +169,8 @@ describe('WorkoutView', () => {
     const workoutFixture = {
       id: 1,
       date: '2026-08-06',
-      started_at: '2026-08-06T09:00:00Z',
+      // formato naive real del backend (sin offset, con microsegundos) — no 'Z'
+      started_at: '2026-08-06T09:00:00.685240',
       ended_at: null,
       routine_id: null,
       note: null,
