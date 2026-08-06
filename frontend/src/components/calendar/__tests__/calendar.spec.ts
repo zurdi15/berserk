@@ -437,6 +437,31 @@ describe('ScheduleSheet', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Too busy')
   })
+
+  it('renders a localized day label in the header, not the raw ISO date', async () => {
+    const wrapper = mount(ScheduleSheet, {
+      props: { date: '2026-08-25', scheduled: [] },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('agosto')
+    expect(wrapper.text()).not.toContain('2026-08-25')
+  })
+
+  it('renders a session time without seconds', async () => {
+    const wrapper = mount(ScheduleSheet, {
+      props: {
+        date: '2026-08-20',
+        scheduled: [
+          { id: 7, date: '2026-08-20', time: '19:30:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
+        ],
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('19:30')
+    expect(wrapper.text()).not.toContain('19:30:00')
+  })
 })
 
 describe('CalendarView locale (I2)', () => {

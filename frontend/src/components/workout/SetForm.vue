@@ -26,6 +26,13 @@ const { t } = useI18n()
 
 const units = computed(() => props.units)
 
+// paso/valores por defecto en el espacio de la unidad del usuario: 2.5 kg es
+// un incremento natural, 2.5 lb no lo es (los discos son de 5 lb)
+const WEIGHT_UI = {
+  kg: { step: 2.5, initial: 20, max: 500 },
+  lb: { step: 5, initial: 45, max: 1100 },
+} as const
+
 // valores por defecto razonables; se mantienen entre series del mismo bloque
 // (no se resetean tras cada submit) para no repetir el mismo tecleo en cada serie.
 // En modo edición, el punto de partida es la serie que se está corrigiendo.
@@ -33,7 +40,7 @@ const reps = ref(props.initialSet?.reps ?? 8)
 const weightDisplay = ref(
   props.initialSet?.weight_kg != null
     ? kgToDisplay(props.initialSet.weight_kg, props.units)
-    : (props.measurement === 'strength' ? 20 : 0),
+    : (props.measurement === 'strength' ? WEIGHT_UI[props.units].initial : 0),
 )
 const durationSeconds = ref(props.initialSet?.duration_seconds ?? (props.measurement === 'cardio' ? 60 : 30))
 const distanceM = ref(props.initialSet?.distance_m ?? 0)
@@ -92,7 +99,7 @@ function submit() {
     <div v-if="measurement === 'strength'" class="flex flex-wrap gap-4">
       <div>
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weight') }}</span>
-        <BkStepper v-model="weightDisplay" :step="2.5" :min="2.5" :max="500" :suffix="units" />
+        <BkStepper v-model="weightDisplay" :step="WEIGHT_UI[units].step" :min="2.5" :max="WEIGHT_UI[units].max" :suffix="units" />
       </div>
       <div>
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
@@ -107,7 +114,7 @@ function submit() {
       </div>
       <div>
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weightOptional') }}</span>
-        <BkStepper v-model="weightDisplay" :step="2.5" :min="0" :max="500" :suffix="units" />
+        <BkStepper v-model="weightDisplay" :step="WEIGHT_UI[units].step" :min="0" :max="WEIGHT_UI[units].max" :suffix="units" />
       </div>
     </div>
 

@@ -71,6 +71,21 @@ const thighStr = ref('')
 const hipStr = ref('')
 const formError = ref('')
 
+// snapshot canónico (kg/cm tal cual llegaron del backend) y las cadenas que
+// se mostraron al precargar: si el usuario no toca un campo, se reenvía el
+// valor canónico original en vez de reconvertirlo — el viaje kg→lb(1dp)→
+// kg(2dp) desplaza el valor (80 kg → 176.4 lb → 80.01 kg) aunque nadie lo
+// haya editado
+const prefill = ref<{
+  weight_kg: number | null
+  waist_cm: number | null
+  chest_cm: number | null
+  arm_cm: number | null
+  thigh_cm: number | null
+  hip_cm: number | null
+}>({ weight_kg: null, waist_cm: null, chest_cm: null, arm_cm: null, thigh_cm: null, hip_cm: null })
+const prefillDisplay = ref({ weight: '', waist: '', chest: '', arm: '', thigh: '', hip: '' })
+
 // el backend hace upsert por fecha con reemplazo completo (PUT /body/{date}):
 // abrir el sheet en blanco sobre una fecha que ya tiene entrada borraría sus
 // valores previos en cuanto se guarde. fillForm precarga desde la entrada
@@ -84,6 +99,23 @@ function fillForm(entry: BodyEntryOut | undefined, dateStr: string) {
   thighStr.value = entry?.thigh_cm != null ? String(entry.thigh_cm) : ''
   hipStr.value = entry?.hip_cm != null ? String(entry.hip_cm) : ''
   formError.value = ''
+
+  prefill.value = {
+    weight_kg: entry?.weight_kg ?? null,
+    waist_cm: entry?.waist_cm ?? null,
+    chest_cm: entry?.chest_cm ?? null,
+    arm_cm: entry?.arm_cm ?? null,
+    thigh_cm: entry?.thigh_cm ?? null,
+    hip_cm: entry?.hip_cm ?? null,
+  }
+  prefillDisplay.value = {
+    weight: weightStr.value,
+    waist: waistStr.value,
+    chest: chestStr.value,
+    arm: armStr.value,
+    thigh: thighStr.value,
+    hip: hipStr.value,
+  }
 }
 
 function entryFor(dateStr: string): BodyEntryOut | undefined {
@@ -122,6 +154,17 @@ function toCmOrNull(value: string): number | null {
   return value.trim() === '' ? null : Number(value)
 }
 
+// si la cadena mostrada sigue siendo la que se precargó, el campo no fue
+// tocado: se reenvía el canónico original en vez de reconvertirlo
+function resolveField(
+  current: string,
+  original: string,
+  canonical: number | null,
+  convert: (value: string) => number | null,
+): number | null {
+  return current === original ? canonical : convert(current)
+}
+
 async function save() {
   // espejo cliente de la validación empty_entry del backend: nunca dejar que
   // la petición salga vacía para descubrirlo por un toast de error genérico
@@ -133,12 +176,12 @@ async function save() {
   formError.value = ''
 
   const body: BodyIn = {
-    weight_kg: toKgOrNull(weightStr.value),
-    waist_cm: toCmOrNull(waistStr.value),
-    chest_cm: toCmOrNull(chestStr.value),
-    arm_cm: toCmOrNull(armStr.value),
-    thigh_cm: toCmOrNull(thighStr.value),
-    hip_cm: toCmOrNull(hipStr.value),
+    weight_kg: resolveField(weightStr.value, prefillDisplay.value.weight, prefill.value.weight_kg, toKgOrNull),
+    waist_cm: resolveField(waistStr.value, prefillDisplay.value.waist, prefill.value.waist_cm, toCmOrNull),
+    chest_cm: resolveField(chestStr.value, prefillDisplay.value.chest, prefill.value.chest_cm, toCmOrNull),
+    arm_cm: resolveField(armStr.value, prefillDisplay.value.arm, prefill.value.arm_cm, toCmOrNull),
+    thigh_cm: resolveField(thighStr.value, prefillDisplay.value.thigh, prefill.value.thigh_cm, toCmOrNull),
+    hip_cm: resolveField(hipStr.value, prefillDisplay.value.hip, prefill.value.hip_cm, toCmOrNull),
   }
 
   try {

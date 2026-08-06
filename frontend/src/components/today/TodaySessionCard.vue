@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 import BkCard from '@/lib/BkCard.vue'
 import BkButton from '@/lib/BkButton.vue'
 import type { ScheduledOut } from '@/api/domain'
-import { todayIso } from '@/utils/dates'
+import { formatTimeShort, todayIso } from '@/utils/dates'
 import { useAthleteStore } from '@/stores/athlete'
 
 const props = withDefaults(
@@ -71,7 +71,7 @@ function goToCalendar() {
       >
         <span :class="['w-2.5 h-2.5', statusClasses(session.status)]" />
         <div class="flex-1 min-w-0">
-          <p class="font-medium text-ink">{{ session.time || '–' }}</p>
+          <p class="font-medium text-ink">{{ formatTimeShort(session.time) || '–' }}</p>
           <p v-if="session.note" class="text-sm text-ink-muted truncate">{{ session.note }}</p>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isoDate, monthGrid, monthLabel, weekdayHeaders } from '../dates'
+import { formatDayLabel, formatTimeShort, isoDate, monthGrid, monthLabel, weekdayHeaders } from '../dates'
 
 describe('dates', () => {
   it('isoDate has no timezone shift', () => {
@@ -19,5 +19,19 @@ describe('dates', () => {
   it('locale-aware labels', () => {
     expect(monthLabel(2026, 8, 'es')).toMatch(/agosto/i)
     expect(weekdayHeaders('es')).toHaveLength(7)
+  })
+
+  it('formatDayLabel builds the label from a LOCAL date, never new Date(iso) (day-shift trap)', () => {
+    const label = formatDayLabel('2026-08-25', 'es')
+    expect(label).toMatch(/25/)
+    expect(label).toMatch(/agosto/i)
+  })
+
+  it('formatTimeShort strips seconds from an HH:MM:SS string', () => {
+    expect(formatTimeShort('19:04:00')).toBe('19:04')
+  })
+
+  it('formatTimeShort passes null through unchanged', () => {
+    expect(formatTimeShort(null)).toBeNull()
   })
 })

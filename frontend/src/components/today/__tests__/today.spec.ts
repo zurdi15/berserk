@@ -83,4 +83,16 @@ describe('TodaySessionCard status dots', () => {
     expect(skippedDot.classes()).toContain('bg-ink-faint')
     expect(skippedDot.classes()).not.toContain('bg-aurora')
   })
+
+  it('renders the session time without seconds', async () => {
+    const schedules: ScheduledOut[] = [
+      { id: 1, date: '2026-08-06', time: '18:00:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
+    ]
+    const wrapper = mount(TodaySessionCard, {
+      props: { schedules },
+      global: { plugins: [createI18nInstance()] },
+    })
+    expect(wrapper.text()).toContain('18:00')
+    expect(wrapper.text()).not.toContain('18:00:00')
+  })
 })

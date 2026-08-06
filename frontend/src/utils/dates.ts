@@ -32,6 +32,15 @@ export function weekdayHeaders(locale: string): string[] {
   )
 }
 
+export function formatDayLabel(iso: string, locale: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(y, m - 1, d))
+}
+
+export function formatTimeShort(hms: string | null): string | null {
+  return hms ? hms.slice(0, 5) : hms
+}
+
 export function monthGrid(year: number, month: number): { date: string; inMonth: boolean }[] {
   const first = new Date(year, month - 1, 1)
   const start = new Date(first)

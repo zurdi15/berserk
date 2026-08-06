@@ -75,6 +75,7 @@ import PrList from '@/components/progress/PrList.vue'
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
+import { useAuthStore } from '@/stores/auth'
 import { todayIso } from '@/utils/dates'
 import { kgToDisplay } from '@/utils/units'
 import ProgressView from '@/views/ProgressView.vue'
@@ -424,6 +425,35 @@ describe('BodySection', () => {
 
     expect(wrapper!.find('[data-testid="confirm-delete-body-2026-07-08"]').exists()).toBe(false)
     expect(domain.deleteBody).not.toHaveBeenCalled()
+  })
+
+  it('round-trip: editing an lb-mode entry without touching weight resends the original kg exactly (no drift)', async () => {
+    // 80 kg → kgToDisplay → 176.4 lb (1dp) → displayToKg de vuelta drifts a
+    // otro valor (ver utils/units.ts): si el campo no se tocó, debe reenviarse
+    // el kg canónico precargado, no reconvertir la cadena mostrada
+    useAuthStore().user = { units: 'lb' } as never
+    vi.mocked(domain.listBody).mockResolvedValue([
+      { date: '2026-07-01', weight_kg: 80, waist_cm: null, chest_cm: null, arm_cm: null, thigh_cm: null, hip_cm: null },
+    ] as never)
+
+    build()
+    await flushPromises()
+
+    await wrapper!.find('[data-testid="edit-body-2026-07-01"]').trigger('click')
+    await flushPromises()
+
+    const saveButton = document.querySelector('[data-testid="save-body-entry"]') as HTMLElement
+    saveButton.click()
+    await flushPromises()
+
+    expect(domain.upsertBody).toHaveBeenCalledWith('2026-07-01', {
+      weight_kg: 80,
+      waist_cm: null,
+      chest_cm: null,
+      arm_cm: null,
+      thigh_cm: null,
+      hip_cm: null,
+    })
   })
 
   it('hides the add button and per-entry delete controls in read-only athlete mode, while list and chart still render', async () => {

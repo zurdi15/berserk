@@ -9,6 +9,7 @@ import { statusClasses } from './statusClasses'
 import type { ScheduledOut, RoutineOut } from '@/api/domain'
 import { updateSchedule, deleteSchedule, schedule, listRoutines } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
+import { formatDayLabel, formatTimeShort } from '@/utils/dates'
 import { useAthleteStore } from '@/stores/athlete'
 
 const props = defineProps<{
@@ -146,7 +147,7 @@ loadRoutines()
   <div class="space-y-4">
     <!-- Date header -->
     <div class="mb-4">
-      <h3 class="font-semibold text-ink">{{ date }}</h3>
+      <h3 class="font-semibold text-ink">{{ formatDayLabel(date, $i18n.locale) }}</h3>
     </div>
 
     <!-- Sessions list -->
@@ -158,7 +159,7 @@ loadRoutines()
       >
         <div class="flex items-center justify-between">
           <div class="flex-1">
-            <p class="font-medium text-ink">{{ session.time || '–' }}</p>
+            <p class="font-medium text-ink">{{ formatTimeShort(session.time) || '–' }}</p>
             <p v-if="session.note" class="text-sm text-ink-muted">{{ session.note }}</p>
             <p v-if="session.status === 'done'" class="text-sm text-ink-muted">{{ $t('calendar.done') }}</p>
           </div>

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Measurement } from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
+import { displayToKg } from '@/utils/units'
 import SetForm from '../SetForm.vue'
 
 function build(measurement: string, units?: 'kg' | 'lb') {
@@ -159,6 +160,17 @@ describe('SetForm', () => {
     await wrapper.find('form').trigger('submit')
     const payload = wrapper.emitted('submit')!.at(-1)![0] as Record<string, unknown>
     expect(payload.duration_seconds).toBe(1)
+  })
+
+  it('lb mode: weight stepper starts at a natural 45 with a natural step of 5, not a kg-space value', async () => {
+    const wrapper = build('strength', 'lb')
+    expect(wrapper.text()).toContain('45')
+
+    const plus = wrapper.findAll('button[aria-label="Aumentar"]')[0]
+    await plus.trigger('click', { detail: 0 })
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload.weight_kg).toBe(displayToKg(50, 'lb'))
   })
 
   it('logs a console warning and emits nothing for an unknown measurement (defensive default)', async () => {
