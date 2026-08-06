@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
-import { getSharing, grantSharing, revokeSharing } from '@/api/domain'
+import { getSharing, grantSharing, listUserDirectory, revokeSharing } from '@/api/domain'
+import type { UserDirectoryEntry } from '@/api/domain'
 import type { UserOut } from '@/api/auth'
 import { toastApiError } from '@/utils/apiErrors'
 import { ApiError } from '@/api/client'
 import BkCard from '@/lib/BkCard.vue'
-import BkField from '@/lib/BkField.vue'
 import BkButton from '@/lib/BkButton.vue'
+import BkEmpty from '@/lib/BkEmpty.vue'
+import BkSelect from '@/lib/BkSelect.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import { useAthleteStore } from '@/stores/athlete'
 import { useToastStore } from '@/stores/toast'
@@ -21,7 +23,10 @@ const toast = useToastStore()
 
 const givenUsers = ref<UserOut[]>([])
 const receivedUsers = ref<UserOut[]>([])
-const grantUsername = ref('')
+// item 11: picker en vez de textfield con el username a ciegas — se elige
+// de una lista real (directory), sin adivinar
+const directory = ref<UserDirectoryEntry[]>([])
+const selectedUsername = ref('')
 const grantError = ref('')
 const isLoading = ref(false)
 const revokeConfirmOpen = ref(false)
@@ -31,6 +36,15 @@ const revokeUserId = ref<number | null>(null)
 // el contenido real de golpe — mismo patrón que TodayView. true también en
 // error, para no dejar la sección en blanco.
 const ready = ref(false)
+
+// item 11: excluye a quien YA tiene acceso concedido (givenUsers) — el
+// directorio en sí ya excluye a uno mismo (ver backend GET /users/directory)
+const grantableUsers = computed(() =>
+  directory.value.filter((u) => !givenUsers.value.some((g) => g.id === u.id)),
+)
+const grantOptions = computed(() =>
+  grantableUsers.value.map((u) => ({ value: u.username, label: u.username })),
+)
 
 async function loadSharing() {
   try {
@@ -44,15 +58,32 @@ async function loadSharing() {
   }
 }
 
-onMounted(loadSharing)
+async function loadDirectory() {
+  try {
+    directory.value = await listUserDirectory()
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
+onMounted(() => {
+  loadSharing()
+  loadDirectory()
+})
 
 async function handleGrant() {
+  // el picker puede quedar vacío (nada seleccionado, o sin candidatos):
+  // no hay nada que enviar todavía
+  if (!selectedUsername.value) return
+
   grantError.value = ''
   isLoading.value = true
 
   try {
-    await grantSharing(grantUsername.value)
-    grantUsername.value = ''
+    // contrato sin cambios (item 11): grantSharing sigue mandando el
+    // username, no un id — el picker solo cambia CÓMO se elige, no qué se envía
+    await grantSharing(selectedUsername.value)
+    selectedUsername.value = ''
     const sharing = await getSharing()
     givenUsers.value = sharing.given
     receivedUsers.value = sharing.received
@@ -105,9 +136,10 @@ function handleViewUser(user: UserOut) {
       <div>
         <h3 class="text-sm font-medium mb-3">{{ $t('profile.sharingGiven') }}</h3>
         <template v-if="ready">
-          <div v-if="givenUsers.length === 0" class="text-sm text-ink-muted">
-            {{ $t('profile.noSharingGiven') }}
-          </div>
+          <!-- item 10: BkEmpty unificado — sin acción propia, conceder
+               acceso exige elegir a alguien primero (picker de abajo), no
+               es un botón de un solo click -->
+          <BkEmpty v-if="givenUsers.length === 0" :message="$t('profile.noSharingGiven')" />
           <div v-else class="space-y-2">
             <div v-for="user in givenUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
               <span>{{ user.username }}</span>
@@ -128,9 +160,7 @@ function handleViewUser(user: UserOut) {
       <div>
         <h3 class="text-sm font-medium mb-3">{{ $t('profile.sharingReceived') }}</h3>
         <template v-if="ready">
-          <div v-if="receivedUsers.length === 0" class="text-sm text-ink-muted">
-            {{ $t('profile.noSharingReceived') }}
-          </div>
+          <BkEmpty v-if="receivedUsers.length === 0" :message="$t('profile.noSharingReceived')" />
           <div v-else class="space-y-2">
             <div v-for="user in receivedUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
               <span class="flex items-center gap-2">
@@ -158,26 +188,33 @@ function handleViewUser(user: UserOut) {
         </template>
       </div>
 
-      <!-- Grant sharing -->
+      <!-- Grant sharing: item 11, picker de la lista real de usuarios en vez
+           de un textfield con el username a ciegas -->
       <div class="space-y-3 pt-4 border-t border-line">
         <h3 class="text-sm font-medium">{{ $t('profile.grantSharing') }}</h3>
-        <div class="flex gap-2">
-          <BkField
-            v-model="grantUsername"
-            :label="$t('profile.username')"
-            :error="grantError"
-            data-testid="grant-username-field"
-            class="flex-1"
-          />
-          <div class="flex items-end">
-            <BkButton
-              :loading="isLoading"
-              data-testid="grant-btn"
-              @click="handleGrant"
-            >
-              {{ $t('common.save') }}
-            </BkButton>
+        <p v-if="!grantOptions.length" class="text-sm text-ink-muted" data-testid="no-grantable-users">
+          {{ $t('profile.noUsersToGrant') }}
+        </p>
+        <div v-else class="space-y-2">
+          <div class="flex gap-2">
+            <BkSelect
+              v-model="selectedUsername"
+              :label="$t('profile.username')"
+              :options="grantOptions"
+              data-testid="grant-user-select"
+              class="flex-1"
+            />
+            <div class="flex items-end">
+              <BkButton
+                :loading="isLoading"
+                data-testid="grant-btn"
+                @click="handleGrant"
+              >
+                {{ $t('common.save') }}
+              </BkButton>
+            </div>
           </div>
+          <p v-if="grantError" data-testid="grant-error" class="text-sm text-danger">{{ grantError }}</p>
         </div>
       </div>
     </div>
