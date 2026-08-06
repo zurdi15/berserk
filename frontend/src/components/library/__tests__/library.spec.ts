@@ -368,6 +368,42 @@ describe('ExerciseManager', () => {
 
     expect(wrapper.text()).toContain('Sin ejercicios en el catálogo')
   })
+
+  it('item 10: own-exercises empty state shows the rune, message and a single "Nuevo ejercicio" action that opens the create form', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Sin ejercicios propios aún')
+    expect(wrapper.findAllComponents({ name: 'BkRune' }).length).toBeGreaterThan(0)
+
+    const buttons = wrapper.findAll('[data-testid="new-exercise-btn"]')
+    expect(buttons).toHaveLength(1)
+
+    expect(byTestId('exercise-name-es-field').exists()).toBe(false)
+    await buttons[0].trigger('click')
+    await flushPromises()
+    expect(byTestId('exercise-name-es-field').exists()).toBe(true)
+  })
+
+  it('item 14(c): the primary-group tag renders the group\'s dedicated rune, not its slug, when they differ', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [{ muscle_group_id: 2, is_primary: true }] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 2, slug: 'shoulders', name_es: 'Hombros', name_en: 'Shoulders', owner_id: null, rune: 'ansuz' },
+    ] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    const ownTag = wrapper.get('[data-testid="exercise-group-tag-12"]')
+    expect(ownTag.findComponent({ name: 'BkRune' }).props('name')).toBe('ansuz')
+  })
 })
 
 describe('MuscleGroupManager', () => {
@@ -426,13 +462,13 @@ describe('MuscleGroupManager', () => {
     expect(globalRow.find('[data-testid="delete-muscle-group-btn"]').exists()).toBe(false)
   })
 
-  it('item 5: admin edits a global group\'s name and rune (slug) through the edit sheet, pre-filled from the row and highlighting the active rune', async () => {
+  it('item 14: admin edits a global group\'s name and DEDICATED rune through the edit sheet, pre-filled from the row (slug read-only, highlighting the effective rune)', async () => {
     const { listMuscleGroups, updateMuscleGroup } = await import('@/api/domain')
     vi.mocked(listMuscleGroups).mockResolvedValue([
       { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
     ] as never)
     vi.mocked(updateMuscleGroup).mockResolvedValue({
-      id: 1, slug: 'shoulders', name_es: 'Pecho y hombro', name_en: 'Chest and shoulder', owner_id: null,
+      id: 1, slug: 'chest', name_es: 'Pecho y hombro', name_en: 'Chest and shoulder', owner_id: null, rune: 'shoulders',
     } as never)
     setUser({ is_admin: true })
 
@@ -442,27 +478,129 @@ describe('MuscleGroupManager', () => {
     await wrapper.get('[data-testid="edit-muscle-group-btn"]').trigger('click')
     await flushPromises()
 
-    // pre-rellenado desde la fila, y la runa actual (chest) resaltada
+    // pre-rellenado desde la fila; slug de solo lectura (item 14: ya no es
+    // editable, identidad estable); runa EFECTIVA (rune ?? slug) resaltada
     expect(byTestId('edit-group-name-es-field').find('input').element).toHaveProperty('value', 'Pecho')
-    expect(byTestId('edit-group-rune-chest').attributes('aria-pressed')).toBe('true')
-    expect(byTestId('edit-group-rune-shoulders').attributes('aria-pressed')).toBe('false')
+    expect(byTestId('edit-group-slug-readonly').exists()).toBe(true)
+    expect(byTestId('edit-group-slug-readonly').text()).toBe('chest')
+    expect(byTestId('edit-group-slug-readonly').find('input').exists()).toBe(false)
+    expect(byTestId('group-rune-chest').attributes('aria-pressed')).toBe('true')
+    expect(byTestId('group-rune-shoulders').attributes('aria-pressed')).toBe('false')
 
     await byTestId('edit-group-name-es-field').find('input').setValue('Pecho y hombro')
     await byTestId('edit-group-name-en-field').find('input').setValue('Chest and shoulder')
-    await byTestId('edit-group-rune-shoulders').trigger('click')
+    await byTestId('group-rune-shoulders').trigger('click')
     await flushPromises()
 
-    expect(byTestId('edit-group-rune-shoulders').attributes('aria-pressed')).toBe('true')
-    expect(byTestId('edit-group-rune-chest').attributes('aria-pressed')).toBe('false')
+    expect(byTestId('group-rune-shoulders').attributes('aria-pressed')).toBe('true')
+    expect(byTestId('group-rune-chest').attributes('aria-pressed')).toBe('false')
 
     await byTestId('save-group-btn').trigger('click')
     await flushPromises()
 
+    // slug NUNCA en el payload — el sheet dejó de editarlo
     expect(updateMuscleGroup).toHaveBeenCalledWith(1, {
       name_es: 'Pecho y hombro',
       name_en: 'Chest and shoulder',
-      slug: 'shoulders',
+      rune: 'shoulders',
     })
+  })
+
+  it('item 14: owner edits their own custom group\'s rune (bug fix: edit used to only show for global rows)', async () => {
+    const { listMuscleGroups, updateMuscleGroup } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 2, slug: 'glutes', name_es: 'Glúteos', name_en: 'Glutes', owner_id: 7, rune: null },
+    ] as never)
+    vi.mocked(updateMuscleGroup).mockResolvedValue({
+      id: 2, slug: 'glutes', name_es: 'Glúteos', name_en: 'Glutes', owner_id: 7, rune: 'legs',
+    } as never)
+    setUser({ id: 7, is_admin: false })
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    // el bug: antes esto no existía para una fila propia no-global
+    const ownRow = wrapper.get('[data-testid="muscle-group-row-2"]')
+    expect(ownRow.find('[data-testid="edit-muscle-group-btn"]').exists()).toBe(true)
+
+    await ownRow.get('[data-testid="edit-muscle-group-btn"]').trigger('click')
+    await flushPromises()
+
+    await byTestId('group-rune-legs').trigger('click')
+    await byTestId('save-group-btn').trigger('click')
+    await flushPromises()
+
+    expect(updateMuscleGroup).toHaveBeenCalledWith(2, {
+      name_es: 'Glúteos',
+      name_en: 'Glutes',
+      rune: 'legs',
+    })
+  })
+
+  it('item 14: create-with-rune round trip — the create drawer has the same rune picker, sent on submit', async () => {
+    const { listMuscleGroups, createMuscleGroup } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    vi.mocked(createMuscleGroup).mockResolvedValue({
+      id: 3, slug: 'glutes', name_es: 'Glúteos', name_en: 'Glutes', owner_id: 7, rune: 'legs',
+    } as never)
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="open-create-group-btn"]').trigger('click')
+    await flushPromises()
+
+    await byTestId('group-slug-field').find('input').setValue('glutes')
+    await byTestId('group-name-es-field').find('input').setValue('Glúteos')
+    await byTestId('group-name-en-field').find('input').setValue('Glutes')
+    await byTestId('group-rune-legs').trigger('click')
+    await flushPromises()
+    expect(byTestId('group-rune-legs').attributes('aria-pressed')).toBe('true')
+
+    await byTestId('create-group-btn').trigger('click')
+    await flushPromises()
+
+    expect(createMuscleGroup).toHaveBeenCalledWith({
+      slug: 'glutes',
+      name_es: 'Glúteos',
+      name_en: 'Glutes',
+      is_global: false,
+      rune: 'legs',
+    })
+  })
+
+  it('item 14(c): a row\'s icon renders the dedicated rune, overriding the slug-derived one, and falls back to the slug when there is none', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'legs', name_es: 'Piernas', name_en: 'Legs', owner_id: null, rune: 'core' },
+      { id: 2, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null, rune: null },
+    ] as never)
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    const overriddenRow = wrapper.get('[data-testid="muscle-group-row-1"]')
+    expect(overriddenRow.findComponent({ name: 'BkRune' }).props('name')).toBe('core')
+
+    const fallbackRow = wrapper.get('[data-testid="muscle-group-row-2"]')
+    expect(fallbackRow.findComponent({ name: 'BkRune' }).props('name')).toBe('chest')
+  })
+
+  it('item 10: empty state shows the rune, message and a single "Nuevo grupo" action that opens the create drawer', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Sin grupos musculares propios aún')
+    const buttons = wrapper.findAll('[data-testid="open-create-group-btn"]')
+    expect(buttons).toHaveLength(1)
+
+    expect(byTestId('group-slug-field').exists()).toBe(false)
+    await buttons[0].trigger('click')
+    await flushPromises()
+    expect(byTestId('group-slug-field').exists()).toBe(true)
   })
 
   it('gates the list on readiness: neither rows nor the empty state show while pending, rows appear once resolved', async () => {
@@ -512,6 +650,7 @@ describe('MuscleGroupManager', () => {
       name_es: 'Antebrazo',
       name_en: 'Forearm',
       is_global: false,
+      rune: null,
     })
   })
 
