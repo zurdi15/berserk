@@ -312,8 +312,11 @@ describe('ScheduleSheet', () => {
     }
     await flushPromises()
 
-    // Click the updateSchedule method directly (the sheet is teleported so finding buttons is complex)
-    await (wrapper.vm as any).saveReplan()
+    // Find and click the Save button in the teleported replan sheet
+    const allButtons = Array.from(document.querySelectorAll('button'))
+    const saveButton = allButtons.find(b => b.textContent?.includes('Guardar') && b.closest('[role="dialog"]'))
+    expect(saveButton).toBeDefined()
+    saveButton?.click()
     await flushPromises()
 
     expect(vi.mocked(domain.updateSchedule)).toHaveBeenCalledWith(7, expect.objectContaining({ date: '2026-08-25' }))

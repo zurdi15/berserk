@@ -165,12 +165,7 @@ loadRoutines()
           <div class="flex items-center gap-2">
             <span
               :data-status="session.status"
-              :class="[
-                'w-2.5 h-2.5 rounded-full',
-                session.status === 'planned' ? 'border-2 border-aurora' : '',
-                session.status === 'done' ? 'bg-aurora' : '',
-                session.status === 'skipped' ? 'bg-ink-faint' : '',
-              ]"
+              :class="['w-2.5 h-2.5', statusClasses(session.status)]"
             />
           </div>
         </div>

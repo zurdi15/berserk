@@ -105,6 +105,25 @@ describe('BkSelect', () => {
     await wrapper.find('select').setValue('b')
     expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual(['b'])
   })
+
+  it('marks disabled options as disabled and leaves others enabled', () => {
+    const wrapper = mount(BkSelect, {
+      props: {
+        label: 'Choose',
+        modelValue: '',
+        options: [
+          { value: '', label: '—', disabled: true },
+          { value: 'a', label: 'Option A' },
+          { value: 'b', label: 'Option B' },
+        ],
+      },
+    })
+    const options = wrapper.findAll('option')
+    expect(options).toHaveLength(3)
+    expect(options[0].attributes('disabled')).toBeDefined()
+    expect(options[1].attributes('disabled')).toBeUndefined()
+    expect(options[2].attributes('disabled')).toBeUndefined()
+  })
 })
 
 describe('BkChart', () => {
