@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -21,20 +21,16 @@ vi.mock('@/api/domain', () => ({
   })),
   revokeSharing: vi.fn(),
   grantSharing: vi.fn(),
-}))
-
-// Mock child components to avoid complex nested dependencies
-vi.mock('@/components/profile/SettingsCard.vue', () => ({
-  default: { name: 'SettingsCard', template: '<div data-testid="settings-card">Settings</div>' },
-}))
-vi.mock('@/components/profile/PasswordCard.vue', () => ({
-  default: { name: 'PasswordCard', template: '<div data-testid="password-card">Password</div>' },
-}))
-vi.mock('@/components/profile/SharingCard.vue', () => ({
-  default: { name: 'SharingCard', template: '<div data-testid="sharing-card">Sharing</div>' },
-}))
-vi.mock('@/components/profile/AdminCard.vue', () => ({
-  default: { name: 'AdminCard', template: '<div data-testid="admin-card">Admin</div>' },
+  listRoutines: vi.fn(() => Promise.resolve([])),
+  adminListUsers: vi.fn(() => Promise.resolve([
+    { id: 1, username: 'root-admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' },
+  ])),
+  adminListInvites: vi.fn(() => Promise.resolve([])),
+  adminCreateUser: vi.fn(),
+  adminUpdateUser: vi.fn(),
+  adminDeleteUser: vi.fn(),
+  adminCreateInvite: vi.fn(),
+  adminDeleteInvite: vi.fn(),
 }))
 
 describe('ProfileView', () => {
@@ -52,10 +48,20 @@ describe('ProfileView', () => {
     }
   })
 
-  function build() {
+  // por defecto las tarjetas hijas van con el auto-stub de VTU (contenido
+  // irrelevante para estos tests); las pruebas de integración de C1 las
+  // desactivan una a una (stubs: false) para comprobar el control real
+  function build(stubs: Record<string, boolean> = {}) {
     return mount(ProfileView, {
       global: {
         plugins: [createI18nInstance()],
+        stubs: {
+          SettingsCard: true,
+          PasswordCard: true,
+          SharingCard: true,
+          AdminCard: true,
+          ...stubs,
+        },
       },
     })
   }
@@ -63,43 +69,25 @@ describe('ProfileView', () => {
   it('logout button calls auth.logout() store action', async () => {
     const wrapper = build()
     const auth = useAuthStore()
-
-    // Spy on logout store action
     const logoutSpy = vi.spyOn(auth, 'logout').mockResolvedValue(undefined)
 
-    // Find and click logout button
     const logoutBtn = wrapper.find('[data-testid="logout-btn"]')
-    if (logoutBtn.exists()) {
-      await logoutBtn.trigger('click')
+    await logoutBtn.trigger('click')
+    await flushPromises()
 
-      // Wait for async
-      await new Promise(resolve => setTimeout(resolve, 0))
-      await wrapper.vm.$nextTick()
-
-      // Verify store logout was called
-      expect(logoutSpy).toHaveBeenCalled()
-    }
+    expect(logoutSpy).toHaveBeenCalled()
   })
 
   it('logout navigates to login after store action', async () => {
     const wrapper = build()
     const auth = useAuthStore()
-
-    // Mock the logout action to avoid API call
     vi.spyOn(auth, 'logout').mockResolvedValue(undefined)
 
-    // Find and click logout button
     const logoutBtn = wrapper.find('[data-testid="logout-btn"]')
-    if (logoutBtn.exists()) {
-      await logoutBtn.trigger('click')
+    await logoutBtn.trigger('click')
+    await flushPromises()
 
-      // Wait for async
-      await new Promise(resolve => setTimeout(resolve, 0))
-      await wrapper.vm.$nextTick()
-
-      // Verify navigation to login
-      expect(push).toHaveBeenCalledWith({ name: 'login' })
-    }
+    expect(push).toHaveBeenCalledWith({ name: 'login' })
   })
 
   it('renders profile tab by default', async () => {
@@ -145,5 +133,59 @@ describe('ProfileView', () => {
 
     const tabsText = wrapper.text()
     expect(tabsText).not.toContain('Administración')
+  })
+
+  // C1: BkTabs no tiene slot — este contenido nunca llegó a renderizar antes
+  // del fix. Estas 3 pruebas son la red de seguridad: cada pestaña debe montar
+  // un control hijo real (no un stub, no solo el texto de la pestaña).
+  describe('C1: cada pestaña monta un control hijo real', () => {
+    it('profile tab renders the real settings select (locale/units), not a swallowed slot', async () => {
+      const wrapper = build({ SettingsCard: false })
+      await flushPromises()
+
+      const localeSelect = wrapper.find('[data-testid="locale-select"] select')
+      expect(localeSelect.exists()).toBe(true)
+      expect(localeSelect.text()).toContain('Español')
+      expect(localeSelect.text()).toContain('English')
+    })
+
+    it('routines tab renders the real RoutineList with its create-routine control', async () => {
+      const wrapper = build()
+      await flushPromises()
+
+      const routinesTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Rutinas')
+      expect(routinesTab).not.toBeUndefined()
+      await routinesTab!.trigger('click')
+      await flushPromises()
+
+      const newRoutineBtn = wrapper.findAll('button').find((b) => b.text() === 'Nueva rutina')
+      expect(newRoutineBtn).not.toBeUndefined()
+    })
+
+    it('admin tab renders the real admin table with the mocked admin user row', async () => {
+      const auth = useAuthStore()
+      auth.user = {
+        id: 1,
+        username: 'root-admin',
+        is_admin: true,
+        locale: 'es',
+        units: 'kg',
+        timezone: 'UTC',
+      }
+
+      const wrapper = build({ AdminCard: false })
+      await flushPromises()
+
+      const adminTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Administración')
+      expect(adminTab).not.toBeUndefined()
+      await adminTab!.trigger('click')
+      await flushPromises()
+
+      const table = wrapper.find('table')
+      expect(table.exists()).toBe(true)
+      const userRow = wrapper.find('[data-testid="user-row-1"]')
+      expect(userRow.exists()).toBe(true)
+      expect(userRow.text()).toContain('root-admin')
+    })
   })
 })

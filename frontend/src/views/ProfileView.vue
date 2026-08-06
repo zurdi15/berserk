@@ -45,30 +45,24 @@ async function handleLogout() {
 
 <template>
   <div class="space-y-4">
-    <BkTabs v-model="activeTab" :tabs="tabs">
-      <template v-if="activeTab === 'profile'">
-        <div class="space-y-4">
-          <SettingsCard />
-          <PasswordCard />
-          <SharingCard />
+    <BkTabs v-model="activeTab" :tabs="tabs" />
 
-          <BkButton
-            variant="ghost"
-            data-testid="logout-btn"
-            @click="handleLogout"
-          >
-            {{ $t('profile.logout') }}
-          </BkButton>
-        </div>
-      </template>
+    <div v-if="activeTab === 'profile'" class="space-y-4">
+      <SettingsCard />
+      <PasswordCard />
+      <SharingCard />
 
-      <template v-if="activeTab === 'routines'">
-        <RoutineList />
-      </template>
+      <BkButton
+        variant="ghost"
+        data-testid="logout-btn"
+        @click="handleLogout"
+      >
+        {{ $t('profile.logout') }}
+      </BkButton>
+    </div>
 
-      <template v-if="activeTab === 'admin' && auth.user?.is_admin">
-        <AdminCard />
-      </template>
-    </BkTabs>
+    <RoutineList v-if="activeTab === 'routines'" />
+
+    <AdminCard v-if="activeTab === 'admin' && auth.user?.is_admin" />
   </div>
 </template>
