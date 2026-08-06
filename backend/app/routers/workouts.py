@@ -126,6 +126,11 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
                     workout_id=workout.id,
                     exercise_id=item.exercise_id,
                     position=item.position,
+                    # item 11: el descanso configurado en la rutina es el
+                    # punto de partida del entreno — el usuario lo puede
+                    # cambiar luego solo para ESTE entreno (rest_seconds del
+                    # WorkoutExercise, no toca la rutina de origen)
+                    rest_seconds=item.rest_seconds,
                 )
             )
         db.flush()
@@ -254,11 +259,24 @@ def add_exercise(
     if get_visible_exercise(db, user.id, payload.exercise_id) is None:
         raise HTTPException(status_code=422, detail="exercise_invalid")
     position = len(workout.exercises) + 1
+    # item 11: si el entreno viene de una rutina y este ejercicio forma parte
+    # de ella (añadido suelto, p.ej. tras haberlo quitado y devuelto a la
+    # tarjeta), hereda su rest_seconds igual que los copiados al empezar el
+    # entreno; si no, None (ad-hoc) — cae al default general en rest.ts
+    rest_seconds = None
+    if workout.routine_id is not None:
+        routine = db.get(Routine, workout.routine_id)
+        routine_item = next(
+            (e for e in (routine.exercises if routine else []) if e.exercise_id == payload.exercise_id),
+            None,
+        )
+        rest_seconds = routine_item.rest_seconds if routine_item else None
     wex = WorkoutExercise(
         workout_id=workout.id,
         exercise_id=payload.exercise_id,
         position=position,
         note=payload.note,
+        rest_seconds=rest_seconds,
     )
     db.add(wex)
     db.flush()

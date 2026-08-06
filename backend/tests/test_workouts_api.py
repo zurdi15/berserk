@@ -232,6 +232,47 @@ def test_muscle_tags_derived_immediately_from_routine_exercises(client: TestClie
     assert workout["muscle_tag_ids"] == [chest]
 
 
+# item 11 (round v0.3.0): descanso configurable por ejercicio del entreno
+def test_rest_seconds_copied_from_routine_on_start_and_on_manual_add(client: TestClient):
+    rid = make_routine(client)  # "Push" con bench a rest_seconds=90
+    workout = client.post("/api/v1/workouts", json={"routine_id": rid}).json()
+    assert workout["exercises"][0]["rest_seconds"] == 90
+
+    # quitar y volver a añadir el mismo ejercicio (sigue en la rutina de origen)
+    wid = workout["id"]
+    client.delete(f"/api/v1/workouts/{wid}/exercises/{workout['exercises'][0]['id']}")
+    added = client.post(
+        f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": bench_id(client)}
+    ).json()
+    assert added["rest_seconds"] == 90
+
+
+def test_rest_seconds_is_null_for_ad_hoc_exercises(client: TestClient):
+    workout = client.post("/api/v1/workouts", json={}).json()  # entreno libre, sin rutina
+    added = client.post(
+        f"/api/v1/workouts/{workout['id']}/exercises", json={"exercise_id": bench_id(client)}
+    ).json()
+    assert added["rest_seconds"] is None
+
+
+def test_rest_seconds_patch_round_trip_and_explicit_clear(client: TestClient):
+    workout = client.post("/api/v1/workouts", json={}).json()
+    wex = client.post(
+        f"/api/v1/workouts/{workout['id']}/exercises", json={"exercise_id": bench_id(client)}
+    ).json()
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}"
+
+    resp = client.patch(url, json={"rest_seconds": 120})
+    assert resp.status_code == 200 and resp.json()["rest_seconds"] == 120
+
+    # fuera de rango (ge=5, le=900)
+    assert client.patch(url, json={"rest_seconds": 2}).status_code == 422
+
+    # null explícito limpia el override (vuelve a caer al default en el frontend)
+    resp = client.patch(url, json={"rest_seconds": None})
+    assert resp.status_code == 200 and resp.json()["rest_seconds"] is None
+
+
 def test_manual_muscle_tags_endpoint_superseded_by_next_exercise_change(client: TestClient):
     """El endpoint PUT .../muscle-groups sigue existiendo (compatibilidad),
     pero cualquier alta/baja de ejercicio posterior lo pisa con el derivado —

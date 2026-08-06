@@ -42,6 +42,9 @@ class WorkoutExerciseOut(BaseModel):
     exercise_id: int
     position: int
     note: str | None
+    # item 11: descanso override de ESTE ejercicio en ESTE entreno; None cae
+    # al target de la rutina de origen o al default general (ver rest.ts)
+    rest_seconds: int | None
     sets: list[SetOut]
 
     model_config = {"from_attributes": True}
@@ -77,6 +80,11 @@ class WorkoutExerciseIn(BaseModel):
 
 class WorkoutExercisePatchIn(BaseModel):
     note: str | None = Field(None, max_length=300)
+    # mismo rango que RoutineExercise.rest_seconds (schemas/routines.py); un
+    # PATCH con {"rest_seconds": null} explícito limpia el override (vuelve
+    # a caer al target de rutina/default) — sí es una semántica válida aquí,
+    # a diferencia del "note" de WorkoutPatchIn.date que nunca se anula
+    rest_seconds: int | None = Field(None, ge=5, le=900)
 
 
 class ExerciseOrderIn(BaseModel):

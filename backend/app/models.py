@@ -213,6 +213,11 @@ class WorkoutExercise(Base):
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
     position: Mapped[int] = mapped_column()
     note: Mapped[str | None] = mapped_column(String(300), default=None)
+    # item 11 (round v0.3.0): descanso configurable por ejercicio DEL ENTRENO
+    # (no solo de la rutina) — None = "sin override", cae al target de la
+    # rutina de origen o al default general (ver services/workouts.py::
+    # resolve_rest_seconds y frontend rest.ts::restFor, misma prioridad)
+    rest_seconds: Mapped[int | None] = mapped_column(default=None)
 
     sets: Mapped[list["WorkoutSet"]] = relationship(
         cascade="all, delete-orphan",
