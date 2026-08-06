@@ -54,21 +54,22 @@ function monthName(month: number): string {
   return new Intl.DateTimeFormat(locale.value, { month: 'short' }).format(new Date(props.year, month - 1, 1))
 }
 
-// bloques por mes que se envuelven en varias filas (flex-wrap) en vez de
-// desbordar en scroll lateral: llenan el ancho disponible bajo "Actividad
-// del año", centrados (justify-center) para que el hueco sobrante quede
-// repartido a los dos lados en vez de solo a la derecha. Cada bloque es su
-// propia mini-rejilla, label centrado encima. Sin Transition propia en el
-// contenedor: el barrido celda a celda de abajo YA es la entrada de este
-// componente — envolverlo en otra sería la misma doble animación que el
-// bug de item 4 en ShellView, a menor escala. (Nota: este comentario vive
-// en <script>, no en <template>, a propósito — un comentario HTML como
-// primer hijo del template lo convierte en fragmento de dos raíces y rompe
-// wrapper.classes()/fallthrough de atributos de un solo elemento raíz.)
+// rejilla FIJA de 3 filas × 4 meses (zurdi): un año siempre trae 12 bloques
+// exactos, así que a diferencia del flex-wrap anterior no hace falta
+// "envolver" nada — grid-cols-4 los reparte en un 3×4 estable, sin depender
+// de cuánto ancho sobre en la última fila. justify-items-center centra cada
+// bloque (label + mini-rejilla) dentro de su celda si le sobra ancho. Sin
+// Transition propia en el contenedor: el barrido celda a celda de abajo YA
+// es la entrada de este componente — envolverlo en otra sería la misma
+// doble animación que el bug de item 4 en ShellView, a menor escala. (Nota:
+// este comentario vive en <script>, no en <template>, a propósito — un
+// comentario HTML como primer hijo del template lo convierte en fragmento
+// de dos raíces y rompe wrapper.classes()/fallthrough de atributos de un
+// solo elemento raíz.)
 </script>
 
 <template>
-  <div class="flex flex-wrap justify-center items-start gap-3">
+  <div class="grid grid-cols-4 justify-items-center items-start gap-3">
     <div v-for="(block, blockIdx) in blocks" :key="`month-${block.month}`" class="flex flex-col items-center gap-1">
       <span class="text-xs text-ink-faint text-center whitespace-nowrap">{{ monthName(block.month) }}</span>
       <div
