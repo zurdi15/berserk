@@ -51,23 +51,16 @@ const activeIndex = computed(() => {
             >
               <span class="text-xs tracking-wide">{{ $t(item.label) }}</span>
               <span :class="item.name === 'workout' && 'bk-slab relative -mb-5 p-2.5 border-aurora text-aurora'">
-                <!-- dos capas en vez de una (evita el salto de fase): la que respira
-                     vive SIEMPRE encendida; una segunda, estática y a opacity 0/1,
-                     se cruza por encima cuando /workout está activo — un
-                     crossfade real en vez de apagar bk-breathe a mitad de ciclo,
-                     que saltaba de golpe a lo que tocara en ese instante -->
-                <span
-                  v-if="item.name === 'workout'"
-                  class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora) bk-breathe"
-                  aria-hidden="true"
-                  data-testid="workout-glow"
-                />
+                <!-- sin respirar (revertido): una sola capa, apagada por defecto,
+                     que funde a opacity 1 cuando /workout está activo y funde de
+                     vuelta a 0 al salir — transition pura, sin animación infinita
+                     de la que "desenganchar" a mitad de ciclo -->
                 <span
                   v-if="item.name === 'workout'"
                   class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
                   :style="{ opacity: route.name === 'workout' ? 1 : 0, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
                   aria-hidden="true"
-                  data-testid="workout-glow-static"
+                  data-testid="workout-glow"
                 />
                 <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
               </span>
@@ -120,19 +113,13 @@ const activeIndex = computed(() => {
               <span
                 :class="item.name === 'workout' && 'bk-slab relative -mt-5 p-2.5 border-aurora text-aurora'"
               >
-                <!-- mismo criterio que en desktop: dos capas, crossfade -->
-                <span
-                  v-if="item.name === 'workout'"
-                  class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora) bk-breathe"
-                  aria-hidden="true"
-                  data-testid="workout-glow"
-                />
+                <!-- mismo criterio que en desktop: una capa, opacity 0/1 -->
                 <span
                   v-if="item.name === 'workout'"
                   class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
                   :style="{ opacity: route.name === 'workout' ? 1 : 0, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
                   aria-hidden="true"
-                  data-testid="workout-glow-static"
+                  data-testid="workout-glow"
                 />
                 <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
               </span>

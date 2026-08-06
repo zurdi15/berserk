@@ -163,39 +163,28 @@ describe('ShellView active section indicator (item 3)', () => {
     expect(wrapper.findAll('[data-testid="nav-underline"]')).toHaveLength(4)
   })
 
-  it('route=workout: the CTA glow crossfades to the static layer (opacity 1) on top of the breathing layer, which never stops breathing', async () => {
+  it('route=workout: the CTA glow fades in to full opacity on both bars (no breathing anymore — reverted to a single transition-driven layer)', async () => {
     const wrapper = await mountWithRoute('workout')
     await flushPromises()
 
-    // round 7: la capa que respira ya NO se apaga (evita el salto de fase a
-    // mitad de ciclo) — una segunda capa estática se cruza encima
-    const breathing = wrapper.findAll('[data-testid="workout-glow"]')
-    expect(breathing).toHaveLength(2) // desktop + móvil
-    expect(breathing[0].classes()).toContain('bk-breathe')
-    expect(breathing[1].classes()).toContain('bk-breathe')
-
-    const static_ = wrapper.findAll('[data-testid="workout-glow-static"]')
-    expect(static_).toHaveLength(2)
-    expect(static_[0].attributes('style')).toContain('opacity: 1')
-    expect(static_[1].attributes('style')).toContain('opacity: 1')
+    const glows = wrapper.findAll('[data-testid="workout-glow"]')
+    expect(glows).toHaveLength(2) // desktop + móvil
+    expect(glows[0].classes()).not.toContain('bk-breathe')
+    expect(glows[0].attributes('style')).toContain('opacity: 1')
+    expect(glows[1].attributes('style')).toContain('opacity: 1')
   })
 
-  it('route=today: the mobile sliding bar is fully visible (opacity 1) and both CTA glow layers read as inactive (breathing shows through, static layer at opacity 0)', async () => {
+  it('route=today: the mobile sliding bar is fully visible (opacity 1) and the CTA glow is faded out (opacity 0, off by default)', async () => {
     const wrapper = await mountWithRoute('today')
     await flushPromises()
 
     const indicator = wrapper.get('[data-testid="nav-indicator"]')
     expect(indicator.attributes('style')).toContain('opacity: 1')
 
-    const breathing = wrapper.findAll('[data-testid="workout-glow"]')
-    expect(breathing).toHaveLength(2)
-    expect(breathing[0].classes()).toContain('bk-breathe')
-    expect(breathing[1].classes()).toContain('bk-breathe')
-
-    const static_ = wrapper.findAll('[data-testid="workout-glow-static"]')
-    expect(static_).toHaveLength(2)
-    expect(static_[0].attributes('style')).toContain('opacity: 0')
-    expect(static_[1].attributes('style')).toContain('opacity: 0')
+    const glows = wrapper.findAll('[data-testid="workout-glow"]')
+    expect(glows).toHaveLength(2)
+    expect(glows[0].attributes('style')).toContain('opacity: 0')
+    expect(glows[1].attributes('style')).toContain('opacity: 0')
   })
 
   it('mobile bottom bar: all 5 labels stay visible regardless of which section is active (active-only-label experiment was reverted)', async () => {

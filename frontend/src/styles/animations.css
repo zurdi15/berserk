@@ -43,14 +43,6 @@
   to { transform: translateX(100%); }
 }
 
-/* Respira el aura, no la runa: glow ambiental sancionado para la CTA
-   del entrenamiento; una runa que se apaga enseña la línea de la barra tras la losa.
-   El guard de reduced-motion ya lo neutraliza */
-@keyframes bk-breathe {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 1; }
-}
-
 /* Ráfaga de ámbar de la celebración de PR: sube de golpe y se asienta en un
    resplandor tenue mientras dura el overlay. Ningún color nuevo — reutiliza
    el mismo --bk-ember-glow del tono ember del resto del sistema. */
@@ -107,10 +99,6 @@
   inset: 0;
   background: linear-gradient(90deg, transparent, var(--bk-line), transparent);
   animation: bk-shimmer var(--bk-dur-5) var(--bk-ease-out) infinite;
-}
-
-.bk-breathe {
-  animation: bk-breathe 3.2s var(--bk-ease-inout) infinite;
 }
 
 .bk-ember-flash {
