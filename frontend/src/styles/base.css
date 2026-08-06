@@ -25,9 +25,21 @@
   --radius-md: var(--bk-radius-md);
 }
 
+/* scrollbar siempre presente (gutter reservado) en vez de aparecer solo
+   cuando la vista es más alta que el viewport: sin esto, navegar de una
+   vista corta a una larga ensancha/estrecha el contenido en el ancho exacto
+   de la scrollbar — un salto de layout en cada cambio de vista. No pelea con
+   el flex min-h-dvh del shell (ShellView.vue): el gutter vive en el html,
+   fuera del árbol flex. Mismo patrón que turtletrips (style.css). */
 html {
   background: var(--bk-bg-void);
   color-scheme: dark;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  /* Firefox: más fina y en aurora — hereda a los scrollers internos sin
+     repetir la regla en cada uno, salvo que .no-scrollbar diga lo contrario */
+  scrollbar-width: thin;
+  scrollbar-color: var(--bk-accent-aurora-deep) transparent;
 }
 
 html.bk-light {
@@ -78,9 +90,31 @@ body::before {
   font-variant-numeric: tabular-nums;
 }
 
+/* WebKit no hereda scrollbar-width/color: van por selector universal para
+   alcanzar tanto el scroller raíz (html) como los contenedores internos con
+   su propio overflow (lista de ejercicios, PrList, tabla de admin...) sin
+   repetir la regla en cada uno. iOS Safari ignora el pseudo-elemento
+   ::-webkit-scrollbar por completo (aceptado, no hay alternativa). */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--bk-accent-aurora-deep);
+  border-radius: var(--bk-radius-full);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bk-accent-aurora);
+}
+
 /* barras con scroll horizontal (tabs, etc.) sin scrollbar visible: el
    affordance de "hay más contenido" ya lo da el corte de los items, la
-   scrollbar encima solo añade ruido visual (mismo patrón que turtletrips) */
+   scrollbar encima solo añade ruido visual (mismo patrón que turtletrips).
+   Gana por especificidad sobre el *::-webkit-scrollbar de arriba (clase +
+   pseudo-elemento > universal + pseudo-elemento). */
 .no-scrollbar {
   scrollbar-width: none;
 }
