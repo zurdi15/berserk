@@ -244,6 +244,35 @@ describe('MonthGrid', () => {
     vi.useRealTimers()
   })
 
+  it('item 6: status dot sits at the top of the cell and runes at the bottom (independent overlays, no shared footer to collide with the day number)', async () => {
+    const wrapper = mount(MonthGrid, {
+      props: {
+        month: {
+          scheduled: [
+            { id: 1, date: '2026-08-01', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
+          ],
+          workouts: [
+            { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [1, 3] },
+          ],
+        },
+        year: 2026,
+        monthNum: 8,
+        groupMap: createGroupMap(),
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const cell = wrapper.get('[data-testid="day-cell-2026-08-01"]')
+    const dotContainer = cell.get('[data-status="planned"]').element.parentElement as HTMLElement
+    const runeContainer = cell.findComponent({ name: 'BkRune' }).element.parentElement as HTMLElement
+
+    expect(dotContainer.className).toContain('top-1')
+    expect(runeContainer.className).toContain('bottom-1')
+    // el número del día sigue presente, sin ser desplazado por ninguno de los dos overlays
+    expect(cell.find('.text-xs.font-semibold').exists()).toBe(true)
+  })
+
   it('emits select event when day is clicked', async () => {
     const wrapper = mount(MonthGrid, {
       props: {
@@ -548,6 +577,33 @@ describe('CalendarView heatmap empty state', () => {
     const heading = wrapper.get('h3')
     expect(heading.text()).toBe('Actividad del año')
     expect(heading.classes()).toContain('text-center')
+  })
+})
+
+describe('CalendarView layout (round 6, items 3/4)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('has no view-level h1 (Hoy never had one) and no horizontal padding of its own on the root', async () => {
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('h1').exists()).toBe(false)
+    // <main> del shell ya pone px-4: la raíz de la vista no debe duplicarlo
+    expect(wrapper.classes().some((c) => c === 'p-4' || c.startsWith('px-'))).toBe(false)
+  })
+
+  it('keeps the rune-legend button in the month-navigation row, next to the chevrons', async () => {
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const infoButton = wrapper.get('[data-testid="rune-legend-btn"]')
+    const monthNavRow = infoButton.element.parentElement as HTMLElement
+    // el mismo row contiene los botones de mes anterior/siguiente + la leyenda
+    expect(monthNavRow.querySelectorAll('button').length).toBeGreaterThanOrEqual(3)
   })
 })
 

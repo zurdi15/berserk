@@ -127,27 +127,20 @@ watch(() => athlete.userId, () => {
   loadMonth()
   loadHeatmap()
 })
+
+// sin padding lateral propio en la raíz (item 4): <main> del shell ya pone
+// px-4/py-4, tenerlo también aquí duplicaba el gutter frente a Hoy.
+// (comentario aquí y no como primer hijo de <template>: un comentario ahí
+// convierte la raíz en un fragmento de dos nodos y rompe wrapper.classes(), ver ShellView.vue)
 </script>
 
 <template>
-  <div class="space-y-6 p-4">
-    <!-- Header with month navigation -->
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold text-ink">{{ $t('app.nav.calendar') }}</h1>
-      <!-- las runas de los squares no se autoexplican: leyenda a un toque -->
-      <button
-        type="button"
-        class="bk-press flex items-center justify-center w-6 h-6 rounded-full border border-line-strong text-xs text-ink-muted hover:text-ink hover:border-aurora"
-        :aria-label="$t('calendar.runeLegend')"
-        data-testid="rune-legend-btn"
-        @click="runeLegendOpen = true"
-      >
-        i
-      </button>
-    </div>
-
+  <div class="space-y-6">
     <!-- Month navigation: icon-only en móvil (el texto largo con flecha
-         desbordaba y aplastaba el label en 390px), texto de vuelta desde sm -->
+         desbordaba y aplastaba el label en 390px), texto de vuelta desde sm.
+         La leyenda de runas (item 3) vive aquí ahora: el h1 de sección que la
+         acompañaba se quitó (Hoy nunca tuvo uno, es el patrón a seguir), así
+         que el botón se reubica a la derecha, a la altura de los chevrons. -->
     <div class="flex items-center gap-2">
       <BkButton variant="ghost" size="sm" :aria-label="$t('calendar.prevMonth')" @click="prevMonth">
         <span aria-hidden="true">‹</span>
@@ -158,6 +151,16 @@ watch(() => athlete.userId, () => {
         <span aria-hidden="true">›</span>
         <span class="hidden sm:inline">{{ $t('calendar.nextMonth') }}</span>
       </BkButton>
+      <!-- las runas de los squares no se autoexplican: leyenda a un toque -->
+      <button
+        type="button"
+        class="bk-press flex items-center justify-center w-6 h-6 rounded-full border border-line-strong text-xs text-ink-muted hover:text-ink hover:border-aurora shrink-0"
+        :aria-label="$t('calendar.runeLegend')"
+        data-testid="rune-legend-btn"
+        @click="runeLegendOpen = true"
+      >
+        i
+      </button>
     </div>
 
     <!-- Month grid -->

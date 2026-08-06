@@ -103,13 +103,14 @@ watch(exerciseId, () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col gap-4 p-4">
+  <div class="h-full flex flex-col gap-4">
     <!-- h-full: <main> del shell ya acota la altura real (ver ShellView.vue) —
          sin ese tope, "ocupa el resto del viewport" no tiene contra qué medirse.
          (comentario DENTRO de la raíz: como primer hijo del template crearía un
-         fragmento de dos raíces y rompería el fall-through de atributos) -->
-    <h1 class="shrink-0 text-2xl font-bold text-ink">{{ $t('app.nav.progress') }}</h1>
-
+         fragmento de dos raíces y rompería el fall-through de atributos)
+         Sin h1 de sección (item 3): Hoy nunca tuvo uno, mismo patrón aquí.
+         Sin padding lateral propio (item 4): <main> del shell ya pone px-4,
+         duplicarlo aquí desalineaba el gutter frente a Hoy. -->
     <BkTabs class="shrink-0" v-model="tab" :tabs="mainTabs" />
 
     <!-- Entrenos: la lista de ejercicios ocupa TODO el resto del alto (scroll

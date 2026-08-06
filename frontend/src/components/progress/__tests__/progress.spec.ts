@@ -40,6 +40,8 @@ const fixtures = vi.hoisted(() => ({
     { workout_id: 1, date: '2026-07-01', top_weight: 80, volume: 800, est_1rm: 90 },
     { workout_id: 2, date: '2026-07-08', top_weight: 85, volume: 900, est_1rm: 95 },
   ],
+  // solo el ejercicio 1 (Press banca) tiene series registradas (item 5)
+  trainedExerciseIds: [1],
   bodyEntries: [
     { date: '2026-07-01', weight_kg: 84, waist_cm: 90, chest_cm: null, arm_cm: null, thigh_cm: null, hip_cm: null },
     { date: '2026-07-08', weight_kg: 83, waist_cm: null, chest_cm: null, arm_cm: null, thigh_cm: null, hip_cm: null },
@@ -61,6 +63,7 @@ vi.mock('@/api/domain', () => ({
   getDistribution: vi.fn(async () => fixtures.distribution),
   getRecords: vi.fn(async () => fixtures.records),
   getSeries: vi.fn(async () => ({ series: fixtures.series })),
+  getTrainedExercises: vi.fn(async () => ({ exercise_ids: fixtures.trainedExerciseIds })),
   listBody: vi.fn(async () => fixtures.bodyEntries),
   upsertBody: vi.fn(async () => fixtures.bodyEntries[0]),
   deleteBody: vi.fn(async () => undefined),
@@ -249,12 +252,32 @@ describe('ExercisePicker', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.mocked(domain.listExercises).mockClear()
+    vi.mocked(domain.getTrainedExercises).mockClear().mockResolvedValue({ exercise_ids: fixtures.trainedExerciseIds } as never)
   })
 
   it('loads the full catalog with athlete threading on mount', async () => {
     mount(ExercisePicker, { props: { modelValue: null }, ...withI18n() })
     await flushPromises()
     expect(domain.listExercises).toHaveBeenCalledWith({ userId: undefined })
+  })
+
+  it('item 5: loads the trained-exercise ids with the same athlete threading as the catalog', async () => {
+    mount(ExercisePicker, { props: { modelValue: null }, ...withI18n() })
+    await flushPromises()
+    expect(domain.getTrainedExercises).toHaveBeenCalledWith(undefined)
+  })
+
+  it('item 5: shows the aurora dot next to an exercise with logged data, not next to one without', async () => {
+    const wrapper = mount(ExercisePicker, { props: { modelValue: null }, ...withI18n() })
+    await flushPromises()
+
+    // ejercicio 1 (Press banca): tiene series → dot presente
+    const trainedOption = wrapper.get('[data-testid="exercise-option-1"]')
+    expect(trainedOption.find('[data-testid="trained-dot"]').exists()).toBe(true)
+
+    // ejercicio 2 (Sentadilla): sin series → sin dot
+    const untrainedOption = wrapper.get('[data-testid="exercise-option-2"]')
+    expect(untrainedOption.find('[data-testid="trained-dot"]').exists()).toBe(false)
   })
 
   it("threads the viewed athlete's id into the catalog request", async () => {
@@ -577,6 +600,9 @@ describe('ProgressView', () => {
     expect(domain.listMuscleGroups).toHaveBeenCalledWith(undefined)
     expect(domain.getDistribution).toHaveBeenCalledWith(4, undefined)
     expect(domain.getRecords).toHaveBeenCalledWith({ exercise_id: undefined, userId: undefined })
+    // item 5: ExercisePicker (montado dentro de la pestaña Entrenos) carga el
+    // set de entrenados con el mismo hilo de atleta que el resto
+    expect(domain.getTrainedExercises).toHaveBeenCalledWith(undefined)
   })
 
   it('hides the metric switch and chart until an exercise is picked', async () => {
@@ -733,6 +759,18 @@ describe('ProgressView', () => {
     const listArea = trainingPanel.findAll('[style*="--bk-stagger-i: 0"]')[0]
     expect(listArea.classes()).toContain('flex-1')
     expect(listArea.classes()).toContain('min-h-0')
+  })
+
+  it('round 6 items 3/4: has no view-level h1 (Hoy never had one) and no horizontal padding of its own on the root', async () => {
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    expect(wrapper.find('h1').exists()).toBe(false)
+    // <main> del shell ya pone px-4: la raíz de la vista no debe duplicarlo
+    expect(wrapper.classes().some((c) => c === 'p-4' || c.startsWith('px-'))).toBe(false)
+    // el chain h-full/flex-col (item 3 del round 3) sigue intacto sin el h1
+    expect(wrapper.classes()).toContain('h-full')
+    expect(wrapper.classes()).toContain('flex-col')
   })
 
   it('item 7: switching tabs replays the entry animation (bk-stagger present per panel; body panel uses bk-rise)', async () => {
