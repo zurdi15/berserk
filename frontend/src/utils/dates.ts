@@ -1,3 +1,5 @@
+import { parseUtc } from './datetime'
+
 export function isoDate(d: Date): string {
   // construcción manual: toISOString desplazaría el día según la zona horaria
   const y = d.getFullYear()
@@ -72,6 +74,19 @@ export function addMonths(iso: string, delta: number): string {
 
 export function formatTimeShort(hms: string | null): string | null {
   return hms ? hms.slice(0, 5) : hms
+}
+
+// para started_at/ended_at (datetime UTC-naive completo, no una hora suelta):
+// formatTimeShort de arriba recorta un STRING de hora y NO sirve aquí — un
+// slice ingenuo del datetime leería la hora UTC cruda, no la LOCAL del
+// viewer. parseUtc interpreta el valor correctamente como UTC y de ahí se lee
+// la hora local con getHours/getMinutes (ver item 2, round 10).
+export function formatDateTimeShort(datetime: string | null): string | null {
+  if (!datetime) return null
+  const date = parseUtc(datetime)
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  return `${h}:${m}`
 }
 
 export function monthGrid(year: number, month: number): { date: string; inMonth: boolean }[] {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import BkActionBtn from '@/lib/BkActionBtn.vue'
@@ -9,17 +10,32 @@ import BkField from '@/lib/BkField.vue'
 import BkTimeField from '@/lib/BkTimeField.vue'
 import BkDateField from '@/lib/BkDateField.vue'
 import BkSheet from '@/lib/BkSheet.vue'
+import BkRune from '@/lib/BkRune.vue'
+import WorkoutDayInfo from './WorkoutDayInfo.vue'
 import { statusClasses } from './statusClasses'
-import type { ScheduledOut, RoutineOut, WorkoutSummaryOut } from '@/api/domain'
-import { updateSchedule, deleteSchedule, schedule, listRoutines, startWorkout } from '@/api/domain'
+import type { ExerciseOut, PersonalRecordOut, RoutineOut, ScheduledOut, WorkoutOut } from '@/api/domain'
+import {
+  deleteSchedule,
+  deleteWorkout,
+  getRecords,
+  listExercises,
+  listRoutines,
+  listWorkouts,
+  schedule,
+  startWorkout,
+  updateSchedule,
+} from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
-import { formatDayLabel, formatTimeShort, todayIso } from '@/utils/dates'
+import { formatDayLabel, formatTimeShort, isoDate, todayIso } from '@/utils/dates'
+import { parseUtc } from '@/utils/datetime'
+import { formatWeight, formatWeightInt } from '@/utils/units'
+import { useDisplayUnits } from '@/composables/useDisplayUnits'
+import { exerciseName } from '@/components/routines/exerciseName'
 import { useAthleteStore } from '@/stores/athlete'
 
 const props = defineProps<{
   date: string
   scheduled: ScheduledOut[]
-  workouts: WorkoutSummaryOut[]
 }>()
 
 const emit = defineEmits<{
@@ -28,6 +44,8 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const athlete = useAthleteStore()
+const { locale } = useI18n()
+const units = useDisplayUnits()
 
 const isViewingSelf = computed(() => !athlete.isViewing)
 // registrar un entreno retroactivo solo tiene sentido hasta hoy — un día
@@ -35,10 +53,41 @@ const isViewingSelf = computed(() => !athlete.isViewing)
 // date, pero para un futuro sí hay date: se oculta en el cliente para no
 // ofrecer una acción que no encaja conceptualmente)
 const isPastOrToday = computed(() => props.date <= todayIso())
+// item 1 (round 10): "programar rutina" solo tiene sentido hoy/futuro — un
+// día pasado ya ofrece registrar/editar el entreno (arriba), "programar"
+// no encaja conceptualmente ahí
+const isTodayOrFuture = computed(() => props.date >= todayIso())
+const isToday = computed(() => props.date === todayIso())
 const loggingPastWorkout = ref(false)
 
 const routines = ref<RoutineOut[]>([])
 const loading = ref(false)
+
+// item 2 (round 10): info completa del/de los entreno(s) del día + catálogo
+// de ejercicios (para resolver nombres) + récords logrados ese día. El
+// payload del mes (monthData.workouts) es solo un resumen (WorkoutSummaryOut,
+// sin ejercicios/hora/duración/nota) — hace falta este fetch propio al abrir
+// el día. Gateado con infoReady (mismo patrón que RoutineList/TodayView):
+// aparece completo de una vez, no en oleadas según qué promesa resuelva antes.
+const infoReady = ref(false)
+const workoutsDetail = ref<WorkoutOut[]>([])
+const exerciseCatalog = ref<ExerciseOut[]>([])
+const dayRecords = ref<PersonalRecordOut[]>([])
+
+// amendment D: ya no hay título genérico de sheet ("Sesiones Programadas");
+// las sesiones planificadas se agrupan bajo un eyebrow ligero solo cuando
+// hay alguna PLANIFICADA de verdad (una lista solo de omitidas no lo lleva,
+// "Planificado" sería engañoso ahí)
+const plannedSessions = computed(() => props.scheduled.filter((s) => s.status !== 'done'))
+const showPlannedEyebrow = computed(() => plannedSessions.value.some((s) => s.status === 'planned'))
+
+// item 1: al programar HOY, las horas/minutos ya pasados se deshabilitan en
+// el BkTimeField (min). Un día futuro no pasa min (cualquier hora vale).
+const minTimeToday = computed(() => {
+  if (!isToday.value) return undefined
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+})
 
 // Form state for creating new session
 // null (no ''): BkTimeField emite null al limpiar/nunca elegir hora — el ''
@@ -52,15 +101,61 @@ const editingId = ref<number | null>(null)
 const editDate = ref('')
 const editTime = ref<string | null>(null)
 
-// Confirm dialog state
-const confirmAction = ref<{ type: 'skip' | 'delete'; id: number } | null>(null)
+// Confirm dialog state: 'kind' distingue qué API llamar en un delete —
+// amendment A unifica la tarjeta de entreno con la de sesión, pero borrar
+// cada una sigue siendo una operación distinta (deleteWorkout vs deleteSchedule)
+const confirmAction = ref<
+  | { type: 'skip'; id: number }
+  | { type: 'delete'; id: number; kind: 'session' | 'workout' }
+  | null
+>(null)
 
 async function loadRoutines() {
   try {
-    routines.value = await listRoutines()
+    routines.value = await listRoutines(athlete.userId)
   } catch (error) {
     toastApiError(error)
   }
+}
+
+async function loadDayInfo() {
+  infoReady.value = false
+  try {
+    const [workoutsResult, recordsResult, exercisesResult] = await Promise.all([
+      listWorkouts({ from_date: props.date, to_date: props.date, userId: athlete.userId }),
+      getRecords({ userId: athlete.userId }),
+      listExercises({ userId: athlete.userId }),
+    ])
+    workoutsDetail.value = workoutsResult
+    // récords "del día": achieved_at es un datetime UTC-naive (igual que
+    // started_at/ended_at) — parseUtc + isoDate en vez de un slice del
+    // string, o el día mostrado se desplazaría cerca de medianoche según el
+    // offset del viewer (misma trampa que en RecentPrs/PrList)
+    dayRecords.value = recordsResult.filter((record) => isoDate(parseUtc(record.achieved_at)) === props.date)
+    exerciseCatalog.value = exercisesResult
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    infoReady.value = true
+  }
+}
+
+function routineNameFor(workout: WorkoutOut): string | null {
+  if (workout.routine_id == null) return null
+  return routines.value.find((r) => r.id === workout.routine_id)?.name ?? null
+}
+
+function exerciseNameFor(exerciseId: number): string {
+  return exerciseName(exerciseCatalog.value.find((e) => e.id === exerciseId), locale.value)
+}
+
+// los 3 kinds de PR son magnitudes en kg (ver FinishSummary/RecentPrs):
+// max_weight es un peso REAL registrado (conserva precisión), est_1rm/
+// max_volume son derivados (sin decimales)
+function formatRecordValue(record: PersonalRecordOut): string {
+  return record.kind === 'max_weight'
+    ? formatWeight(record.value, units.value)
+    : formatWeightInt(record.value, units.value)
 }
 
 async function skipSession(id: number) {
@@ -83,8 +178,12 @@ async function confirmSkip() {
   }
 }
 
-async function deleteSession(id: number) {
-  confirmAction.value = { type: 'delete', id }
+function deleteSession(id: number) {
+  confirmAction.value = { type: 'delete', id, kind: 'session' }
+}
+
+function deleteWorkoutEntry(id: number) {
+  confirmAction.value = { type: 'delete', id, kind: 'workout' }
 }
 
 function startReplan(session: ScheduledOut) {
@@ -122,12 +221,23 @@ function cancelReplan() {
 
 async function confirmDelete() {
   if (!confirmAction.value || confirmAction.value.type !== 'delete') return
-  const id = confirmAction.value.id
+  const { id, kind } = confirmAction.value
   confirmAction.value = null
 
   try {
     loading.value = true
-    await deleteSchedule(id)
+    if (kind === 'workout') {
+      // amendment A: borrar la tarjeta unificada borra el ENTRENO. El
+      // backend revierte la sesión vinculada (si la había) a 'planned' —
+      // comportamiento menos sorprendente: tras recargar el mes, esa sesión
+      // vuelve a aparecer en la lista de planificadas de arriba, como si el
+      // entreno nunca se hubiera registrado. Un standalone (sin sesión) solo
+      // desaparece, sin nada que reaparezca.
+      await deleteWorkout(id)
+      await loadDayInfo()
+    } else {
+      await deleteSchedule(id)
+    }
     emit('updated')
   } catch (error) {
     toastApiError(error)
@@ -172,7 +282,14 @@ async function createSession() {
   }
 }
 
+// el sheet no se remonta al cambiar de día con el sheet ya abierto (el
+// v-if="selectedDate" del padre sigue siendo truthy para cualquier fecha):
+// sin este watch, cambiar de día sin cerrar antes dejaría la info del día
+// anterior en pantalla
+watch(() => props.date, () => loadDayInfo())
+
 loadRoutines()
+loadDayInfo()
 </script>
 
 <template>
@@ -182,10 +299,39 @@ loadRoutines()
       <h3 class="font-semibold text-ink">{{ formatDayLabel(date, $i18n.locale) }}</h3>
     </div>
 
-    <!-- Sessions list -->
-    <div class="space-y-3">
+    <!-- Tarjetas unificadas de entreno (item 2 + amendment A): un entreno es
+         un entreno, con o sin sesión programada detrás. Gateadas en
+         infoReady para no aparecer campo a campo. -->
+    <div v-if="infoReady && workoutsDetail.length" class="space-y-3 bk-stagger">
+      <div v-for="(workout, i) in workoutsDetail" :key="workout.id" :style="{ '--bk-stagger-i': i }">
+        <WorkoutDayInfo
+          :workout="workout"
+          :routine-name="routineNameFor(workout)"
+          :exercise-catalog="exerciseCatalog"
+          :can-edit="isViewingSelf"
+          @edit="editWorkout(workout.id)"
+          @delete="deleteWorkoutEntry(workout.id)"
+        />
+      </div>
+    </div>
+
+    <!-- PRs del día (nivel día, no por entreno) -->
+    <div v-if="infoReady && dayRecords.length" class="space-y-2 border border-line rounded-sm p-3">
+      <h4 class="text-xs uppercase tracking-wide text-ink-faint">{{ $t('calendar.prsOfDay') }}</h4>
+      <div v-for="record in dayRecords" :key="record.id" :data-testid="`pr-of-day-${record.id}`" class="flex items-center gap-2 text-ember text-sm">
+        <BkRune name="pr" :size="18" tone="ember" />
+        <span class="font-medium">
+          {{ $t(`progress.kinds.${record.kind}`) }} — {{ exerciseNameFor(record.exercise_id) }} — {{ formatRecordValue(record) }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Sesiones planificadas/omitidas: las completadas ya se muestran arriba
+         como tarjeta unificada (amendment A), no aquí -->
+    <div v-if="plannedSessions.length" class="space-y-3">
+      <p v-if="showPlannedEyebrow" class="text-xs uppercase tracking-wide text-ink-faint">{{ $t('calendar.plannedEyebrow') }}</p>
       <div
-        v-for="session in scheduled"
+        v-for="session in plannedSessions"
         :key="session.id"
         class="border border-line rounded-sm p-3 space-y-2"
       >
@@ -193,7 +339,6 @@ loadRoutines()
           <div class="flex-1">
             <p class="font-medium text-ink">{{ formatTimeShort(session.time) || '–' }}</p>
             <p v-if="session.note" class="text-sm text-ink-muted">{{ session.note }}</p>
-            <p v-if="session.status === 'done'" class="text-sm text-ink-muted">{{ $t('calendar.done') }}</p>
           </div>
           <div class="flex items-center gap-2">
             <span
@@ -235,29 +380,11 @@ loadRoutines()
       </div>
     </div>
 
-    <!-- Workouts already logged this day: cada uno con su affordance de editar -->
-    <div v-if="workouts.length" class="space-y-3">
-      <h4 class="font-medium text-ink">{{ $t('app.nav.workout') }}</h4>
-      <div
-        v-for="workout in workouts"
-        :key="workout.id"
-        class="border border-line rounded-sm p-3 flex items-center justify-between"
-      >
-        <p class="text-sm text-ink-muted">{{ $t('calendar.workoutEntry') }}</p>
-        <BkActionBtn
-          v-if="isViewingSelf"
-          icon="edit"
-          :data-testid="`edit-workout-${workout.id}`"
-          :aria-label="$t('common.edit')"
-          @click="editWorkout(workout.id)"
-        />
-      </div>
-    </div>
-
-    <!-- Registrar un entreno pasado: solo hoy/pasado (ver isPastOrToday) -->
+    <!-- Registrar un entreno pasado: solo hoy/pasado (ver isPastOrToday).
+         amendment B: variant primary, como toda acción de "añadir algo" -->
     <div v-if="isViewingSelf && isPastOrToday" class="border border-line rounded-sm p-3">
       <BkButton
-        variant="ghost"
+        variant="primary"
         block
         data-testid="log-past-workout"
         :disabled="loggingPastWorkout"
@@ -267,14 +394,15 @@ loadRoutines()
       </BkButton>
     </div>
 
-    <!-- Create new session form -->
-    <div v-if="isViewingSelf" class="border border-line rounded-sm p-3 space-y-3">
+    <!-- Create new session form: solo hoy/futuro (item 1) -->
+    <div v-if="isViewingSelf && isTodayOrFuture" class="border border-line rounded-sm p-3 space-y-3">
       <h4 class="font-medium text-ink">{{ $t('calendar.newSession') }}</h4>
       <div class="space-y-2">
         <BkTimeField
           v-model="newTime"
           :label="$t('calendar.time')"
           :hint="$t('calendar.optional')"
+          :min="minTimeToday"
         />
         <BkSelect
           v-model="newRoutineId"
@@ -331,10 +459,16 @@ loadRoutines()
     </BkSheet>
 
     <!-- Confirm sheet -->
-    <BkSheet :open="confirmAction !== null" :title="confirmAction?.type === 'skip' ? $t('calendar.confirmSkip') : $t('calendar.confirmDelete')" @close="confirmAction = null">
+    <BkSheet
+      :open="confirmAction !== null"
+      :title="confirmAction?.type === 'skip' ? $t('calendar.confirmSkip') : (confirmAction?.kind === 'workout' ? $t('workout.discardTitle') : $t('calendar.confirmDelete'))"
+      @close="confirmAction = null"
+    >
       <div v-if="confirmAction" class="space-y-4">
         <p class="text-ink-muted">
-          {{ confirmAction.type === 'skip' ? $t('calendar.confirmSkipMessage') : $t('calendar.confirmDeleteMessage') }}
+          {{ confirmAction.type === 'skip'
+            ? $t('calendar.confirmSkipMessage')
+            : (confirmAction.kind === 'workout' ? $t('workout.discardHint') : $t('calendar.confirmDeleteMessage')) }}
         </p>
         <div class="flex gap-2">
           <BkButton

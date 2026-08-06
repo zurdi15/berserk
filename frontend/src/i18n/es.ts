@@ -202,10 +202,8 @@ export const es = {
     prevMonth: 'Mes anterior',
     nextMonth: 'Mes siguiente',
     yearActivity: 'Actividad del año',
-    scheduledSessions: 'Sesiones Programadas',
     skip: 'Omitir',
     replan: 'Replanificar',
-    done: 'Completada',
     optional: 'Opcional',
     routine: 'Rutina',
     selectRoutine: 'Selecciona una rutina',
@@ -221,7 +219,8 @@ export const es = {
     runeLegend: 'Leyenda de runas',
     runeLegendHint: 'Cada runa marca el grupo muscular principal trabajado ese día.',
     logPastWorkout: 'Registrar entreno',
-    workoutEntry: 'Entreno registrado',
+    prsOfDay: 'Récords del día',
+    plannedEyebrow: 'Planificado',
   },
   progress: {
     kinds: {

@@ -179,13 +179,15 @@ watch(() => athlete.userId, () => {
       <BkHeatmap :data="heatmapData" :year="year" />
     </div>
 
-    <!-- Schedule sheet modal -->
-    <BkSheet :open="selectedDate !== null" :title="$t('calendar.scheduledSessions')" @close="closeScheduleSheet">
+    <!-- Schedule sheet modal: sin título genérico (amendment D, round 10) —
+         el contenido mixto (tarjetas de entreno, sesiones planificadas,
+         formulario) ya no encaja bajo un único "Sesiones Programadas";
+         cada sección se etiqueta a su propia altura si hace falta -->
+    <BkSheet :open="selectedDate !== null" @close="closeScheduleSheet">
       <ScheduleSheet
         v-if="selectedDate"
         :date="selectedDate"
         :scheduled="monthData.scheduled.filter(s => s.date === selectedDate)"
-        :workouts="monthData.workouts.filter(w => w.date === selectedDate)"
         @updated="loadMonth"
       />
     </BkSheet>

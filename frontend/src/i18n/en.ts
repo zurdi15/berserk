@@ -202,10 +202,8 @@ export const en = {
     prevMonth: 'Previous Month',
     nextMonth: 'Next Month',
     yearActivity: 'Year Activity',
-    scheduledSessions: 'Scheduled Sessions',
     skip: 'Skip',
     replan: 'Replan',
-    done: 'Done',
     optional: 'Optional',
     routine: 'Routine',
     selectRoutine: 'Select a routine',
@@ -221,7 +219,8 @@ export const en = {
     runeLegend: 'Rune legend',
     runeLegendHint: 'Each rune marks the main muscle group trained that day.',
     logPastWorkout: 'Log workout',
-    workoutEntry: 'Logged workout',
+    prsOfDay: 'PRs of the day',
+    plannedEyebrow: 'Planned',
   },
   progress: {
     kinds: {

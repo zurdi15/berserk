@@ -253,8 +253,8 @@ export const deleteExercise = (id: number) =>
   api<void>(`/exercises/${id}`, { method: 'DELETE' })
 
 // Routine endpoints
-export const listRoutines = () =>
-  api<RoutineOut[]>('/routines')
+export const listRoutines = (userId?: number) =>
+  api<RoutineOut[]>(`/routines${qs({ userId })}`)
 
 export const createRoutine = (body: {
   name: string

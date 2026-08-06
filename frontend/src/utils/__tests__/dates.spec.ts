@@ -4,6 +4,7 @@ import {
   addDays,
   addMonths,
   formatDateShort,
+  formatDateTimeShort,
   formatDayLabel,
   formatTimeShort,
   isoDate,
@@ -43,6 +44,17 @@ describe('dates', () => {
 
   it('formatTimeShort passes null through unchanged', () => {
     expect(formatTimeShort(null)).toBeNull()
+  })
+
+  it('formatDateTimeShort (item 2, round 10) reads a full UTC-naive datetime as the LOCAL clock time, not a raw string slice', () => {
+    // TZ pineado a Europe/Madrid (vitest.config.ts): 5 de agosto es CEST
+    // (UTC+2), así que 18:30 UTC cae a las 20:30 locales — un slice ingenuo
+    // del string ("18:30") sería la trampa exacta que este helper evita
+    expect(formatDateTimeShort('2026-08-05T18:30:00')).toBe('20:30')
+  })
+
+  it('formatDateTimeShort passes null through unchanged', () => {
+    expect(formatDateTimeShort(null)).toBeNull()
   })
 
   it('formatDateShort builds a short localized date (day, abbreviated month, year)', () => {

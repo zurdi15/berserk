@@ -50,6 +50,7 @@ READ_PATHS = [
     "/api/v1/body?user_id={uid}",
     "/api/v1/exercises?user_id={uid}",
     "/api/v1/muscle-groups?user_id={uid}",
+    "/api/v1/routines?user_id={uid}",
 ]
 
 

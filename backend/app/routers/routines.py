@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from ..auth import CurrentUser
 from ..db import get_db
 from ..models import Routine, RoutineExercise
+from ..permissions import TargetUser
 from ..schemas.routines import RoutineExerciseIn, RoutineIn, RoutineOut, RoutinePatchIn
 from .exercises import get_visible_exercise
 
@@ -18,10 +19,14 @@ def _own_routine(db: Session, user_id: int, routine_id: int) -> Routine:
     return routine
 
 
+# TargetUser (no CurrentUser): GET compartible con ?user_id= para que el
+# sheet del día (round 10, item 2) resuelva el nombre de la rutina de un
+# entreno cuando se está viendo a un atleta compartido, no solo el propio.
+# Las mutaciones de abajo siguen en CurrentUser sin cambios.
 @router.get("", response_model=list[RoutineOut])
-def list_routines(user: CurrentUser, db: Session = Depends(get_db)):
+def list_routines(target: TargetUser, db: Session = Depends(get_db)):
     return db.scalars(
-        select(Routine).where(Routine.owner_id == user.id).order_by(Routine.name)
+        select(Routine).where(Routine.owner_id == target.id).order_by(Routine.name)
     ).all()
 
 
