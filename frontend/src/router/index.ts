@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import { toastApiError } from '@/utils/apiErrors'
 import BootstrapView from '@/views/BootstrapView.vue'
 import LoginView from '@/views/LoginView.vue'
+import RedeemView from '@/views/RedeemView.vue'
 import TodayView from '@/views/TodayView.vue'
 import CalendarView from '@/views/CalendarView.vue'
 import ProfileView from '@/views/ProfileView.vue'
@@ -16,6 +17,7 @@ export const router = createRouter({
   routes: [
     { path: '/login', name: 'login', component: LoginView },
     { path: '/bootstrap', name: 'bootstrap', component: BootstrapView },
+    { path: '/invite/:token', name: 'invite', component: RedeemView },
     {
       path: '/',
       component: ShellView,
@@ -45,7 +47,7 @@ router.beforeEach(async (to) => {
     // backend caído: el login es estático y es el único destino con sentido
     return to.name === 'login' ? true : { name: 'login' }
   }
-  const isPublic = to.name === 'login' || to.name === 'bootstrap'
+  const isPublic = to.name === 'login' || to.name === 'bootstrap' || to.name === 'invite'
   if (!auth.bootstrapped && to.name !== 'bootstrap') return { name: 'bootstrap' }
   if (auth.bootstrapped && to.name === 'bootstrap') return auth.isAuthenticated ? { name: 'today' } : { name: 'login' }
   if (!auth.isAuthenticated && !isPublic) return { name: 'login' }

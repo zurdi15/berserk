@@ -20,3 +20,5 @@ export const updateSettings = (partial: Partial<Pick<UserOut, 'locale' | 'units'
   api<UserOut>('/users/me', { method: 'PATCH', body: partial })
 export const changePassword = (current_password: string, new_password: string) =>
   api<void>('/auth/password', { method: 'POST', body: { current_password, new_password } })
+export const redeemInvite = (token: string, username: string, password: string) =>
+  api<UserOut>('/auth/invites/redeem', { method: 'POST', body: { token, username, password } })

@@ -160,7 +160,7 @@ async function handleCopyToken() {
   if (!newToken.value) return
 
   try {
-    await navigator.clipboard.writeText(newToken.value)
+    await navigator.clipboard.writeText(redeemUrl(newToken.value))
     toast.push('info', t('common.saved'))
   } catch {
     // Silently fail if clipboard is not available
@@ -195,6 +195,11 @@ function formatDate(dateString: string): string {
 
 function isInviteUsed(invite: InviteOut): boolean {
   return invite.used_at !== null
+}
+
+// el token bare no es un destino: la persona invitada necesita la URL completa
+function redeemUrl(token: string): string {
+  return `${window.location.origin}/invite/${token}`
 }
 </script>
 

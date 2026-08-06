@@ -18,6 +18,8 @@ export const es = {
     bootstrapTitle: 'Forja tu cuenta',
     bootstrapHint: 'Primera cuenta de la instancia: será la administradora.',
     create: 'Crear cuenta',
+    redeemTitle: 'Únete al clan',
+    redeemHint: 'Te han invitado a esta instancia. Crea tu cuenta.',
   },
   errors: {
     not_authenticated: 'Tu sesión ha caducado. Entra de nuevo.',

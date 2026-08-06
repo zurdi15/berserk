@@ -44,6 +44,11 @@ export const useAuthStore = defineStore('auth', () => {
     bootstrapped.value = true
   }
 
+  async function redeemAccount(token: string, username: string, password: string) {
+    user.value = await authApi.redeemInvite(token, username, password)
+    applyLocale(user.value.locale)
+  }
+
   async function logout() {
     await authApi.logout()
     user.value = null
@@ -55,5 +60,5 @@ export const useAuthStore = defineStore('auth', () => {
     useActiveWorkoutStore().reset()
   }
 
-  return { user, bootstrapped, ready, isAuthenticated, init, login, bootstrapAccount, logout }
+  return { user, bootstrapped, ready, isAuthenticated, init, login, bootstrapAccount, redeemAccount, logout }
 })

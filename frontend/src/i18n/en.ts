@@ -18,6 +18,8 @@ export const en = {
     bootstrapTitle: 'Forge your account',
     bootstrapHint: 'First account of this instance: it will be the admin.',
     create: 'Create account',
+    redeemTitle: 'Join the clan',
+    redeemHint: "You've been invited to this instance. Create your account.",
   },
   errors: {
     not_authenticated: 'Your session expired. Sign in again.',

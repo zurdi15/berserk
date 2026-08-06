@@ -204,7 +204,8 @@ describe('AdminCard', () => {
     await copyBtn.trigger('click')
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    expect(mockWriteText).toHaveBeenCalledWith('test-token-abc123')
+    // el token bare no lleva a ningún sitio: el botón copia la URL de canje completa
+    expect(mockWriteText).toHaveBeenCalledWith(`${window.location.origin}/invite/test-token-abc123`)
   })
 
   it('handles missing clipboard gracefully without crashing', async () => {
