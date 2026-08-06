@@ -1,5 +1,8 @@
 name: release
 on:
+  # lanzamiento manual sobre un tag: los eventos de push de tag re-creado
+  # pueden ser suprimidos por GitHub (anti-bucle) — ver release v0.3.0
+  workflow_dispatch:
   push:
     tags: ['v*']
 permissions:
