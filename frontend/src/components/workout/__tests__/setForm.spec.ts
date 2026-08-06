@@ -122,11 +122,16 @@ describe('SetForm', () => {
     expect(payload.rpe).toBe(8)
   })
 
-  it('rpe defaults to undefined when left at "—"', async () => {
+  it('rpe defaults to undefined when left at the empty placeholder option', async () => {
     wrapper = build('strength')
     await wrapper.find('form').trigger('submit')
     const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
     expect(payload.rpe).toBeUndefined()
+  })
+
+  it('item 4e: the rpe placeholder option has no em/en-dash label (zurdi: "quita el m-dash")', () => {
+    wrapper = build('strength')
+    expect(wrapper.text()).not.toMatch(/[—–]/)
   })
 
   it('keeps entered values as defaults for the next set', async () => {
@@ -199,5 +204,42 @@ describe('SetForm', () => {
     expect(wrapper.emitted('submit')).toBeFalsy()
     expect(warnSpy).toHaveBeenCalled()
     warnSpy.mockRestore()
+  })
+
+  describe('item 4: drawer layout', () => {
+    it('item 4a: the form content is centered (flex-col items-center)', () => {
+      wrapper = build('strength')
+      const form = wrapper.get('form')
+      expect(form.classes()).toEqual(expect.arrayContaining(['flex', 'flex-col', 'items-center']))
+    })
+
+    it('item 4b: weight and reps are laid out as a stable two-column grid (never flex-wrap) for strength', () => {
+      wrapper = build('strength')
+      const grid = wrapper.get('.bk-set-grid')
+      expect(grid.classes()).toEqual(expect.arrayContaining(['grid', 'grid-cols-2']))
+      const columns = Array.from(grid.element.children)
+      expect(columns).toHaveLength(2)
+      for (const column of columns) expect(column.classList.contains('min-w-0')).toBe(true)
+    })
+
+    it('item 4b: reps and (optional) weight are also a two-column grid for bodyweight', () => {
+      wrapper = build('bodyweight')
+      const grid = wrapper.get('.bk-set-grid')
+      expect(grid.classes()).toEqual(expect.arrayContaining(['grid', 'grid-cols-2']))
+    })
+
+    it('item 4b: duration and distance are a two-column grid for cardio', () => {
+      wrapper = build('cardio')
+      const grid = wrapper.get('.bk-set-grid')
+      expect(grid.classes()).toEqual(expect.arrayContaining(['grid', 'grid-cols-2']))
+    })
+
+    it('item 4c: the warmup toggle sits on its own row, not sharing a flex row with the rpe select', () => {
+      wrapper = build('strength')
+      const toggle = wrapper.get('[data-testid="warmup-toggle"]')
+      // el padre directo del toggle es ahora el <form> (flex-col): ya no
+      // comparte un contenedor flex-row con el select de rpe
+      expect(toggle.element.parentElement?.tagName).toBe('FORM')
+    })
   })
 })

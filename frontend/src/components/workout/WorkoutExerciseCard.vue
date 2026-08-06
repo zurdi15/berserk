@@ -25,7 +25,7 @@ import BkSheet from '@/lib/BkSheet.vue'
 import type { RuneName } from '@/lib/runes'
 import { REST_PRESETS, restFor } from './rest'
 import { resolveNewSetDefaults } from './setDefaults'
-import { formatHistoryLine } from './setHistoryFormat'
+import { formatHistoryLine, formatHistorySetLines } from './setHistoryFormat'
 import SetForm from './SetForm.vue'
 import type { WorkoutActions } from './workoutActions'
 
@@ -122,6 +122,14 @@ watch(
 const historyLine = computed(() => {
   if (!props.exercise || !history.value?.sets.length) return ''
   return formatHistoryLine(history.value.sets, props.exercise.measurement, props.units)
+})
+
+// item 4d: bloque multilínea para el cajón (hay sitio vertical de sobra
+// ahí) — distinto de historyLine, que sigue siendo la línea densa para el
+// hint compacto de la tarjeta (card-history-hint, sin sitio de sobra)
+const historyLines = computed(() => {
+  if (!props.exercise || !history.value?.sets.length) return []
+  return formatHistorySetLines(history.value.sets, props.exercise.measurement, props.units)
 })
 
 const historyDateLabel = computed(() => {
@@ -341,39 +349,46 @@ async function moveDown() {
           <span v-if="set.rpe" class="text-ink-faint"> · RPE {{ set.rpe }}</span>
         </span>
 
-        <div v-if="deleteConfirming !== set.id" class="flex items-center gap-1 shrink-0">
-          <BkActionBtn
-            v-if="exercise"
-            icon="edit"
-            :data-testid="`edit-set-${set.id}`"
-            :aria-label="t('common.edit')"
-            @click="openEdit(set)"
-          />
-          <BkActionBtn
-            icon="delete"
-            :data-testid="`delete-set-${set.id}`"
-            :aria-label="t('workout.deleteSet')"
-            @click="deleteConfirming = set.id"
-          />
-        </div>
-        <div v-else class="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            :data-testid="`confirm-delete-set-${set.id}`"
-            class="text-danger text-xs px-2 py-1 border border-danger rounded-sm"
-            @click="onDeleteSet(set.id)"
-          >
-            {{ t('common.confirm') }}
-          </button>
-          <button
-            type="button"
-            :data-testid="`cancel-delete-set-${set.id}`"
-            class="text-ink-faint text-xs px-2 py-1"
-            @click="deleteConfirming = null"
-          >
-            {{ t('common.cancel') }}
-          </button>
-        </div>
+        <!-- item 7: el swap borrar↔confirmar/cancelar anima con el mismo
+             idioma que el resto de swaps de la app (bk-pop-soft, out-in —
+             ver ShellView.vue). :key en ambas ramas porque son del mismo
+             tag (<div>): sin él, Vue las trataría como el mismo nodo
+             parcheado in-place y la Transition nunca dispararía -->
+        <Transition name="bk-pop-soft" mode="out-in">
+          <div v-if="deleteConfirming !== set.id" key="actions" class="flex items-center gap-1 shrink-0">
+            <BkActionBtn
+              v-if="exercise"
+              icon="edit"
+              :data-testid="`edit-set-${set.id}`"
+              :aria-label="t('common.edit')"
+              @click="openEdit(set)"
+            />
+            <BkActionBtn
+              icon="delete"
+              :data-testid="`delete-set-${set.id}`"
+              :aria-label="t('workout.deleteSet')"
+              @click="deleteConfirming = set.id"
+            />
+          </div>
+          <div v-else key="confirm" class="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              :data-testid="`confirm-delete-set-${set.id}`"
+              class="text-danger text-xs px-2 py-1 border border-danger rounded-sm"
+              @click="onDeleteSet(set.id)"
+            >
+              {{ t('common.confirm') }}
+            </button>
+            <button
+              type="button"
+              :data-testid="`cancel-delete-set-${set.id}`"
+              class="text-ink-faint text-xs px-2 py-1"
+              @click="deleteConfirming = null"
+            >
+              {{ t('common.cancel') }}
+            </button>
+          </div>
+        </Transition>
       </div>
     </div>
     <p v-else-if="historyLine" class="text-xs text-ink-faint mb-3 truncate" data-testid="card-history-hint">
@@ -390,30 +405,33 @@ async function moveDown() {
       {{ isCardio ? t('workout.addCardio') : t('workout.addSet') }}
     </BkButton>
 
+    <!-- item 7: mismo idioma bk-pop-soft/out-in que el swap de arriba -->
     <div class="mt-3 pt-3 border-t border-line">
-      <div v-if="!removeConfirming">
-        <BkButton
-          variant="ghost"
-          size="sm"
-          :data-testid="`remove-exercise-${workoutExercise.id}`"
-          @click="removeConfirming = true"
-        >
-          {{ t('workout.remove') }}
-        </BkButton>
-      </div>
-      <div v-else class="flex gap-2">
-        <BkButton
-          variant="danger"
-          size="sm"
-          :data-testid="`confirm-remove-exercise-${workoutExercise.id}`"
-          @click="confirmRemove"
-        >
-          {{ t('common.confirm') }}
-        </BkButton>
-        <BkButton variant="ghost" size="sm" @click="removeConfirming = false">
-          {{ t('common.cancel') }}
-        </BkButton>
-      </div>
+      <Transition name="bk-pop-soft" mode="out-in">
+        <div v-if="!removeConfirming" key="remove">
+          <BkButton
+            variant="ghost"
+            size="sm"
+            :data-testid="`remove-exercise-${workoutExercise.id}`"
+            @click="removeConfirming = true"
+          >
+            {{ t('workout.remove') }}
+          </BkButton>
+        </div>
+        <div v-else key="confirm" class="flex gap-2">
+          <BkButton
+            variant="danger"
+            size="sm"
+            :data-testid="`confirm-remove-exercise-${workoutExercise.id}`"
+            @click="confirmRemove"
+          >
+            {{ t('common.confirm') }}
+          </BkButton>
+          <BkButton variant="ghost" size="sm" @click="removeConfirming = false">
+            {{ t('common.cancel') }}
+          </BkButton>
+        </div>
+      </Transition>
     </div>
 
     <BkSheet :open="drawerOpen" :title="name" @close="closeDrawer">
@@ -426,9 +444,14 @@ async function moveDown() {
           :live="restEnabled"
           @submit="onDrawerSubmit"
         />
-        <p v-if="historyLine" class="text-xs text-ink-faint" data-testid="drawer-history-hint">
-          {{ t('workout.lastTime', { date: historyDateLabel }) }}: {{ historyLine }}
-        </p>
+        <!-- item 4d: bloque multilínea en vez de una línea cramped — fecha en
+             su propia línea, cada serie efectiva en la suya (Sn · reps × peso).
+             Hay sitio vertical de sobra aquí (a diferencia del hint compacto
+             de la tarjeta, que sigue siendo card-history-hint más abajo) -->
+        <div v-if="historyLines.length" class="text-xs text-ink-faint space-y-0.5" data-testid="drawer-history-hint">
+          <p class="text-ink-muted">{{ t('workout.lastTime', { date: historyDateLabel }) }}</p>
+          <p v-for="(line, i) in historyLines" :key="i" class="bk-metric">{{ line }}</p>
+        </div>
       </div>
     </BkSheet>
   </BkCard>

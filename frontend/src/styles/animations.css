@@ -63,26 +63,84 @@
   100% { opacity: 0.6; }
 }
 
-/* item 9 (round v0.3.0): pulso "aurora" en los bordes de pantalla al
-   registrar una serie ordinaria con éxito (ver NeonPulse.vue) — feedback
-   ambiental sutil, pico de opacity moderado, NO un flashbang. Mismo patrón
-   que bk-ember-flash (la celebración de PR), pero:
-     - solo opacity (0→pico→0): sin excepción al "solo transform/opacity" de
-       la cabecera de este archivo, el brillo en sí vive en un box-shadow
-       INSET fijo en la clase .bk-neon-pulse (no se anima su valor)
-     - color aurora (turquesa), no ámbar: el ámbar de bk-ember-flash sigue
-       siendo exclusivo de la celebración de PR — cuando esa celebración
-       dispara, el pulso aurora NUNCA se lanza (ver WorkoutView.vue, que
-       comprueba new_records antes de mostrar NeonPulse) */
-@keyframes bk-neon-pulse {
-  0% { opacity: 0; }
-  35% { opacity: 1; }
-  100% { opacity: 0; }
+/* item 2 (ola de pulido v0.3.0): "algo más impresionante, un neón que
+   recorra la pantalla en dos direcciones" — sustituye el flash de borde
+   estático de antes (bk-neon-pulse, un solo box-shadow parpadeando) por DOS
+   estelas aurora que recorren los bordes en sentidos opuestos y se cruzan
+   arriba, al registrar una serie ordinaria con éxito (ver NeonPulse.vue).
+   Cada estela son DOS tramos — un elemento fixed por arista, nunca el mismo
+   nodo cambiando de arista — para no salirse de la disciplina
+   transform/opacity: sube pegada a su lateral (bk-neon-rise, translateY)
+   y, justo cuando llega a la esquina, el tramo del borde superior
+   correspondiente (bk-neon-close, translateX) continúa desde ahí hasta el
+   centro, donde las dos estelas se encuentran y se apagan juntas. El
+   retardo del tramo superior es EXACTAMENTE la duración del lateral
+   (calc(var(--bk-dur-5) * 0.6)) para que el relevo sea continuo, sin hueco
+   ni solape — entre los dos tramos suman var(--bk-dur-5) en total. Color
+   aurora (turquesa), nunca ámbar: el ámbar de bk-ember-flash sigue siendo
+   exclusivo de la celebración de PR — cuando esa celebración dispara, el
+   pulso aurora NUNCA se lanza (ver WorkoutView.vue, que comprueba
+   new_records antes de mostrar NeonPulse). */
+@keyframes bk-neon-rise {
+  0% { opacity: 0; transform: translateY(250%); }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0.35; transform: translateY(0%); }
 }
 
-.bk-neon-pulse {
-  box-shadow: inset 0 0 48px 10px var(--bk-aurora-glow);
-  animation: bk-neon-pulse var(--bk-dur-4) var(--bk-ease-out) forwards;
+@keyframes bk-neon-close {
+  0% { opacity: 0; transform: translateX(var(--bk-neon-x-from, -100%)); }
+  15% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(0%); }
+}
+
+.bk-neon-streak {
+  position: fixed;
+  pointer-events: none;
+  border-radius: var(--bk-radius-full);
+}
+
+/* laterales: suben desde fuera de pantalla hasta que su extremo (el
+   "cabezal", el borde de la barra pegado a top:0) llega exactamente a la
+   esquina — ahí empieza el tramo horizontal correspondiente */
+.bk-neon-edge-left,
+.bk-neon-edge-right {
+  top: 0;
+  width: 3px;
+  height: 40vh;
+  box-shadow: 0 0 14px 2px var(--bk-aurora-glow);
+  animation: bk-neon-rise calc(var(--bk-dur-5) * 0.6) var(--bk-ease-out) forwards;
+}
+.bk-neon-edge-left {
+  left: 0;
+  background: linear-gradient(to top, transparent, var(--bk-accent-aurora));
+}
+.bk-neon-edge-right {
+  right: 0;
+  background: linear-gradient(to top, transparent, var(--bk-accent-aurora));
+}
+
+/* superiores: cada una cubre EXACTAMENTE la mitad del borde de arriba
+   (50vw) para que las dos, viniendo de esquinas opuestas, se encuentren en
+   el centro exacto sin hueco ni solape */
+.bk-neon-edge-top-a,
+.bk-neon-edge-top-b {
+  top: 0;
+  height: 3px;
+  width: 50vw;
+  box-shadow: 0 0 14px 2px var(--bk-aurora-glow);
+  animation: bk-neon-close calc(var(--bk-dur-5) * 0.4) var(--bk-ease-out) calc(var(--bk-dur-5) * 0.6) forwards;
+}
+.bk-neon-edge-top-a {
+  left: 0;
+  --bk-neon-x-from: -100%;
+  background: linear-gradient(to right, transparent, var(--bk-accent-aurora));
+}
+.bk-neon-edge-top-b {
+  right: 0;
+  --bk-neon-x-from: 100%;
+  background: linear-gradient(to left, transparent, var(--bk-accent-aurora));
 }
 
 /* transiciones de Vue: <Transition name="bk-rise"> etc. — solo entrada */

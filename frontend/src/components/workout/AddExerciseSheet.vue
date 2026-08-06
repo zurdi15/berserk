@@ -7,8 +7,8 @@ import { listExercises, listMuscleGroups } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { useAuthStore } from '@/stores/auth'
-import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
+import BkSearchList from '@/lib/BkSearchList.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
@@ -23,11 +23,16 @@ const { t } = useI18n()
 const auth = useAuthStore()
 
 const query = ref('')
-const results = ref<ExerciseOut[]>([])
+// item 5: catálogo COMPLETO cargado una vez — BkSearchList filtra en
+// cliente, ya no hay debounce ni una llamada a listExercises por tecla
+const exercises = ref<ExerciseOut[]>([])
+// gatea la lista hasta que el catálogo carga (mismo patrón que WorkoutView):
+// sin esto, "sin resultados" parpadearía un instante antes de que llegue el
+// fetch. true también en error, igual que el resto de la app.
+const catalogReady = ref(false)
 // item 6: catálogo de grupos, cargado una vez, para resolver el tag de
 // runa+nombre de cada resultado de búsqueda
 const muscleGroups = ref<MuscleGroupOut[]>([])
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 function groupLabel(group: MuscleGroupOut): string {
   return auth.user?.locale === 'en' ? group.name_en : group.name_es
@@ -37,35 +42,29 @@ function primaryGroup(exercise: ExerciseOut): MuscleGroupOut | undefined {
   return primaryMuscleGroup(exercise, muscleGroups.value)
 }
 
+function labelFor(exercise: ExerciseOut): string {
+  return exerciseName(exercise, auth.user?.locale || 'es')
+}
+
 onMounted(async () => {
   try {
-    muscleGroups.value = await listMuscleGroups()
+    const [exercisesList, muscleGroupsList] = await Promise.all([
+      listExercises({}),
+      listMuscleGroups(),
+    ])
+    exercises.value = exercisesList
+    muscleGroups.value = muscleGroupsList
   } catch (error) {
     toastApiError(error)
+  } finally {
+    catalogReady.value = true
   }
 })
-
-function search() {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(async () => {
-    const q = query.value.trim()
-    if (!q) {
-      results.value = []
-      return
-    }
-    try {
-      results.value = await listExercises({ q })
-    } catch (error) {
-      toastApiError(error)
-    }
-  }, 300)
-}
 
 async function pick(exercise: ExerciseOut) {
   try {
     await props.actions.addExercise(exercise.id)
     query.value = ''
-    results.value = []
     emit('close')
   } catch (error) {
     toastApiError(error)
@@ -75,30 +74,28 @@ async function pick(exercise: ExerciseOut) {
 watch(
   () => props.open,
   (open) => {
-    if (!open) {
-      query.value = ''
-      results.value = []
-    }
+    if (!open) query.value = ''
   },
 )
-
-watch(query, search)
 </script>
 
 <template>
   <BkSheet :open="open" :title="t('workout.addExercise')" @close="emit('close')">
-    <div class="space-y-3">
-      <BkField v-model="query" :label="t('workout.searchExercise')" />
-      <div v-if="results.length" class="max-h-64 overflow-y-auto space-y-1">
-        <button
-          v-for="exercise in results"
-          :key="exercise.id"
-          type="button"
+    <BkSearchList
+      v-if="catalogReady"
+      v-model="query"
+      :items="exercises"
+      :label-fn="labelFor"
+      :key-fn="(exercise: ExerciseOut) => exercise.id"
+      :label="t('workout.searchExercise')"
+      @select="pick"
+    >
+      <template #item="{ item: exercise }">
+        <div
           :data-testid="`exercise-result-${exercise.id}`"
-          class="w-full flex items-center justify-between gap-2 text-left p-2 rounded-sm hover:bg-stone transition-colors text-sm text-ink border border-transparent hover:border-line"
-          @click="pick(exercise)"
+          class="w-full flex items-center justify-between gap-2 text-left p-2 text-sm text-ink"
         >
-          <span class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
+          <span class="truncate">{{ labelFor(exercise) }}</span>
           <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
           <span
             v-if="primaryGroup(exercise)"
@@ -112,8 +109,8 @@ watch(query, search)
             />
             <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
           </span>
-        </button>
-      </div>
-    </div>
+        </div>
+      </template>
+    </BkSearchList>
   </BkSheet>
 </template>

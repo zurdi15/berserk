@@ -325,7 +325,7 @@ export const en = {
     addCardio: 'Add cardio',
     logSetAndAnother: 'Log and another',
     startCountdown: 'Start',
-    lastTime: 'Last time — {date}',
+    lastTime: 'Last time ({date})',
     lastTimeHint: 'Last time: {line}',
     stretched: 'Stretched',
     saveAsRoutine: 'Save as routine',

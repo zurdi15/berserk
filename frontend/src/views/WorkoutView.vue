@@ -228,34 +228,20 @@ onBeforeUnmount(() => {
     />
 
     <div v-else-if="activeWorkout.workout" class="space-y-4 bk-stagger">
-      <!-- item 10 (fix M7: comentario corregido, el gap-3 exterior es 12px,
-           no 8px — ese 8px es el gap-2 INTERIOR entre los dos botones):
-           en 328px de contenido (360px de viewport − 2×16px de p-4), el
-           bloque fecha+cronómetro (~150px) más el bloque de botones
-           (Descartar ~135px + gap-2/8px + Terminar ~125px ≈ 268px) suman
-           ~430px con el gap-3/12px exterior que los separa — no caben en
-           una sola fila. flex-wrap deja que el bloque de botones baje a su
-           propia línea (268px < 328px, sobra sitio de sobra ahí) en vez de
-           desbordar o solaparse -->
+      <!-- item 3 (ola de pulido v0.3.0): la fecha pasa a la MISMA fila que el
+           cronómetro, a su derecha (antes iba apilada arriba) — flex-wrap se
+           conserva como red de seguridad: una fecha larga (locale EN con
+           weekday+month largos) más el cronómetro en formato h:mm:ss podría
+           no caber en los ~328px de contenido de un viewport de 360px, y
+           aquí es preferible que la fecha baje a su propia línea a que se
+           corte o se solape con el cronómetro -->
       <div
         class="bk-slab p-4 flex flex-wrap items-center justify-between gap-3"
         data-testid="workout-header"
         :style="{ '--bk-stagger-i': 0 }"
       >
-        <div>
-          <p class="text-sm text-ink-muted capitalize">{{ dateLabel }}</p>
-          <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <BkButton
-            variant="danger"
-            data-testid="discard-workout"
-            @click="discardConfirmOpen = true"
-          >
-            {{ t('workout.discard') }}
-          </BkButton>
-          <BkButton variant="primary" @click="onFinish">{{ t('workout.finish') }}</BkButton>
-        </div>
+        <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
+        <p class="text-sm text-ink-muted capitalize" data-testid="workout-date">{{ dateLabel }}</p>
       </div>
 
       <div v-if="derivedMuscleGroups.length" class="bk-slab p-4 space-y-2" :style="{ '--bk-stagger-i': 1 }">
@@ -299,6 +285,26 @@ onBeforeUnmount(() => {
       </BkButton>
 
       <AddExerciseSheet :open="addSheetOpen" :actions="activeWorkout" @close="addSheetOpen = false" />
+
+      <!-- item 3: Descartar/Terminar salen de la cabecera y bajan al fondo
+           del contenido, tras una línea divisoria — ya no compiten por
+           espacio con la fecha/cronómetro, y quedan lejos del pulgar en el
+           flujo normal de "añadir ejercicio, registrar series", donde una
+           acción destructiva junto al cronómetro invitaba al toque accidental -->
+      <div
+        class="border-t border-line pt-4 flex flex-wrap items-center gap-2"
+        data-testid="workout-actions"
+        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 3 }"
+      >
+        <BkButton
+          variant="danger"
+          data-testid="discard-workout"
+          @click="discardConfirmOpen = true"
+        >
+          {{ t('workout.discard') }}
+        </BkButton>
+        <BkButton variant="primary" @click="onFinish">{{ t('workout.finish') }}</BkButton>
+      </div>
 
       <BkSheet
         :open="discardConfirmOpen"
