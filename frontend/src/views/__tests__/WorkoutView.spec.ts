@@ -22,6 +22,7 @@ vi.mock('@/api/domain', () => ({
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
+import { useAuthStore } from '@/stores/auth'
 import WorkoutView from '../WorkoutView.vue'
 
 function build() {
@@ -208,6 +209,24 @@ describe('WorkoutView', () => {
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'BkCelebration' }).props('runeName')).toBe('pr')
+    })
+
+    it("passes the athlete's configured units through to the celebration", async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+      useAuthStore().user = { units: 'lb' } as never
+
+      wrapper = build()
+      await flushPromises()
+
+      activeWorkout.lastRecords = [
+        { id: 9, exercise_id: 5, kind: 'max_weight', value: 100, achieved_at: 'x' },
+      ] as never
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'BkCelebration' }).props('units')).toBe('lb')
     })
   })
 })

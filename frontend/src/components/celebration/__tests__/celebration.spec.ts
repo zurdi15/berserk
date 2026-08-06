@@ -2,6 +2,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
+import { kgToDisplay } from '@/utils/units'
 import BkCelebration from '../BkCelebration.vue'
 
 const records = [
@@ -13,9 +14,9 @@ let wrapper: VueWrapper | null = null
 
 // el contenido va teletransportado a document.body, fuera del árbol DOM del
 // wrapper: cada test debe desmontar el suyo o el siguiente heredaría su overlay
-function mountCelebration() {
+function mountCelebration(props: Partial<Record<string, unknown>> = {}) {
   wrapper = mount(BkCelebration, {
-    props: { records: records as never, runeName: 'chest' },
+    props: { records: records as never, runeName: 'chest', ...props },
     global: { plugins: [createI18nInstance()] },
   })
   return wrapper
@@ -42,6 +43,22 @@ describe('BkCelebration', () => {
       const record2 = document.querySelector('[data-testid="celebration-record-2"]') as HTMLElement
       expect(record1.textContent).toContain('100')
       expect(record2.textContent).toContain('120')
+    })
+
+    it('renders a max_weight record with the kg unit suffix by default', async () => {
+      mountCelebration()
+      await flushPromises()
+
+      const record1 = document.querySelector('[data-testid="celebration-record-1"]') as HTMLElement
+      expect(record1.textContent).toContain('100 kg')
+    })
+
+    it('renders a max_weight record converted to lb when units is "lb"', async () => {
+      mountCelebration({ units: 'lb' })
+      await flushPromises()
+
+      const record1 = document.querySelector('[data-testid="celebration-record-1"]') as HTMLElement
+      expect(record1.textContent).toContain(`${kgToDisplay(100, 'lb')} lb`)
     })
 
     it('shows the newRecord heading and the carved ember rune for the given rune name', async () => {

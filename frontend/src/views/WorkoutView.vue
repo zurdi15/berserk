@@ -151,6 +151,7 @@ onBeforeUnmount(() => {
       v-if="activeWorkout.lastRecords.length"
       :records="activeWorkout.lastRecords"
       :rune-name="celebrationRune"
+      :units="units"
       @done="onCelebrationDone"
     />
 

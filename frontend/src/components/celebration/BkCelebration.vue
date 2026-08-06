@@ -5,8 +5,12 @@ import { useI18n } from 'vue-i18n'
 import type { PersonalRecordOut } from '@/api/domain'
 import BkRune from '@/lib/BkRune.vue'
 import type { RuneName } from '@/lib/runes'
+import { formatWeight } from '@/utils/units'
 
-const props = defineProps<{ records: PersonalRecordOut[]; runeName: RuneName }>()
+const props = withDefaults(
+  defineProps<{ records: PersonalRecordOut[]; runeName: RuneName; units?: 'kg' | 'lb' }>(),
+  { units: 'kg' },
+)
 const emit = defineEmits<{ done: [] }>()
 
 const { t } = useI18n()
@@ -30,8 +34,11 @@ let rafId: number | null = null
 let dismissTimer: ReturnType<typeof setTimeout> | null = null
 let dismissed = false
 
+// todos los kinds de récord (max_weight, est_1rm, max_volume) vienen del backend
+// en kg — mismo formateador que FinishSummary, para que el mismo PR no cambie
+// de aspecto entre la celebración y el resumen
 function formatValue(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+  return formatWeight(value, props.units)
 }
 
 function countUp() {
@@ -39,7 +46,9 @@ function countUp() {
   const step = (now: number) => {
     const progress = Math.min(1, (now - start) / COUNT_UP_MS)
     props.records.forEach((record, i) => {
-      displayValues[i] = record.value * progress
+      // redondeado a 1 decimal en kg: sin esto el paso intermedio muestra colas
+      // de decimales feas antes de convertir a la unidad de salida
+      displayValues[i] = Math.round(record.value * progress * 10) / 10
     })
     rafId = progress < 1 ? requestAnimationFrame(step) : null
   }
