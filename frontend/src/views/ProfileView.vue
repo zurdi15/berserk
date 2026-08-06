@@ -11,6 +11,8 @@ import PasswordCard from '@/components/profile/PasswordCard.vue'
 import SharingCard from '@/components/profile/SharingCard.vue'
 import AdminCard from '@/components/profile/AdminCard.vue'
 import RoutineList from '@/components/routines/RoutineList.vue'
+import ExerciseManager from '@/components/library/ExerciseManager.vue'
+import MuscleGroupManager from '@/components/library/MuscleGroupManager.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
@@ -24,6 +26,7 @@ const tabs = computed(() => {
   const baseTabs = [
     { value: 'profile', label: t('profile.tab') },
     { value: 'routines', label: t('profile.routinesTab') },
+    { value: 'library', label: t('profile.libraryTab') },
   ]
 
   if (auth.user?.is_admin) {
@@ -62,6 +65,12 @@ async function handleLogout() {
     </div>
 
     <RoutineList v-if="activeTab === 'routines'" />
+
+    <div v-if="activeTab === 'library'" class="space-y-4">
+      <h2 class="text-lg font-semibold text-ink">{{ $t('library.title') }}</h2>
+      <ExerciseManager />
+      <MuscleGroupManager />
+    </div>
 
     <AdminCard v-if="activeTab === 'admin' && auth.user?.is_admin" />
   </div>

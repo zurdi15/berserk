@@ -1,0 +1,238 @@
+import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { createI18nInstance } from '@/i18n'
+import { useAuthStore } from '@/stores/auth'
+import ExerciseManager from '../ExerciseManager.vue'
+import MuscleGroupManager from '../MuscleGroupManager.vue'
+
+vi.mock('@/api/domain', () => ({
+  listExercises: vi.fn(),
+  createExercise: vi.fn(),
+  updateExercise: vi.fn(),
+  deleteExercise: vi.fn(),
+  listMuscleGroups: vi.fn(),
+  createMuscleGroup: vi.fn(),
+  deleteMuscleGroup: vi.fn(),
+}))
+
+function setUser(overrides: Partial<{ id: number; is_admin: boolean }> = {}) {
+  const auth = useAuthStore()
+  auth.user = {
+    id: overrides.id ?? 7,
+    username: 'thor',
+    is_admin: overrides.is_admin ?? false,
+    locale: 'es',
+    units: 'kg',
+    timezone: 'UTC',
+  }
+}
+
+// BkSheet usa <Teleport to="body">: su contenido vive fuera del árbol del
+// wrapper, así que hay que montar sobre document.body, buscar ahí dentro
+// (wrapper.find no ve nodos teletransportados) y desmontar tras cada
+// prueba para que el body no arrastre contenido de la prueba anterior.
+let mountedWrappers: VueWrapper[] = []
+
+function byTestId(id: string): DOMWrapper<Element> {
+  return new DOMWrapper(document.body.querySelector(`[data-testid="${id}"]`) as Element | null)
+}
+
+function buildExerciseManager() {
+  const wrapper = mount(ExerciseManager, {
+    global: { plugins: [createI18nInstance()] },
+    attachTo: document.body,
+  })
+  mountedWrappers.push(wrapper)
+  return wrapper
+}
+
+function buildMuscleGroupManager() {
+  const wrapper = mount(MuscleGroupManager, {
+    global: { plugins: [createI18nInstance()] },
+    attachTo: document.body,
+  })
+  mountedWrappers.push(wrapper)
+  return wrapper
+}
+
+afterEach(() => {
+  mountedWrappers.forEach((wrapper) => wrapper.unmount())
+  mountedWrappers = []
+})
+
+describe('ExerciseManager', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    setUser()
+  })
+
+  it('lists only own exercises, hiding catalog rows owned by nobody', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [] },
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [{ muscle_group_id: 1, is_primary: true }] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Press Arnold')
+    expect(wrapper.text()).not.toContain('Press banca')
+  })
+
+  it('creates an exercise from the form with the checked muscle group marked primary', async () => {
+    const { listExercises, listMuscleGroups, createExercise } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'pecho', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+      { id: 2, slug: 'espalda', name_es: 'Espalda', name_en: 'Back', owner_id: null },
+    ] as never)
+    vi.mocked(createExercise).mockResolvedValue({
+      id: 20, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7,
+      muscle_groups: [{ muscle_group_id: 1, is_primary: true }],
+    } as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
+    await flushPromises()
+
+    await byTestId('exercise-name-es-field').find('input').setValue('Press Arnold')
+    await byTestId('exercise-name-en-field').find('input').setValue('Arnold press')
+    await byTestId('exercise-measurement-select').find('select').setValue('strength')
+    await byTestId('muscle-group-checkbox-1').setValue(true)
+    await byTestId('muscle-group-primary-1').setValue(true)
+
+    await byTestId('save-exercise-btn').trigger('click')
+    await flushPromises()
+
+    expect(createExercise).toHaveBeenCalledWith({
+      name_es: 'Press Arnold',
+      name_en: 'Arnold press',
+      measurement: 'strength',
+      muscle_groups: [{ muscle_group_id: 1, is_primary: true }],
+    })
+  })
+
+  it('delete click-through opens the confirm sheet and confirming calls deleteExercise', async () => {
+    const { listExercises, listMuscleGroups, deleteExercise } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    vi.mocked(deleteExercise).mockResolvedValue(undefined as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="delete-exercise-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(byTestId('delete-exercise-confirm-sheet').exists()).toBe(true)
+
+    await byTestId('delete-exercise-confirm-btn').trigger('click')
+    await flushPromises()
+
+    expect(deleteExercise).toHaveBeenCalledWith(12)
+  })
+})
+
+describe('MuscleGroupManager', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    setUser()
+  })
+
+  it('renders global groups without a delete control and own groups with one', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'pecho', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+      { id: 2, slug: 'gemelo', name_es: 'Gemelo', name_en: 'Calf', owner_id: 7 },
+    ] as never)
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    const globalRow = wrapper.find('[data-testid="muscle-group-row-1"]')
+    expect(globalRow.find('[data-testid="delete-muscle-group-btn"]').exists()).toBe(false)
+    expect(globalRow.find('[data-testid="global-group-badge"]').exists()).toBe(true)
+
+    const ownRow = wrapper.find('[data-testid="muscle-group-row-2"]')
+    expect(ownRow.find('[data-testid="delete-muscle-group-btn"]').exists()).toBe(true)
+    expect(ownRow.find('[data-testid="global-group-badge"]').exists()).toBe(false)
+  })
+
+  it('creates a muscle group from the form', async () => {
+    const { listMuscleGroups, createMuscleGroup } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    vi.mocked(createMuscleGroup).mockResolvedValue({
+      id: 3, slug: 'antebrazo', name_es: 'Antebrazo', name_en: 'Forearm', owner_id: 7,
+    } as never)
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="group-slug-field"] input').setValue('antebrazo')
+    await wrapper.find('[data-testid="group-name-es-field"] input').setValue('Antebrazo')
+    await wrapper.find('[data-testid="group-name-en-field"] input').setValue('Forearm')
+
+    await wrapper.find('[data-testid="create-group-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(createMuscleGroup).toHaveBeenCalledWith({
+      slug: 'antebrazo',
+      name_es: 'Antebrazo',
+      name_en: 'Forearm',
+      is_global: false,
+    })
+  })
+
+  it('deletes an own muscle group through the confirm sheet', async () => {
+    const { listMuscleGroups, deleteMuscleGroup } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 2, slug: 'gemelo', name_es: 'Gemelo', name_en: 'Calf', owner_id: 7 },
+    ] as never)
+    vi.mocked(deleteMuscleGroup).mockResolvedValue(undefined as never)
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="delete-muscle-group-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(byTestId('delete-group-confirm-sheet').exists()).toBe(true)
+
+    await byTestId('delete-group-confirm-btn').trigger('click')
+    await flushPromises()
+
+    expect(deleteMuscleGroup).toHaveBeenCalledWith(2)
+  })
+
+  it('hides the is_global toggle for a non-admin user', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    setUser({ is_admin: false })
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="group-is-global-checkbox"]').exists()).toBe(false)
+  })
+
+  it('shows the is_global toggle for an admin user', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    setUser({ is_admin: true })
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="group-is-global-checkbox"]').exists()).toBe(true)
+  })
+})

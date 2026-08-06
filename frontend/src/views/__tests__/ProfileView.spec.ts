@@ -22,6 +22,8 @@ vi.mock('@/api/domain', () => ({
   revokeSharing: vi.fn(),
   grantSharing: vi.fn(),
   listRoutines: vi.fn(() => Promise.resolve([])),
+  listExercises: vi.fn(() => Promise.resolve([])),
+  listMuscleGroups: vi.fn(() => Promise.resolve([])),
   adminListUsers: vi.fn(() => Promise.resolve([
     { id: 1, username: 'root-admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' },
   ])),
@@ -160,6 +162,20 @@ describe('ProfileView', () => {
 
       const newRoutineBtn = wrapper.findAll('button').find((b) => b.text() === 'Nueva rutina')
       expect(newRoutineBtn).not.toBeUndefined()
+    })
+
+    it('library tab renders the real ExerciseManager control, not a swallowed slot', async () => {
+      const wrapper = build()
+      await flushPromises()
+
+      const libraryTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
+      expect(libraryTab).not.toBeUndefined()
+      await libraryTab!.trigger('click')
+      await flushPromises()
+
+      const newExerciseBtn = wrapper.find('[data-testid="new-exercise-btn"]')
+      expect(newExerciseBtn.exists()).toBe(true)
+      expect(newExerciseBtn.text()).toBe('Nuevo ejercicio')
     })
 
     it('admin tab renders the real admin table with the mocked admin user row', async () => {
