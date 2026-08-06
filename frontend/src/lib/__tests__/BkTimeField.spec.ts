@@ -5,7 +5,7 @@ import { createI18nInstance } from '@/i18n'
 import BkTimeField from '../BkTimeField.vue'
 import BkSheet from '../BkSheet.vue'
 
-function build(props: { modelValue: string | null } = { modelValue: null }) {
+function build(props: { modelValue: string | null; hint?: string } = { modelValue: null }) {
   return mount(BkTimeField, {
     props: { label: 'Hora', ...props },
     global: { plugins: [createI18nInstance()] },
@@ -28,6 +28,16 @@ describe('BkTimeField', () => {
     wrapper.unmount()
     wrapper = build({ modelValue: '14:30' })
     expect(wrapper.get('[role="combobox"]').text()).toContain('14:30')
+  })
+
+  it('renders the hint text below the trigger when provided (parity with BkField, needed by ScheduleSheet)', () => {
+    wrapper = build({ modelValue: null, hint: 'Opcional' })
+    expect(wrapper.text()).toContain('Opcional')
+  })
+
+  it('renders no hint text when the prop is omitted', () => {
+    wrapper = build({ modelValue: null })
+    expect(wrapper.text()).not.toContain('Opcional')
   })
 
   it('opens a panel with two listboxes: 24 hours and 12 five-minute-step minutes', async () => {
