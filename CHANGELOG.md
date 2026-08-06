@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.3.0 - 2026-08-07
+
+- Workout flow redesigned around compact exercise cards and a bottom logging drawer: new sets prefill from your last effective set, the previous session's sets are shown line by line, "log and another" chains fast consecutive sets, and rest between sets is configurable per exercise (workout → routine → default).
+- Muscle groups are now derived automatically from the workout's exercises (with backfill for existing history), a finished workout can be saved as a routine, cardio logs as its own block with a target-duration countdown that auto-logs on completion, and a stretched check rides along each workout.
+- Logging a set fires an aurora signature: two light streaks race up the screen edges and meet at the top — personal records still take the ember celebration.
+- Calendar: one dot per workout (colored by the viewed athlete's color), planned sessions as hollow dots, today marked by its border, icon actions to delete/skip/replan, a fixed 3×4 annual heatmap with horizontal weeks and flat brightness, "schedule session" deep-links into today's day sheet, and deleting a past workout no longer resurrects a planned session.
+- Rest timer takes over the central rune with a live countdown, the button glows while a workout is in progress, and a mobile notification fires when rest ends in the background.
+- The full Elder Futhark is available for routines, every rune ships as a reusable SVG asset, and muscle groups carry a dedicated rune with a unified picker in create and edit.
+- Library: admins manage global exercises and the predefined catalog, muscle-group tags show everywhere exercises are listed, and creation flows live in drawers.
+- Progress: a lifetime stats tab (gym hours, cardio time, distance, volume, longest streak and more) leads the reordered tabs, and the muscle distribution states exactly what it measures.
+- Sharing picks users from a directory instead of a guess-the-username field, each user has a color, and empty states are unified with their action button in place.
+- A reusable search-list primitive powers exercise picking, confirm/cancel swaps animate, the set drawer is centered with side-by-side steppers, and stray dash placeholders are gone.
+
 ## 0.2.0 - 2026-08-06
 
 - Custom form primitives replacing every native picker: a filterable select, a time field, and a mini-calendar date field, all with full keyboard support, ARIA semantics, and a shared layer stack so Escape always closes the topmost surface.
