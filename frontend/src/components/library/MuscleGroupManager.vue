@@ -24,7 +24,9 @@ function groupLabel(group: MuscleGroupOut): string {
   return auth.user?.locale === 'en' ? group.name_en : group.name_es
 }
 
-// Estado del formulario de creación (no hay edición: la API no la ofrece)
+// item 2: formulario de creación en drawer (antes inline), mismo patrón que
+// el alta de usuarios de AdminCard
+const createGroupOpen = ref(false)
 const slug = ref('')
 const nameEs = ref('')
 const nameEn = ref('')
@@ -50,6 +52,14 @@ async function loadGroups() {
 
 onMounted(loadGroups)
 
+function openCreateGroup() {
+  slug.value = ''
+  nameEs.value = ''
+  nameEn.value = ''
+  isGlobal.value = false
+  createGroupOpen.value = true
+}
+
 async function submitGroup() {
   creating.value = true
   try {
@@ -59,10 +69,7 @@ async function submitGroup() {
       name_en: nameEn.value,
       is_global: isGlobal.value,
     })
-    slug.value = ''
-    nameEs.value = ''
-    nameEn.value = ''
-    isGlobal.value = false
+    createGroupOpen.value = false
     await loadGroups()
     toast.push('info', t('common.saved'))
   } catch (error) {
@@ -121,21 +128,38 @@ async function confirmDelete() {
 
         <BkEmpty v-else-if="ready" :message="$t('library.noGroups')" />
 
-        <!-- Formulario de creación (inline, como el alta de usuarios de AdminCard) -->
-        <div class="space-y-3 pt-4 border-t border-line">
-          <h3 class="text-sm font-medium">{{ $t('library.newGroup') }}</h3>
-          <BkField v-model="slug" :label="$t('library.slug')" data-testid="group-slug-field" />
-          <BkField v-model="nameEs" :label="$t('library.nameEs')" data-testid="group-name-es-field" />
-          <BkField v-model="nameEn" :label="$t('library.nameEn')" data-testid="group-name-en-field" />
-          <label v-if="auth.user?.is_admin" class="flex items-center gap-2 cursor-pointer">
-            <input
-              v-model="isGlobal"
-              type="checkbox"
-              class="rounded border border-line"
-              data-testid="group-is-global-checkbox"
-            />
-            <span class="text-sm text-ink-muted">{{ $t('library.isGlobal') }}</span>
-          </label>
+        <!-- item 2: crear ya no es inline — un botón abre el drawer, mismo
+             patrón que el alta de usuarios de AdminCard -->
+        <div>
+          <BkButton data-testid="open-create-group-btn" @click="openCreateGroup">
+            {{ $t('library.newGroup') }}
+          </BkButton>
+        </div>
+      </div>
+    </BkCard>
+
+    <BkSheet
+      :open="createGroupOpen"
+      :title="$t('library.newGroup')"
+      @close="createGroupOpen = false"
+    >
+      <div class="space-y-4 p-4">
+        <BkField v-model="slug" :label="$t('library.slug')" data-testid="group-slug-field" />
+        <BkField v-model="nameEs" :label="$t('library.nameEs')" data-testid="group-name-es-field" />
+        <BkField v-model="nameEn" :label="$t('library.nameEn')" data-testid="group-name-en-field" />
+        <label v-if="auth.user?.is_admin" class="flex items-center gap-2 cursor-pointer">
+          <input
+            v-model="isGlobal"
+            type="checkbox"
+            class="rounded border border-line"
+            data-testid="group-is-global-checkbox"
+          />
+          <span class="text-sm text-ink-muted">{{ $t('library.isGlobal') }}</span>
+        </label>
+        <div class="flex gap-2">
+          <BkButton variant="ghost" @click="createGroupOpen = false">
+            {{ $t('common.cancel') }}
+          </BkButton>
           <BkButton
             :loading="creating"
             data-testid="create-group-btn"
@@ -145,7 +169,7 @@ async function confirmDelete() {
           </BkButton>
         </div>
       </div>
-    </BkCard>
+    </BkSheet>
 
     <BkSheet
       :open="deleteConfirmOpen"

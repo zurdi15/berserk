@@ -235,7 +235,7 @@ describe('MuscleGroupManager', () => {
     expect(wrapper.find('[data-testid="muscle-group-row-2"]').exists()).toBe(true)
   })
 
-  it('creates a muscle group from the form', async () => {
+  it('item 2: create opens a drawer (BkSheet) from a primary button, and submits through it', async () => {
     const { listMuscleGroups, createMuscleGroup } = await import('@/api/domain')
     vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
     vi.mocked(createMuscleGroup).mockResolvedValue({
@@ -245,11 +245,17 @@ describe('MuscleGroupManager', () => {
     const wrapper = buildMuscleGroupManager()
     await flushPromises()
 
-    await wrapper.find('[data-testid="group-slug-field"] input').setValue('antebrazo')
-    await wrapper.find('[data-testid="group-name-es-field"] input').setValue('Antebrazo')
-    await wrapper.find('[data-testid="group-name-en-field"] input').setValue('Forearm')
+    // el formulario no está en el DOM hasta que se abre el drawer
+    expect(byTestId('group-slug-field').exists()).toBe(false)
 
-    await wrapper.find('[data-testid="create-group-btn"]').trigger('click')
+    await wrapper.find('[data-testid="open-create-group-btn"]').trigger('click')
+    await flushPromises()
+
+    await byTestId('group-slug-field').find('input').setValue('antebrazo')
+    await byTestId('group-name-es-field').find('input').setValue('Antebrazo')
+    await byTestId('group-name-en-field').find('input').setValue('Forearm')
+
+    await byTestId('create-group-btn').trigger('click')
     await flushPromises()
 
     expect(createMuscleGroup).toHaveBeenCalledWith({
@@ -303,8 +309,10 @@ describe('MuscleGroupManager', () => {
 
     const wrapper = buildMuscleGroupManager()
     await flushPromises()
+    await wrapper.find('[data-testid="open-create-group-btn"]').trigger('click')
+    await flushPromises()
 
-    expect(wrapper.find('[data-testid="group-is-global-checkbox"]').exists()).toBe(false)
+    expect(byTestId('group-is-global-checkbox').exists()).toBe(false)
   })
 
   it('shows the is_global toggle for an admin user', async () => {
@@ -314,7 +322,9 @@ describe('MuscleGroupManager', () => {
 
     const wrapper = buildMuscleGroupManager()
     await flushPromises()
+    await wrapper.find('[data-testid="open-create-group-btn"]').trigger('click')
+    await flushPromises()
 
-    expect(wrapper.find('[data-testid="group-is-global-checkbox"]').exists()).toBe(true)
+    expect(byTestId('group-is-global-checkbox').exists()).toBe(true)
   })
 })
