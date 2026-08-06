@@ -82,6 +82,9 @@ export const en = {
   },
   timer: {
     rest: 'Rest',
+    notifyTitle: 'Rest over',
+    notifyBody: 'Tap to get back to your workout.',
+    notifyBodyWithExercise: 'Tap to get back to {exercise}.',
   },
   profile: {
     tab: 'Profile',
