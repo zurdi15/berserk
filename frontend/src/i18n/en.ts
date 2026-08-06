@@ -118,6 +118,7 @@ export const en = {
     expires: 'Expires',
     noUsers: 'No users yet',
     noInvites: 'No invites yet',
+    actions: 'Actions',
   },
   routines: {
     newRoutine: 'New routine',

@@ -1,6 +1,6 @@
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -61,6 +61,14 @@ describe('AdminCard', () => {
       timezone: 'UTC',
     }
     vi.clearAllMocks()
+  })
+
+  // solo la usa el test del dialog de "crear usuario" (teleport pattern):
+  // build() no la toca, así que el afterEach es un no-op para el resto
+  let wrapper: VueWrapper | null = null
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
   })
 
   function build() {
@@ -311,7 +319,57 @@ describe('AdminCard', () => {
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
 
+    // "Guardar" ahora vive dentro del sheet de crear usuario, cerrado por
+    // defecto (item 9) — el botón que SIEMPRE está visible es el que lo abre
     const text = wrapper.text()
-    expect(text).toContain('Guardar')
+    expect(text).toContain('Crear usuario')
+  })
+
+  it('create user (item 9, dialog flow): open button → sheet opens → fill form → submit → adminCreateUser called with full payload', async () => {
+    const { adminCreateUser } = await import('@/api/domain')
+    wrapper = mount(AdminCard, {
+      global: { plugins: [createI18nInstance()] },
+      attachTo: document.body,
+    })
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // el dialog empieza cerrado: sin form visible hasta abrirlo
+    expect(document.querySelector('[data-testid="create-username-field"] input')).toBeNull()
+
+    const openBtn = wrapper.find('[data-testid="open-create-user-btn"]')
+    expect(openBtn.exists()).toBe(true)
+    await openBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const usernameInput = document.querySelector('[data-testid="create-username-field"] input') as HTMLInputElement
+    expect(usernameInput).not.toBeNull()
+    usernameInput.value = 'newbie'
+    usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
+
+    const passwordInput = document.querySelector('[data-testid="create-password-field"] input') as HTMLInputElement
+    expect(passwordInput).not.toBeNull()
+    passwordInput.value = 'hunter22'
+    passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
+
+    const adminCheckbox = document.querySelector('[data-testid="create-is-admin-checkbox"]') as HTMLInputElement
+    expect(adminCheckbox).not.toBeNull()
+    adminCheckbox.click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const submitBtn = document.querySelector('[data-testid="create-user-btn"]') as HTMLElement
+    expect(submitBtn).not.toBeNull()
+    submitBtn.click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(adminCreateUser).toHaveBeenCalledWith({
+      username: 'newbie',
+      password: 'hunter22',
+      is_admin: true,
+    })
+
+    // tras el éxito, el dialog se cierra y el form ya no está en el DOM
+    await wrapper.vm.$nextTick()
+    expect(document.querySelector('[data-testid="create-username-field"] input')).toBeNull()
   })
 })

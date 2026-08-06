@@ -34,6 +34,7 @@ const createPassword = ref('')
 const createIsAdmin = ref(false)
 const createError = ref('')
 const isCreatingUser = ref(false)
+const createUserOpen = ref(false)
 const resetPasswordOpen = ref(false)
 const resetUserId = ref<number | null>(null)
 const resetNewPassword = ref('')
@@ -72,6 +73,14 @@ async function loadInvites() {
   }
 }
 
+function openCreateUser() {
+  createUsername.value = ''
+  createPassword.value = ''
+  createIsAdmin.value = false
+  createError.value = ''
+  createUserOpen.value = true
+}
+
 async function handleCreateUser() {
   createError.value = ''
   isCreatingUser.value = true
@@ -85,6 +94,7 @@ async function handleCreateUser() {
     createUsername.value = ''
     createPassword.value = ''
     createIsAdmin.value = false
+    createUserOpen.value = false
     await loadUsers()
     toast.push('info', t('common.saved'))
   } catch (error) {
@@ -208,18 +218,20 @@ function redeemUrl(token: string): string {
     <!-- Users section -->
     <BkCard :title="$t('admin.users')">
       <div class="space-y-4">
-        <!-- Users table -->
+        <!-- Users table: botones icon-only en móvil (aria-label), texto de
+             vuelta desde sm — objetivo: sin scroll lateral en 390px. El
+             overflow-x-auto queda como red de seguridad, no como caso normal -->
         <div v-if="users.length > 0" class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-line">
                 <th class="text-left py-2 px-2">{{ $t('admin.username') }}</th>
                 <th class="text-left py-2 px-2">{{ $t('admin.isAdmin') }}</th>
-                <th class="text-left py-2 px-2">{{ $t('common.delete') }}</th>
+                <th class="text-left py-2 px-2"><span class="sr-only">{{ $t('admin.actions') }}</span></th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="user in users" :key="user.id" :data-testid="`user-row-${user.id}`" class="border-b border-line hover:bg-stone/30">
+            <tbody class="divide-y divide-line">
+              <tr v-for="user in users" :key="user.id" :data-testid="`user-row-${user.id}`" class="hover:bg-stone/30">
                 <td class="py-2 px-2">{{ user.username }}</td>
                 <td class="py-2 px-2">
                   <span v-if="user.is_admin" class="text-aurora font-semibold" data-testid="admin-badge">✦</span>
@@ -230,19 +242,23 @@ function redeemUrl(token: string): string {
                       v-if="!isOwnUser(user.id)"
                       variant="ghost"
                       size="sm"
+                      :aria-label="$t('admin.resetPassword')"
                       data-testid="reset-password-btn"
                       @click="handleResetPassword(user.id)"
                     >
-                      {{ $t('admin.resetPassword') }}
+                      <span aria-hidden="true">⟳</span>
+                      <span class="hidden sm:inline">{{ $t('admin.resetPassword') }}</span>
                     </BkButton>
                     <BkButton
                       v-if="!isOwnUser(user.id)"
                       variant="danger"
                       size="sm"
+                      :aria-label="$t('common.delete')"
                       data-testid="delete-user-btn"
                       @click="handleDeleteUser(user.id)"
                     >
-                      {{ $t('common.delete') }}
+                      <span aria-hidden="true">✕</span>
+                      <span class="hidden sm:inline">{{ $t('common.delete') }}</span>
                     </BkButton>
                   </div>
                 </td>
@@ -255,39 +271,12 @@ function redeemUrl(token: string): string {
           {{ $t('admin.noUsers') }}
         </div>
 
-        <!-- Create user form -->
-        <div class="space-y-3 pt-4 border-t border-line">
-          <h3 class="text-sm font-medium">{{ $t('admin.createUser') }}</h3>
-          <div class="space-y-3">
-            <BkField
-              v-model="createUsername"
-              :label="$t('admin.username')"
-              :error="createError"
-              data-testid="create-username-field"
-            />
-            <BkField
-              v-model="createPassword"
-              type="password"
-              :label="$t('admin.password')"
-              data-testid="create-password-field"
-            />
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input
-                v-model="createIsAdmin"
-                type="checkbox"
-                class="rounded border border-line"
-                data-testid="create-is-admin-checkbox"
-              />
-              <span class="text-sm text-ink-muted">{{ $t('admin.isAdmin') }}</span>
-            </label>
-            <BkButton
-              :loading="isCreatingUser"
-              data-testid="create-user-btn"
-              @click="handleCreateUser"
-            >
-              {{ $t('common.save') }}
-            </BkButton>
-          </div>
+        <!-- Crear usuario: dialog en vez de form inline (sin divider extra
+             entre la tabla y esto — space-y-4 del contenedor ya separa) -->
+        <div>
+          <BkButton data-testid="open-create-user-btn" @click="openCreateUser">
+            {{ $t('admin.createUser') }}
+          </BkButton>
         </div>
       </div>
     </BkCard>
@@ -369,6 +358,52 @@ function redeemUrl(token: string): string {
         </div>
       </div>
     </BkCard>
+
+    <!-- Create user sheet -->
+    <BkSheet
+      :open="createUserOpen"
+      :title="$t('admin.createUser')"
+      @close="createUserOpen = false"
+    >
+      <div class="space-y-4 p-4">
+        <BkField
+          v-model="createUsername"
+          :label="$t('admin.username')"
+          :error="createError"
+          data-testid="create-username-field"
+        />
+        <BkField
+          v-model="createPassword"
+          type="password"
+          :label="$t('admin.password')"
+          data-testid="create-password-field"
+        />
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            v-model="createIsAdmin"
+            type="checkbox"
+            class="rounded border border-line"
+            data-testid="create-is-admin-checkbox"
+          />
+          <span class="text-sm text-ink-muted">{{ $t('admin.isAdmin') }}</span>
+        </label>
+        <div class="flex gap-2">
+          <BkButton
+            variant="ghost"
+            @click="createUserOpen = false"
+          >
+            {{ $t('common.cancel') }}
+          </BkButton>
+          <BkButton
+            :loading="isCreatingUser"
+            data-testid="create-user-btn"
+            @click="handleCreateUser"
+          >
+            {{ $t('common.save') }}
+          </BkButton>
+        </div>
+      </div>
+    </BkSheet>
 
     <!-- Password reset sheet -->
     <BkSheet

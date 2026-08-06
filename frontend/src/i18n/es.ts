@@ -118,6 +118,7 @@ export const es = {
     expires: 'Expira',
     noUsers: 'Sin usuarios aún',
     noInvites: 'Sin invitaciones aún',
+    actions: 'Acciones',
   },
   routines: {
     newRoutine: 'Nueva rutina',

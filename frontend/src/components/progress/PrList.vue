@@ -40,7 +40,7 @@ function formatAchievedDate(dateStr: string): string {
 
 <template>
   <BkEmpty v-if="!records.length" :message="t('progress.noRecords')" />
-  <div v-else class="space-y-2">
+  <div v-else class="space-y-2 max-h-72 overflow-y-auto">
     <div
       v-for="record in records"
       :key="record.id"
