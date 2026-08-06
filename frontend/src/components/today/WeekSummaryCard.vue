@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { RuneName } from '@/lib/runes'
 import type { WorkoutOut, ExerciseOut, MuscleGroupOut } from '@/api/domain'
 
 import { useAnimatedNumber } from '@/composables/useAnimatedNumber'
 import BkCard from '@/lib/BkCard.vue'
 import BkRune from '@/lib/BkRune.vue'
+import BkTooltip from '@/lib/BkTooltip.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -20,7 +22,16 @@ const props = withDefaults(
   },
 )
 
+const { locale } = useI18n()
+
 const validRunes = new Set<string>(['chest', 'back', 'biceps', 'triceps', 'shoulders', 'legs', 'core'])
+
+// item 3 (v0.3.0): nombre localizado del grupo para el tooltip de la runa —
+// mismo criterio que la leyenda de runas del calendario (CalendarView.vue):
+// el idioma de la UI (viewer), no el del atleta
+function muscleGroupName(mg: MuscleGroupOut): string {
+  return locale.value === 'es' ? mg.name_es : mg.name_en
+}
 
 const workoutDays = computed(() => {
   const uniqueDates = new Set(props.workouts.map((w) => w.date))
@@ -101,12 +112,17 @@ const animatedEffectiveSets = useAnimatedNumber(() => effectiveSets.value)
       <div v-if="muscleGroupsInWeek.length > 0" class="pt-2 border-t border-line">
         <p class="text-ink-muted text-sm mb-2">{{ $t('today.muscleGroupsTouched') }}</p>
         <div class="flex flex-wrap gap-2">
-          <BkRune
+          <!-- item 3 (v0.3.0): tap/click o foco+Enter revela el nombre del
+               grupo — las runas no se autoexplican fuera del contexto del
+               catálogo (mismo problema que ya resolvió la leyenda del
+               calendario, aquí a nivel de icono individual en vez de sheet) -->
+          <BkTooltip
             v-for="mg in muscleGroupsInWeek"
             :key="mg.id"
-            :name="(mg.slug as RuneName)"
-            :size="24"
-          />
+            :text="muscleGroupName(mg)"
+          >
+            <BkRune :name="(mg.slug as RuneName)" :size="24" />
+          </BkTooltip>
         </div>
       </div>
     </div>
