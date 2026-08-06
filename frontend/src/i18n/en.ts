@@ -48,6 +48,7 @@ export const en = {
     increase: 'Increase',
     saved: 'Saved',
     edit: 'Edit',
+    confirm: 'Confirm',
   },
   athlete: {
     viewing: 'Viewing {name}',
@@ -136,6 +137,25 @@ export const en = {
     effectiveSets: 'Effective Sets',
     muscleGroupsTouched: 'Muscle Groups',
     recentPrs: 'Recent PRs',
+  },
+  calendar: {
+    prevMonth: 'Previous Month',
+    nextMonth: 'Next Month',
+    yearActivity: 'Year Activity',
+    scheduledSessions: 'Scheduled Sessions',
+    skip: 'Skip',
+    optional: 'Optional',
+    routine: 'Routine',
+    selectRoutine: 'Select a routine',
+    newSession: 'New session',
+    time: 'Time',
+    note: 'Note',
+    schedule: 'Schedule',
+    confirmSkip: 'Skip session',
+    confirmSkipMessage: 'Are you sure you want to skip this session?',
+    confirmDelete: 'Delete session',
+    confirmDeleteMessage: 'Are you sure you want to delete this session?',
+    viewWorkout: 'View workout',
   },
   progress: {
     kinds: {

@@ -6,6 +6,7 @@ import BootstrapView from '@/views/BootstrapView.vue'
 import LoginView from '@/views/LoginView.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
 import TodayView from '@/views/TodayView.vue'
+import CalendarView from '@/views/CalendarView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import ShellView from '@/views/ShellView.vue'
 
@@ -20,7 +21,7 @@ export const router = createRouter({
       redirect: { name: 'today' },
       children: [
         { path: 'today', name: 'today', component: TodayView },
-        { path: 'calendar', name: 'calendar', component: PlaceholderView },
+        { path: 'calendar', name: 'calendar', component: CalendarView },
         { path: 'workout', name: 'workout', component: PlaceholderView },
         { path: 'progress', name: 'progress', component: PlaceholderView },
         { path: 'profile', name: 'profile', component: ProfileView },
