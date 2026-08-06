@@ -91,15 +91,17 @@ describe('BkHeatmap', () => {
     expect(labels[1].text()).toBe('feb')
   })
 
-  it('renders each month as its own grid block, separated by a real gap (not one continuous grid)', () => {
+  it('renders each month as its own grid block, wrapping into rows with flex-wrap instead of a horizontal scroll', () => {
     const wrapper = mount(BkHeatmap, {
       props: { year: 2026, data: [] },
       global: { plugins: [createI18nInstance()] },
     })
-    // contenedor exterior: flex con gap real entre bloques de mes
-    const outer = wrapper.find('.overflow-x-auto > div')
-    expect(outer.classes()).toContain('flex')
+    // contenedor exterior: flex-wrap con gap real entre bloques de mes — sin
+    // overflow-x-auto, los bloques se apilan en varias filas en vez de scrollear
+    const outer = wrapper.find('.flex.flex-wrap')
+    expect(outer.exists()).toBe(true)
     expect(outer.classes()).toContain('gap-3')
+    expect(wrapper.find('.overflow-x-auto').exists()).toBe(false)
     // 12 bloques (uno por mes), cada uno con su propia mini-rejilla de celdas
     const blocks = wrapper.findAll('.flex.flex-col.items-center.gap-1')
     expect(blocks).toHaveLength(12)

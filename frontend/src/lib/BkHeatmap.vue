@@ -24,24 +24,23 @@ function monthName(month: number): string {
 
 <template>
   <Transition name="bk-fade" appear>
-    <div class="overflow-x-auto">
-      <!-- bloques por mes, separados por un hueco real (no una rejilla continua):
-           cada bloque es su propia mini-rejilla, con el label centrado encima -->
-      <div class="flex items-start gap-3">
-        <div v-for="block in blocks" :key="`month-${block.month}`" class="flex flex-col items-center gap-1">
-          <span class="text-xs text-ink-faint text-center whitespace-nowrap">{{ monthName(block.month) }}</span>
+    <!-- bloques por mes que se envuelven en varias filas (flex-wrap) en vez de
+         desbordar en scroll lateral: llenan el ancho disponible bajo "Actividad
+         del año" — cada bloque es su propia mini-rejilla, label centrado encima -->
+    <div class="flex flex-wrap items-start gap-3">
+      <div v-for="block in blocks" :key="`month-${block.month}`" class="flex flex-col items-center gap-1">
+        <span class="text-xs text-ink-faint text-center whitespace-nowrap">{{ monthName(block.month) }}</span>
+        <div
+          class="grid gap-1"
+          :style="{ gridTemplateColumns: `repeat(${block.columnCount}, auto)`, gridTemplateRows: 'repeat(7, 1fr)' }"
+        >
           <div
-            class="grid gap-1"
-            :style="{ gridTemplateColumns: `repeat(${block.columnCount}, auto)`, gridTemplateRows: 'repeat(7, 1fr)' }"
-          >
-            <div
-              v-for="cell in block.cells"
-              :key="cell.date"
-              :title="`${cell.date}: ${cell.count}`"
-              class="w-2.5 h-2.5 rounded-xs bg-aurora"
-              :style="{ gridColumn: cell.column + 1, gridRow: cell.day + 1, opacity: cell.count ? levels[Math.min(cell.count - 1, 3)] : 0.08 }"
-            />
-          </div>
+            v-for="cell in block.cells"
+            :key="cell.date"
+            :title="`${cell.date}: ${cell.count}`"
+            class="w-2.5 h-2.5 rounded-xs bg-aurora"
+            :style="{ gridColumn: cell.column + 1, gridRow: cell.day + 1, opacity: cell.count ? levels[Math.min(cell.count - 1, 3)] : 0.08 }"
+          />
         </div>
       </div>
     </div>
