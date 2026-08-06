@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/api/domain', () => ({
   getMonth: vi.fn(async () => ({
@@ -397,8 +397,12 @@ describe('ScheduleSheet', () => {
 
 describe('CalendarView locale (I2)', () => {
   beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => vi.useRealTimers())
 
   it('renders the month label and weekday headers in the VIEWER locale, not the viewed athlete\'s', async () => {
+    // reloj fijado: la vista deriva el mes del reloj real y la aserción
+    // sobre "August" solo es estable con fecha pineada
+    vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
     const athlete = useAthleteStore()
     // el atleta visto es hispanohablante; el viewer (esta sesión) está en inglés
     athlete.view({ id: 9, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
