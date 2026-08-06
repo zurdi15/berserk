@@ -32,7 +32,12 @@ onBeforeUnmount(() => {
 })
 
 // suelo de foco: role=dialog aria-modal no basta si el foco se queda atrás,
-// así que lo movemos al abrir y lo devolvemos a quien abrió el sheet al cerrar
+// así que lo movemos al abrir y lo devolvemos a quien abrió el sheet al cerrar.
+// immediate: true porque un sheet puede montarse ya abierto (v-if en el padre
+// en vez de v-show) — sin esto, nunca entra en sheetStack y Escape se lo come
+// en silencio. La rama else es un no-op inofensivo en el disparo inicial con
+// open=false: id no está en la pila (indexOf -1, no splice) y lastFocused
+// todavía es null (el optional chaining en focus() no hace nada).
 watch(
   () => props.open,
   async (open) => {
@@ -48,6 +53,7 @@ watch(
       lastFocused = null
     }
   },
+  { immediate: true },
 )
 </script>
 

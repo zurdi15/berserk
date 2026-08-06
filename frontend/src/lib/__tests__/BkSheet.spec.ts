@@ -90,6 +90,28 @@ describe('BkSheet', () => {
     editor.unmount()
     confirm.unmount()
   })
+
+  it('emits close on Escape when mounted already open (v-if-style consumer)', async () => {
+    // algunos consumidores montan el sheet directamente con open=true (p.ej.
+    // detrás de un v-if del padre) en vez de open:false → true; sin
+    // immediate:true en el watcher, este id nunca entraba en sheetStack y
+    // Escape se lo comía en silencio
+    const wrapper = mount(BkSheet, {
+      props: { open: true, title: 'Ya abierto' },
+      attachTo: document.body,
+    })
+    await nextTick()
+    await nextTick()
+
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await nextTick()
+
+    expect(wrapper.emitted('close')).toHaveLength(1)
+
+    wrapper.unmount()
+  })
 })
 
 describe('BkToast', () => {
