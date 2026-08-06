@@ -5,7 +5,7 @@ import { createI18nInstance } from '../../i18n'
 import BkRing from '../BkRing.vue'
 import BkRune from '../BkRune.vue'
 import BkStepper from '../BkStepper.vue'
-import { RUNES, RUNE_SEQUENCES } from '../runes'
+import { FUTHARK_RUNE_NAMES, RUNES, RUNE_SEQUENCES } from '../runes'
 
 describe('runes catalog', () => {
   it('has the logo, the 7 muscle groups and the achievement/nav runes', () => {
@@ -13,11 +13,32 @@ describe('runes catalog', () => {
     // shoulders se quedan (StreakCard y el catálogo de grupos musculares
     // siguen usándolos), el nav solo cambió a qué runa apunta
     expect(Object.keys(RUNES).sort()).toEqual(
-      ['back', 'berserk', 'biceps', 'chest', 'core', 'dagaz', 'legs', 'pr', 'shoulders', 'sowilo', 'streak', 'triceps'].sort(),
+      [
+        'back', 'berserk', 'biceps', 'chest', 'core', 'dagaz', 'legs', 'pr',
+        'shoulders', 'sowilo', 'streak', 'triceps',
+        // v0.3.0: futhark antiguo completo (menos sowilo/dagaz, ya listadas
+        // arriba) para el selector de rutinas — ver FUTHARK_24 más abajo
+        'fehu', 'uruz', 'thurisaz', 'ansuz', 'raidho', 'kenaz', 'gebo',
+        'wunjo', 'hagalaz', 'nauthiz', 'isa', 'jera', 'eihwaz', 'perthro',
+        'algiz', 'tiwaz', 'berkano', 'ehwaz', 'mannaz', 'laguz', 'ingwaz',
+        'othala',
+      ].sort(),
     )
     for (const d of Object.values(RUNES)) {
       expect(d).toMatch(/^M[\d\s.]/) // path data válido que empieza con moveto
     }
+  })
+
+  it('v0.3.0: contains all 24 Elder Futhark runes by name, for the routine picker', () => {
+    for (const name of FUTHARK_RUNE_NAMES) {
+      expect(Object.keys(RUNES)).toContain(name)
+    }
+    expect(FUTHARK_RUNE_NAMES).toHaveLength(24)
+    expect(new Set(FUTHARK_RUNE_NAMES).size).toBe(24) // sin nombres repetidos
+  })
+
+  it('v0.3.0: tiwaz reuses the pr glyph verbatim (same canonical Týr shape, two names)', () => {
+    expect(RUNES.tiwaz).toBe(RUNES.pr)
   })
 
   it('item 4: pr has no underline stroke below the Tyr glyph (round 9 — shared by the Progresión nav and PR-list icons)', () => {

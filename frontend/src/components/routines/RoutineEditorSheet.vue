@@ -14,7 +14,7 @@ import BkField from '@/lib/BkField.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkStepper from '@/lib/BkStepper.vue'
 import BkRune from '@/lib/BkRune.vue'
-import { RUNES, type RuneName } from '@/lib/runes'
+import { FUTHARK_RUNE_NAMES, type RuneName } from '@/lib/runes'
 import { exerciseName } from './exerciseName'
 
 const props = defineProps<{ open: boolean; routine?: RoutineOut }>()
@@ -50,7 +50,11 @@ const loading = ref(false)
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Computed
-const runes: RuneName[] = ['chest', 'back', 'biceps', 'triceps', 'shoulders', 'legs', 'core']
+// v0.3.0: el picker ya no cura runas de grupo muscular (esas quedan
+// reservadas a los propios grupos, ver WeekSummaryCard) — ofrece el futhark
+// antiguo completo, para que la runa de la rutina sea una elección libre y
+// no se confunda visualmente con "esta rutina trabaja este músculo"
+const runes: RuneName[] = FUTHARK_RUNE_NAMES
 const berserkerRune: RuneName = 'berserk'
 
 const groupedExercises = computed(() => {
@@ -243,10 +247,13 @@ watch(
         type="text"
       />
 
-      <!-- Rune Picker -->
+      <!-- Rune Picker: futhark completo (24) + berserk aparte — con el
+           grupo muscular fuera del picker, la lista es larga, así que se
+           limita la altura y se deja scroll (mismo patrón que la lista de
+           ejercicios agrupados más abajo) en vez de empujar el resto del sheet -->
       <div class="space-y-2">
         <span class="block text-sm text-ink-muted">{{ $t('routines.rune') }}</span>
-        <div class="flex gap-3 flex-wrap">
+        <div class="flex gap-3 flex-wrap max-h-48 overflow-y-auto">
           <button
             v-for="runeName in runes"
             :key="runeName"
