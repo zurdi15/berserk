@@ -778,6 +778,38 @@ describe('BodySection', () => {
     expect(wrapper!.findComponent({ name: 'BkChart' }).exists()).toBe(true)
     expect(domain.listBody).toHaveBeenCalledWith(7)
   })
+
+  // item 1 (post-0.3.0): no había BkEmpty con acción — con la lista vacía la
+  // sección se quedaba sin ningún CTA visible para dar de alta la primera entrada
+  it('shows the unified empty state (rune + message + action) when there are no entries, and the action opens the add-entry sheet', async () => {
+    vi.mocked(domain.listBody).mockResolvedValueOnce([])
+
+    build()
+    await flushPromises()
+
+    expect(wrapper!.findComponent({ name: 'BkEmpty' }).exists()).toBe(true)
+    expect(wrapper!.text()).toContain('Sin entradas de cuerpo aún')
+
+    const actionBtn = wrapper!.get('[data-testid="add-body-entry"]')
+    await actionBtn.trigger('click')
+    await flushPromises()
+
+    const sheetTitle = document.querySelector('[role="dialog"] h2') as HTMLElement
+    expect(sheetTitle).not.toBeNull()
+    expect(sheetTitle.textContent).toBe('Nueva entrada')
+  })
+
+  it('the empty state has no action button in read-only athlete mode', async () => {
+    const athlete = useAthleteStore()
+    athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
+    vi.mocked(domain.listBody).mockResolvedValueOnce([])
+
+    build()
+    await flushPromises()
+
+    expect(wrapper!.findComponent({ name: 'BkEmpty' }).exists()).toBe(true)
+    expect(wrapper!.find('[data-testid="add-body-entry"]').exists()).toBe(false)
+  })
 })
 
 describe('ProgressView', () => {

@@ -220,13 +220,22 @@ watch(() => athlete.userId, load, { immediate: true })
       <BkChart :points="chartPoints" color="aurora" :suffix="` ${units}`" />
     </div>
 
-    <div v-if="isViewingSelf">
+    <!-- botón persistente: solo con entradas ya cargadas (añadir MÁS). Con la
+         lista vacía, el CTA vive en el propio BkEmpty de abajo (patrón
+         unificado item 10) — así no hay dos botones idénticos a la vez -->
+    <div v-if="isViewingSelf && entries.length">
       <BkButton data-testid="add-body-entry" variant="primary" size="sm" @click="openAdd">
         {{ t('body.add') }}
       </BkButton>
     </div>
 
-    <BkEmpty v-if="!entries.length" :message="t('body.noEntries')" />
+    <BkEmpty
+      v-if="!entries.length"
+      :message="t('body.noEntries')"
+      :action-label="isViewingSelf ? t('body.add') : undefined"
+      action-testid="add-body-entry"
+      @action="openAdd"
+    />
     <div v-else class="space-y-2">
       <div
         v-for="entry in recentFirst"
