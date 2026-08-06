@@ -215,6 +215,21 @@ describe('BkSelect', () => {
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
+  // side-fix 1 (round-7 re-review): Escape y "aplicar" ya devolvían el foco
+  // al trigger al cerrar; el cierre por click-fuera se había quedado corto y
+  // lo dejaba en el body — useFloatingPanel.ts ahora también lo restaura ahí
+  it('side-fix 1: clicking outside returns real focus to the trigger, not the body', async () => {
+    wrapper = build()
+    const trigger = wrapper.get('[role="combobox"]')
+    await trigger.trigger('click')
+    expect(document.querySelector('[role="listbox"]')).not.toBeNull()
+
+    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    await flushPromises()
+
+    expect(document.activeElement).toBe(trigger.element)
+  })
+
   it('flips the panel above the trigger when there is not enough room below', async () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       top: 750, bottom: 780, left: 10, right: 200, width: 190, height: 30,
