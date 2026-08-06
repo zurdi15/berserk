@@ -245,6 +245,82 @@ def test_admin_can_update_and_delete_global_muscle_group(client: TestClient, app
     assert any(g["slug"] == "quads" for g in remaining)
 
 
+def test_create_muscle_group_with_rune(client: TestClient, app):
+    # item 14: runa dedicada, libre de la restricción slug==nombre_de_runa
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    resp = freyja.post(
+        "/api/v1/muscle-groups",
+        json={"slug": "glutes", "name_es": "Glúteos", "name_en": "Glutes", "rune": "core"},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["slug"] == "glutes" and body["rune"] == "core"
+
+    # backend permisivo a propósito: no valida contra el diccionario RUNES
+    # del frontend, cualquier string cabe (hasta 30 chars)
+    resp = freyja.post(
+        "/api/v1/muscle-groups",
+        json={"slug": "forearms", "name_es": "Antebrazos", "name_en": "Forearms", "rune": "not-a-real-rune"},
+    )
+    assert resp.status_code == 201 and resp.json()["rune"] == "not-a-real-rune"
+
+
+def test_create_muscle_group_without_rune_defaults_to_none(client: TestClient):
+    resp = client.post(
+        "/api/v1/muscle-groups",
+        json={"slug": "calves", "name_es": "Gemelos", "name_en": "Calves"},
+    )
+    assert resp.status_code == 201 and resp.json()["rune"] is None
+
+
+def test_owner_edits_own_group_rune(client: TestClient, app):
+    # item 14 (bug de zurdi): el botón de editar estaba gateado al revés
+    # (solo grupos globales); el dueño de un grupo PROPIO debe poder editar
+    # su runa igual que un admin edita una global — esto ya lo permitía
+    # _can_edit, este test lo deja explícito y a prueba de regresión
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    gid = freyja.post(
+        "/api/v1/muscle-groups",
+        json={"slug": "glutes", "name_es": "Glúteos", "name_en": "Glutes"},
+    ).json()["id"]
+
+    resp = freyja.patch(f"/api/v1/muscle-groups/{gid}", json={"rune": "legs"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["rune"] == "legs" and body["slug"] == "glutes"  # slug intacto
+
+    # slug sigue siendo tocable a nivel de API (el frontend deja de
+    # exponerlo, pero el backend no lo prohíbe, ver MuscleGroupPatchIn)
+    resp = freyja.patch(f"/api/v1/muscle-groups/{gid}", json={"rune": None})
+    assert resp.status_code == 200 and resp.json()["rune"] is None
+
+
+def test_admin_cannot_edit_other_users_own_group(client: TestClient, app):
+    # _can_edit es owner-o-admin-de-global, NUNCA admin-de-lo-ajeno: un
+    # grupo PRIVADO de otro usuario sigue siendo 404 para el admin
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    gid = freyja.post(
+        "/api/v1/muscle-groups",
+        json={"slug": "glutes", "name_es": "Glúteos", "name_en": "Glutes"},
+    ).json()["id"]
+
+    resp = client.patch(f"/api/v1/muscle-groups/{gid}", json={"rune": "legs"})
+    assert resp.status_code == 404
+
+
+def test_admin_patches_global_group_rune(client: TestClient, app):
+    legs = group_id(client, "legs")
+    resp = client.patch(f"/api/v1/muscle-groups/{legs}", json={"rune": "core"})
+    assert resp.status_code == 200 and resp.json()["rune"] == "core"
+
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    assert freyja.patch(f"/api/v1/muscle-groups/{legs}", json={"rune": "chest"}).status_code == 404
+
+
 def test_admin_delete_global_muscle_group_in_use_conflict(client: TestClient):
     # la guarda 409 sigue aplicando incluso para un admin sobre una fila global
     chest = group_id(client, "chest")

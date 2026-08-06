@@ -88,7 +88,8 @@ def create_muscle_group(payload: MuscleGroupIn, user: CurrentUser, db: Session =
     if db.scalar(select(MuscleGroup).where(scope, MuscleGroup.slug == payload.slug)):
         raise HTTPException(status_code=409, detail="slug_taken")
     group = MuscleGroup(
-        slug=payload.slug, name_es=payload.name_es, name_en=payload.name_en, owner_id=owner_id
+        slug=payload.slug, name_es=payload.name_es, name_en=payload.name_en,
+        owner_id=owner_id, rune=payload.rune,
     )
     db.add(group)
     db.commit()
@@ -115,6 +116,11 @@ def update_muscle_group(
         group.name_es = payload.name_es
     if payload.name_en is not None:
         group.name_en = payload.name_en
+    # model_fields_set (no "is not None"): rune es legítimamente anulable —
+    # un payload con rune=null debe LIMPIAR la runa dedicada (cae de vuelta
+    # al slug, ver runeResolve.groupRune), distinto de omitir el campo
+    if "rune" in payload.model_fields_set:
+        group.rune = payload.rune
     db.commit()
     return group
 

@@ -79,6 +79,15 @@ class MuscleGroup(Base):
     slug: Mapped[str] = mapped_column(String(30))
     name_es: Mapped[str] = mapped_column(String(50))
     name_en: Mapped[str] = mapped_column(String(50))
+    # runa dedicada (item 14): antes el frontend derivaba la runa DIRECTO del
+    # slug (ver runeResolve.ts), así que solo el subconjunto de grupos
+    # "canónicos" (slug == nombre de runa) podía mostrar icono. Con esta
+    # columna cualquier grupo (global o propio) puede llevar cualquier runa
+    # del futhark sin que su slug tenga que coincidir. NULL = sin runa
+    # propia; el frontend cae de vuelta al slug (rune ?? slug, ver
+    # runeResolve.groupRune) — así los grupos sembrados antes de esta
+    # columna (backfill de la migración) siguen mostrando su icono de siempre.
+    rune: Mapped[str | None] = mapped_column(String(30), default=None)
     # NULL = grupo global del seed; con owner = grupo privado del usuario
     owner_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), default=None, index=True
