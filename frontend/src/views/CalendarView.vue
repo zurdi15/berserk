@@ -180,6 +180,7 @@ watch(() => athlete.userId, () => {
       :year="year"
       :month-num="month"
       :group-map="groupMap"
+      :dot-color="athlete.viewing?.color"
       @select="selectDay"
     />
 

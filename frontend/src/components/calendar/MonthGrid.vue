@@ -12,6 +12,8 @@ const props = defineProps<{
   year: number
   monthNum: number
   groupMap: Map<number, string>
+  // color de dots por atleta observado (dato de usuario, no token): null → aurora
+  dotColor?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -97,7 +99,7 @@ function selectDay(date: string) {
     <div
       class="grid grid-cols-7 gap-1 bk-stagger"
       data-testid="month-grid"
-      style="--bk-day-dot: var(--color-aurora)"
+      :style="{ '--bk-day-dot': dotColor ?? 'var(--color-aurora)' }"
     >
       <button
         v-for="(cell, i) in grid"
