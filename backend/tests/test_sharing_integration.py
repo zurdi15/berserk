@@ -44,6 +44,7 @@ READ_PATHS = [
     "/api/v1/progress/records?user_id={uid}",
     "/api/v1/progress/heatmap/2026?user_id={uid}",
     "/api/v1/progress/streak?user_id={uid}",
+    "/api/v1/progress/trained-exercises?user_id={uid}",
     "/api/v1/progress/muscle-distribution?user_id={uid}",
     "/api/v1/body?user_id={uid}",
     "/api/v1/exercises?user_id={uid}",

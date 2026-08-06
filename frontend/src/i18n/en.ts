@@ -217,6 +217,7 @@ export const en = {
     },
     searchExercise: 'Search exercise',
     allExercises: 'All exercises',
+    hasData: 'Has data',
     noSeries: 'No data for this exercise yet',
     records: 'Records',
     noRecords: 'No records yet',

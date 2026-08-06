@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut } from '@/api/domain'
-import { listExercises } from '@/api/domain'
+import { getTrainedExercises, listExercises } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { useAthleteStore } from '@/stores/athlete'
@@ -22,12 +22,20 @@ const query = ref('')
 // que lo de abajo (chart + selector de métrica) no salte de sitio al llegar
 // los datos. true también en error, para no dejar el esqueleto para siempre.
 const ready = ref(false)
+// ids de ejercicios con al menos una serie registrada (item 5): el punto
+// aurora junto al nombre — mismo Set para lookup O(1) en el template
+const trainedIds = ref<Set<number>>(new Set())
 
 async function load() {
   try {
     // catálogo completo con hilo de atleta: buscamos entre los ejercicios de
     // quien se está viendo, no siempre los propios — luego se filtra en cliente
-    allExercises.value = await listExercises({ userId: athlete.userId })
+    const [list, trained] = await Promise.all([
+      listExercises({ userId: athlete.userId }),
+      getTrainedExercises(athlete.userId),
+    ])
+    allExercises.value = list
+    trainedIds.value = new Set(trained.exercise_ids)
   } catch (error) {
     toastApiError(error)
   } finally {
@@ -77,11 +85,22 @@ watch(() => athlete.userId, load)
         :key="exercise.id"
         type="button"
         :data-testid="`exercise-option-${exercise.id}`"
-        class="w-full text-left p-2 rounded-sm hover:bg-stone transition-colors text-sm border border-transparent hover:border-line"
+        class="w-full text-left p-2 rounded-sm hover:bg-stone transition-colors text-sm border border-transparent hover:border-line flex items-center gap-1.5"
         :class="modelValue === exercise.id ? 'text-aurora' : 'text-ink'"
         @click="select(exercise.id)"
       >
-        {{ exerciseName(exercise, locale) }}
+        <span>{{ exerciseName(exercise, locale) }}</span>
+        <!-- punto aurora (item 5): mismo visual que los dots "done" del
+             calendario (w-1.5 h-1.5 rounded-full bg-aurora, ver MonthGrid.vue)
+             — señal de que este ejercicio ya tiene series registradas -->
+        <span
+          v-if="trainedIds.has(exercise.id)"
+          class="w-1.5 h-1.5 rounded-full bg-aurora shrink-0"
+          data-testid="trained-dot"
+          :title="t('progress.hasData')"
+        >
+          <span class="sr-only">{{ t('progress.hasData') }}</span>
+        </span>
       </button>
     </div>
   </div>

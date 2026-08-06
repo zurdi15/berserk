@@ -32,6 +32,7 @@ vi.mock('@/api/domain', () => ({
   getDistribution: vi.fn(async () => []),
   getRecords: vi.fn(async () => []),
   getSeries: vi.fn(async () => ({ series: [{ workout_id: 1, date: '2026-08-01', top_weight: 80, volume: 800, est_1rm: 90 }] })),
+  getTrainedExercises: vi.fn(async () => ({ exercise_ids: [] })),
   listWorkouts: vi.fn(async () => []),
   listExercises: vi.fn(async () => [EXERCISE]),
   listMuscleGroups: vi.fn(async () => []),
@@ -147,6 +148,7 @@ describe('ProgressView athlete threading', () => {
     vi.mocked(domain.getSeries).mockClear()
     vi.mocked(domain.listBody).mockClear()
     vi.mocked(domain.listExercises).mockClear().mockResolvedValue([EXERCISE] as never)
+    vi.mocked(domain.getTrainedExercises).mockClear()
   })
 
   it('threads the viewed athlete id through distribution and records on mount', async () => {
@@ -156,6 +158,8 @@ describe('ProgressView athlete threading', () => {
 
     expect(domain.getDistribution).toHaveBeenCalledWith(4, 7)
     expect(domain.getRecords).toHaveBeenCalledWith({ exercise_id: undefined, userId: 7 })
+    // item 5: el set de "entrenados" de ExercisePicker sigue el mismo hilo de atleta
+    expect(domain.getTrainedExercises).toHaveBeenCalledWith(7)
   })
 
   it('threads the viewed athlete id into the series fetch once an exercise is picked', async () => {

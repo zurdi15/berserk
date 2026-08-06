@@ -217,6 +217,7 @@ export const es = {
     },
     searchExercise: 'Buscar ejercicio',
     allExercises: 'Todos los ejercicios',
+    hasData: 'Con datos',
     noSeries: 'Aún no hay datos de este ejercicio',
     records: 'Récords',
     noRecords: 'Sin récords aún',

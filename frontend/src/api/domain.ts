@@ -368,6 +368,9 @@ export const getStreak = (userId?: number) =>
 export const getDistribution = (weeks?: number, userId?: number) =>
   api<DistributionItem[]>(`/progress/muscle-distribution${qs({ weeks, userId })}`)
 
+export const getTrainedExercises = (userId?: number) =>
+  api<{ exercise_ids: number[] }>(`/progress/trained-exercises${qs({ userId })}`)
+
 // Body endpoints
 export const listBody = (userId?: number) =>
   api<BodyEntryOut[]>(`/body${qs({ userId })}`)

@@ -27,3 +27,7 @@ class StreakOut(BaseModel):
 class DistributionItem(BaseModel):
     muscle_group_id: int
     sets: int
+
+
+class TrainedExercisesOut(BaseModel):
+    exercise_ids: list[int]

@@ -42,6 +42,29 @@ def test_series_records_heatmap_streak_distribution(client: TestClient):
     assert sum(d["sets"] for d in dist) == 2
 
 
+def test_trained_exercises(client: TestClient):
+    exercises = client.get("/api/v1/exercises").json()
+    bench = next(e["id"] for e in exercises if e["name_en"] == "Bench press")
+    squat = next(e["id"] for e in exercises if e["name_en"] == "Squat")
+
+    log_workout(client, date.today().isoformat(), reps=5, weight=100)  # entrena bench
+
+    ids = client.get("/api/v1/progress/trained-exercises").json()["exercise_ids"]
+    assert bench in ids
+    assert squat not in ids
+
+
+def test_trained_exercises_respects_athlete_threading(client: TestClient, app):
+    from tests.conftest import login, make_user
+
+    make_user(client, "freyja")
+    log_workout(client, date.today().isoformat(), reps=5, weight=100)  # admin entrena bench
+
+    freyja = login(app, "freyja")
+    # freyja no ha entrenado nada todavía: su propia vista está vacía
+    assert freyja.get("/api/v1/progress/trained-exercises").json()["exercise_ids"] == []
+
+
 def test_series_of_invisible_exercise_404(client: TestClient, app):
     from tests.conftest import login, make_user
 

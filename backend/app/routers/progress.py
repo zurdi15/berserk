@@ -13,12 +13,14 @@ from ..schemas.progress import (
     HeatmapDay,
     SeriesOut,
     StreakOut,
+    TrainedExercisesOut,
 )
 from ..schemas.workouts import PersonalRecordOut
 from ..services.progress import (
     annual_heatmap,
     exercise_series,
     muscle_distribution,
+    trained_exercise_ids,
     weekly_streak,
 )
 from .exercises import get_visible_exercise
@@ -59,6 +61,11 @@ def streak(target: TargetUser, db: Session = Depends(get_db)):
     dates = db.scalars(select(Workout.date).where(Workout.owner_id == target.id)).all()
     # racha sobre la fecha del servidor: app personal, margen de una semana entera
     return StreakOut(weeks=weekly_streak(dates, today=date_type.today()))
+
+
+@router.get("/trained-exercises", response_model=TrainedExercisesOut)
+def trained_exercises(target: TargetUser, db: Session = Depends(get_db)):
+    return TrainedExercisesOut(exercise_ids=sorted(trained_exercise_ids(db, target.id)))
 
 
 @router.get("/muscle-distribution", response_model=list[DistributionItem])

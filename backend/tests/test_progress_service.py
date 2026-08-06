@@ -67,6 +67,17 @@ def test_annual_heatmap(db_session):
     assert date(2026, 1, 1) not in heatmap
 
 
+def test_trained_exercise_ids(db_session):
+    user, _, bench = seed_user_with_workouts(db_session)
+    # ejercicio nunca entrenado por este usuario: no debe aparecer
+    untrained = models.Exercise(name_es="Sentadilla", name_en="Squat", measurement="strength")
+    db_session.add(untrained)
+    db_session.commit()
+
+    assert svc.trained_exercise_ids(db_session, user.id) == {bench.id}
+    assert untrained.id not in svc.trained_exercise_ids(db_session, user.id)
+
+
 def test_muscle_distribution(db_session):
     user, chest, _ = seed_user_with_workouts(db_session)
     dist = svc.muscle_distribution(

@@ -111,6 +111,18 @@ def annual_heatmap(db: Session, owner_id: int, year: int) -> list[tuple[date, in
     return [(row[0], row[1]) for row in rows]
 
 
+def trained_exercise_ids(db: Session, owner_id: int) -> set[int]:
+    """Ids de ejercicios con al menos una serie registrada (item 5): base para
+    el punto aurora de "con datos" en el selector de Progresión."""
+    rows = db.execute(
+        select(WorkoutExercise.exercise_id.distinct())
+        .join(Workout, Workout.id == WorkoutExercise.workout_id)
+        .join(WorkoutSet, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .where(Workout.owner_id == owner_id)
+    ).all()
+    return {row[0] for row in rows}
+
+
 def muscle_distribution(db: Session, owner_id: int, start: date, end: date) -> dict[int, int]:
     """Series efectivas por grupo muscular primario en el rango."""
     rows = db.execute(
