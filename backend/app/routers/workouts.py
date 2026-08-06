@@ -54,6 +54,7 @@ def workout_out(workout: Workout) -> WorkoutOut:
         routine_id=workout.routine_id,
         note=workout.note,
         feeling=workout.feeling,
+        stretched=workout.stretched,
         exercises=workout.exercises,
         muscle_tag_ids=[t.muscle_group_id for t in workout.muscle_tags],
     )

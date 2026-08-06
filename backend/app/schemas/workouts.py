@@ -18,6 +18,9 @@ class WorkoutPatchIn(BaseModel):
     date: date_type | None = None
     note: str | None = Field(None, max_length=500)
     feeling: int | None = Field(None, ge=1, le=5)
+    # item 8: bool "normal" (no anulable, sin semántica de "sin fijar" — un
+    # PATCH sin este campo simplemente no lo toca, vía exclude_unset)
+    stretched: bool | None = None
 
 
 class SetOut(BaseModel):
@@ -52,6 +55,7 @@ class WorkoutOut(BaseModel):
     routine_id: int | None
     note: str | None
     feeling: int | None
+    stretched: bool
     exercises: list[WorkoutExerciseOut]
     muscle_tag_ids: list[int] = []
 

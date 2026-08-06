@@ -189,6 +189,9 @@ class Workout(Base):
     )
     note: Mapped[str | None] = mapped_column(String(500), default=None)
     feeling: Mapped[int | None] = mapped_column(default=None)
+    # item 8 (round v0.3.0): "check en el entreno" — si el usuario ha
+    # estirado, sin más semántica que esa (no hay minutos/tipo de estiramiento)
+    stretched: Mapped[bool] = mapped_column(default=False)
 
     exercises: Mapped[list["WorkoutExercise"]] = relationship(
         cascade="all, delete-orphan",

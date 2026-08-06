@@ -120,6 +120,22 @@ def test_patch_and_delete(client: TestClient, app):
     assert client.get(f"/api/v1/workouts/{wid}").status_code == 404
 
 
+def test_stretched_defaults_false_and_patch_toggles_it(client: TestClient):
+    workout = client.post("/api/v1/workouts", json={"date": "2026-08-01"}).json()
+    wid = workout["id"]
+    assert workout["stretched"] is False
+
+    resp = client.patch(f"/api/v1/workouts/{wid}", json={"stretched": True})
+    assert resp.status_code == 200 and resp.json()["stretched"] is True
+
+    # una petición sin el campo no lo toca (exclude_unset)
+    resp = client.patch(f"/api/v1/workouts/{wid}", json={"note": "x"})
+    assert resp.json()["stretched"] is True
+
+    resp = client.patch(f"/api/v1/workouts/{wid}", json={"stretched": False})
+    assert resp.json()["stretched"] is False
+
+
 def test_patch_workout_explicit_null_semantics(client: TestClient):
     workout = client.post("/api/v1/workouts", json={"date": "2026-08-01"}).json()
     wid = workout["id"]
