@@ -5,6 +5,7 @@ import { parseUtc } from '../datetime'
 describe('parseUtc', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
   })
 
   it('parses the real backend naive format (with microseconds) as UTC', () => {
@@ -42,9 +43,26 @@ describe('parseUtc', () => {
   })
 
   it('parses a date-only string (no time component) instead of producing an Invalid Date', () => {
-    // 'YYYY-MM-DD' no lleva 'T': appendear 'Z' a ciegas da 'YYYY-MM-DDZ',
-    // que Date() no puede parsear (Invalid Date). Una fecha sin hora ya es
-    // UTC-medianoche por spec de Date(), así que no necesita el sufijo.
-    expect(parseUtc('2026-08-06').getUTCDate()).toBe(6)
+    // 'YYYY-MM-DD' no lleva 'T': appendear 'Z' a ciegas daría 'YYYY-MM-DDZ'.
+    // En V8 (el motor de este runner) ambos strings producen el mismo Date,
+    // así que comprobar solo la salida no detecta una regresión aquí si se
+    // reintroduce el append incondicional — hace falta espiar el constructor
+    // Date y comprobar el string crudo que realmente recibe. El trap de
+    // 'construct' delega en Reflect.construct para que el resultado siga
+    // siendo un Date real y utilizable (getUTCDate, etc).
+    const seenInputs: unknown[] = []
+    const RealDate = globalThis.Date
+    const DateSpy = new Proxy(RealDate, {
+      construct(target, args) {
+        seenInputs.push(args[0])
+        return Reflect.construct(target, args)
+      },
+    })
+    vi.stubGlobal('Date', DateSpy)
+
+    const result = parseUtc('2026-08-06')
+
+    expect(seenInputs).toEqual(['2026-08-06']) // nunca '2026-08-06Z'
+    expect(result.getUTCDate()).toBe(6)
   })
 })
