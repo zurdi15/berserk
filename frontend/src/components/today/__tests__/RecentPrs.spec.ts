@@ -23,7 +23,7 @@ describe('RecentPrs', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('renders nothing when there are no records', () => {
-    const wrapper = mount(RecentPrs, { props: { records: [], exercises }, ...withI18n() })
+    const wrapper = mount(RecentPrs, { props: { records: [], exercises: exercises as never }, ...withI18n() })
     expect(wrapper.text()).toBe('')
   })
 

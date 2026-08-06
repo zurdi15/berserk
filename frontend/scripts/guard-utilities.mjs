@@ -19,11 +19,12 @@ const CANDIDATE_RE =
 // Construido empíricamente: primera corrida del guard con whitelist vacía,
 // se inspeccionó cada falso positivo uno a uno (nunca por prefijo).
 const WHITELIST = new Set([
-  // atributos de presentación SVG, no clases de Tailwind — `:stroke-width` y
-  // `stroke-linecap` en BkRing.vue/BkRune.vue matchean el mismo prefijo
-  // `stroke-` que la utilidad de color `stroke-*`, pero Tailwind nunca genera
-  // CSS para ellos porque no son utilidades.
+  // atributos de presentación SVG, no clases de Tailwind — `:stroke-width`,
+  // `stroke-linecap` y `stroke-linejoin` (icono de llave en AdminCard.vue)
+  // matchean el mismo prefijo `stroke-` que la utilidad de color `stroke-*`,
+  // pero Tailwind nunca genera CSS para ellos porque no son utilidades.
   'stroke-linecap',
+  'stroke-linejoin',
   'stroke-width',
 ])
 
