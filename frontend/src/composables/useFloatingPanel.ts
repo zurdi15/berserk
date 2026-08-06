@@ -65,7 +65,12 @@ export function useFloatingPanel() {
     const target = event.target as Node
     if (triggerEl.value?.contains(target)) return
     if (panelEl.value?.contains(target)) return
+    // round-7 re-review (side-fix 1): un click FUERA (no Escape, no "aplicar")
+    // dejaba el foco en el body — Escape y aplicar sí lo devuelven al trigger,
+    // este camino se había quedado corto. Mismo destino que los otros dos: el
+    // trigger, para no perder el hilo del teclado tras cerrar.
     closePanel()
+    triggerEl.value?.focus()
   }
 
   function openPanel() {

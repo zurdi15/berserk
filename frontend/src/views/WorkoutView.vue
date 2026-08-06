@@ -262,9 +262,11 @@ onBeforeUnmount(() => {
         :exercise="exerciseMap.get(we.exercise_id)"
         :muscle-groups="muscleGroups"
         :routines="routines"
+        :routine-id="activeWorkout.workout.routine_id"
         :exercise-ids="exerciseIds"
         :units="units"
         :locale="locale"
+        :actions="activeWorkout"
         @recorded="onRecorded"
       />
 
@@ -277,7 +279,7 @@ onBeforeUnmount(() => {
         {{ t('workout.addExercise') }}
       </BkButton>
 
-      <AddExerciseSheet :open="addSheetOpen" @close="addSheetOpen = false" />
+      <AddExerciseSheet :open="addSheetOpen" :actions="activeWorkout" @close="addSheetOpen = false" />
 
       <BkSheet
         :open="discardConfirmOpen"

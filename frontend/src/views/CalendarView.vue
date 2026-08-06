@@ -185,6 +185,7 @@ watch(() => athlete.userId, () => {
         v-if="selectedDate"
         :date="selectedDate"
         :scheduled="monthData.scheduled.filter(s => s.date === selectedDate)"
+        :workouts="monthData.workouts.filter(w => w.date === selectedDate)"
         @updated="loadMonth"
       />
     </BkSheet>

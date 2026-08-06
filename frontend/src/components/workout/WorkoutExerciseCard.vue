@@ -14,7 +14,6 @@ import type {
 import { primaryRune as resolvePrimaryRune } from '@/lib/runeResolve'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
-import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { formatWeight } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
@@ -23,6 +22,7 @@ import BkRune from '@/lib/BkRune.vue'
 import type { RuneName } from '@/lib/runes'
 import { restFor } from './rest'
 import SetForm from './SetForm.vue'
+import type { WorkoutActions } from './workoutActions'
 
 const props = withDefaults(
   defineProps<{
@@ -30,22 +30,33 @@ const props = withDefaults(
     exercise?: ExerciseOut
     muscleGroups?: MuscleGroupOut[]
     routines?: RoutineOut[]
+    // solo hace falta para el cálculo del descanso (ver rest.ts); null en el
+    // editor retroactivo, donde restEnabled ya lo deja sin usar
+    routineId?: number | null
     exerciseIds: number[]
     units?: 'kg' | 'lb'
     locale?: string
+    // store-agnóstico (round 8): quien monta la tarjeta decide si las
+    // acciones van contra activeWorkout (entreno en vivo) o workoutEditor
+    // (edición retroactiva) — ver workoutActions.ts
+    actions: WorkoutActions
+    // el descanso post-serie es un concepto de entreno EN VIVO: el editor
+    // retroactivo no lo quiere (no hay nada de lo que "descansar")
+    restEnabled?: boolean
   }>(),
   {
     muscleGroups: () => [],
     routines: () => [],
+    routineId: null,
     units: 'kg',
     locale: 'es',
+    restEnabled: true,
   },
 )
 
 const emit = defineEmits<{ recorded: [records: PersonalRecordOut[]] }>()
 
 const { t } = useI18n()
-const activeWorkout = useActiveWorkoutStore()
 const restTimer = useRestTimerStore()
 
 const removeConfirming = ref(false)
@@ -90,10 +101,12 @@ function formatSetValue(set: SetOut): string {
 // el backend rechaza, un toast lo cuenta — nunca un fallo silencioso en consola
 async function onSubmitSet(value: SetIn) {
   try {
-    const result = await activeWorkout.logSet(props.workoutExercise.id, value)
+    const result = await props.actions.logSet(props.workoutExercise.id, value)
     // el descanso depende de si el entreno viene de una rutina (su rest_seconds) o es libre (default)
-    const seconds = restFor(activeWorkout.workout, props.routines, props.workoutExercise.exercise_id)
-    restTimer.start(seconds)
+    if (props.restEnabled) {
+      const seconds = restFor(props.routineId, props.routines, props.workoutExercise.exercise_id)
+      restTimer.start(seconds)
+    }
     if (result.new_records.length) emit('recorded', result.new_records)
   } catch (error) {
     toastApiError(error)
@@ -103,7 +116,7 @@ async function onSubmitSet(value: SetIn) {
 async function onDeleteSet(setId: number) {
   deleteConfirming.value = null
   try {
-    await activeWorkout.deleteSet(props.workoutExercise.id, setId)
+    await props.actions.deleteSet(props.workoutExercise.id, setId)
   } catch (error) {
     toastApiError(error)
   }
@@ -115,7 +128,7 @@ async function onDeleteSet(setId: number) {
 async function onUpdateSet(setId: number, value: SetIn) {
   editingSetId.value = null
   try {
-    await activeWorkout.updateSet(props.workoutExercise.id, setId, value)
+    await props.actions.updateSet(props.workoutExercise.id, setId, value)
   } catch (error) {
     toastApiError(error)
   }
@@ -124,7 +137,7 @@ async function onUpdateSet(setId: number, value: SetIn) {
 async function confirmRemove() {
   removeConfirming.value = false
   try {
-    await activeWorkout.removeExercise(props.workoutExercise.id)
+    await props.actions.removeExercise(props.workoutExercise.id)
   } catch (error) {
     toastApiError(error)
   }
@@ -139,7 +152,7 @@ function swap(a: number, b: number): number[] {
 async function moveUp() {
   if (isFirst.value) return
   try {
-    await activeWorkout.reorder(swap(index.value, index.value - 1))
+    await props.actions.reorder(swap(index.value, index.value - 1))
   } catch (error) {
     toastApiError(error)
   }
@@ -148,7 +161,7 @@ async function moveUp() {
 async function moveDown() {
   if (isLast.value) return
   try {
-    await activeWorkout.reorder(swap(index.value, index.value + 1))
+    await props.actions.reorder(swap(index.value, index.value + 1))
   } catch (error) {
     toastApiError(error)
   }
