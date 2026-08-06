@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser
 from ..db import get_db
-from ..models import Exercise, ExerciseMuscleGroup, MuscleGroup, RoutineExercise, WorkoutExercise
+from ..models import Exercise, ExerciseMuscleGroup, MuscleGroup, RoutineExercise, User, WorkoutExercise
 from ..permissions import TargetUser
 from ..schemas.catalog import (
     ExerciseIn,
@@ -13,6 +13,7 @@ from ..schemas.catalog import (
     ExercisePatchIn,
     MuscleGroupIn,
     MuscleGroupOut,
+    MuscleGroupPatchIn,
 )
 
 router = APIRouter(tags=["catalog"])
@@ -46,6 +47,12 @@ def get_visible_exercise(db: Session, user_id: int, exercise_id: int) -> Exercis
     if exercise is None or (exercise.owner_id is not None and exercise.owner_id != user_id):
         return None
     return exercise
+
+
+def _can_edit(owner_id: int | None, user: User) -> bool:
+    """Dueño siempre puede; un admin además puede sobre filas globales
+    (owner_id NULL, el catálogo predefinido) — item 5."""
+    return owner_id == user.id or (owner_id is None and user.is_admin)
 
 
 def _apply_links(db: Session, exercise: Exercise, links: list[ExerciseMuscleLink], user_id: int) -> None:
@@ -88,10 +95,34 @@ def create_muscle_group(payload: MuscleGroupIn, user: CurrentUser, db: Session =
     return group
 
 
+@router.patch("/muscle-groups/{group_id}", response_model=MuscleGroupOut)
+def update_muscle_group(
+    group_id: int, payload: MuscleGroupPatchIn, user: CurrentUser, db: Session = Depends(get_db)
+):
+    group = db.get(MuscleGroup, group_id)
+    if group is None or not _can_edit(group.owner_id, user):
+        raise HTTPException(status_code=404, detail="not_found")
+    if payload.slug is not None and payload.slug != group.slug:
+        scope = (
+            MuscleGroup.owner_id.is_(None)
+            if group.owner_id is None
+            else MuscleGroup.owner_id == group.owner_id
+        )
+        if db.scalar(select(MuscleGroup).where(scope, MuscleGroup.slug == payload.slug)):
+            raise HTTPException(status_code=409, detail="slug_taken")
+        group.slug = payload.slug
+    if payload.name_es is not None:
+        group.name_es = payload.name_es
+    if payload.name_en is not None:
+        group.name_en = payload.name_en
+    db.commit()
+    return group
+
+
 @router.delete("/muscle-groups/{group_id}", status_code=204)
 def delete_muscle_group(group_id: int, user: CurrentUser, db: Session = Depends(get_db)):
     group = db.get(MuscleGroup, group_id)
-    if group is None or group.owner_id != user.id:
+    if group is None or not _can_edit(group.owner_id, user):
         raise HTTPException(status_code=404, detail="not_found")
     if db.scalar(
         select(ExerciseMuscleGroup).where(ExerciseMuscleGroup.muscle_group_id == group_id)
@@ -127,11 +158,14 @@ def list_exercises(
 
 @router.post("/exercises", response_model=ExerciseOut, status_code=201)
 def create_exercise(payload: ExerciseIn, user: CurrentUser, db: Session = Depends(get_db)):
+    if payload.is_global and not user.is_admin:
+        raise HTTPException(status_code=403, detail="admin_only")
+    owner_id = None if payload.is_global else user.id
     exercise = Exercise(
         name_es=payload.name_es,
         name_en=payload.name_en,
         measurement=payload.measurement,
-        owner_id=user.id,
+        owner_id=owner_id,
     )
     db.add(exercise)
     db.flush()
@@ -145,7 +179,7 @@ def update_exercise(
     exercise_id: int, payload: ExercisePatchIn, user: CurrentUser, db: Session = Depends(get_db)
 ):
     exercise = db.get(Exercise, exercise_id)
-    if exercise is None or exercise.owner_id != user.id:
+    if exercise is None or not _can_edit(exercise.owner_id, user):
         raise HTTPException(status_code=404, detail="not_found")
     if payload.name_es is not None:
         exercise.name_es = payload.name_es
@@ -160,7 +194,7 @@ def update_exercise(
 @router.delete("/exercises/{exercise_id}", status_code=204)
 def delete_exercise(exercise_id: int, user: CurrentUser, db: Session = Depends(get_db)):
     exercise = db.get(Exercise, exercise_id)
-    if exercise is None or exercise.owner_id != user.id:
+    if exercise is None or not _can_edit(exercise.owner_id, user):
         raise HTTPException(status_code=404, detail="not_found")
     in_use = db.scalar(
         select(RoutineExercise).where(RoutineExercise.exercise_id == exercise_id)
