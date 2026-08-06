@@ -4,11 +4,15 @@
 // independientemente navegables, mismo mecanismo de posicionamiento/Escape/
 // click-fuera que BkSelect (useFloatingPanel, ver ese archivo para el porqué
 // de la pila de capas compartida con BkSheet).
-import { nextTick, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFloatingPanel } from '@/composables/useFloatingPanel'
 
-const props = defineProps<{ label: string; modelValue: string | null; hint?: string }>()
+// item 1 (round 10): min ("HH:MM") deshabilita horas/minutos anteriores —
+// guardarraíl de cliente para "programar rutina hoy solo a una hora
+// posterior a la actual" (ScheduleSheet la pasa solo cuando el día
+// seleccionado es hoy). No es seguridad: el backend no valida esto.
+const props = defineProps<{ label: string; modelValue: string | null; hint?: string; min?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>()
 
 const { t } = useI18n()
@@ -38,9 +42,37 @@ function snapMinute(m: string): string {
   return String(snapped).padStart(2, '0')
 }
 
-const [defaultH, defaultM] = props.modelValue ? props.modelValue.split(':') : ['00', '00']
+const minHour = computed(() => props.min?.split(':')[0])
+const minMinute = computed(() => (props.min ? Number(props.min.split(':')[1]) : null))
+
+function isHourDisabled(h: string): boolean {
+  return minHour.value !== undefined && h < minHour.value
+}
+function isMinuteDisabled(m: string): boolean {
+  return minHour.value !== undefined && pendingHour.value === minHour.value && Number(m) <= (minMinute.value ?? -1)
+}
+
+// sin modelValue previo, el default no puede ser '00:00' a ciegas si hay un
+// min: abriría el panel ya anclado sobre una opción disabled (mismo defecto
+// que BkSelect evita re-anclando a la primera opción habilitada). Primero
+// intenta un minuto posterior DENTRO de la propia hora mínima; si esa hora ya
+// no tiene ningún minuto válido (p.ej. min="23:57"), salta a la siguiente
+// hora con minuto '00' — y si tampoco queda hora siguiente (min ya en la
+// última hora del día), cae al último hueco disponible como mejor opción
+// posible, aun a sabiendas de que puede seguir siendo <= min.
+function firstValidDefault(): [string, string] {
+  if (!props.min) return ['00', '00']
+  const [mh, mmStr] = props.min.split(':')
+  const mm = Number(mmStr)
+  const laterMinuteSameHour = MINUTES.find((m) => Number(m) > mm)
+  if (laterMinuteSameHour) return [mh, laterMinuteSameHour]
+  const nextHour = HOURS.find((h) => h > mh)
+  return nextHour ? [nextHour, '00'] : [HOURS[HOURS.length - 1], MINUTES[MINUTES.length - 1]]
+}
+
+const [defaultH, defaultM] = props.modelValue ? props.modelValue.split(':') : firstValidDefault()
 const pendingHour = ref(defaultH)
-const pendingMinute = ref(snapMinute(defaultM))
+const pendingMinute = ref(props.modelValue ? snapMinute(defaultM) : defaultM)
 
 function hourId(h: string) { return `${hoursId}-${h}` }
 function minuteId(m: string) { return `${minutesId}-${m}` }
@@ -54,9 +86,15 @@ async function scrollIntoView(id: string) {
 }
 
 async function openField() {
-  const [h, m] = props.modelValue ? props.modelValue.split(':') : ['00', '00']
-  pendingHour.value = h
-  pendingMinute.value = snapMinute(m)
+  if (props.modelValue) {
+    const [h, m] = props.modelValue.split(':')
+    pendingHour.value = h
+    pendingMinute.value = snapMinute(m)
+  } else {
+    const [h, m] = firstValidDefault()
+    pendingHour.value = h
+    pendingMinute.value = m
+  }
   openPanel()
   scrollIntoView(hourId(pendingHour.value))
   scrollIntoView(minuteId(pendingMinute.value))
@@ -72,16 +110,38 @@ function toggleField() {
   else openField()
 }
 
+// roving cíclico que salta las opciones disabled (mismo patrón que
+// BkSelect.moveActive): min puede dejar huecos al principio de las horas o,
+// dentro de la hora mínima, al principio de los minutos
 function moveHour(delta: number) {
-  const idx = HOURS.indexOf(pendingHour.value)
-  pendingHour.value = HOURS[(idx + delta + HOURS.length) % HOURS.length]
+  const enabled = HOURS.filter((h) => !isHourDisabled(h))
+  if (!enabled.length) return
+  const currentIdx = enabled.indexOf(pendingHour.value)
+  const nextIdx = currentIdx === -1 ? (delta > 0 ? 0 : enabled.length - 1) : (currentIdx + delta + enabled.length) % enabled.length
+  pendingHour.value = enabled[nextIdx]
   scrollIntoView(hourId(pendingHour.value))
 }
 
 function moveMinute(delta: number) {
-  const idx = MINUTES.indexOf(pendingMinute.value)
-  pendingMinute.value = MINUTES[(idx + delta + MINUTES.length) % MINUTES.length]
+  const enabled = MINUTES.filter((m) => !isMinuteDisabled(m))
+  if (!enabled.length) return
+  const currentIdx = enabled.indexOf(pendingMinute.value)
+  const nextIdx = currentIdx === -1 ? (delta > 0 ? 0 : enabled.length - 1) : (currentIdx + delta + enabled.length) % enabled.length
+  pendingMinute.value = enabled[nextIdx]
   scrollIntoView(minuteId(pendingMinute.value))
+}
+
+// mismo tratamiento que BkSelect.selectOption: clic sobre una opción disabled
+// no hace nada, en vez de dejar elegir una hora/minuto ya pasado
+function selectHour(h: string) {
+  if (isHourDisabled(h)) return
+  pendingHour.value = h
+  scrollIntoView(hourId(h))
+}
+function selectMinute(m: string) {
+  if (isMinuteDisabled(m)) return
+  pendingMinute.value = m
+  scrollIntoView(minuteId(m))
 }
 
 function apply() {
@@ -103,13 +163,25 @@ function cancel() {
 
 function onColumnKeydown(column: 'hour' | 'minute', event: KeyboardEvent) {
   const move = column === 'hour' ? moveHour : moveMinute
-  const list = column === 'hour' ? HOURS : MINUTES
+  const enabledList = column === 'hour'
+    ? HOURS.filter((h) => !isHourDisabled(h))
+    : MINUTES.filter((m) => !isMinuteDisabled(m))
   const pending = column === 'hour' ? pendingHour : pendingMinute
   switch (event.key) {
     case 'ArrowDown': event.preventDefault(); move(1); break
     case 'ArrowUp': event.preventDefault(); move(-1); break
-    case 'Home': event.preventDefault(); pending.value = list[0]; scrollIntoView(column === 'hour' ? hourId(pending.value) : minuteId(pending.value)); break
-    case 'End': event.preventDefault(); pending.value = list[list.length - 1]; scrollIntoView(column === 'hour' ? hourId(pending.value) : minuteId(pending.value)); break
+    case 'Home':
+      event.preventDefault()
+      if (!enabledList.length) break
+      pending.value = enabledList[0]
+      scrollIntoView(column === 'hour' ? hourId(pending.value) : minuteId(pending.value))
+      break
+    case 'End':
+      event.preventDefault()
+      if (!enabledList.length) break
+      pending.value = enabledList[enabledList.length - 1]
+      scrollIntoView(column === 'hour' ? hourId(pending.value) : minuteId(pending.value))
+      break
     case 'Enter':
     case ' ':
       event.preventDefault()
@@ -134,9 +206,15 @@ function onTriggerKeydown(event: KeyboardEvent) {
 // (poco común, pero p.ej. un reset de formulario), re-anclar lo pendiente
 watch(() => props.modelValue, (value) => {
   if (open.value) return
-  const [h, m] = value ? value.split(':') : ['00', '00']
-  pendingHour.value = h
-  pendingMinute.value = snapMinute(m)
+  if (value) {
+    const [h, m] = value.split(':')
+    pendingHour.value = h
+    pendingMinute.value = snapMinute(m)
+  } else {
+    const [h, m] = firstValidDefault()
+    pendingHour.value = h
+    pendingMinute.value = m
+  }
 })
 </script>
 
@@ -188,9 +266,10 @@ watch(() => props.modelValue, (value) => {
               <li
                 v-for="h in HOURS" :key="h" :id="hourId(h)" role="option"
                 :aria-selected="h === pendingHour ? 'true' : 'false'"
-                class="px-4 py-1.5 text-center text-sm cursor-pointer"
-                :class="h === pendingHour ? 'bg-aurora/15 text-aurora' : 'text-ink'"
-                @click="pendingHour = h; scrollIntoView(hourId(h))"
+                :aria-disabled="isHourDisabled(h) ? 'true' : undefined"
+                class="px-4 py-1.5 text-center text-sm"
+                :class="isHourDisabled(h) ? 'text-ink-faint cursor-not-allowed' : (h === pendingHour ? 'bg-aurora/15 text-aurora cursor-pointer' : 'text-ink cursor-pointer')"
+                @click="selectHour(h)"
               >{{ h }}</li>
             </ul>
             <ul
@@ -205,9 +284,10 @@ watch(() => props.modelValue, (value) => {
               <li
                 v-for="m in MINUTES" :key="m" :id="minuteId(m)" role="option"
                 :aria-selected="m === pendingMinute ? 'true' : 'false'"
-                class="px-4 py-1.5 text-center text-sm cursor-pointer"
-                :class="m === pendingMinute ? 'bg-aurora/15 text-aurora' : 'text-ink'"
-                @click="pendingMinute = m; scrollIntoView(minuteId(m))"
+                :aria-disabled="isMinuteDisabled(m) ? 'true' : undefined"
+                class="px-4 py-1.5 text-center text-sm"
+                :class="isMinuteDisabled(m) ? 'text-ink-faint cursor-not-allowed' : (m === pendingMinute ? 'bg-aurora/15 text-aurora cursor-pointer' : 'text-ink cursor-pointer')"
+                @click="selectMinute(m)"
               >{{ m }}</li>
             </ul>
           </div>

@@ -5,7 +5,7 @@ import { createI18nInstance } from '@/i18n'
 import BkTimeField from '../BkTimeField.vue'
 import BkSheet from '../BkSheet.vue'
 
-function build(props: { modelValue: string | null; hint?: string } = { modelValue: null }) {
+function build(props: { modelValue: string | null; hint?: string; min?: string } = { modelValue: null }) {
   return mount(BkTimeField, {
     props: { label: 'Hora', ...props },
     global: { plugins: [createI18nInstance()] },
@@ -198,6 +198,79 @@ describe('BkTimeField', () => {
 
     expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([null])
     expect(document.querySelector('[role="listbox"]')).toBeNull()
+  })
+
+  describe('min prop (item 1, round 10): disables hours/minutes before a floor time', () => {
+    it('hours before min\'s hour render aria-disabled; min\'s own hour does not', async () => {
+      wrapper = build({ modelValue: '15:00', min: '10:00' })
+      await wrapper.get('[role="combobox"]').trigger('click')
+      await flushPromises()
+
+      const hourList = document.querySelectorAll('[role="listbox"]')[0] as HTMLElement
+      const hour09 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '09')!
+      const hour10 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '10')!
+
+      expect(hour09.getAttribute('aria-disabled')).toBe('true')
+      expect(hour10.getAttribute('aria-disabled')).toBeNull()
+    })
+
+    it('within min\'s own hour, minutes at or before min\'s minute render aria-disabled; later minutes do not', async () => {
+      wrapper = build({ modelValue: '10:00', min: '10:30' })
+      await wrapper.get('[role="combobox"]').trigger('click')
+      await flushPromises()
+
+      const minuteList = document.querySelectorAll('[role="listbox"]')[1] as HTMLElement
+      const minute15 = Array.from(minuteList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '15')!
+      const minute30 = Array.from(minuteList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '30')!
+      const minute35 = Array.from(minuteList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '35')!
+
+      expect(minute15.getAttribute('aria-disabled')).toBe('true')
+      expect(minute30.getAttribute('aria-disabled')).toBe('true')
+      expect(minute35.getAttribute('aria-disabled')).toBeNull()
+    })
+
+    it('clicking a disabled hour option does not change the pending hour', async () => {
+      wrapper = build({ modelValue: '15:00', min: '10:00' })
+      await wrapper.get('[role="combobox"]').trigger('click')
+      await flushPromises()
+
+      const hourList = document.querySelectorAll('[role="listbox"]')[0] as HTMLElement
+      const hour09 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '09')!
+      hour09.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+
+      expect(hourList.getAttribute('aria-activedescendant')).not.toBe(hour09.id)
+    })
+
+    it('ArrowUp keyboard roving on the hours column cycles only among enabled hours, skipping the disabled ones', async () => {
+      wrapper = build({ modelValue: '15:00', min: '10:00' })
+      await wrapper.get('[role="combobox"]').trigger('click')
+      await flushPromises()
+
+      const hourList = document.querySelectorAll('[role="listbox"]')[0] as HTMLElement
+      hourList.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }))
+      await flushPromises()
+      // Home salta a la primera hora HABILITADA (10), no a la 00 real
+      let activeId = hourList.getAttribute('aria-activedescendant')
+      expect(document.getElementById(activeId!)?.textContent).toBe('10')
+
+      hourList.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }))
+      await flushPromises()
+      // desde la primera habilitada, ArrowUp envuelve cíclicamente a la
+      // última habilitada (23), saltándose las horas 00-09 deshabilitadas
+      activeId = hourList.getAttribute('aria-activedescendant')
+      expect(document.getElementById(activeId!)?.textContent).toBe('23')
+    })
+
+    it('without a min prop, no hour or minute options carry aria-disabled', async () => {
+      wrapper = build({ modelValue: '05:00' })
+      await wrapper.get('[role="combobox"]').trigger('click')
+      await flushPromises()
+
+      const [hourList, minuteList] = document.querySelectorAll('[role="listbox"]')
+      expect(hourList.querySelector('[aria-disabled="true"]')).toBeNull()
+      expect(minuteList.querySelector('[aria-disabled="true"]')).toBeNull()
+    })
   })
 
   describe('Escape interplay with BkSheet', () => {
