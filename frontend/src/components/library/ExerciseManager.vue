@@ -43,6 +43,9 @@ const nameEn = ref('')
 const measurement = ref<Measurement>('strength')
 const checkedGroupIds = ref<number[]>([])
 const primaryGroupId = ref<number | null>(null)
+// item 3: solo en creación (igual que measurement arriba) — is_global no es
+// patchable en el backend, así que no tiene sentido mostrarlo al editar
+const isGlobal = ref(false)
 const saving = ref(false)
 
 const deleteConfirmOpen = ref(false)
@@ -73,6 +76,7 @@ function openCreate() {
   measurement.value = 'strength'
   checkedGroupIds.value = []
   primaryGroupId.value = null
+  isGlobal.value = false
   formOpen.value = true
 }
 
@@ -119,6 +123,7 @@ async function submitForm() {
         name_en: nameEn.value,
         measurement: measurement.value,
         muscle_groups,
+        is_global: isGlobal.value,
       })
     }
     formOpen.value = false
@@ -211,6 +216,20 @@ async function confirmDelete() {
           :options="measurementOptions"
           data-testid="exercise-measurement-select"
         />
+        <!-- item 3: global (owner_id null, visible a todos) — solo admin,
+             y solo al crear (no es patchable, mismo criterio que measurement) -->
+        <label
+          v-if="editingId === null && auth.user?.is_admin"
+          class="flex items-center gap-2 cursor-pointer"
+        >
+          <input
+            v-model="isGlobal"
+            type="checkbox"
+            class="rounded border border-line"
+            data-testid="exercise-is-global-checkbox"
+          />
+          <span class="text-sm text-ink-muted">{{ $t('library.isGlobal') }}</span>
+        </label>
 
         <div class="space-y-2">
           <span class="block text-sm text-ink-muted">{{ $t('library.muscleGroups') }}</span>

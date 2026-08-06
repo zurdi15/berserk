@@ -239,6 +239,8 @@ export const createExercise = (body: {
   name_en: string
   measurement: Measurement
   muscle_groups: ExerciseMuscleLink[]
+  // item 3: ejercicio global (owner_id null) — solo un admin puede pedirlo
+  is_global?: boolean
 }) =>
   api<ExerciseOut>('/exercises', { method: 'POST', body })
 

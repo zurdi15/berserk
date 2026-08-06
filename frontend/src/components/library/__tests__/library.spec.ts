@@ -145,7 +145,64 @@ describe('ExerciseManager', () => {
       name_en: 'Arnold press',
       measurement: 'strength',
       muscle_groups: [{ muscle_group_id: 1, is_primary: true }],
+      is_global: false,
     })
+  })
+
+  it('item 3: hides the is_global toggle for a non-admin user', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    setUser({ is_admin: false })
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+    await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(byTestId('exercise-is-global-checkbox').exists()).toBe(false)
+  })
+
+  it('item 3: shows the is_global toggle for an admin user and sends it true when checked', async () => {
+    const { listExercises, listMuscleGroups, createExercise } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    vi.mocked(createExercise).mockResolvedValue({
+      id: 21, name_es: 'X', name_en: 'X', measurement: 'strength', owner_id: null, muscle_groups: [],
+    } as never)
+    setUser({ is_admin: true })
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+    await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(byTestId('exercise-is-global-checkbox').exists()).toBe(true)
+
+    await byTestId('exercise-name-es-field').find('input').setValue('X')
+    await byTestId('exercise-name-en-field').find('input').setValue('X')
+    await byTestId('exercise-is-global-checkbox').setValue(true)
+    await byTestId('save-exercise-btn').trigger('click')
+    await flushPromises()
+
+    expect(createExercise).toHaveBeenCalledWith(expect.objectContaining({ is_global: true }))
+  })
+
+  it('item 3: does not render the is_global toggle when editing (create-only, not patchable)', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    setUser({ is_admin: true })
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="edit-exercise-12"]').trigger('click')
+    await flushPromises()
+
+    expect(byTestId('exercise-is-global-checkbox').exists()).toBe(false)
   })
 
   it('delete click-through opens the confirm sheet and confirming calls deleteExercise', async () => {
