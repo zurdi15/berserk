@@ -377,5 +377,46 @@ describe('WorkoutView', () => {
       expect(domain.setWorkoutMuscleTags).toHaveBeenCalledWith(1, [1])
       expect(wrapper.find('[data-testid="muscle-tag-1"]').attributes('aria-pressed')).toBe('true')
     })
+
+    it('guards concurrent toggles: a second chip click is inert while the first request is in flight, preventing a lost update', async () => {
+      vi.mocked(domain.listMuscleGroups).mockResolvedValue(muscleGroupsFixture as never)
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+
+      // se resetea el mock explícitamente: el conteo de llamadas no se limpia solo
+      // entre tests en este archivo, y esta prueba depende de un conteo exacto
+      let resolveSetTags!: (value: unknown) => void
+      vi.mocked(domain.setWorkoutMuscleTags).mockReset()
+      vi.mocked(domain.setWorkoutMuscleTags).mockImplementation(
+        () => new Promise((resolve) => { resolveSetTags = resolve }) as never,
+      )
+
+      wrapper = mount(WorkoutView, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await flushPromises()
+
+      // primer click: dispara la petición y deja "chest" en vuelo
+      await wrapper.find('[data-testid="muscle-tag-1"]').trigger('click')
+
+      // mientras la primera sigue pendiente, el botón queda con el atributo disabled real
+      expect(wrapper.find('[data-testid="muscle-tag-2"]').attributes('disabled')).toBe('')
+
+      // segundo click, en otro chip, mientras la primera petición sigue sin resolver:
+      // debe quedar inerte (nada de una segunda llamada a la api)
+      await wrapper.find('[data-testid="muscle-tag-2"]').trigger('click')
+
+      resolveSetTags({ ...workoutFixture, muscle_tag_ids: [1] })
+      await flushPromises()
+
+      expect(domain.setWorkoutMuscleTags).toHaveBeenCalledTimes(1)
+      expect(domain.setWorkoutMuscleTags).toHaveBeenCalledWith(1, [1])
+      expect(wrapper.find('[data-testid="muscle-tag-1"]').attributes('aria-pressed')).toBe('true')
+      expect(wrapper.find('[data-testid="muscle-tag-2"]').attributes('aria-pressed')).toBe('false')
+      expect(wrapper.find('[data-testid="muscle-tag-2"]').attributes('disabled')).toBe(undefined)
+    })
   })
 })

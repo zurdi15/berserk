@@ -29,6 +29,7 @@ const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
 const addSheetOpen = ref(false)
 const discardConfirmOpen = ref(false)
+const muscleTagPending = ref(false)
 const finishedWorkout = ref<WorkoutOut | null>(null)
 const sessionRecords = ref<PersonalRecordOut[]>([])
 const now = ref(Date.now())
@@ -130,12 +131,19 @@ function isMuscleTagActive(id: number): boolean {
 }
 
 async function toggleMuscleTag(id: number) {
+  // guarda de vuelo único: dos toggles en paralelo partirían del mismo
+  // muscle_tag_ids "viejo" y el que responda último pisaría al otro
+  // (lost update); mientras haya una petición en curso, los clics son inertes
+  if (muscleTagPending.value) return
   const current = activeWorkout.workout?.muscle_tag_ids ?? []
   const next = current.includes(id) ? current.filter((tagId) => tagId !== id) : [...current, id]
+  muscleTagPending.value = true
   try {
     await activeWorkout.setMuscleTags(next)
   } catch (error) {
     toastApiError(error)
+  } finally {
+    muscleTagPending.value = false
   }
 }
 
@@ -221,9 +229,10 @@ onBeforeUnmount(() => {
             :key="group.id"
             type="button"
             :data-testid="`muscle-tag-${group.id}`"
-            class="bk-press px-3 py-1.5 rounded-sm border text-sm"
+            class="bk-press px-3 py-1.5 rounded-sm border text-sm disabled:opacity-50"
             :class="isMuscleTagActive(group.id) ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
             :aria-pressed="isMuscleTagActive(group.id) ? 'true' : 'false'"
+            :disabled="muscleTagPending"
             @click="toggleMuscleTag(group.id)"
           >
             {{ muscleTagLabel(group) }}
