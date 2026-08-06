@@ -25,15 +25,18 @@ COPY backend/alembic.ini ./
 COPY --from=webbuild /web/dist ./static
 ENV PATH="/app/.venv/bin:$PATH"
 
-ENV BK_DATA_DIR=/data
-VOLUME /data
-EXPOSE 8000
-
 # el proceso no necesita root: correr como usuario dedicado limita el radio
-# de un compromiso del contenedor; /data debe ser suyo para poder escribir la DB
+# de un compromiso del contenedor; /data debe ser suyo para poder escribir la DB.
+# Este bloque va ANTES de declarar VOLUME: el builder legacy (no-BuildKit)
+# descarta cambios hechos en el mismo build sobre un path ya declarado como
+# volumen, así que el chown perdería efecto si VOLUME lo precediera.
 RUN groupadd --system berserk && useradd --system --gid berserk --home-dir /app berserk \
   && mkdir -p /data && chown berserk:berserk /data
 USER berserk
+
+ENV BK_DATA_DIR=/data
+VOLUME /data
+EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1

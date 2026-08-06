@@ -4,6 +4,13 @@ services:
     container_name: berserk
     ports:
       - "8000:8000"
+    # volumen nombrado, no bind mount: docker solo aplica el ownership de
+    # /data de la imagen (usuario berserk) a volúmenes nombrados/anónimos,
+    # nunca a un bind mount de ./data — con bind mount el contenedor no
+    # arranca (uid sin permiso de escritura en la DB)
     volumes:
-      - ./data:/data
+      - berserk-data:/data
     restart: unless-stopped
+
+volumes:
+  berserk-data:
