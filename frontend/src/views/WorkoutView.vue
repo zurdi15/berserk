@@ -27,6 +27,10 @@ const activeWorkout = useActiveWorkoutStore()
 const routines = ref<RoutineOut[]>([])
 const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
+// gatea la lista de "empezar desde rutina" hasta que el catálogo carga: sin
+// esto la lista aparece de golpe ~100ms después de montar, encima del botón
+// de entreno libre — mismo patrón que TodayView. true también en error.
+const catalogReady = ref(false)
 const addSheetOpen = ref(false)
 const discardConfirmOpen = ref(false)
 const muscleTagPending = ref(false)
@@ -79,6 +83,8 @@ async function loadCatalog() {
     muscleGroups.value = muscleGroupsList
   } catch (error) {
     toastApiError(error)
+  } finally {
+    catalogReady.value = true
   }
 }
 
@@ -297,7 +303,7 @@ onBeforeUnmount(() => {
         {{ t('workout.freeWorkout') }}
       </BkButton>
 
-      <div v-if="routines.length" class="space-y-2">
+      <div v-if="catalogReady && routines.length" class="space-y-2">
         <p class="text-sm text-ink-muted">{{ t('workout.startFromRoutine') }}</p>
         <BkButton
           v-for="routine in routines"

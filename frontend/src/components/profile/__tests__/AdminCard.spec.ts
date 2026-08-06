@@ -89,6 +89,48 @@ describe('AdminCard', () => {
     expect(text).toContain('user2')
   })
 
+  it('gates the users table on readiness: neither the table nor "sin usuarios" show while adminListUsers is pending, the table appears once resolved', async () => {
+    const { adminListUsers } = await import('@/api/domain')
+    let resolveUsers: (value: never) => void = () => {}
+    vi.mocked(adminListUsers).mockImplementationOnce(() => new Promise((resolve) => { resolveUsers = resolve }))
+
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('table').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Sin usuarios aún')
+
+    resolveUsers([
+      { id: 1, username: 'admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' },
+    ] as never)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('table').exists()).toBe(true)
+    expect(wrapper.text()).toContain('admin')
+  })
+
+  it('gates the invites list on readiness: neither the list nor "sin invitaciones" show while adminListInvites is pending, the list appears once resolved', async () => {
+    const { adminListInvites } = await import('@/api/domain')
+    let resolveInvites: (value: never) => void = () => {}
+    vi.mocked(adminListInvites).mockImplementationOnce(() => new Promise((resolve) => { resolveInvites = resolve }))
+
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0)) // deja resolver loadUsers (no bloqueado)
+
+    expect(wrapper.find('[data-testid^="invite-row-"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Sin invitaciones aún')
+
+    resolveInvites([
+      { id: 1, created_at: '2026-08-06T10:00:00', expires_at: '2026-08-09T10:00:00', used_at: null },
+    ] as never)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="invite-row-1"]').exists()).toBe(true)
+  })
+
   it('shows the admin star (with its accessible label) for admin users only, no separate column', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()

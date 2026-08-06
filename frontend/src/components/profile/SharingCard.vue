@@ -26,16 +26,25 @@ const grantError = ref('')
 const isLoading = ref(false)
 const revokeConfirmOpen = ref(false)
 const revokeUserId = ref<number | null>(null)
+// gatea las dos listas (given/received) hasta que la carga inicial resuelve:
+// sin esto cada una muestra su mensaje de "nadie" y ~100ms después aparece
+// el contenido real de golpe — mismo patrón que TodayView. true también en
+// error, para no dejar la sección en blanco.
+const ready = ref(false)
 
-onMounted(async () => {
+async function loadSharing() {
   try {
     const sharing = await getSharing()
     givenUsers.value = sharing.given
     receivedUsers.value = sharing.received
   } catch (error) {
     toastApiError(error)
+  } finally {
+    ready.value = true
   }
-})
+}
+
+onMounted(loadSharing)
 
 async function handleGrant() {
   grantError.value = ''
@@ -95,43 +104,47 @@ function handleViewUser(user: UserOut) {
       <!-- Given sharing -->
       <div>
         <h3 class="text-sm font-medium mb-3">{{ $t('profile.sharingGiven') }}</h3>
-        <div v-if="givenUsers.length === 0" class="text-sm text-ink-muted">
-          {{ $t('profile.noSharingGiven') }}
-        </div>
-        <div v-else class="space-y-2">
-          <div v-for="user in givenUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
-            <span>{{ user.username }}</span>
-            <BkButton
-              variant="ghost"
-              size="sm"
-              data-testid="revoke-btn"
-              @click="handleRevoke(user.id)"
-            >
-              {{ $t('common.delete') }}
-            </BkButton>
+        <template v-if="ready">
+          <div v-if="givenUsers.length === 0" class="text-sm text-ink-muted">
+            {{ $t('profile.noSharingGiven') }}
           </div>
-        </div>
+          <div v-else class="space-y-2">
+            <div v-for="user in givenUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
+              <span>{{ user.username }}</span>
+              <BkButton
+                variant="ghost"
+                size="sm"
+                data-testid="revoke-btn"
+                @click="handleRevoke(user.id)"
+              >
+                {{ $t('common.delete') }}
+              </BkButton>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- Received sharing -->
       <div>
         <h3 class="text-sm font-medium mb-3">{{ $t('profile.sharingReceived') }}</h3>
-        <div v-if="receivedUsers.length === 0" class="text-sm text-ink-muted">
-          {{ $t('profile.noSharingReceived') }}
-        </div>
-        <div v-else class="space-y-2">
-          <div v-for="user in receivedUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
-            <span>{{ user.username }}</span>
-            <BkButton
-              variant="ghost"
-              size="sm"
-              data-testid="view-user-btn"
-              @click="handleViewUser(user)"
-            >
-              {{ $t('profile.view') }}
-            </BkButton>
+        <template v-if="ready">
+          <div v-if="receivedUsers.length === 0" class="text-sm text-ink-muted">
+            {{ $t('profile.noSharingReceived') }}
           </div>
-        </div>
+          <div v-else class="space-y-2">
+            <div v-for="user in receivedUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
+              <span>{{ user.username }}</span>
+              <BkButton
+                variant="ghost"
+                size="sm"
+                data-testid="view-user-btn"
+                @click="handleViewUser(user)"
+              >
+                {{ $t('profile.view') }}
+              </BkButton>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- Grant sharing -->

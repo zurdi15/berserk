@@ -78,6 +78,26 @@ describe('WorkoutView', () => {
     expect(startSpy).toHaveBeenCalledWith({ routine_id: 7 })
   })
 
+  it('gates the "start from routine" list on readiness: absent while listRoutines is pending, present once resolved', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+
+    let resolveRoutines: (value: never) => void = () => {}
+    vi.mocked(domain.listRoutines).mockImplementationOnce(() => new Promise((resolve) => { resolveRoutines = resolve }))
+
+    const wrapper = build()
+    await flushPromises()
+
+    // pendiente: el botón de entreno libre sí está, la lista de rutinas no
+    expect(wrapper.find('[data-testid="start-free"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="start-routine-7"]').exists()).toBe(false)
+
+    resolveRoutines(routines as never)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="start-routine-7"]').exists()).toBe(true)
+  })
+
   it('auto-starts from the ?session= query when there is no active workout (start({scheduled_session_id}))', async () => {
     routeQuery.session = '42'
     const activeWorkout = useActiveWorkoutStore()

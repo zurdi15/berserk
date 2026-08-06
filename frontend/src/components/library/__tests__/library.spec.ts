@@ -84,6 +84,27 @@ describe('ExerciseManager', () => {
     expect(wrapper.text()).not.toContain('Press banca')
   })
 
+  it('gates the list on readiness: neither rows nor the empty state show while pending, the loaded rows appear once resolved', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    let resolveExercises: (value: never) => void = () => {}
+    vi.mocked(listExercises).mockImplementationOnce(() => new Promise((resolve) => { resolveExercises = resolve }))
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    // pendiente: ni una fila de ejercicio propio ni el mensaje vacío
+    expect(wrapper.find('[data-testid^="exercise-row-"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Sin ejercicios propios aún')
+
+    resolveExercises([
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="exercise-row-12"]').exists()).toBe(true)
+  })
+
   it('creates an exercise from the form with the checked muscle group marked primary', async () => {
     const { listExercises, listMuscleGroups, createExercise } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([] as never)
@@ -166,6 +187,25 @@ describe('MuscleGroupManager', () => {
     const ownRow = wrapper.find('[data-testid="muscle-group-row-2"]')
     expect(ownRow.find('[data-testid="delete-muscle-group-btn"]').exists()).toBe(true)
     expect(ownRow.find('[data-testid="global-group-badge"]').exists()).toBe(false)
+  })
+
+  it('gates the list on readiness: neither rows nor the empty state show while pending, rows appear once resolved', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    let resolveGroups: (value: never) => void = () => {}
+    vi.mocked(listMuscleGroups).mockImplementationOnce(() => new Promise((resolve) => { resolveGroups = resolve }))
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid^="muscle-group-row-"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Sin grupos musculares propios aún')
+
+    resolveGroups([
+      { id: 2, slug: 'gemelo', name_es: 'Gemelo', name_en: 'Calf', owner_id: 7 },
+    ] as never)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="muscle-group-row-2"]').exists()).toBe(true)
   })
 
   it('creates a muscle group from the form', async () => {

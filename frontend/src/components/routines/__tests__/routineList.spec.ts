@@ -206,4 +206,24 @@ describe('RoutineList', () => {
     const text = wrapper.text()
     expect(text).toContain('Sin rutinas aún')
   })
+
+  it('gates the list on readiness: neither the list nor the empty state show while listRoutines is pending, both possibilities appear once it resolves', async () => {
+    const { listRoutines } = await import('@/api/domain')
+    let resolveList: (value: never) => void = () => {}
+    vi.mocked(listRoutines).mockImplementationOnce(() => new Promise((resolve) => { resolveList = resolve }))
+
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+
+    // pendiente: ni la lista (grid) ni el mensaje vacío deben estar en el DOM
+    expect(wrapper.find('.grid.gap-3').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Sin rutinas aún')
+
+    resolveList([] as never)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await wrapper.vm.$nextTick()
+
+    // resuelto (vacío en este caso): ahora sí aparece el mensaje
+    expect(wrapper.text()).toContain('Sin rutinas aún')
+  })
 })

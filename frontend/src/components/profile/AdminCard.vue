@@ -52,6 +52,13 @@ const isCreatingInvite = ref(false)
 const deleteInviteConfirmOpen = ref(false)
 const deleteInviteId = ref<number | null>(null)
 
+// cada tabla se gatea con su propia bandera (no una compartida): users e
+// invites cargan en paralelo lógico pero secuenciados abajo, y la tabla de
+// usuarios no debería esperar a que termine invites para dejar de estar en
+// blanco — mismo patrón que TodayView, true también en error
+const usersReady = ref(false)
+const invitesReady = ref(false)
+
 onMounted(async () => {
   await loadUsers()
   await loadInvites()
@@ -62,6 +69,8 @@ async function loadUsers() {
     users.value = await adminListUsers()
   } catch (error) {
     toastApiError(error)
+  } finally {
+    usersReady.value = true
   }
 }
 
@@ -70,6 +79,8 @@ async function loadInvites() {
     invites.value = await adminListInvites()
   } catch (error) {
     toastApiError(error)
+  } finally {
+    invitesReady.value = true
   }
 }
 
@@ -220,8 +231,10 @@ function redeemUrl(token: string): string {
       <div class="space-y-4">
         <!-- Users table: botones icon-only en móvil (aria-label), texto de
              vuelta desde sm — objetivo: sin scroll lateral en 390px. El
-             overflow-x-auto queda como red de seguridad, no como caso normal -->
-        <div v-if="users.length > 0" class="overflow-x-auto">
+             overflow-x-auto queda como red de seguridad, no como caso normal.
+             Gateada en usersReady: sin esto, el "sin usuarios" aparece y
+             ~100ms después la tabla real la reemplaza de golpe. -->
+        <div v-if="usersReady && users.length > 0" class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-line">
@@ -275,7 +288,7 @@ function redeemUrl(token: string): string {
           </table>
         </div>
 
-        <div v-else class="text-sm text-ink-muted">
+        <div v-else-if="usersReady" class="text-sm text-ink-muted">
           {{ $t('admin.noUsers') }}
         </div>
 
@@ -323,8 +336,8 @@ function redeemUrl(token: string): string {
           </div>
         </div>
 
-        <!-- Invites list -->
-        <div v-if="invites.length > 0" class="space-y-2 pt-4 border-t border-line">
+        <!-- Invites list: gateada en invitesReady, mismo motivo que la tabla de usuarios -->
+        <div v-if="invitesReady && invites.length > 0" class="space-y-2 pt-4 border-t border-line">
           <h3 class="text-sm font-medium">{{ $t('admin.invites') }}</h3>
           <div class="space-y-2">
             <div
@@ -361,7 +374,7 @@ function redeemUrl(token: string): string {
           </div>
         </div>
 
-        <div v-else class="text-sm text-ink-muted">
+        <div v-else-if="invitesReady" class="text-sm text-ink-muted">
           {{ $t('admin.noInvites') }}
         </div>
       </div>

@@ -32,12 +32,18 @@ const creating = ref(false)
 
 const deleteConfirmOpen = ref(false)
 const deleteId = ref<number | null>(null)
+// gatea lista/vacío hasta que la carga resuelve (mismo patrón que TodayView):
+// sin esto la lista entra vacía y los grupos aparecen de golpe ~100ms
+// después. true también en error, para no dejar la sección en blanco.
+const ready = ref(false)
 
 async function loadGroups() {
   try {
     groups.value = await listMuscleGroups()
   } catch (error) {
     toastApiError(error)
+  } finally {
+    ready.value = true
   }
 }
 
@@ -88,7 +94,7 @@ async function confirmDelete() {
   <div class="space-y-4">
     <BkCard :title="$t('library.muscleGroups')">
       <div class="space-y-4">
-        <div v-if="groups.length > 0" class="space-y-2">
+        <div v-if="ready && groups.length > 0" class="space-y-2">
           <div
             v-for="group in groups"
             :key="group.id"
@@ -113,7 +119,7 @@ async function confirmDelete() {
           </div>
         </div>
 
-        <BkEmpty v-else :message="$t('library.noGroups')" />
+        <BkEmpty v-else-if="ready" :message="$t('library.noGroups')" />
 
         <!-- Formulario de creación (inline, como el alta de usuarios de AdminCard) -->
         <div class="space-y-3 pt-4 border-t border-line">

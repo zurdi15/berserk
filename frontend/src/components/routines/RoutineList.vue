@@ -17,17 +17,20 @@ const { t } = useI18n()
 const routines = ref<RoutineOut[]>([])
 const editorOpen = ref(false)
 const selectedRoutine = ref<RoutineOut | undefined>()
-const loading = ref(false)
 const deleteConfirming = ref<number | null>(null)
+// gatea lista/vacío hasta que la carga resuelve: sin esto la lista entra
+// vacía (BkEmpty) y ~100ms después las rutinas aparecen de golpe encima —
+// mismo patrón que TodayView. true también en error, para no dejar la
+// sección en blanco si la carga falla.
+const ready = ref(false)
 
 async function loadRoutines() {
   try {
-    loading.value = true
     routines.value = await listRoutines()
   } catch (error) {
     toastApiError(error)
   } finally {
-    loading.value = false
+    ready.value = true
   }
 }
 
@@ -71,8 +74,9 @@ onMounted(() => {
       </BkButton>
     </div>
 
-    <!-- Routines List -->
-    <div v-if="routines.length > 0" class="grid gap-3">
+    <!-- Routines List: gateada en ready para no mostrar el vacío y luego
+         reemplazarlo de golpe por la lista real -->
+    <div v-if="ready && routines.length > 0" class="grid gap-3">
       <div
         v-for="routine in routines"
         :key="routine.id"
@@ -132,7 +136,7 @@ onMounted(() => {
     </div>
 
     <!-- Empty State -->
-    <BkEmpty v-else :message="$t('routines.noRoutines')" />
+    <BkEmpty v-else-if="ready" :message="$t('routines.noRoutines')" />
 
     <!-- Editor Sheet -->
     <RoutineEditorSheet
