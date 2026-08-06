@@ -298,12 +298,14 @@ onBeforeUnmount(() => {
       </BkSheet>
     </div>
 
-    <div v-else class="space-y-4">
-      <BkButton variant="primary" block data-testid="start-free" @click="startFree">
+    <!-- item 4: sin bk-stagger propio, esta rama entraba desnuda (nunca tuvo
+         entrada propia — dependía del ahora-eliminado Transition de ShellView) -->
+    <div v-else class="space-y-4 bk-stagger">
+      <BkButton variant="primary" block data-testid="start-free" :style="{ '--bk-stagger-i': 0 }" @click="startFree">
         {{ t('workout.freeWorkout') }}
       </BkButton>
 
-      <div v-if="catalogReady && routines.length" class="space-y-2">
+      <div v-if="catalogReady && routines.length" class="space-y-2" :style="{ '--bk-stagger-i': 1 }">
         <p class="text-sm text-ink-muted">{{ t('workout.startFromRoutine') }}</p>
         <BkButton
           v-for="routine in routines"

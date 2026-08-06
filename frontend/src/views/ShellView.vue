@@ -24,16 +24,20 @@ const activeIndex = computed(() => {
   const idx = items.findIndex((item) => item.name === route.name)
   return idx === -1 ? 0 : idx
 })
+
+// h-dvh (no min-h-dvh) en la raíz de abajo: un tope real de altura es lo que
+// permite que <main> reparta con flex-1 un alto DEFINIDO — sin él, una vista
+// que pida "ocupa el resto del viewport" (progresión, item 3) no tiene
+// contra qué medirse y la página entera crece en vez de scrollear por
+// dentro. El resto de vistas no cambian de comportamiento: su contenido
+// sigue scrolleando igual, solo que ahora el scroll vive en <main> en vez de
+// en el documento. (Nota: este comentario vive en <script>, no como primer
+// hijo de <template> — un comentario HTML ahí convierte la raíz en un
+// fragmento de dos nodos y rompe wrapper.classes()/fallthrough de un solo
+// elemento raíz, ver BkChart.vue.)
 </script>
 
 <template>
-  <!-- h-dvh (no min-h-dvh): un tope real de altura es lo que permite que
-       <main> reparta con flex-1 un alto DEFINIDO — sin él, una vista que
-       pida "ocupa el resto del viewport" (progresión, item 3) no tiene contra
-       qué medirse y la página entera crece en vez de scrollear por dentro.
-       El resto de vistas no cambian de comportamiento: su contenido sigue
-       scrolleando igual, solo que ahora el scroll vive en <main> en vez de
-       en el documento. -->
   <div class="h-dvh flex flex-col">
     <!-- Desktop navbar: barra superior centrada con destinos (identidad por ahora en móvil) -->
     <header class="hidden sm:block border-b border-line">
@@ -119,11 +123,14 @@ const activeIndex = computed(() => {
       </div>
     </nav>
     <main class="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-24 max-w-3xl w-full mx-auto">
-      <RouterView v-slot="{ Component }">
-        <Transition name="bk-rise" mode="out-in">
-          <component :is="Component" />
-        </Transition>
-      </RouterView>
+      <!-- sin Transition aquí a propósito (item 4): esto envolvía la vista
+           ENTERA en un fade bk-rise MIENTRAS su propio bk-stagger interno
+           corría con su propio delay — dos sistemas de animación a la vez,
+           el viewport se veía negro los primeros ~80ms tras navegar porque
+           las opacidades de ambos se multiplican. Cada vista es dueña de su
+           única animación de entrada ahora (bk-stagger/bk-rise propio, o
+           ninguna si no hace falta) — ver auditoría por vista en el informe. -->
+      <RouterView />
     </main>
     <TimerPill />
   </div>

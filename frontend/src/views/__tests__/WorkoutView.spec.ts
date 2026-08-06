@@ -50,6 +50,17 @@ describe('WorkoutView', () => {
     expect(resumeSpy).toHaveBeenCalled()
   })
 
+  it('item 4: the idle (no active workout) state has its own bk-stagger entry, since it no longer gets one from the removed router Transition', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+
+    const wrapper = build()
+    await flushPromises()
+
+    expect(wrapper.find('.bk-stagger').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="start-free"]').exists()).toBe(true)
+  })
+
   it('starts a free workout when clicking the free-workout button (start({}))', async () => {
     const activeWorkout = useActiveWorkoutStore()
     vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)

@@ -11,7 +11,7 @@ import ShellView from '../ShellView.vue'
 // aquí a mano) — necesario para que RouterLink resuelva aria-current y las
 // clases activas de verdad, cosa que un stub de RouterLink no puede dar
 function buildRouter(initialName: string): Router {
-  const stub = { template: '<div />' }
+  const stub = { template: '<div data-testid="routed-view" />' }
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -179,5 +179,28 @@ describe('ShellView active section indicator (item 3)', () => {
     expect(glows).toHaveLength(2)
     expect(glows[0].classes()).toContain('bk-breathe')
     expect(glows[1].classes()).toContain('bk-breathe')
+  })
+
+  it('item 4: RouterView renders the matched view directly, with no bk-rise Transition wrapper around it', async () => {
+    // RouterView SIN stub a propósito: el stub oculta justo lo que hay que
+    // comprobar (si el contenido routeado lleva o no clases de Transition)
+    const router = buildRouter('today')
+    await router.isReady()
+    const wrapper = mount(ShellView, {
+      global: {
+        plugins: [router, createI18nInstance()],
+        stubs: { TimerPill: true, AthleteBanner: true },
+      },
+    })
+    await flushPromises()
+
+    // el bug era exactamente esto: la vista routeada entraba con
+    // bk-rise-enter-active (el Transition del router) MIENTRAS su propio
+    // bk-stagger interno corría con su propio delay — sin el Transition, la
+    // vista routeada no debe llevar ninguna clase de entrada del router
+    const routedView = wrapper.find('[data-testid="routed-view"]')
+    expect(routedView.exists()).toBe(true)
+    expect(routedView.classes()).not.toContain('bk-rise-enter-active')
+    expect(routedView.classes()).not.toContain('bk-rise-enter-from')
   })
 })
