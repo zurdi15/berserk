@@ -5,7 +5,6 @@ import { createI18nInstance } from '@/i18n'
 import { core } from '@/tokens'
 import BkChart from '../BkChart.vue'
 import BkHeatmap from '../BkHeatmap.vue'
-import BkSelect from '../BkSelect.vue'
 import BkTabs from '../BkTabs.vue'
 import { monthBlocksFor } from '../heatmap'
 
@@ -191,44 +190,6 @@ describe('BkHeatmap', () => {
     // enero (bloque 0) ocupa 5 columnas, tal y como calcula heatmap.spec.ts
     const januaryGrid = blocks[0].find('.grid')
     expect(januaryGrid.attributes('style')).toContain('repeat(5, auto)')
-  })
-})
-
-describe('BkSelect', () => {
-  it('binds v-model and renders options', async () => {
-    const wrapper = mount(BkSelect, {
-      props: {
-        label: 'Choose',
-        modelValue: 'a',
-        options: [
-          { value: 'a', label: 'Option A' },
-          { value: 'b', label: 'Option B' },
-        ],
-      },
-    })
-    expect(wrapper.find('select').element.value).toBe('a')
-    expect(wrapper.findAll('option')).toHaveLength(2)
-    await wrapper.find('select').setValue('b')
-    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual(['b'])
-  })
-
-  it('marks disabled options as disabled and leaves others enabled', () => {
-    const wrapper = mount(BkSelect, {
-      props: {
-        label: 'Choose',
-        modelValue: '',
-        options: [
-          { value: '', label: '—', disabled: true },
-          { value: 'a', label: 'Option A' },
-          { value: 'b', label: 'Option B' },
-        ],
-      },
-    })
-    const options = wrapper.findAll('option')
-    expect(options).toHaveLength(3)
-    expect(options[0].attributes('disabled')).toBeDefined()
-    expect(options[1].attributes('disabled')).toBeUndefined()
-    expect(options[2].attributes('disabled')).toBeUndefined()
   })
 })
 

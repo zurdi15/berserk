@@ -67,6 +67,12 @@ export const es = {
     edit: 'Editar',
     confirm: 'Confirmar',
     dismiss: 'Cerrar aviso',
+    filter: 'Filtrar…',
+    noResults: 'Sin resultados',
+    clear: 'Limpiar',
+    apply: 'Aplicar',
+    hours: 'Horas',
+    minutes: 'Minutos',
   },
   athlete: {
     viewing: 'Viendo a {name}',

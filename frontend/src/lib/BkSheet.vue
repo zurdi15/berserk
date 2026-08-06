@@ -1,14 +1,6 @@
-<script lang="ts">
-// pila de sheets abiertos a nivel de módulo: con sheets anidados, un Escape
-// debe cerrar SOLO el de arriba, no toda la pila a la vez. Declarada en un
-// <script> normal (no <script setup>) a propósito: el código de
-// <script setup> se re-ejecuta en cada instancia, así que ahí la pila no se
-// compartiría entre sheets anidados.
-const sheetStack: symbol[] = []
-</script>
-
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import { isTopLayer, popLayer, pushLayer } from './layerStack'
 
 const props = defineProps<{ open: boolean; title?: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -20,15 +12,14 @@ let lastFocused: HTMLElement | null = null
 
 function onKey(event: KeyboardEvent) {
   if (event.key !== 'Escape') return
-  if (sheetStack.at(-1) !== id) return
+  if (!isTopLayer(id)) return
   emit('close')
 }
 
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
-  const idx = sheetStack.indexOf(id)
-  if (idx !== -1) sheetStack.splice(idx, 1)
+  popLayer(id)
 })
 
 // suelo de foco: role=dialog aria-modal no basta si el foco se queda atrás,
@@ -42,13 +33,12 @@ watch(
   () => props.open,
   async (open) => {
     if (open) {
-      sheetStack.push(id)
+      pushLayer(id)
       lastFocused = document.activeElement as HTMLElement | null
       await nextTick()
       panel.value?.focus()
     } else {
-      const idx = sheetStack.indexOf(id)
-      if (idx !== -1) sheetStack.splice(idx, 1)
+      popLayer(id)
       lastFocused?.focus()
       lastFocused = null
     }
