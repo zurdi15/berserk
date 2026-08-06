@@ -373,7 +373,7 @@ describe('WorkoutView', () => {
     })
   })
 
-  describe('item 10 (fix M7): header wraps at narrow viewports instead of overflowing', () => {
+  describe('item 3 (ola de pulido v0.3.0): header carries only date+timer now, wraps at narrow viewports', () => {
     const workoutFixture = {
       id: 1,
       date: '2026-08-06',
@@ -392,19 +392,48 @@ describe('WorkoutView', () => {
       wrapper = null
     })
 
-    it('pins flex-wrap (plus items-center/justify-between/gap-3) on the elapsed+discard+finish row', async () => {
+    function mountLive() {
       const activeWorkout = useActiveWorkoutStore()
       vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
         activeWorkout.workout = workoutFixture as never
       })
+      return build()
+    }
 
-      wrapper = build()
+    // re-apuntado (ronda anterior: el pin cubría fecha+cronómetro+botones en
+    // una sola fila; ahora los botones ya no viven aquí, ver item 3 debajo)
+    it('pins flex-wrap (plus items-center/justify-between/gap-3) on the elapsed+date row', async () => {
+      wrapper = mountLive()
       await flushPromises()
 
       const header = wrapper.get('[data-testid="workout-header"]')
       expect(header.classes()).toEqual(
         expect.arrayContaining(['flex', 'flex-wrap', 'items-center', 'justify-between', 'gap-3']),
       )
+    })
+
+    it('the header shows only the elapsed timer and the date — no discard/finish buttons in it', async () => {
+      wrapper = mountLive()
+      await flushPromises()
+
+      const header = wrapper.get('[data-testid="workout-header"]')
+      expect(header.find('[data-testid="elapsed"]').exists()).toBe(true)
+      expect(header.find('[data-testid="workout-date"]').exists()).toBe(true)
+      expect(header.find('[data-testid="discard-workout"]').exists()).toBe(false)
+    })
+
+    it('discard/finish now live at the bottom of the workout content, after a divider, below "Añadir ejercicio"', async () => {
+      wrapper = mountLive()
+      await flushPromises()
+
+      const actions = wrapper.get('[data-testid="workout-actions"]')
+      expect(actions.classes()).toEqual(expect.arrayContaining(['border-t', 'border-line']))
+      expect(actions.find('[data-testid="discard-workout"]').exists()).toBe(true)
+      expect(actions.text()).toContain('Terminar')
+
+      // orden real en el DOM: "Añadir ejercicio" antes que el bloque de acciones
+      const html = wrapper.html()
+      expect(html.indexOf('Añadir ejercicio')).toBeLessThan(html.indexOf('data-testid="workout-actions"'))
     })
   })
 
