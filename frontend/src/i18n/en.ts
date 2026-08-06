@@ -85,6 +85,8 @@ export const en = {
     notifyTitle: 'Rest over',
     notifyBody: 'Tap to get back to your workout.',
     notifyBodyWithExercise: 'Tap to get back to {exercise}.',
+    autoRest: 'Auto rest',
+    cancelRest: 'Cancel rest',
   },
   profile: {
     tab: 'Profile',

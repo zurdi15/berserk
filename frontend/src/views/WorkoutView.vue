@@ -10,6 +10,8 @@ import { parseUtc } from '@/utils/datetime'
 import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
+import { useRestTimerStore } from '@/stores/restTimer'
+import { getRestAutoEnabled, setRestAutoEnabled } from '@/utils/uiPrefs'
 import AddExerciseSheet from '@/components/workout/AddExerciseSheet.vue'
 import FinishSummary from '@/components/workout/FinishSummary.vue'
 import NeonPulse from '@/components/workout/NeonPulse.vue'
@@ -25,6 +27,19 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const activeWorkout = useActiveWorkoutStore()
+const restTimer = useRestTimerStore()
+
+// item 4 (post-0.3.0): opt-out de descanso automático, pref de cliente
+// (localStorage, ver uiPrefs.ts) — WorkoutExerciseCard.restEnabled combina
+// esta preferencia con la señal intrínseca de la vista (aquí siempre true:
+// esto es el entreno EN VIVO; el editor retroactivo pasa false aparte y no
+// pregunta esta preferencia)
+const restAutoEnabled = ref(getRestAutoEnabled())
+
+function toggleRestAuto() {
+  restAutoEnabled.value = !restAutoEnabled.value
+  setRestAutoEnabled(restAutoEnabled.value)
+}
 
 const routines = ref<RoutineOut[]>([])
 const exercises = ref<ExerciseOut[]>([])
@@ -241,10 +256,43 @@ onBeforeUnmount(() => {
         :style="{ '--bk-stagger-i': 0 }"
       >
         <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
+        <!-- item 4 (post-0.3.0): chip compacto de cancelar descanso — zurdi a
+             veces cronometra con su reloj y quiere poder cortar el countdown
+             sin esperar. Vive AQUÍ (solo /workout), no en el CTA del shell
+             (ese sigue navegando al tocarlo, nunca cancela) -->
+        <div v-if="restTimer.active" class="flex items-center gap-2" data-testid="rest-cancel-chip">
+          <span class="bk-metric text-sm text-aurora">{{ restTimer.label }}</span>
+          <button
+            type="button"
+            data-testid="cancel-rest"
+            :aria-label="t('timer.cancelRest')"
+            class="bk-press w-6 h-6 flex items-center justify-center rounded-full border border-aurora text-aurora text-xs"
+            @click="restTimer.clear()"
+          >
+            ✕
+          </button>
+        </div>
         <p class="text-sm text-ink-muted capitalize" data-testid="workout-date">{{ dateLabel }}</p>
       </div>
 
-      <div v-if="derivedMuscleGroups.length" class="bk-slab p-4 space-y-2" :style="{ '--bk-stagger-i': 1 }">
+      <!-- item 4 (post-0.3.0): opt-out de descanso automático — mismo idiom
+           visual que el toggle de calentamiento de SetForm (borde+aria-pressed,
+           sin cambiar de texto entre estados) -->
+      <div class="flex items-center justify-between" :style="{ '--bk-stagger-i': 1 }">
+        <span class="text-sm text-ink-muted">{{ t('timer.autoRest') }}</span>
+        <button
+          type="button"
+          data-testid="rest-auto-toggle"
+          class="bk-press px-3 py-1.5 rounded-sm border text-sm"
+          :class="restAutoEnabled ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+          :aria-pressed="restAutoEnabled ? 'true' : 'false'"
+          @click="toggleRestAuto"
+        >
+          {{ t('timer.autoRest') }}
+        </button>
+      </div>
+
+      <div v-if="derivedMuscleGroups.length" class="bk-slab p-4 space-y-2" :style="{ '--bk-stagger-i': 2 }">
         <p class="text-sm text-ink-muted">{{ t('workout.muscleTags') }}</p>
         <div class="flex flex-wrap gap-2">
           <span
@@ -261,7 +309,7 @@ onBeforeUnmount(() => {
       <WorkoutExerciseCard
         v-for="(we, i) in activeWorkout.workout.exercises"
         :key="we.id"
-        :style="{ '--bk-stagger-i': i + 2 }"
+        :style="{ '--bk-stagger-i': i + 3 }"
         :workout-exercise="we"
         :exercise="exerciseMap.get(we.exercise_id)"
         :muscle-groups="muscleGroups"
@@ -271,6 +319,7 @@ onBeforeUnmount(() => {
         :units="units"
         :locale="locale"
         :actions="activeWorkout"
+        :rest-enabled="restAutoEnabled"
         @recorded="onRecorded"
         @logged="onLogged"
       />
@@ -278,7 +327,7 @@ onBeforeUnmount(() => {
       <BkButton
         variant="ghost"
         block
-        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 2 }"
+        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 3 }"
         @click="addSheetOpen = true"
       >
         {{ t('workout.addExercise') }}
@@ -294,7 +343,7 @@ onBeforeUnmount(() => {
       <div
         class="border-t border-line pt-4 flex flex-wrap items-center gap-2"
         data-testid="workout-actions"
-        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 3 }"
+        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 4 }"
       >
         <BkButton
           variant="danger"

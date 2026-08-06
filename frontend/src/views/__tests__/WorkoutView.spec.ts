@@ -33,6 +33,7 @@ import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
+import { useRestTimerStore } from '@/stores/restTimer'
 import WorkoutView from '../WorkoutView.vue'
 
 function build() {
@@ -695,6 +696,120 @@ describe('WorkoutView', () => {
 
       expect(domain.logSet).toHaveBeenCalledTimes(1)
       expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
+    })
+  })
+
+  describe('item 4 (post-0.3.0): rest timer cancel chip + auto-rest opt-out', () => {
+    const exerciseFixture = {
+      id: 5,
+      name_es: 'Press banca',
+      name_en: 'Bench press',
+      measurement: 'strength' as const,
+      owner_id: null,
+      muscle_groups: [],
+    }
+    const workoutFixture = {
+      id: 1,
+      date: '2026-08-06',
+      started_at: '2026-08-06T09:00:00Z',
+      ended_at: null,
+      routine_id: null,
+      note: null,
+      feeling: null,
+      exercises: [{ id: 20, exercise_id: 5, position: 0, note: null, rest_seconds: null, sets: [] }],
+      muscle_tag_ids: [],
+    }
+
+    let wrapper: VueWrapper | null = null
+
+    beforeEach(() => {
+      vi.mocked(domain.listExercises).mockResolvedValue([exerciseFixture] as never)
+      vi.mocked(domain.getWorkout).mockResolvedValue(workoutFixture as never)
+      vi.mocked(domain.logSet).mockClear()
+      vi.mocked(domain.logSet).mockResolvedValue({
+        set: { id: 101, set_number: 1, reps: 8, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+        new_records: [],
+      } as never)
+    })
+
+    afterEach(() => {
+      wrapper?.unmount()
+      wrapper = null
+      document.body.innerHTML = ''
+      vi.unstubAllGlobals()
+    })
+
+    function mountLive() {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+      return mount(WorkoutView, { global: { plugins: [createI18nInstance()] }, attachTo: document.body })
+    }
+
+    async function logASet(w: VueWrapper) {
+      await w.find('[data-testid="add-set-20"]').trigger('click')
+      await flushPromises()
+      const form = new DOMWrapper(document.body.querySelector('form') as Element)
+      await form.trigger('submit')
+      await flushPromises()
+    }
+
+    it('logging a set with auto-rest ON shows the cancel chip, and tapping ✕ clears the timer (DOM-real, not a direct store poke)', async () => {
+      wrapper = mountLive()
+      await flushPromises()
+      const restTimer = useRestTimerStore()
+
+      await logASet(wrapper)
+
+      expect(restTimer.active).toBe(true)
+      const chip = document.body.querySelector('[data-testid="rest-cancel-chip"]')
+      expect(chip).not.toBeNull()
+
+      const cancelBtn = document.body.querySelector('[data-testid="cancel-rest"]') as HTMLElement
+      cancelBtn.click()
+      await flushPromises()
+
+      expect(restTimer.active).toBe(false)
+      expect(document.body.querySelector('[data-testid="rest-cancel-chip"]')).toBeNull()
+    })
+
+    it('tapping the auto-rest toggle off, then logging a set, starts NO timer', async () => {
+      wrapper = mountLive()
+      await flushPromises()
+      const restTimer = useRestTimerStore()
+
+      const toggle = wrapper.get('[data-testid="rest-auto-toggle"]')
+      expect(toggle.attributes('aria-pressed')).toBe('true')
+      await toggle.trigger('click')
+      expect(toggle.attributes('aria-pressed')).toBe('false')
+
+      await logASet(wrapper)
+
+      expect(domain.logSet).toHaveBeenCalled()
+      expect(restTimer.active).toBe(false)
+      expect(document.body.querySelector('[data-testid="rest-cancel-chip"]')).toBeNull()
+    })
+
+    it('the auto-rest preference persists to localStorage and is restored on the next mount', async () => {
+      const store = new Map<string, string>()
+      vi.stubGlobal('localStorage', {
+        getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+        setItem: (key: string, value: string) => { store.set(key, value) },
+      })
+
+      wrapper = mountLive()
+      await flushPromises()
+
+      await wrapper.get('[data-testid="rest-auto-toggle"]').trigger('click')
+      expect(store.get('berserk:rest-auto-enabled')).toBe('false')
+
+      // "recarga": un montaje nuevo, mismo backing store — debe arrancar ya en OFF
+      wrapper.unmount()
+      wrapper = mountLive()
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="rest-auto-toggle"]').attributes('aria-pressed')).toBe('false')
     })
   })
 })

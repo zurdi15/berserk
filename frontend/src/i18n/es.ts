@@ -85,6 +85,8 @@ export const es = {
     notifyTitle: 'Descanso terminado',
     notifyBody: 'Toca para volver al entreno.',
     notifyBodyWithExercise: 'Toca para volver a {exercise}.',
+    autoRest: 'Descanso automático',
+    cancelRest: 'Cancelar descanso',
   },
   profile: {
     tab: 'Perfil',
