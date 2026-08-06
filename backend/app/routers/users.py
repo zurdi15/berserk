@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser
 from ..db import get_db
+from ..models import User
 from ..schemas.auth import UserOut
-from ..schemas.users import SettingsIn
+from ..schemas.users import SettingsIn, UserDirectoryOut
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -20,3 +22,16 @@ def update_settings(payload: SettingsIn, user: CurrentUser, db: Session = Depend
         setattr(user, field, value)
     db.commit()
     return user
+
+
+@router.get("/directory", response_model=list[UserDirectoryOut])
+def list_directory(user: CurrentUser, db: Session = Depends(get_db)):
+    """item 11: picker de "conceder acceso" — una instancia self-hosted
+    pequeña no necesita ocultar quién más existe (a diferencia de sharing,
+    que sí exige un grant previo para leer datos), así que esto NO es
+    admin-only, solo autenticado. Se excluye a uno mismo (no tiene sentido
+    concederse acceso) y NUNCA se filtra is_admin/locale/timezone."""
+    users = db.scalars(
+        select(User).where(User.id != user.id).order_by(User.username)
+    ).all()
+    return users

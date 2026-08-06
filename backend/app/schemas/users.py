@@ -73,3 +73,16 @@ class GrantIn(BaseModel):
 class SharingOut(BaseModel):
     given: list[UserOut]
     received: list[UserOut]
+
+
+class UserDirectoryOut(BaseModel):
+    """item 11: ficha mínima del picker de "conceder acceso" — instancia
+    self-hosted pequeña, cualquier usuario autenticado puede ver este listado
+    de los demás. A propósito NO reutiliza UserOut: nunca debe filtrar
+    is_admin/locale/units/timezone, solo lo que el picker necesita pintar."""
+
+    id: int
+    username: str
+    color: str | None
+
+    model_config = {"from_attributes": True}

@@ -116,6 +116,36 @@ def test_settings_reject_hex_without_hash(client: TestClient):
     assert resp.status_code == 422
 
 
+def test_directory_requires_auth(anon: TestClient):
+    # item 11: autenticado sí, admin-only NO — pero sigue exigiendo sesión
+    assert anon.get("/api/v1/users/directory").status_code == 401
+
+
+def test_directory_excludes_self_and_lists_others(client: TestClient, app):
+    # el picker de "conceder acceso" es de una instancia self-hosted
+    # pequeña: cualquier usuario ve a los demás, nunca a sí mismo
+    make_user(client, "freyja")
+    make_user(client, "loki")
+    me = client.get("/api/v1/auth/me").json()
+
+    directory = client.get("/api/v1/users/directory").json()
+    usernames = {u["username"] for u in directory}
+    assert usernames == {"freyja", "loki"}
+    assert all(u["id"] != me["id"] for u in directory)
+
+    freyja = login(app, "freyja")
+    freyja_directory = freyja.get("/api/v1/users/directory").json()
+    assert {u["username"] for u in freyja_directory} == {me["username"], "loki"}
+
+
+def test_directory_only_exposes_minimal_fields(client: TestClient):
+    # nunca debe filtrar is_admin/locale/units/timezone — solo lo que el
+    # picker necesita pintar (ver schemas.users.UserDirectoryOut)
+    make_user(client, "freyja")
+    entry = client.get("/api/v1/users/directory").json()[0]
+    assert set(entry.keys()) == {"id", "username", "color"}
+
+
 def test_settings_color_explicit_null_clears_it(client: TestClient):
     # a diferencia de locale/units/timezone, color sí acepta null explícito:
     # es la forma de volver al aurora del tema por defecto
