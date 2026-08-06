@@ -10,6 +10,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useWorkoutEditorStore } from '@/stores/workoutEditor'
 import AddExerciseSheet from '@/components/workout/AddExerciseSheet.vue'
+import NeonPulse from '@/components/workout/NeonPulse.vue'
+import SaveAsRoutineSheet from '@/components/workout/SaveAsRoutineSheet.vue'
 import WorkoutExerciseCard from '@/components/workout/WorkoutExerciseCard.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkDateField from '@/lib/BkDateField.vue'
@@ -26,8 +28,12 @@ const workoutEditor = useWorkoutEditorStore()
 const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
 const addSheetOpen = ref(false)
-const muscleTagPending = ref(false)
+const saveAsRoutineOpen = ref(false)
 const note = ref('')
+// item 9: mismo pulso que WorkoutView, disparado en CUALQUIER logueo exitoso
+// (aquí nunca compite con una celebración de PR: ver onRecorded, que solo
+// lanza un toast discreto — la corrección retroactiva de historial no celebra)
+const neonPulse = ref(false)
 let noteTimeout: ReturnType<typeof setTimeout> | null = null
 
 const units = computed(() => ((auth.user?.units as 'kg' | 'lb') || 'kg'))
@@ -68,6 +74,16 @@ async function pickFeeling(value: number) {
   }
 }
 
+async function toggleStretched() {
+  if (!workoutEditor.workout) return
+  const next = !workoutEditor.workout.stretched
+  try {
+    await workoutEditor.patch({ stretched: next })
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
 async function saveNote() {
   try {
     await workoutEditor.patch({ note: note.value || null })
@@ -82,25 +98,11 @@ watch(note, () => {
   noteTimeout = setTimeout(saveNote, 600)
 })
 
-function isMuscleTagActive(id: number): boolean {
-  return workoutEditor.workout?.muscle_tag_ids.includes(id) ?? false
-}
-
-async function toggleMuscleTag(id: number) {
-  // mismo guard de vuelo único que WorkoutView: dos toggles en paralelo
-  // partirían del mismo muscle_tag_ids "viejo" y perderían una actualización
-  if (muscleTagPending.value) return
-  const current = workoutEditor.workout?.muscle_tag_ids ?? []
-  const next = current.includes(id) ? current.filter((tagId) => tagId !== id) : [...current, id]
-  muscleTagPending.value = true
-  try {
-    await workoutEditor.setMuscleTags(next)
-  } catch (error) {
-    toastApiError(error)
-  } finally {
-    muscleTagPending.value = false
-  }
-}
+// item 4: derivados de los ejercicios del entreno, de solo lectura (ver
+// WorkoutView.vue, mismo criterio) — ya no hay editor manual de tags
+const derivedMuscleGroups = computed(() =>
+  muscleGroups.value.filter((g) => workoutEditor.workout?.muscle_tag_ids.includes(g.id)),
+)
 
 // un PR recalculado al corregir historial no se celebra con BkCelebration
 // (esa fanfarria es solo para el registro EN VIVO, ver WorkoutView.vue) —
@@ -109,6 +111,12 @@ async function toggleMuscleTag(id: number) {
 function onRecorded(records: PersonalRecordOut[]) {
   if (!records.length) return
   toast.push('ember', t('workout.retroPrs', { n: records.length }))
+}
+
+// item 9: aquí SIEMPRE dispara (nunca hay celebración de PR con la que
+// competir en este editor retroactivo, ver onRecorded arriba)
+function onLogged() {
+  neonPulse.value = true
 }
 
 async function loadWorkout() {
@@ -130,41 +138,48 @@ onMounted(() => {
 
 <template>
   <div v-if="workoutEditor.workout" class="space-y-4 bk-stagger">
-    <div class="flex items-center gap-2" :style="{ '--bk-stagger-i': 0 }">
-      <button
-        type="button"
-        data-testid="back-to-calendar"
-        class="bk-press w-8 h-8 shrink-0 text-ink-muted hover:text-ink"
-        :aria-label="t('workout.backToCalendar')"
-        @click="router.push({ name: 'calendar' })"
+    <NeonPulse :show="neonPulse" @done="neonPulse = false" />
+
+    <div class="flex items-center justify-between gap-2" :style="{ '--bk-stagger-i': 0 }">
+      <div class="flex items-center gap-2 min-w-0">
+        <button
+          type="button"
+          data-testid="back-to-calendar"
+          class="bk-press w-8 h-8 shrink-0 text-ink-muted hover:text-ink"
+          :aria-label="t('workout.backToCalendar')"
+          @click="router.push({ name: 'calendar' })"
+        >
+          <span aria-hidden="true">‹</span>
+        </button>
+        <h1 class="font-display font-semibold uppercase tracking-wider text-sm text-ink truncate">
+          {{ t('workout.editTitle') }}
+        </h1>
+      </div>
+      <BkButton
+        variant="ghost"
+        size="sm"
+        data-testid="save-as-routine-btn"
+        @click="saveAsRoutineOpen = true"
       >
-        <span aria-hidden="true">‹</span>
-      </button>
-      <h1 class="font-display font-semibold uppercase tracking-wider text-sm text-ink">
-        {{ t('workout.editTitle') }}
-      </h1>
+        {{ t('workout.saveAsRoutine') }}
+      </BkButton>
     </div>
 
     <div class="bk-slab p-4" :style="{ '--bk-stagger-i': 1 }">
       <BkDateField v-model="dateModel" :label="t('calendar.date')" />
     </div>
 
-    <div v-if="muscleGroups.length" class="bk-slab p-4 space-y-2" :style="{ '--bk-stagger-i': 2 }">
+    <div v-if="derivedMuscleGroups.length" class="bk-slab p-4 space-y-2" :style="{ '--bk-stagger-i': 2 }">
       <p class="text-sm text-ink-muted">{{ t('workout.muscleTags') }}</p>
       <div class="flex flex-wrap gap-2">
-        <button
-          v-for="group in muscleGroups"
+        <span
+          v-for="group in derivedMuscleGroups"
           :key="group.id"
-          type="button"
           :data-testid="`muscle-tag-${group.id}`"
-          class="bk-press px-3 py-1.5 rounded-sm border text-sm disabled:opacity-50"
-          :class="isMuscleTagActive(group.id) ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
-          :aria-pressed="isMuscleTagActive(group.id) ? 'true' : 'false'"
-          :disabled="muscleTagPending"
-          @click="toggleMuscleTag(group.id)"
+          class="px-3 py-1.5 rounded-sm border border-line text-sm text-ink-muted"
         >
           {{ locale === 'es' ? group.name_es : group.name_en }}
-        </button>
+        </span>
       </div>
     </div>
 
@@ -181,6 +196,7 @@ onMounted(() => {
       :actions="workoutEditor"
       :rest-enabled="false"
       @recorded="onRecorded"
+      @logged="onLogged"
     />
 
     <BkButton
@@ -211,6 +227,28 @@ onMounted(() => {
         </button>
       </div>
       <BkField v-model="note" :label="t('workout.note')" />
+
+      <button
+        type="button"
+        data-testid="stretched-toggle"
+        class="bk-press flex items-center gap-2 text-sm"
+        :class="workoutEditor.workout.stretched ? 'text-aurora' : 'text-ink-muted'"
+        :aria-pressed="workoutEditor.workout.stretched ? 'true' : 'false'"
+        @click="toggleStretched"
+      >
+        <span
+          class="w-4 h-4 rounded-xs border shrink-0"
+          :class="workoutEditor.workout.stretched ? 'border-aurora bg-aurora/20' : 'border-line'"
+          aria-hidden="true"
+        />
+        {{ t('workout.stretched') }}
+      </button>
     </div>
+
+    <SaveAsRoutineSheet
+      :open="saveAsRoutineOpen"
+      :workout="workoutEditor.workout"
+      @close="saveAsRoutineOpen = false"
+    />
   </div>
 </template>

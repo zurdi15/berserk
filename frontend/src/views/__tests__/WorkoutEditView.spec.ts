@@ -1,4 +1,4 @@
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -31,8 +31,11 @@ vi.mock('@/api/domain', () => ({
   addWorkoutExercise: vi.fn(),
   removeWorkoutExercise: vi.fn(),
   reorderWorkoutExercises: vi.fn(),
-  setWorkoutMuscleTags: vi.fn(),
+  updateWorkoutExercise: vi.fn(),
+  getExerciseHistory: vi.fn(async () => null),
   updateWorkout: vi.fn(),
+  createRoutine: vi.fn(),
+  replaceRoutineExercises: vi.fn(),
 }))
 
 import * as domain from '@/api/domain'
@@ -49,7 +52,8 @@ const workoutFixture = {
   routine_id: null,
   note: null,
   feeling: null,
-  exercises: [{ id: 20, exercise_id: 5, position: 0, note: null, sets: [] }],
+  stretched: false,
+  exercises: [{ id: 20, exercise_id: 5, position: 0, note: null, rest_seconds: null, sets: [] }],
   muscle_tag_ids: [],
 }
 
@@ -60,6 +64,16 @@ function build() {
   })
 }
 
+// BkSheet (el cajón de SetForm, ver WorkoutExerciseCard) teletransporta a
+// document.body: hay que abrirlo con un click real y buscar el form ahí
+async function openDrawerAndGetForm(wrapper: VueWrapper): Promise<DOMWrapper<HTMLFormElement>> {
+  await wrapper.find('[data-testid="add-set-20"]').trigger('click')
+  await flushPromises()
+  const form = document.body.querySelector('form')
+  expect(form).not.toBeNull()
+  return new DOMWrapper(form as HTMLFormElement)
+}
+
 describe('WorkoutEditView', () => {
   let wrapper: VueWrapper | null = null
 
@@ -68,11 +82,13 @@ describe('WorkoutEditView', () => {
     push.mockClear()
     routeParams.id = '4'
     vi.mocked(domain.getWorkout).mockResolvedValue(workoutFixture as never)
+    vi.mocked(domain.getExerciseHistory).mockResolvedValue(null as never)
   })
 
   afterEach(() => {
     wrapper?.unmount()
     wrapper = null
+    document.body.innerHTML = ''
   })
 
   it('loads the workout by the :id route param on mount', async () => {
@@ -83,7 +99,7 @@ describe('WorkoutEditView', () => {
     expect(wrapper.text()).toContain('Press banca')
   })
 
-  it('logs a set through workoutEditor.logSet with the full SetIn payload via a real submit', async () => {
+  it('logs a set through workoutEditor.logSet with the full SetIn payload via the drawer', async () => {
     vi.mocked(domain.logSet).mockResolvedValue({
       set: { id: 101, set_number: 1, reps: 8, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
       new_records: [],
@@ -91,8 +107,9 @@ describe('WorkoutEditView', () => {
 
     wrapper = build()
     await flushPromises()
+    const form = await openDrawerAndGetForm(wrapper)
 
-    await wrapper.find('form').trigger('submit')
+    await form.trigger('submit')
     await flushPromises()
 
     expect(domain.logSet).toHaveBeenCalledWith(
@@ -116,7 +133,8 @@ describe('WorkoutEditView', () => {
     await flushPromises()
     expect(wrapper.findComponent({ name: 'BkCelebration' }).exists()).toBe(false)
 
-    await wrapper.find('form').trigger('submit')
+    const form = await openDrawerAndGetForm(wrapper)
+    await form.trigger('submit')
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'BkCelebration' }).exists()).toBe(false)
@@ -132,11 +150,30 @@ describe('WorkoutEditView', () => {
 
     wrapper = build()
     await flushPromises()
+    const form = await openDrawerAndGetForm(wrapper)
 
-    await wrapper.find('form').trigger('submit')
+    await form.trigger('submit')
     await flushPromises()
 
     expect(toast.toasts).toHaveLength(0)
+  })
+
+  it('item 9: shows the neon pulse on a successful log (no PR celebration ever competes here)', async () => {
+    vi.mocked(domain.logSet).mockResolvedValue({
+      set: { id: 101, set_number: 1, reps: 8, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+      new_records: [],
+    } as never)
+
+    wrapper = build()
+    await flushPromises()
+    const form = await openDrawerAndGetForm(wrapper)
+
+    expect(document.body.querySelector('[data-testid="neon-pulse"]')).toBeNull()
+
+    await form.trigger('submit')
+    await flushPromises()
+
+    expect(document.body.querySelector('[data-testid="neon-pulse"]')).not.toBeNull()
   })
 
   it('edits the workout date through BkDateField, calling workoutEditor.patch', async () => {
@@ -166,5 +203,58 @@ describe('WorkoutEditView', () => {
     await flushPromises()
 
     expect(push).toHaveBeenCalledWith({ name: 'calendar' })
+  })
+
+  describe('item 4: derived muscle groups are read-only', () => {
+    it('renders the group as a span, not an interactive button, from muscle_tag_ids', async () => {
+      vi.mocked(domain.getWorkout).mockResolvedValue({ ...workoutFixture, muscle_tag_ids: [1] } as never)
+
+      wrapper = build()
+      await flushPromises()
+
+      const tag = wrapper.get('[data-testid="muscle-tag-1"]')
+      expect(tag.element.tagName).toBe('SPAN')
+      expect(tag.text()).toBe('Pecho')
+    })
+
+    it('renders nothing when muscle_tag_ids is empty', async () => {
+      wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid^="muscle-tag-"]').exists()).toBe(false)
+    })
+  })
+
+  describe('item 8: stretched toggle', () => {
+    it('toggles via workoutEditor.patch', async () => {
+      vi.mocked(domain.updateWorkout).mockResolvedValue({ ...workoutFixture, stretched: true } as never)
+
+      wrapper = build()
+      await flushPromises()
+
+      const toggle = wrapper.get('[data-testid="stretched-toggle"]')
+      expect(toggle.attributes('aria-pressed')).toBe('false')
+
+      await toggle.trigger('click')
+      await flushPromises()
+
+      expect(domain.updateWorkout).toHaveBeenCalledWith(4, { stretched: true })
+      expect(toggle.attributes('aria-pressed')).toBe('true')
+    })
+  })
+
+  describe('item 5: save as routine', () => {
+    it('the header trigger opens SaveAsRoutineSheet with the loaded workout', async () => {
+      wrapper = build()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="save-as-routine-btn"]').trigger('click')
+      await flushPromises()
+
+      const sheet = document.body.querySelector('[data-testid="save-as-routine-sheet"]')
+      expect(sheet).not.toBeNull()
+      const input = sheet?.querySelector('input') as HTMLInputElement
+      expect(input.value).toBe('Entreno 2026-07-20')
+    })
   })
 })
