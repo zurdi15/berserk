@@ -89,14 +89,22 @@ describe('AdminCard', () => {
     expect(text).toContain('user2')
   })
 
-  it('shows admin badge for admin users only', async () => {
+  it('shows the admin dot (with its accessible label) for admin users only, no separate column', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
 
+    // sin columna "Administrador": la tabla solo tiene usuario + acciones (sr-only)
+    const headers = wrapper.findAll('th')
+    expect(headers).toHaveLength(2)
+    expect(wrapper.find('thead').text()).not.toContain('Administrador')
+
     const adminRow = wrapper.find('[data-testid="user-row-1"]')
     const badgeInAdminRow = adminRow.find('[data-testid="admin-badge"]')
     expect(badgeInAdminRow.exists()).toBe(true)
+    expect(badgeInAdminRow.classes()).toContain('bg-aurora')
+    expect(badgeInAdminRow.classes()).toContain('rounded-full')
+    expect(badgeInAdminRow.text()).toBe('Administrador') // sr-only, mismo texto que admin.isAdmin
 
     const nonAdminRow = wrapper.find('[data-testid="user-row-2"]')
     const badgeInNonAdminRow = nonAdminRow.find('[data-testid="admin-badge"]')
