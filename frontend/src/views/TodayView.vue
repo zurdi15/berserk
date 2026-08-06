@@ -19,6 +19,13 @@ const workouts = ref<WorkoutOut[]>([])
 const records = ref<PersonalRecordOut[]>([])
 const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
+// gatea el montaje de las cards a datos ya resueltos: sin esto, las cards
+// entran con el estado vacío (streak 0, tono ink) y ~100ms después load()
+// las repinta de golpe — un doble-render visible. Con v-if="ready" solo
+// entran una vez con su color/valor final, y el roll de useAnimatedNumber
+// arranca ya sobre ese valor. true también en error (finally) para no dejar
+// la vista en blanco si la carga falla.
+const ready = ref(false)
 
 async function load() {
   try {
@@ -54,6 +61,8 @@ async function load() {
     muscleGroups.value = muscleGroupsList
   } catch (error) {
     toastApiError(error)
+  } finally {
+    ready.value = true
   }
 }
 
@@ -64,7 +73,7 @@ watch(() => athlete.userId, () => load(), { immediate: true })
 </script>
 
 <template>
-  <div class="space-y-4 bk-stagger">
+  <div v-if="ready" class="space-y-4 bk-stagger">
     <div :style="{ '--bk-stagger-i': 0 }">
       <StreakCard :streak="streak" />
     </div>

@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/api/domain', () => ({
   updateWorkout: vi.fn(async () => ({})),
@@ -44,7 +44,12 @@ function build(records: unknown[] = []) {
 describe('FinishSummary', () => {
   beforeEach(() => {
     vi.mocked(domain.updateWorkout).mockClear()
+    // reduced-motion forzado: el test de totales lee el valor final de forma
+    // síncrona (sin await) — useAnimatedNumber (item 1) salta directo al
+    // objetivo en este modo, igual que en producción
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
   })
+  afterEach(() => vi.restoreAllMocks())
 
   it('renders duration, non-warmup set count and effective volume', () => {
     const wrapper = build()

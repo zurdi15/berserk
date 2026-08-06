@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import type { ExerciseOut, PersonalRecordOut } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
+import BkAnimatedNumber from '@/lib/BkAnimatedNumber.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkRune from '@/lib/BkRune.vue'
 import { parseUtc } from '@/utils/datetime'
@@ -26,8 +27,8 @@ function getExerciseName(exerciseId: number): string {
 // los 3 kinds de PR (max_weight, est_1rm, max_volume) son magnitudes en kg —
 // mismo criterio que BkCelebration: todos pasan por formatWeight, sin caso
 // especial para max_volume (antes se mostraba como número pelado)
-function formatRecordValue(record: PersonalRecordOut): string {
-  return formatWeight(record.value, units.value)
+function formatRecordValue(value: number): string {
+  return formatWeight(value, units.value)
 }
 
 function formatAchievedDate(dateStr: string): string {
@@ -54,7 +55,9 @@ function formatAchievedDate(dateStr: string): string {
         </div>
       </div>
       <div class="text-right shrink-0">
-        <p class="text-ember font-semibold" data-testid="pr-value">{{ formatRecordValue(record) }}</p>
+        <BkAnimatedNumber :value="record.value" v-slot="{ value }">
+          <p class="text-ember font-semibold tabular-nums" data-testid="pr-value">{{ formatRecordValue(value ?? 0) }}</p>
+        </BkAnimatedNumber>
         <p class="text-xs text-ink-faint">{{ formatAchievedDate(record.achieved_at) }}</p>
       </div>
     </div>

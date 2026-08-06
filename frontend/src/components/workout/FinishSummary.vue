@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import type { PersonalRecordOut, WorkoutOut } from '@/api/domain'
 import { updateWorkout } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
+import { useAnimatedNumber } from '@/composables/useAnimatedNumber'
 import { useAuthStore } from '@/stores/auth'
 import { formatWeight } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
@@ -49,6 +50,9 @@ const totalVolume = computed(() =>
   }, 0),
 )
 
+const animatedTotalSets = useAnimatedNumber(() => totalSets.value)
+const animatedTotalVolume = useAnimatedNumber(() => totalVolume.value)
+
 // los 3 kinds de PR son magnitudes en kg: todos pasan por formatWeight (ver
 // PrList/RecentPrs/BkCelebration — antes max_volume se mostraba sin convertir)
 function formatRecordValue(record: PersonalRecordOut): string {
@@ -92,11 +96,11 @@ watch(note, () => {
       </div>
       <div>
         <p class="text-ink-muted text-sm">{{ t('workout.totalSets') }}</p>
-        <p class="bk-metric text-xl text-ink" data-testid="summary-sets">{{ totalSets }}</p>
+        <p class="bk-metric text-xl text-ink" data-testid="summary-sets">{{ animatedTotalSets ?? 0 }}</p>
       </div>
       <div class="col-span-2">
         <p class="text-ink-muted text-sm">{{ t('workout.totalVolume') }}</p>
-        <p class="bk-metric text-xl text-ink" data-testid="summary-volume">{{ formatWeight(totalVolume, units) }}</p>
+        <p class="bk-metric text-xl text-ink" data-testid="summary-volume">{{ formatWeight(animatedTotalVolume ?? 0, units) }}</p>
       </div>
     </div>
 

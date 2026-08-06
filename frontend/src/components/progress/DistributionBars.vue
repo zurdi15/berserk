@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { DistributionItem, MuscleGroupOut } from '@/api/domain'
+import BkAnimatedNumber from '@/lib/BkAnimatedNumber.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkRune from '@/lib/BkRune.vue'
 import { isValidRuneName } from '@/lib/runeResolve'
@@ -50,7 +51,9 @@ function groupRune(muscleGroupId: number): RuneName | null {
       <div class="flex-1 h-2 rounded-xs bg-stone overflow-hidden">
         <div class="h-full bg-aurora rounded-xs" :style="{ width: barWidth(item.sets, max) }" />
       </div>
-      <span class="bk-metric text-sm text-ink w-8 text-right" data-testid="distribution-sets">{{ item.sets }}</span>
+      <BkAnimatedNumber :value="item.sets" v-slot="{ value }">
+        <span class="bk-metric text-sm text-ink w-8 text-right" data-testid="distribution-sets">{{ value ?? 0 }}</span>
+      </BkAnimatedNumber>
     </div>
   </div>
 </template>

@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { RuneName } from '@/lib/runes'
 import type { WorkoutOut, ExerciseOut, MuscleGroupOut } from '@/api/domain'
 
+import { useAnimatedNumber } from '@/composables/useAnimatedNumber'
 import BkCard from '@/lib/BkCard.vue'
 import BkRune from '@/lib/BkRune.vue'
 
@@ -78,6 +79,9 @@ const muscleGroupsInWeek = computed(() => {
   }
   return result
 })
+
+const animatedWorkoutDays = useAnimatedNumber(() => workoutDays.value)
+const animatedEffectiveSets = useAnimatedNumber(() => effectiveSets.value)
 </script>
 
 <template>
@@ -86,11 +90,11 @@ const muscleGroupsInWeek = computed(() => {
       <div class="flex justify-between text-sm">
         <div>
           <p class="text-ink-muted">{{ $t('today.workoutDays') }}</p>
-          <p class="text-xl font-semibold text-ink">{{ workoutDays }}</p>
+          <p class="text-xl font-semibold text-ink tabular-nums">{{ animatedWorkoutDays ?? 0 }}</p>
         </div>
         <div>
           <p class="text-ink-muted">{{ $t('today.effectiveSets') }}</p>
-          <p class="text-xl font-semibold text-ink">{{ effectiveSets }}</p>
+          <p class="text-xl font-semibold text-ink tabular-nums">{{ animatedEffectiveSets ?? 0 }}</p>
         </div>
       </div>
 

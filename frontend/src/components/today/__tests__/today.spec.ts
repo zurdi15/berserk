@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/api/domain', () => ({
   getStreak: vi.fn(async () => ({ weeks: 3 })),
@@ -24,7 +24,14 @@ import TodayView from '@/views/TodayView.vue'
 import TodaySessionCard from '@/components/today/TodaySessionCard.vue'
 
 describe('TodayView', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    // reduced-motion forzado: estos tests leen el valor FINAL nada más
+    // flush-ear promesas, sin avanzar rAF — useAnimatedNumber (item 1) salta
+    // directo al objetivo en este modo, igual que en producción
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+  })
+  afterEach(() => vi.restoreAllMocks())
 
   it('threads athlete user_id through every read', async () => {
     useAthleteStore().view({ id: 7, username: 'freyja', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
@@ -39,6 +46,30 @@ describe('TodayView', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="streak-card"]').classes().join(' ')).toContain('text-ember')
     expect(wrapper.text()).toContain('3')
+  })
+
+  it('gates card mount on readiness: cards are absent while data is pending, present once it resolves', async () => {
+    let resolveStreak: (value: { weeks: number }) => void = () => {}
+    vi.mocked(domain.getStreak).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveStreak = resolve }),
+    )
+
+    const wrapper = mount(TodayView, { global: { plugins: [createI18nInstance()] } })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="streak-card"]').exists()).toBe(false)
+
+    resolveStreak({ weeks: 3 })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="streak-card"]').exists()).toBe(true)
+  })
+
+  it('still shows the cards (ready) when a load fails, instead of leaving a blank view', async () => {
+    vi.mocked(domain.getStreak).mockRejectedValueOnce(new Error('boom'))
+
+    const wrapper = mount(TodayView, { global: { plugins: [createI18nInstance()] } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="streak-card"]').exists()).toBe(true)
   })
 })
 

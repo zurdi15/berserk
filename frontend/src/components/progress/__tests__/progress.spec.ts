@@ -122,6 +122,11 @@ describe('barWidth', () => {
 })
 
 describe('DistributionBars', () => {
+  // reduced-motion forzado: estos tests leen el número final sin avanzar rAF —
+  // useAnimatedNumber (item 1) salta directo al objetivo en este modo
+  beforeEach(() => vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList))
+  afterEach(() => vi.restoreAllMocks())
+
   it('renders bars sorted by sets desc, each with rune, name and bar width', () => {
     const wrapper = mount(DistributionBars, {
       props: { items: fixtures.distribution as never, groups: fixtures.muscleGroups as never },
@@ -153,7 +158,10 @@ describe('DistributionBars', () => {
 describe('PrList', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    // reduced-motion forzado: mismo motivo que en DistributionBars arriba
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
   })
+  afterEach(() => vi.restoreAllMocks())
 
   it('renders each record with kind label, exercise name, ember value and date', () => {
     const wrapper = mount(PrList, {
