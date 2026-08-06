@@ -13,6 +13,8 @@ vi.mock('@/api/domain', () => ({
   updateSet: vi.fn(),
   deleteSet: vi.fn(),
   deleteWorkout: vi.fn(),
+  getExerciseHistory: vi.fn(),
+  updateWorkoutExercise: vi.fn(),
 }))
 
 import * as domain from '@/api/domain'
@@ -110,5 +112,69 @@ describe('active workout store', () => {
     store.reset()
     expect(store.workout).toBeNull()
     expect(store.lastRecords).toHaveLength(0)
+  })
+
+  describe('exerciseHistory (item 3)', () => {
+    // los tests de este bloque afirman conteos exactos de llamadas: el mock
+    // de domain no se limpia solo entre tests (no hay clearMocks global aquí,
+    // ver otros describe de este archivo que solo usan toHaveBeenCalledWith)
+    beforeEach(() => {
+      vi.mocked(domain.getExerciseHistory).mockClear()
+    })
+
+    it('fetches with the current workout id as exclude_workout_id and caches the result', async () => {
+      vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+      const store = useActiveWorkoutStore()
+      await store.resume()
+      vi.mocked(domain.getExerciseHistory).mockResolvedValue({
+        workout_id: 1, date: '2026-08-01', sets: [],
+      } as never)
+
+      const first = await store.exerciseHistory(5)
+      const second = await store.exerciseHistory(5)
+
+      expect(domain.getExerciseHistory).toHaveBeenCalledWith(5, { exclude_workout_id: 4 })
+      expect(domain.getExerciseHistory).toHaveBeenCalledTimes(1)
+      expect(first).toEqual(second)
+    })
+
+    it('caches a null result too (never trained) without refetching', async () => {
+      vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+      const store = useActiveWorkoutStore()
+      await store.resume()
+      vi.mocked(domain.getExerciseHistory).mockResolvedValue(null as never)
+
+      expect(await store.exerciseHistory(5)).toBeNull()
+      expect(await store.exerciseHistory(5)).toBeNull()
+      expect(domain.getExerciseHistory).toHaveBeenCalledTimes(1)
+    })
+
+    it('resume clears the cache since it may resolve to a different workout', async () => {
+      vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+      const store = useActiveWorkoutStore()
+      await store.resume()
+      vi.mocked(domain.getExerciseHistory).mockResolvedValue({
+        workout_id: 1, date: '2026-08-01', sets: [],
+      } as never)
+      await store.exerciseHistory(5)
+
+      await store.resume()
+      await store.exerciseHistory(5)
+
+      expect(domain.getExerciseHistory).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it('setExerciseRest patches the workout exercise and refreshes (item 11)', async () => {
+    vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+    const store = useActiveWorkoutStore()
+    await store.resume()
+    vi.mocked(domain.updateWorkoutExercise).mockResolvedValue({ id: 9, rest_seconds: 120 } as never)
+    vi.mocked(domain.getWorkout).mockResolvedValue(workout as never)
+
+    await store.setExerciseRest(9, 120)
+
+    expect(domain.updateWorkoutExercise).toHaveBeenCalledWith(4, 9, { rest_seconds: 120 })
+    expect(domain.getWorkout).toHaveBeenCalledWith(4)
   })
 })

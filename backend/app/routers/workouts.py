@@ -39,6 +39,7 @@ from ..services.workout_sets import (
     validate_set_fields,
     SET_VALUE_FIELDS,
 )
+from ..services.workouts import sync_derived_muscle_groups
 from .exercises import get_visible_exercise, visible_muscle_group_ids
 
 router = APIRouter(prefix="/workouts", tags=["workouts"])
@@ -53,6 +54,7 @@ def workout_out(workout: Workout) -> WorkoutOut:
         routine_id=workout.routine_id,
         note=workout.note,
         feeling=workout.feeling,
+        stretched=workout.stretched,
         exercises=workout.exercises,
         muscle_tag_ids=[t.muscle_group_id for t in workout.muscle_tags],
     )
@@ -124,8 +126,18 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
                     workout_id=workout.id,
                     exercise_id=item.exercise_id,
                     position=item.position,
+                    # item 11: el descanso configurado en la rutina es el
+                    # punto de partida del entreno — el usuario lo puede
+                    # cambiar luego solo para ESTE entreno (rest_seconds del
+                    # WorkoutExercise, no toca la rutina de origen)
+                    rest_seconds=item.rest_seconds,
                 )
             )
+        db.flush()
+        # item 4: los grupos musculares del entreno se derivan desde el
+        # instante en que trae ejercicios de la rutina, no solo al añadirlos
+        # uno a uno luego
+        sync_derived_muscle_groups(db, workout.id)
     if session is not None:
         session.status = "done"
         session.workout_id = workout.id
@@ -252,13 +264,31 @@ def add_exercise(
     if get_visible_exercise(db, user.id, payload.exercise_id) is None:
         raise HTTPException(status_code=422, detail="exercise_invalid")
     position = len(workout.exercises) + 1
+    # item 11: si el entreno viene de una rutina y este ejercicio forma parte
+    # de ella (añadido suelto, p.ej. tras haberlo quitado y devuelto a la
+    # tarjeta), hereda su rest_seconds igual que los copiados al empezar el
+    # entreno; si no, None (ad-hoc) — cae al default general en rest.ts
+    rest_seconds = None
+    if workout.routine_id is not None:
+        routine = db.get(Routine, workout.routine_id)
+        routine_item = next(
+            (e for e in (routine.exercises if routine else []) if e.exercise_id == payload.exercise_id),
+            None,
+        )
+        rest_seconds = routine_item.rest_seconds if routine_item else None
     wex = WorkoutExercise(
         workout_id=workout.id,
         exercise_id=payload.exercise_id,
         position=position,
         note=payload.note,
+        rest_seconds=rest_seconds,
     )
     db.add(wex)
+    db.flush()
+    # fix M9 (revisión): sync_derived_muscle_groups ahora consulta
+    # workout_exercises ella misma (ver services/workouts.py), así que ya no
+    # hace falta precomputar exercise_ids aquí solo para pasárselo
+    sync_derived_muscle_groups(db, workout.id)
     db.commit()
     return wex
 
@@ -291,6 +321,8 @@ def remove_exercise(
         [e for e in workout.exercises if e.id != wex.id], start=1
     ):
         item.position = position
+    db.flush()
+    sync_derived_muscle_groups(db, workout.id)
     db.commit()
 
 
@@ -316,6 +348,12 @@ def reorder_exercises(
 def set_muscle_tags(
     workout_id: int, payload: MuscleTagsIn, user: CurrentUser, db: Session = Depends(get_db)
 ):
+    """Etiquetado MANUAL, superseded por el derivado del item 4 (round
+    v0.3.0): el frontend ya no lo llama (los chips de WorkoutView/
+    WorkoutEditView pasaron a ser de solo lectura, derivados de los
+    ejercicios del entreno — ver sync_derived_muscle_groups). Se conserva el
+    endpoint por si algún consumidor externo lo usa, pero cualquier alta/baja
+    de ejercicio posterior recalcula y PISA lo que se fije aquí."""
     workout = _own_workout(db, user.id, workout_id)
     if not set(payload.muscle_group_ids) <= visible_muscle_group_ids(db, user.id):
         raise HTTPException(status_code=422, detail="muscle_group_invalid")

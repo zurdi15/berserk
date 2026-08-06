@@ -7,20 +7,30 @@ import { displayToKg, kgToDisplay } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkStepper from '@/lib/BkStepper.vue'
+import CardioCountdown from './CardioCountdown.vue'
 
 const props = withDefaults(
   defineProps<{
     measurement: Measurement
     units?: 'kg' | 'lb'
-    // precarga desde una serie existente (edición); si no se pasa, valores
-    // por defecto de registro en vivo (ver I5: reutilizar el mismo formulario
-    // para editar en vez de duplicar la lógica de armado del SetIn)
-    initialSet?: SetOut | null
+    // precarga desde una serie existente (edición) o desde el default
+    // calculado por item 2 (registro nuevo) — Partial porque el default de
+    // objetivo de rutina no trae id/set_number/completed_at (ver
+    // setDefaults.ts::resolveNewSetDefaults y WorkoutExerciseCard.vue)
+    initialSet?: Partial<SetOut> | null
     editing?: boolean
+    // item 7: el countdown de cardio solo tiene sentido registrando EN VIVO
+    // (WorkoutView), no en el editor retroactivo — mismo criterio que
+    // restEnabled de WorkoutExerciseCard, pasado explícito aquí porque
+    // SetForm no conoce ese prop
+    live?: boolean
   }>(),
-  { units: 'kg', initialSet: null, editing: false },
+  { units: 'kg', initialSet: null, editing: false, live: true },
 )
-const emit = defineEmits<{ submit: [value: SetIn] }>()
+// keepOpen (item 1): false = "Registrar serie" (cierra el cajón), true =
+// "Registrar y otra" (se queda abierto, valores conservados para la
+// siguiente serie — ver WorkoutExerciseCard.vue)
+const emit = defineEmits<{ submit: [value: SetIn, keepOpen: boolean] }>()
 
 const { t } = useI18n()
 
@@ -35,7 +45,8 @@ const WEIGHT_UI = {
 
 // valores por defecto razonables; se mantienen entre series del mismo bloque
 // (no se resetean tras cada submit) para no repetir el mismo tecleo en cada serie.
-// En modo edición, el punto de partida es la serie que se está corrigiendo.
+// En modo edición, el punto de partida es la serie que se está corrigiendo;
+// en modo alta, el punto de partida es la cadena de defaults del item 2.
 const reps = ref(props.initialSet?.reps ?? 8)
 const weightDisplay = ref(
   props.initialSet?.weight_kg != null
@@ -46,6 +57,10 @@ const durationSeconds = ref(props.initialSet?.duration_seconds ?? (props.measure
 const distanceM = ref(props.initialSet?.distance_m ?? 0)
 const isWarmup = ref(props.initialSet?.is_warmup ?? false)
 const rpe = ref(props.initialSet?.rpe != null ? String(props.initialSet.rpe) : '')
+
+// item 7: pantalla completa del cajón sustituida por el countdown mientras
+// corre — nunca en edición (corregir una serie pasada no es "vivirla ahora")
+const countdownActive = ref(false)
 
 const rpeOptions = computed(() => [
   { value: '', label: '—' },
@@ -85,17 +100,33 @@ function buildValue(): SetIn | null {
   return value
 }
 
-function submit() {
+function submit(keepOpen: boolean) {
   const value = buildValue()
   if (!value) return
-  emit('submit', value)
+  emit('submit', value, keepOpen)
   // el calentamiento es por serie: no debe arrastrarse a la siguiente sin querer
   isWarmup.value = false
+}
+
+// item 7: el countdown llega a 0 solo — se registra con la duración objetivo
+// exacta (no lo que haya tardado en tickear) y SIEMPRE cierra el cajón (como
+// "Registrar serie"): no tiene sentido dejarlo abierto para "otra" cuando la
+// serie se acaba de auto-completar
+function onCountdownDone() {
+  countdownActive.value = false
+  submit(false)
 }
 </script>
 
 <template>
-  <form class="space-y-3" @submit.prevent="submit">
+  <CardioCountdown
+    v-if="countdownActive"
+    :target-seconds="durationSeconds"
+    @done="onCountdownDone"
+    @cancel="countdownActive = false"
+  />
+
+  <form v-else class="space-y-3" @submit.prevent="submit(false)">
     <div v-if="measurement === 'strength'" class="flex flex-wrap gap-4">
       <div>
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weight') }}</span>
@@ -123,15 +154,26 @@ function submit() {
       <BkStepper v-model="durationSeconds" :step="15" :min="1" :max="3600" suffix="s" />
     </div>
 
-    <div v-else-if="measurement === 'cardio'" class="flex flex-wrap gap-4">
-      <div>
-        <span class="block text-xs text-ink-muted mb-2">{{ t('workout.duration') }}</span>
-        <BkStepper v-model="durationSeconds" :step="60" :min="1" :max="21600" suffix="s" />
+    <div v-else-if="measurement === 'cardio'" class="space-y-3">
+      <div class="flex flex-wrap gap-4">
+        <div>
+          <span class="block text-xs text-ink-muted mb-2">{{ t('workout.duration') }}</span>
+          <BkStepper v-model="durationSeconds" :step="60" :min="1" :max="21600" suffix="s" />
+        </div>
+        <div>
+          <span class="block text-xs text-ink-muted mb-2">{{ t('workout.distanceOptional') }}</span>
+          <BkStepper v-model="distanceM" :step="100" :min="0" :max="100000" suffix="m" />
+        </div>
       </div>
-      <div>
-        <span class="block text-xs text-ink-muted mb-2">{{ t('workout.distanceOptional') }}</span>
-        <BkStepper v-model="distanceM" :step="100" :min="0" :max="100000" suffix="m" />
-      </div>
+      <BkButton
+        v-if="!editing && live"
+        type="button"
+        variant="ghost"
+        data-testid="cardio-start-countdown"
+        @click="countdownActive = true"
+      >
+        {{ t('workout.startCountdown') }}
+      </BkButton>
     </div>
 
     <div class="flex items-center gap-3 flex-wrap">
@@ -151,6 +193,20 @@ function submit() {
       </div>
     </div>
 
-    <BkButton type="submit" variant="primary" block>{{ editing ? t('common.save') : t('workout.logSet') }}</BkButton>
+    <div class="flex gap-2">
+      <BkButton
+        v-if="!editing"
+        type="button"
+        variant="ghost"
+        class="flex-1"
+        data-testid="log-set-and-another"
+        @click="submit(true)"
+      >
+        {{ t('workout.logSetAndAnother') }}
+      </BkButton>
+      <BkButton type="submit" variant="primary" class="flex-1">
+        {{ editing ? t('common.save') : t('workout.logSet') }}
+      </BkButton>
+    </div>
   </form>
 </template>

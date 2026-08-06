@@ -63,6 +63,28 @@
   100% { opacity: 0.6; }
 }
 
+/* item 9 (round v0.3.0): pulso "aurora" en los bordes de pantalla al
+   registrar una serie ordinaria con éxito (ver NeonPulse.vue) — feedback
+   ambiental sutil, pico de opacity moderado, NO un flashbang. Mismo patrón
+   que bk-ember-flash (la celebración de PR), pero:
+     - solo opacity (0→pico→0): sin excepción al "solo transform/opacity" de
+       la cabecera de este archivo, el brillo en sí vive en un box-shadow
+       INSET fijo en la clase .bk-neon-pulse (no se anima su valor)
+     - color aurora (turquesa), no ámbar: el ámbar de bk-ember-flash sigue
+       siendo exclusivo de la celebración de PR — cuando esa celebración
+       dispara, el pulso aurora NUNCA se lanza (ver WorkoutView.vue, que
+       comprueba new_records antes de mostrar NeonPulse) */
+@keyframes bk-neon-pulse {
+  0% { opacity: 0; }
+  35% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.bk-neon-pulse {
+  box-shadow: inset 0 0 48px 10px var(--bk-aurora-glow);
+  animation: bk-neon-pulse var(--bk-dur-4) var(--bk-ease-out) forwards;
+}
+
 /* transiciones de Vue: <Transition name="bk-rise"> etc. — solo entrada */
 .bk-fade-enter-active { animation: bk-fade var(--bk-dur-2) var(--bk-ease-out); }
 .bk-rise-enter-active { animation: bk-rise var(--bk-dur-3) var(--bk-ease-out); }

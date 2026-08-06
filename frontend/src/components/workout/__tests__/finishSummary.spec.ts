@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/api/domain', () => ({
   updateWorkout: vi.fn(async () => ({})),
+  createRoutine: vi.fn(),
+  deleteRoutine: vi.fn(),
+  replaceRoutineExercises: vi.fn(),
 }))
 
 import * as domain from '@/api/domain'
@@ -18,12 +21,14 @@ const workout = {
   routine_id: null,
   note: null,
   feeling: null,
+  stretched: false,
   exercises: [
     {
       id: 20,
       exercise_id: 5,
       position: 0,
       note: null,
+      rest_seconds: null,
       sets: [
         { id: 1, set_number: 1, reps: 5, weight_kg: 100, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
         { id: 2, set_number: 2, reps: 5, weight_kg: 40, duration_seconds: null, distance_m: null, is_warmup: true, rpe: null, completed_at: 'x' },
@@ -124,5 +129,46 @@ describe('FinishSummary', () => {
     const wrapper = build()
     await wrapper.find('button.bg-aurora-deep').trigger('click')
     expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  describe('item 8: stretched toggle', () => {
+    it('toggles on click, calling updateWorkout with the new value', async () => {
+      const wrapper = build()
+      const toggle = wrapper.get('[data-testid="stretched-toggle"]')
+      expect(toggle.attributes('aria-pressed')).toBe('false')
+
+      await toggle.trigger('click')
+      await flushPromises()
+
+      expect(toggle.attributes('aria-pressed')).toBe('true')
+      expect(domain.updateWorkout).toHaveBeenCalledWith(9, { stretched: true })
+    })
+
+    it('reverts the optimistic flip when the API call fails', async () => {
+      vi.mocked(domain.updateWorkout).mockRejectedValueOnce(new Error('boom'))
+      const wrapper = build()
+      const toggle = wrapper.get('[data-testid="stretched-toggle"]')
+
+      await toggle.trigger('click')
+      await flushPromises()
+
+      expect(toggle.attributes('aria-pressed')).toBe('false')
+    })
+  })
+
+  describe('item 5: save as routine', () => {
+    it('clicking the trigger opens the SaveAsRoutineSheet with this workout', async () => {
+      const wrapper = mount(FinishSummary, {
+        props: { workout: workout as never, records: [] },
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+
+      await wrapper.find('[data-testid="save-as-routine-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(document.body.querySelector('[data-testid="save-as-routine-sheet"]')).not.toBeNull()
+      wrapper.unmount()
+    })
   })
 })

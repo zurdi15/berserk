@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -12,6 +12,7 @@ import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import AddExerciseSheet from '@/components/workout/AddExerciseSheet.vue'
 import FinishSummary from '@/components/workout/FinishSummary.vue'
+import NeonPulse from '@/components/workout/NeonPulse.vue'
 import WorkoutExerciseCard from '@/components/workout/WorkoutExerciseCard.vue'
 import BkCelebration from '@/components/celebration/BkCelebration.vue'
 import BkButton from '@/lib/BkButton.vue'
@@ -34,8 +35,9 @@ const muscleGroups = ref<MuscleGroupOut[]>([])
 const catalogReady = ref(false)
 const addSheetOpen = ref(false)
 const discardConfirmOpen = ref(false)
-const muscleTagPending = ref(false)
 const finishedWorkout = ref<WorkoutOut | null>(null)
+// item 9: pulso aurora de feedback tras registrar una serie ordinaria
+const neonPulse = ref(false)
 const sessionRecords = ref<PersonalRecordOut[]>([])
 const now = ref(Date.now())
 let ticker: ReturnType<typeof setInterval> | null = null
@@ -71,6 +73,13 @@ const dateLabel = computed(() => {
     new Date(`${activeWorkout.workout.date}T00:00:00`),
   )
 })
+
+// item 4: grupos musculares derivados de los ejercicios del entreno — de
+// solo lectura, el backend ya los recalcula en cada alta/baja de ejercicio
+// (ver services/workouts.py::sync_derived_muscle_groups); ya no hay editor manual
+const derivedMuscleGroups = computed(() =>
+  muscleGroups.value.filter((g) => activeWorkout.workout?.muscle_tag_ids.includes(g.id)),
+)
 
 async function loadCatalog() {
   try {
@@ -140,25 +149,24 @@ function muscleTagLabel(group: MuscleGroupOut): string {
   return locale.value === 'en' ? group.name_en : group.name_es
 }
 
-function isMuscleTagActive(id: number): boolean {
-  return activeWorkout.workout?.muscle_tag_ids.includes(id) ?? false
+// item 9: el pulso neón es para series ORDINARIAS — cuando la misma serie
+// también dispara la celebración de PR (ember, ver BkCelebration arriba),
+// esa celebración gana siempre y el pulso se salta
+//
+// fix M4 (revisión): un segundo logueo mientras el pulso anterior seguía
+// animándose (neonPulse ya en `true`) no disparaba nada — v-if="show" con
+// show ya en true no remonta el nodo, así que la animación no reinicia. Se
+// fuerza un ciclo false→true real (NeonPulse solo se desmonta con `false`,
+// respetando su propio contrato de "done" para cerrar el ciclo anterior)
+async function triggerNeonPulse() {
+  neonPulse.value = false
+  await nextTick()
+  neonPulse.value = true
 }
 
-async function toggleMuscleTag(id: number) {
-  // guarda de vuelo único: dos toggles en paralelo partirían del mismo
-  // muscle_tag_ids "viejo" y el que responda último pisaría al otro
-  // (lost update); mientras haya una petición en curso, los clics son inertes
-  if (muscleTagPending.value) return
-  const current = activeWorkout.workout?.muscle_tag_ids ?? []
-  const next = current.includes(id) ? current.filter((tagId) => tagId !== id) : [...current, id]
-  muscleTagPending.value = true
-  try {
-    await activeWorkout.setMuscleTags(next)
-  } catch (error) {
-    toastApiError(error)
-  } finally {
-    muscleTagPending.value = false
-  }
+function onLogged(hasNewRecords: boolean) {
+  if (hasNewRecords) return
+  triggerNeonPulse()
 }
 
 // la celebración solo sale del logueo en vivo (logSet rellena lastRecords);
@@ -210,6 +218,8 @@ onBeforeUnmount(() => {
       @done="onCelebrationDone"
     />
 
+    <NeonPulse :show="neonPulse" @done="neonPulse = false" />
+
     <FinishSummary
       v-if="finishedWorkout"
       :workout="finishedWorkout"
@@ -218,7 +228,20 @@ onBeforeUnmount(() => {
     />
 
     <div v-else-if="activeWorkout.workout" class="space-y-4 bk-stagger">
-      <div class="bk-slab p-4 flex items-center justify-between" :style="{ '--bk-stagger-i': 0 }">
+      <!-- item 10 (fix M7: comentario corregido, el gap-3 exterior es 12px,
+           no 8px — ese 8px es el gap-2 INTERIOR entre los dos botones):
+           en 328px de contenido (360px de viewport − 2×16px de p-4), el
+           bloque fecha+cronómetro (~150px) más el bloque de botones
+           (Descartar ~135px + gap-2/8px + Terminar ~125px ≈ 268px) suman
+           ~430px con el gap-3/12px exterior que los separa — no caben en
+           una sola fila. flex-wrap deja que el bloque de botones baje a su
+           propia línea (268px < 328px, sobra sitio de sobra ahí) en vez de
+           desbordar o solaparse -->
+      <div
+        class="bk-slab p-4 flex flex-wrap items-center justify-between gap-3"
+        data-testid="workout-header"
+        :style="{ '--bk-stagger-i': 0 }"
+      >
         <div>
           <p class="text-sm text-ink-muted capitalize">{{ dateLabel }}</p>
           <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
@@ -235,22 +258,17 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="muscleGroups.length" class="bk-slab p-4 space-y-2" :style="{ '--bk-stagger-i': 1 }">
+      <div v-if="derivedMuscleGroups.length" class="bk-slab p-4 space-y-2" :style="{ '--bk-stagger-i': 1 }">
         <p class="text-sm text-ink-muted">{{ t('workout.muscleTags') }}</p>
         <div class="flex flex-wrap gap-2">
-          <button
-            v-for="group in muscleGroups"
+          <span
+            v-for="group in derivedMuscleGroups"
             :key="group.id"
-            type="button"
             :data-testid="`muscle-tag-${group.id}`"
-            class="bk-press px-3 py-1.5 rounded-sm border text-sm disabled:opacity-50"
-            :class="isMuscleTagActive(group.id) ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
-            :aria-pressed="isMuscleTagActive(group.id) ? 'true' : 'false'"
-            :disabled="muscleTagPending"
-            @click="toggleMuscleTag(group.id)"
+            class="px-3 py-1.5 rounded-sm border border-line text-sm text-ink-muted"
           >
             {{ muscleTagLabel(group) }}
-          </button>
+          </span>
         </div>
       </div>
 
@@ -268,6 +286,7 @@ onBeforeUnmount(() => {
         :locale="locale"
         :actions="activeWorkout"
         @recorded="onRecorded"
+        @logged="onLogged"
       />
 
       <BkButton

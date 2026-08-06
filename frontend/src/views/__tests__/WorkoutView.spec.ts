@@ -18,7 +18,15 @@ vi.mock('@/api/domain', () => ({
   listExercises: vi.fn(async () => []),
   listMuscleGroups: vi.fn(async () => []),
   deleteWorkout: vi.fn(),
-  setWorkoutMuscleTags: vi.fn(),
+  getExerciseHistory: vi.fn(async () => null),
+  getWorkout: vi.fn(),
+  logSet: vi.fn(),
+  updateSet: vi.fn(),
+  deleteSet: vi.fn(),
+  addWorkoutExercise: vi.fn(),
+  removeWorkoutExercise: vi.fn(),
+  reorderWorkoutExercises: vi.fn(),
+  updateWorkoutExercise: vi.fn(),
 }))
 
 import * as domain from '@/api/domain'
@@ -365,6 +373,41 @@ describe('WorkoutView', () => {
     })
   })
 
+  describe('item 10 (fix M7): header wraps at narrow viewports instead of overflowing', () => {
+    const workoutFixture = {
+      id: 1,
+      date: '2026-08-06',
+      started_at: '2026-08-06T09:00:00Z',
+      ended_at: null,
+      routine_id: null,
+      note: null,
+      feeling: null,
+      exercises: [],
+      muscle_tag_ids: [],
+    }
+
+    let wrapper: VueWrapper | null = null
+    afterEach(() => {
+      wrapper?.unmount()
+      wrapper = null
+    })
+
+    it('pins flex-wrap (plus items-center/justify-between/gap-3) on the elapsed+discard+finish row', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+
+      wrapper = build()
+      await flushPromises()
+
+      const header = wrapper.get('[data-testid="workout-header"]')
+      expect(header.classes()).toEqual(
+        expect.arrayContaining(['flex', 'flex-wrap', 'items-center', 'justify-between', 'gap-3']),
+      )
+    })
+  })
+
   describe('discard workout', () => {
     const workoutFixture = {
       id: 1,
@@ -417,7 +460,7 @@ describe('WorkoutView', () => {
     })
   })
 
-  describe('muscle tag chips', () => {
+  describe('item 4: derived muscle groups display (read-only)', () => {
     const workoutFixture = {
       id: 1,
       date: '2026-08-06',
@@ -427,7 +470,7 @@ describe('WorkoutView', () => {
       note: null,
       feeling: null,
       exercises: [],
-      muscle_tag_ids: [],
+      muscle_tag_ids: [1],
     }
     const muscleGroupsFixture = [
       { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
@@ -441,68 +484,188 @@ describe('WorkoutView', () => {
       wrapper = null
     })
 
-    it('toggles the chest chip: calls setWorkoutMuscleTags with the new full array and marks it selected', async () => {
+    it('renders only the groups present in muscle_tag_ids, as non-interactive spans (no click handler, no editor)', async () => {
       vi.mocked(domain.listMuscleGroups).mockResolvedValue(muscleGroupsFixture as never)
       const activeWorkout = useActiveWorkoutStore()
       vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
         activeWorkout.workout = workoutFixture as never
       })
-      vi.mocked(domain.setWorkoutMuscleTags).mockResolvedValue({ ...workoutFixture, muscle_tag_ids: [1] } as never)
 
-      wrapper = mount(WorkoutView, {
-        global: { plugins: [createI18nInstance()] },
-        attachTo: document.body,
-      })
+      wrapper = build()
       await flushPromises()
 
-      expect(wrapper.find('[data-testid="muscle-tag-1"]').attributes('aria-pressed')).toBe('false')
-
-      await wrapper.find('[data-testid="muscle-tag-1"]').trigger('click')
-      await flushPromises()
-
-      expect(domain.setWorkoutMuscleTags).toHaveBeenCalledWith(1, [1])
-      expect(wrapper.find('[data-testid="muscle-tag-1"]').attributes('aria-pressed')).toBe('true')
+      const tag = wrapper.get('[data-testid="muscle-tag-1"]')
+      expect(tag.element.tagName).toBe('SPAN')
+      expect(tag.text()).toBe('Pecho')
+      expect(wrapper.find('[data-testid="muscle-tag-2"]').exists()).toBe(false)
     })
 
-    it('guards concurrent toggles: a second chip click is inert while the first request is in flight, preventing a lost update', async () => {
+    it('renders nothing when muscle_tag_ids is empty (no exercises added yet)', async () => {
       vi.mocked(domain.listMuscleGroups).mockResolvedValue(muscleGroupsFixture as never)
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = { ...workoutFixture, muscle_tag_ids: [] } as never
+      })
+
+      wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid^="muscle-tag-"]').exists()).toBe(false)
+    })
+  })
+
+  describe('item 1 + item 9: drawer logging flow and neon feedback', () => {
+    const exerciseFixture = {
+      id: 5,
+      name_es: 'Press banca',
+      name_en: 'Bench press',
+      measurement: 'strength' as const,
+      owner_id: null,
+      muscle_groups: [],
+    }
+    const workoutFixture = {
+      id: 1,
+      date: '2026-08-06',
+      started_at: '2026-08-06T09:00:00Z',
+      ended_at: null,
+      routine_id: null,
+      note: null,
+      feeling: null,
+      exercises: [{ id: 20, exercise_id: 5, position: 0, note: null, rest_seconds: null, sets: [] }],
+      muscle_tag_ids: [],
+    }
+
+    let wrapper: VueWrapper | null = null
+
+    beforeEach(() => {
+      vi.mocked(domain.listExercises).mockResolvedValue([exerciseFixture] as never)
+      vi.mocked(domain.getWorkout).mockResolvedValue(workoutFixture as never)
+      // el mock de logSet no se limpia solo entre tests de este archivo, y el
+      // último test de este bloque afirma un conteo exacto de llamadas
+      vi.mocked(domain.logSet).mockClear()
+    })
+
+    afterEach(() => {
+      wrapper?.unmount()
+      wrapper = null
+      document.body.innerHTML = ''
+    })
+
+    function mountLive() {
       const activeWorkout = useActiveWorkoutStore()
       vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
         activeWorkout.workout = workoutFixture as never
       })
+      return mount(WorkoutView, { global: { plugins: [createI18nInstance()] }, attachTo: document.body })
+    }
 
-      // se resetea el mock explícitamente: el conteo de llamadas no se limpia solo
-      // entre tests en este archivo, y esta prueba depende de un conteo exacto
-      let resolveSetTags!: (value: unknown) => void
-      vi.mocked(domain.setWorkoutMuscleTags).mockReset()
-      vi.mocked(domain.setWorkoutMuscleTags).mockImplementation(
-        () => new Promise((resolve) => { resolveSetTags = resolve }) as never,
+    it('no drawer is open right after mount — adding an exercise never auto-opens a form (zurdi\'s bug)', async () => {
+      wrapper = mountLive()
+      await flushPromises()
+
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+    })
+
+    it('opens the drawer via "+ Serie", logs the set on submit, closes the drawer and fires the neon pulse', async () => {
+      vi.mocked(domain.logSet).mockResolvedValue({
+        set: { id: 101, set_number: 1, reps: 8, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+        new_records: [],
+      } as never)
+
+      wrapper = mountLive()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="add-set-20"]').trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
+
+      const form = new DOMWrapper(document.body.querySelector('form') as Element)
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(domain.logSet).toHaveBeenCalledWith(
+        1,
+        20,
+        expect.objectContaining({ is_warmup: false, reps: expect.any(Number), weight_kg: expect.any(Number) }),
       )
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+      expect(document.body.querySelector('[data-testid="neon-pulse"]')).not.toBeNull()
+    })
 
-      wrapper = mount(WorkoutView, {
-        global: { plugins: [createI18nInstance()] },
-        attachTo: document.body,
-      })
+    it('fix M4: a second log while the first pulse is still "animating" (no done yet) retriggers a fresh pulse instead of staying inert', async () => {
+      vi.mocked(domain.logSet).mockResolvedValue({
+        set: { id: 101, set_number: 1, reps: 8, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+        new_records: [],
+      } as never)
+
+      wrapper = mountLive()
       await flushPromises()
 
-      // primer click: dispara la petición y deja "chest" en vuelo
-      await wrapper.find('[data-testid="muscle-tag-1"]').trigger('click')
-
-      // mientras la primera sigue pendiente, el botón queda con el atributo disabled real
-      expect(wrapper.find('[data-testid="muscle-tag-2"]').attributes('disabled')).toBe('')
-
-      // segundo click, en otro chip, mientras la primera petición sigue sin resolver:
-      // debe quedar inerte (nada de una segunda llamada a la api)
-      await wrapper.find('[data-testid="muscle-tag-2"]').trigger('click')
-
-      resolveSetTags({ ...workoutFixture, muscle_tag_ids: [1] })
+      await wrapper.find('[data-testid="add-set-20"]').trigger('click')
+      await flushPromises()
+      let form = new DOMWrapper(document.body.querySelector('form') as Element)
+      await form.trigger('submit')
       await flushPromises()
 
-      expect(domain.setWorkoutMuscleTags).toHaveBeenCalledTimes(1)
-      expect(domain.setWorkoutMuscleTags).toHaveBeenCalledWith(1, [1])
-      expect(wrapper.find('[data-testid="muscle-tag-1"]').attributes('aria-pressed')).toBe('true')
-      expect(wrapper.find('[data-testid="muscle-tag-2"]').attributes('aria-pressed')).toBe('false')
-      expect(wrapper.find('[data-testid="muscle-tag-2"]').attributes('disabled')).toBe(undefined)
+      const firstPulseEl = document.body.querySelector('[data-testid="neon-pulse"]')
+      expect(firstPulseEl).not.toBeNull()
+
+      // segundo logueo SIN que el pulso anterior haya emitido 'done' (como si
+      // la animación CSS del primero siguiera en curso) — antes del fix,
+      // show ya estaba en `true` y una segunda asignación a `true` no
+      // remontaba el nodo, así que el pulso no se reiniciaba visualmente
+      await wrapper.find('[data-testid="add-set-20"]').trigger('click')
+      await flushPromises()
+      form = new DOMWrapper(document.body.querySelector('form') as Element)
+      await form.trigger('submit')
+      await flushPromises()
+
+      const secondPulseEl = document.body.querySelector('[data-testid="neon-pulse"]')
+      expect(secondPulseEl).not.toBeNull()
+      // nodo DOM distinto: se desmontó y remontó de verdad (ciclo
+      // false→true real), no el mismo elemento que se quedó ahí sin más
+      expect(secondPulseEl).not.toBe(firstPulseEl)
+    })
+
+    it('skips the neon pulse when the log produces a new PR — the ember celebration wins instead', async () => {
+      vi.mocked(domain.logSet).mockResolvedValue({
+        set: { id: 101, set_number: 1, reps: 8, weight_kg: 100, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+        new_records: [{ id: 9, exercise_id: 5, kind: 'max_weight', value: 100, achieved_at: 'x' }],
+      } as never)
+
+      wrapper = mountLive()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="add-set-20"]').trigger('click')
+      await flushPromises()
+      const form = new DOMWrapper(document.body.querySelector('form') as Element)
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(document.body.querySelector('[data-testid="celebration-overlay"]')).not.toBeNull()
+      expect(document.body.querySelector('[data-testid="neon-pulse"]')).toBeNull()
+    })
+
+    it('"Registrar y otra" logs the set and keeps the drawer open', async () => {
+      vi.mocked(domain.logSet).mockResolvedValue({
+        set: { id: 101, set_number: 1, reps: 8, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+        new_records: [],
+      } as never)
+
+      wrapper = mountLive()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="add-set-20"]').trigger('click')
+      await flushPromises()
+
+      const andAnother = new DOMWrapper(
+        document.body.querySelector('[data-testid="log-set-and-another"]') as Element,
+      )
+      await andAnother.trigger('click')
+      await flushPromises()
+
+      expect(domain.logSet).toHaveBeenCalledTimes(1)
+      expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
     })
   })
 })

@@ -64,6 +64,9 @@ export interface WorkoutExerciseOut {
   exercise_id: number
   position: number
   note: string | null
+  // item 11: override de descanso de ESTE ejercicio en ESTE entreno; null
+  // cae al target de la rutina de origen o al default general (ver rest.ts)
+  rest_seconds: number | null
   sets: SetOut[]
 }
 
@@ -75,8 +78,30 @@ export interface WorkoutOut {
   routine_id: number | null
   note: string | null
   feeling: number | null
+  // item 8: "check en el entreno" — sin minutos/tipo, solo si se ha estirado
+  stretched: boolean
   exercises: WorkoutExerciseOut[]
+  // item 4: derivados de los grupos primarios de los ejercicios del entreno,
+  // ya no elegidos a mano — de solo lectura desde el frontend (ver
+  // routers/workouts.py::sync_derived_muscle_groups)
   muscle_tag_ids: number[]
+}
+
+// item 3: historial de la última sesión TERMINADA (no la actual) en la que
+// se hizo este ejercicio — usado para el prefill del drawer y el hint de la
+// tarjeta compacta (ver components/workout/setDefaults.ts / setHistoryFormat.ts)
+export interface ExerciseHistorySetOut {
+  reps: number | null
+  weight_kg: number | null
+  duration_seconds: number | null
+  distance_m: number | null
+  is_warmup: boolean
+}
+
+export interface ExerciseHistoryOut {
+  workout_id: number
+  date: string
+  sets: ExerciseHistorySetOut[]
 }
 
 export interface SetIn {
@@ -322,6 +347,7 @@ export const updateWorkout = (id: number, body: {
   date?: string
   note?: string | null
   feeling?: number | null
+  stretched?: boolean
 }) =>
   api<WorkoutOut>(`/workouts/${id}`, { method: 'PATCH', body })
 
@@ -334,14 +360,20 @@ export const addWorkoutExercise = (id: number, body: {
 }) =>
   api<WorkoutExerciseOut>(`/workouts/${id}/exercises`, { method: 'POST', body })
 
+// item 11: binding re-añadido (existía antes de round 8 y se había retirado
+// al no tener consumidor frontend) — PATCH .../exercises/{weid} ya existía
+// en el backend para `note`; ahora también acepta rest_seconds
+export const updateWorkoutExercise = (wid: number, weid: number, body: {
+  note?: string | null
+  rest_seconds?: number | null
+}) =>
+  api<WorkoutExerciseOut>(`/workouts/${wid}/exercises/${weid}`, { method: 'PATCH', body })
+
 export const removeWorkoutExercise = (wid: number, weid: number) =>
   api<void>(`/workouts/${wid}/exercises/${weid}`, { method: 'DELETE' })
 
 export const reorderWorkoutExercises = (wid: number, ids: number[]) =>
   api<WorkoutOut>(`/workouts/${wid}/exercises-order`, { method: 'PUT', body: { workout_exercise_ids: ids } })
-
-export const setWorkoutMuscleTags = (wid: number, ids: number[]) =>
-  api<WorkoutOut>(`/workouts/${wid}/muscle-groups`, { method: 'PUT', body: { muscle_group_ids: ids } })
 
 export const logSet = (wid: number, weid: number, body: SetIn) =>
   api<SetLogOut>(`/workouts/${wid}/exercises/${weid}/sets`, { method: 'POST', body })
@@ -400,6 +432,12 @@ export const getTrainedExercises = (userId?: number) =>
 
 export const getStats = (userId?: number) =>
   api<StatsOut>(`/progress/stats${qs({ userId })}`)
+
+export const getExerciseHistory = (
+  exerciseId: number,
+  params: { exclude_workout_id?: number; userId?: number } = {},
+) =>
+  api<ExerciseHistoryOut | null>(`/progress/exercise-history/${exerciseId}${qs(params)}`)
 
 // Body endpoints
 export const listBody = (userId?: number) =>

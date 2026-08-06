@@ -103,6 +103,61 @@ def test_stats_respects_athlete_threading(client: TestClient, app):
     assert shared["total_volume_kg"] == 500.0
 
 
+def test_exercise_history_returns_latest_finished_session(client: TestClient):
+    bench, first_id = log_workout(client, "2026-07-20", reps=5, weight=100)
+    _, second_id = log_workout(client, "2026-08-01", reps=5, weight=105)
+
+    result = client.get(f"/api/v1/progress/exercise-history/{bench}").json()
+    assert result["workout_id"] == second_id
+    assert result["date"] == "2026-08-01"
+    assert result["sets"] == [
+        {"reps": 5, "weight_kg": 105.0, "duration_seconds": None, "distance_m": None, "is_warmup": False}
+    ]
+
+
+def test_exercise_history_excludes_current_workout_and_null_when_none(client: TestClient):
+    bench, only_id = log_workout(client, "2026-07-20", reps=5, weight=100)
+
+    excluded = client.get(
+        f"/api/v1/progress/exercise-history/{bench}?exclude_workout_id={only_id}"
+    ).json()
+    assert excluded is None
+
+
+def test_exercise_history_ignores_the_active_unfinished_workout(client: TestClient):
+    bench = next(
+        e["id"] for e in client.get("/api/v1/exercises").json() if e["name_en"] == "Bench press"
+    )
+    workout = client.post("/api/v1/workouts", json={}).json()
+    wex = client.post(
+        f"/api/v1/workouts/{workout['id']}/exercises", json={"exercise_id": bench}
+    ).json()
+    client.post(
+        f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets",
+        json={"reps": 5, "weight_kg": 999},
+    )
+    # el entreno sigue activo (sin terminar): no debe contar como "última vez"
+    assert client.get(f"/api/v1/progress/exercise-history/{bench}").json() is None
+
+
+def test_exercise_history_of_invisible_exercise_404(client: TestClient, app):
+    from tests.conftest import login, make_user
+
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    chest = next(
+        g["id"] for g in freyja.get("/api/v1/muscle-groups").json() if g["slug"] == "chest"
+    )
+    custom = freyja.post(
+        "/api/v1/exercises",
+        json={
+            "name_es": "Mi press", "name_en": "My press", "measurement": "strength",
+            "muscle_groups": [{"muscle_group_id": chest, "is_primary": True}],
+        },
+    ).json()["id"]
+    assert client.get(f"/api/v1/progress/exercise-history/{custom}").status_code == 404
+
+
 def test_series_of_invisible_exercise_404(client: TestClient, app):
     from tests.conftest import login, make_user
 

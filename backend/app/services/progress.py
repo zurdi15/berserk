@@ -16,26 +16,18 @@ from ..models import (
     WorkoutSet,
 )
 from .workout_sets import effective_set_filters, estimate_1rm
+from .workouts import primary_muscle_groups_by_workout
 
 
 def workout_muscle_group_ids(db: Session, workout_ids: list[int]) -> dict[int, set[int]]:
-    """Grupos por workout: primarios de los ejercicios registrados ∪ tags manuales."""
-    result: dict[int, set[int]] = {wid: set() for wid in workout_ids}
+    """Grupos por workout: primarios de los ejercicios registrados ∪ tags
+    manuales. La mitad "derivada" vive en services/workouts.py (fix M9:
+    antes duplicada aquí como una query casi idéntica a
+    sync_derived_muscle_groups) — esta función solo le suma la mitad manual,
+    que sync_derived_muscle_groups no necesita conocer."""
+    result = primary_muscle_groups_by_workout(db, workout_ids)
     if not workout_ids:
         return result
-    derived = db.execute(
-        select(WorkoutExercise.workout_id, ExerciseMuscleGroup.muscle_group_id)
-        .join(
-            ExerciseMuscleGroup,
-            ExerciseMuscleGroup.exercise_id == WorkoutExercise.exercise_id,
-        )
-        .where(
-            WorkoutExercise.workout_id.in_(workout_ids),
-            ExerciseMuscleGroup.is_primary.is_(True),
-        )
-    ).all()
-    for workout_id, group_id in derived:
-        result[workout_id].add(group_id)
     manual = db.execute(
         select(WorkoutMuscleGroup.workout_id, WorkoutMuscleGroup.muscle_group_id).where(
             WorkoutMuscleGroup.workout_id.in_(workout_ids)
@@ -72,6 +64,51 @@ def exercise_series(db: Session, owner_id: int, exercise_id: int) -> list[dict]:
         entry["volume"] += reps * weight
         entry["est_1rm"] = max(entry["est_1rm"], estimate_1rm(weight, reps))
     return list(by_workout.values())
+
+
+def latest_exercise_session(
+    db: Session,
+    owner_id: int,
+    exercise_id: int,
+    exclude_workout_id: int | None = None,
+) -> dict | None:
+    """Sesión TERMINADA más reciente (día + series) en la que se hizo este
+    ejercicio, excluyendo opcionalmente un workout (el que se está editando/
+    viviendo ahora mismo — un entreno retroactivo ya cerrado, si no se
+    excluye, se encontraría a sí mismo como "la última vez"). None si nunca
+    se ha entrenado (terminado) este ejercicio.
+
+    Si el ejercicio aparece más de una vez en la misma sesión (dos
+    WorkoutExercise del mismo exercise_id — el alta no lo impide), se
+    devuelven las series de TODAS esas entradas juntas, ordenadas por
+    completed_at: "todas las series de la última vez que hice el ejercicio",
+    no solo las de una de las entradas.
+    """
+    query = (
+        select(Workout.id, Workout.date)
+        .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
+        .where(
+            Workout.owner_id == owner_id,
+            Workout.ended_at.is_not(None),
+            WorkoutExercise.exercise_id == exercise_id,
+        )
+    )
+    if exclude_workout_id is not None:
+        query = query.where(Workout.id != exclude_workout_id)
+    row = db.execute(query.order_by(Workout.date.desc(), Workout.id.desc()).limit(1)).first()
+    if row is None:
+        return None
+    workout_id, workout_date = row
+    sets = db.scalars(
+        select(WorkoutSet)
+        .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .where(
+            WorkoutExercise.workout_id == workout_id,
+            WorkoutExercise.exercise_id == exercise_id,
+        )
+        .order_by(WorkoutSet.completed_at, WorkoutSet.id)
+    ).all()
+    return {"workout_id": workout_id, "date": workout_date, "sets": sets}
 
 
 def _prev_week(week: tuple[int, int]) -> tuple[int, int]:
@@ -198,6 +235,10 @@ def lifetime_stats(db: Session, owner_id: int) -> dict:
     ).one()
     total_sets, total_reps = int(sets_row[0]), int(sets_row[1])
 
+    # calentamientos excluidos aquí también (bug reportado en revisión): sets/reps/
+    # volumen de arriba ya usan effective_set_filters (que descarta is_warmup), pero
+    # esta agregación de cardio los estaba colando sin filtrar — un calentamiento en
+    # cinta inflaba total_cardio_seconds/total_distance_m con datos no efectivos
     cardio_row = db.execute(
         select(
             func.coalesce(func.sum(WorkoutSet.duration_seconds), 0),
@@ -206,7 +247,11 @@ def lifetime_stats(db: Session, owner_id: int) -> dict:
         .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
         .join(Exercise, Exercise.id == WorkoutExercise.exercise_id)
         .join(Workout, Workout.id == WorkoutExercise.workout_id)
-        .where(Workout.owner_id == owner_id, Exercise.measurement == "cardio")
+        .where(
+            Workout.owner_id == owner_id,
+            Exercise.measurement == "cardio",
+            WorkoutSet.is_warmup.is_(False),
+        )
     ).one()
     total_cardio_seconds, total_distance_m = int(cardio_row[0]), float(cardio_row[1])
 

@@ -11,6 +11,7 @@ import { formatWeight, formatWeightInt } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
+import SaveAsRoutineSheet from './SaveAsRoutineSheet.vue'
 
 const props = withDefaults(
   defineProps<{ workout: WorkoutOut; records?: PersonalRecordOut[] }>(),
@@ -25,6 +26,11 @@ const units = computed(() => ((auth.user?.units as 'kg' | 'lb') || 'kg'))
 
 const feeling = ref(props.workout.feeling)
 const note = ref(props.workout.note || '')
+// item 8: "check en el entreno" — se refleja al toque, sin esperar la
+// respuesta (mismo criterio optimista que feeling, que ya mutaba el ref
+// local antes del await)
+const stretched = ref(props.workout.stretched)
+const saveAsRoutineOpen = ref(false)
 let noteTimeout: ReturnType<typeof setTimeout> | null = null
 
 const durationLabel = computed(() => {
@@ -79,6 +85,16 @@ async function saveNote() {
   try {
     await updateWorkout(props.workout.id, { note: note.value || null })
   } catch (error) {
+    toastApiError(error)
+  }
+}
+
+async function toggleStretched() {
+  stretched.value = !stretched.value
+  try {
+    await updateWorkout(props.workout.id, { stretched: stretched.value })
+  } catch (error) {
+    stretched.value = !stretched.value
     toastApiError(error)
   }
 }
@@ -141,6 +157,33 @@ watch(note, () => {
 
     <BkField v-model="note" :label="t('workout.note')" />
 
+    <button
+      type="button"
+      data-testid="stretched-toggle"
+      class="bk-press flex items-center gap-2 text-sm"
+      :class="stretched ? 'text-aurora' : 'text-ink-muted'"
+      :aria-pressed="stretched ? 'true' : 'false'"
+      @click="toggleStretched"
+    >
+      <span
+        class="w-4 h-4 rounded-xs border shrink-0"
+        :class="stretched ? 'border-aurora bg-aurora/20' : 'border-line'"
+        aria-hidden="true"
+      />
+      {{ t('workout.stretched') }}
+    </button>
+
+    <BkButton
+      variant="ghost"
+      block
+      data-testid="save-as-routine-btn"
+      @click="saveAsRoutineOpen = true"
+    >
+      {{ t('workout.saveAsRoutine') }}
+    </BkButton>
+
     <BkButton variant="primary" block @click="emit('close')">{{ t('workout.finishClose') }}</BkButton>
+
+    <SaveAsRoutineSheet :open="saveAsRoutineOpen" :workout="workout" @close="saveAsRoutineOpen = false" />
   </section>
 </template>

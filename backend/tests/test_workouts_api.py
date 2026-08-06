@@ -11,6 +11,16 @@ def bench_id(client) -> int:
     )
 
 
+def exercise_id(client, name_en: str) -> int:
+    return next(
+        e["id"] for e in client.get("/api/v1/exercises").json() if e["name_en"] == name_en
+    )
+
+
+def muscle_group_id(client, slug: str) -> int:
+    return next(g["id"] for g in client.get("/api/v1/muscle-groups").json() if g["slug"] == slug)
+
+
 def make_routine(client) -> int:
     rid = client.post("/api/v1/routines", json={"name": "Push"}).json()["id"]
     client.put(
@@ -166,6 +176,22 @@ def test_patch_and_delete(client: TestClient, app):
     assert client.get(f"/api/v1/workouts/{wid}").status_code == 404
 
 
+def test_stretched_defaults_false_and_patch_toggles_it(client: TestClient):
+    workout = client.post("/api/v1/workouts", json={"date": "2026-08-01"}).json()
+    wid = workout["id"]
+    assert workout["stretched"] is False
+
+    resp = client.patch(f"/api/v1/workouts/{wid}", json={"stretched": True})
+    assert resp.status_code == 200 and resp.json()["stretched"] is True
+
+    # una petición sin el campo no lo toca (exclude_unset)
+    resp = client.patch(f"/api/v1/workouts/{wid}", json={"note": "x"})
+    assert resp.json()["stretched"] is True
+
+    resp = client.patch(f"/api/v1/workouts/{wid}", json={"stretched": False})
+    assert resp.json()["stretched"] is False
+
+
 def test_patch_workout_explicit_null_semantics(client: TestClient):
     workout = client.post("/api/v1/workouts", json={"date": "2026-08-01"}).json()
     wid = workout["id"]
@@ -226,3 +252,97 @@ def test_list_with_date_filters(client: TestClient):
         client.post(f"/api/v1/workouts/{wid}/finish")
     july = client.get("/api/v1/workouts?from_date=2026-07-01&to_date=2026-07-31").json()
     assert [w["date"] for w in july] == ["2026-07-15", "2026-07-01"]
+
+
+# item 4 (round v0.3.0): grupos musculares derivados, ya no elegidos a mano
+def test_muscle_tags_derive_from_exercises_and_recompute_on_add_remove(client: TestClient):
+    chest = muscle_group_id(client, "chest")
+    legs = muscle_group_id(client, "legs")
+    workout = client.post("/api/v1/workouts", json={}).json()
+    wid = workout["id"]
+    assert workout["muscle_tag_ids"] == []
+
+    bench_wex = client.post(
+        f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": bench_id(client)}
+    ).json()
+    assert client.get(f"/api/v1/workouts/{wid}").json()["muscle_tag_ids"] == [chest]
+
+    client.post(
+        f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": exercise_id(client, "Squat")}
+    )
+    assert sorted(client.get(f"/api/v1/workouts/{wid}").json()["muscle_tag_ids"]) == sorted(
+        [chest, legs]
+    )
+
+    # quitar el press banca deja solo el grupo del ejercicio que queda (legs)
+    assert (
+        client.delete(f"/api/v1/workouts/{wid}/exercises/{bench_wex['id']}").status_code == 204
+    )
+    assert client.get(f"/api/v1/workouts/{wid}").json()["muscle_tag_ids"] == [legs]
+
+
+def test_muscle_tags_derived_immediately_from_routine_exercises(client: TestClient):
+    chest = muscle_group_id(client, "chest")
+    rid = make_routine(client)  # rutina "Push" con solo el press banca
+    workout = client.post("/api/v1/workouts", json={"routine_id": rid}).json()
+    assert workout["muscle_tag_ids"] == [chest]
+
+
+# item 11 (round v0.3.0): descanso configurable por ejercicio del entreno
+def test_rest_seconds_copied_from_routine_on_start_and_on_manual_add(client: TestClient):
+    rid = make_routine(client)  # "Push" con bench a rest_seconds=90
+    workout = client.post("/api/v1/workouts", json={"routine_id": rid}).json()
+    assert workout["exercises"][0]["rest_seconds"] == 90
+
+    # quitar y volver a añadir el mismo ejercicio (sigue en la rutina de origen)
+    wid = workout["id"]
+    client.delete(f"/api/v1/workouts/{wid}/exercises/{workout['exercises'][0]['id']}")
+    added = client.post(
+        f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": bench_id(client)}
+    ).json()
+    assert added["rest_seconds"] == 90
+
+
+def test_rest_seconds_is_null_for_ad_hoc_exercises(client: TestClient):
+    workout = client.post("/api/v1/workouts", json={}).json()  # entreno libre, sin rutina
+    added = client.post(
+        f"/api/v1/workouts/{workout['id']}/exercises", json={"exercise_id": bench_id(client)}
+    ).json()
+    assert added["rest_seconds"] is None
+
+
+def test_rest_seconds_patch_round_trip_and_explicit_clear(client: TestClient):
+    workout = client.post("/api/v1/workouts", json={}).json()
+    wex = client.post(
+        f"/api/v1/workouts/{workout['id']}/exercises", json={"exercise_id": bench_id(client)}
+    ).json()
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}"
+
+    resp = client.patch(url, json={"rest_seconds": 120})
+    assert resp.status_code == 200 and resp.json()["rest_seconds"] == 120
+
+    # fuera de rango (ge=5, le=900)
+    assert client.patch(url, json={"rest_seconds": 2}).status_code == 422
+
+    # null explícito limpia el override (vuelve a caer al default en el frontend)
+    resp = client.patch(url, json={"rest_seconds": None})
+    assert resp.status_code == 200 and resp.json()["rest_seconds"] is None
+
+
+def test_manual_muscle_tags_endpoint_superseded_by_next_exercise_change(client: TestClient):
+    """El endpoint PUT .../muscle-groups sigue existiendo (compatibilidad),
+    pero cualquier alta/baja de ejercicio posterior lo pisa con el derivado —
+    deja de ser una fuente de verdad independiente."""
+    chest = muscle_group_id(client, "chest")
+    legs = muscle_group_id(client, "legs")
+    workout = client.post("/api/v1/workouts", json={}).json()
+    wid = workout["id"]
+
+    manual = client.put(
+        f"/api/v1/workouts/{wid}/muscle-groups", json={"muscle_group_ids": [legs]}
+    ).json()
+    assert manual["muscle_tag_ids"] == [legs]
+
+    client.post(f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": bench_id(client)})
+    # el alta de un ejercicio de pecho reemplaza el tag manual de piernas
+    assert client.get(f"/api/v1/workouts/{wid}").json()["muscle_tag_ids"] == [chest]

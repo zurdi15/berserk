@@ -152,6 +152,17 @@ def seed_stats_user(db_session):
             workout_exercise_id=wex_b.id, set_number=1, duration_seconds=1800, distance_m=5000
         )
     )
+    # calentamiento de cardio: debe quedar fuera de total_cardio_seconds/
+    # total_distance_m igual que ya quedaba fuera de total_sets/total_reps/
+    # total_volume_kg (bug de revisión: la agregación de cardio no filtraba
+    # is_warmup) — con set_number 2 antes del calentamiento real de A para
+    # que el orden de inserción no oculte el bug
+    db_session.add(
+        models.WorkoutSet(
+            workout_exercise_id=wex_b.id, set_number=2, duration_seconds=300,
+            distance_m=1000, is_warmup=True,
+        )
+    )
 
     # Workout C: ACTIVO (ended_at None) — mismo lunes ISO que B (semana 32),
     # no debe sumar workout ni tiempo de gym
@@ -196,6 +207,67 @@ def test_lifetime_stats_seeded_numbers(db_session):
         "avg_session_seconds": 3150.0,     # 6300 / 2
         "longest_streak_weeks": 2,         # semanas 31 (A) y 32 (B y C) consecutivas
     }
+
+
+def make_finished_workout(db_session, owner_id, exercise_id, day, sets, ended=True):
+    workout = models.Workout(
+        owner_id=owner_id,
+        date=day,
+        ended_at=datetime.combine(day, datetime.min.time()) if ended else None,
+    )
+    db_session.add(workout)
+    db_session.flush()
+    wex = models.WorkoutExercise(workout_id=workout.id, exercise_id=exercise_id, position=1)
+    db_session.add(wex)
+    db_session.flush()
+    for n, fields in enumerate(sets, start=1):
+        db_session.add(models.WorkoutSet(workout_exercise_id=wex.id, set_number=n, **fields))
+    db_session.commit()
+    return workout
+
+
+def test_latest_exercise_session_returns_most_recent_finished_workout(db_session):
+    user, _, bench = seed_user_with_workouts(db_session)
+    # seed_user_with_workouts ya deja 2 sesiones terminadas (27 jul y 3 ago);
+    # una tercera, más reciente, es la que debe devolver
+    newest = make_finished_workout(
+        db_session, user.id, bench.id, date(2026, 8, 10),
+        [{"reps": 3, "weight_kg": 110}, {"reps": 3, "weight_kg": 112.5}],
+    )
+    result = svc.latest_exercise_session(db_session, user.id, bench.id)
+    assert result["workout_id"] == newest.id
+    assert result["date"] == date(2026, 8, 10)
+    assert [s.weight_kg for s in result["sets"]] == [110, 112.5]
+
+
+def test_latest_exercise_session_excludes_given_workout_id(db_session):
+    user, _, bench = seed_user_with_workouts(db_session)
+    newest = make_finished_workout(
+        db_session, user.id, bench.id, date(2026, 8, 10), [{"reps": 3, "weight_kg": 110}]
+    )
+    # excluyendo la más reciente (p.ej. el propio entreno retroactivo que se
+    # está editando), debe caer a la sesión terminada anterior (3 ago)
+    result = svc.latest_exercise_session(db_session, user.id, bench.id, exclude_workout_id=newest.id)
+    assert result["date"] == date(2026, 8, 3)
+
+
+def test_latest_exercise_session_ignores_unfinished_workouts(db_session):
+    user, _, bench = seed_user_with_workouts(db_session)
+    make_finished_workout(
+        db_session, user.id, bench.id, date(2026, 8, 20), [{"reps": 1, "weight_kg": 200}],
+        ended=False,
+    )
+    # el entreno activo (ended_at None) no cuenta como "última vez"
+    result = svc.latest_exercise_session(db_session, user.id, bench.id)
+    assert result["date"] == date(2026, 8, 3)
+
+
+def test_latest_exercise_session_none_when_never_trained(db_session):
+    user = models.User(username="ghost", password_hash="x")
+    exercise = models.Exercise(name_es="X", name_en="X", measurement="strength")
+    db_session.add_all([user, exercise])
+    db_session.commit()
+    assert svc.latest_exercise_session(db_session, user.id, exercise.id) is None
 
 
 def test_lifetime_stats_empty_user(db_session):

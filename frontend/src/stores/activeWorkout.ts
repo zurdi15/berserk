@@ -3,16 +3,22 @@ import { ref } from 'vue'
 
 import { ApiError } from '@/api/client'
 import * as domain from '@/api/domain'
-import type { PersonalRecordOut, SetIn, SetLogOut, WorkoutOut } from '@/api/domain'
+import type { ExerciseHistoryOut, PersonalRecordOut, SetIn, SetLogOut, WorkoutOut } from '@/api/domain'
 import { useRestTimerStore } from '@/stores/restTimer'
 
 export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   const workout = ref<WorkoutOut | null>(null)
   const loading = ref(false)
   const lastRecords = ref<PersonalRecordOut[]>([])
+  // item 3: cache de "última sesión" por exercise_id, vigente mientras dure
+  // ESTE entreno — se limpia en cualquier punto donde `workout` pase a
+  // referirse a uno distinto (start/resume/reset), porque el resultado
+  // depende de qué workout se excluye de la búsqueda (ver exerciseHistory)
+  const historyCache = ref(new Map<number, ExerciseHistoryOut | null>())
 
   async function resume() {
     loading.value = true
+    historyCache.value.clear()
     try {
       workout.value = await domain.getActiveWorkout()
     } catch (error) {
@@ -29,7 +35,17 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   }
 
   async function start(body: Parameters<typeof domain.startWorkout>[0]) {
+    historyCache.value.clear()
     workout.value = await domain.startWorkout(body)
+  }
+
+  async function exerciseHistory(exerciseId: number): Promise<ExerciseHistoryOut | null> {
+    if (historyCache.value.has(exerciseId)) return historyCache.value.get(exerciseId) ?? null
+    const result = await domain.getExerciseHistory(exerciseId, {
+      exclude_workout_id: workout.value?.id,
+    })
+    historyCache.value.set(exerciseId, result)
+    return result
   }
 
   async function finish(): Promise<WorkoutOut> {
@@ -70,6 +86,11 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     await refresh()
   }
 
+  async function setExerciseRest(weid: number, restSeconds: number | null) {
+    await domain.updateWorkoutExercise(workout.value!.id, weid, { rest_seconds: restSeconds })
+    await refresh()
+  }
+
   async function discard() {
     await domain.deleteWorkout(workout.value!.id)
     workout.value = null
@@ -78,15 +99,29 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     useRestTimerStore().clear()
   }
 
-  async function setMuscleTags(ids: number[]) {
-    // el endpoint devuelve el entreno completo actualizado: no hace falta un refresh aparte
-    workout.value = await domain.setWorkoutMuscleTags(workout.value!.id, ids)
-  }
-
   function reset() {
     workout.value = null
     lastRecords.value = []
+    historyCache.value.clear()
   }
 
-  return { workout, loading, lastRecords, resume, refresh, start, finish, addExercise, removeExercise, reorder, logSet, updateSet, deleteSet, discard, setMuscleTags, reset }
+  return {
+    workout,
+    loading,
+    lastRecords,
+    resume,
+    refresh,
+    start,
+    finish,
+    addExercise,
+    removeExercise,
+    reorder,
+    logSet,
+    updateSet,
+    deleteSet,
+    discard,
+    exerciseHistory,
+    setExerciseRest,
+    reset,
+  }
 })
