@@ -37,6 +37,35 @@ export function formatDayLabel(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(y, m - 1, d))
 }
 
+// variante corta (BkDateField, gatillo del trigger): sin día de la semana,
+// mes abreviado — formatDayLabel es demasiado largo para caber en un campo
+export function formatDateShort(iso: string, locale: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(y, m - 1, d))
+}
+
+// suma días/meses vía constructor LOCAL (nunca Date.parse(iso) ni
+// toISOString): ese es justo el patrón que evita la trampa del desplazamiento
+// de día por zona horaria (ver isoDate arriba). setDate/setMonth operan sobre
+// el calendario local; un cambio de horario de verano de por medio no mueve
+// el y-m-d que pedimos, lo resuelve el motor de JS por debajo.
+export function addDays(iso: string, delta: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  date.setDate(date.getDate() + delta)
+  return isoDate(date)
+}
+
+export function addMonths(iso: string, delta: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  // día 1 primero: construir ya con el día real (p.ej. 31) sobre un mes con
+  // menos días desbordaría al mes siguiente antes de poder acotarlo
+  const first = new Date(y, m - 1 + delta, 1)
+  const daysInTarget = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
+  first.setDate(Math.min(d, daysInTarget))
+  return isoDate(first)
+}
+
 export function formatTimeShort(hms: string | null): string | null {
   return hms ? hms.slice(0, 5) : hms
 }
