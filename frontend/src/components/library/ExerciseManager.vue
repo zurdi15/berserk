@@ -23,9 +23,12 @@ const toast = useToastStore()
 const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
 
-// el catálogo global (owner_id null) es de solo lectura aquí: esta pantalla
-// gestiona únicamente los ejercicios propios del usuario
 const ownExercises = computed(() => exercises.value.filter((e) => e.owner_id !== null))
+// item 4: catálogo predefinido (owner_id null) en su propia sección,
+// colapsada por defecto — de solo lectura para un usuario normal; item 5
+// añade edición/borrado ahí mismo para un admin
+const catalogExercises = computed(() => exercises.value.filter((e) => e.owner_id === null))
+const catalogOpen = ref(false)
 
 const measurementValues: Measurement[] = ['strength', 'bodyweight', 'timed', 'cardio']
 const measurementOptions = computed(() =>
@@ -190,6 +193,48 @@ async function confirmDelete() {
         <BkButton data-testid="new-exercise-btn" @click="openCreate">
           {{ $t('library.newExercise') }}
         </BkButton>
+      </div>
+    </BkCard>
+
+    <!-- item 4: catálogo predefinido, colapsado por defecto — mismo patrón
+         de expandir/colapsar que las rutinas de RoutineList -->
+    <BkCard>
+      <div class="space-y-4">
+        <button
+          type="button"
+          class="bk-press flex w-full items-center justify-between text-left"
+          :aria-expanded="catalogOpen ? 'true' : 'false'"
+          data-testid="toggle-catalog"
+          @click="catalogOpen = !catalogOpen"
+        >
+          <h2 class="font-display font-semibold text-ink uppercase tracking-wider text-sm">
+            {{ $t('library.catalog') }}
+          </h2>
+          <svg
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"
+            class="w-4 h-4 shrink-0 text-ink-muted transition-transform"
+            :class="{ 'rotate-180': catalogOpen }"
+            aria-hidden="true"
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+
+        <div v-if="catalogOpen" :data-testid="'catalog-list'" class="space-y-2">
+          <div v-if="ready && catalogExercises.length > 0" class="space-y-2">
+            <div
+              v-for="exercise in catalogExercises"
+              :key="exercise.id"
+              :data-testid="`catalog-exercise-row-${exercise.id}`"
+              class="flex items-center justify-between gap-2 p-2 rounded border border-line text-sm"
+            >
+              <span>{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
+            </div>
+          </div>
+
+          <BkEmpty v-else-if="ready" :message="$t('library.noCatalog')" />
+        </div>
       </div>
     </BkCard>
 

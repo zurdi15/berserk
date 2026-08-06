@@ -181,6 +181,8 @@ export const en = {
     isGlobal: 'Global (all users)',
     noExercises: 'No custom exercises yet',
     noGroups: 'No custom muscle groups yet',
+    catalog: 'Predefined catalog',
+    noCatalog: 'No exercises in the catalog',
     confirmDeleteExercise: 'Delete exercise',
     confirmDeleteExerciseMessage: 'Are you sure you want to delete this exercise?',
     confirmDeleteGroup: 'Delete muscle group',

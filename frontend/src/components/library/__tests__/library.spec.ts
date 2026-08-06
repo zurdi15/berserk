@@ -245,6 +245,62 @@ describe('ExerciseManager', () => {
     expect(deleteBtn.attributes('aria-label')).toBe('Borrar')
     expect(deleteBtn.classes()).toContain('text-danger')
   })
+
+  it('item 4: the predefined catalog section is collapsed by default (no rows in the DOM, toggle collapsed)', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [] },
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    const toggle = wrapper.get('[data-testid="toggle-catalog"]')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('[data-testid="catalog-exercise-row-1"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Catálogo predefinido')
+  })
+
+  it('item 4: expanding the catalog toggle reveals predefined (owner_id null) rows, read-only for a non-admin user', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [] },
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    setUser({ is_admin: false })
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="toggle-catalog"]').attributes('aria-expanded')).toBe('true')
+    const row = wrapper.get('[data-testid="catalog-exercise-row-1"]')
+    expect(row.text()).toContain('Press banca')
+    // solo lectura: sin controles de editar/borrar para un usuario normal
+    expect(row.find('[data-testid="edit-exercise-1"]').exists()).toBe(false)
+    expect(row.find('[data-testid="delete-exercise-1"]').exists()).toBe(false)
+    // el propio (owner_id 7) no aparece duplicado en el catálogo
+    expect(wrapper.find('[data-testid="catalog-exercise-row-12"]').exists()).toBe(false)
+  })
+
+  it('item 4: shows the empty state once loaded if the catalog has no predefined rows', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Sin ejercicios en el catálogo')
+  })
 })
 
 describe('MuscleGroupManager', () => {
