@@ -3,6 +3,8 @@
 # así el build multi-arch no emula npm/vite bajo QEMU para arm64
 FROM --platform=$BUILDPLATFORM node:22-alpine AS webbuild
 WORKDIR /web
+# guard:tokens corre bash; alpine solo trae ash por defecto
+RUN apk add --no-cache bash
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
@@ -27,7 +29,13 @@ ENV BK_DATA_DIR=/data
 VOLUME /data
 EXPOSE 8000
 
+# el proceso no necesita root: correr como usuario dedicado limita el radio
+# de un compromiso del contenedor; /data debe ser suyo para poder escribir la DB
+RUN groupadd --system berserk && useradd --system --gid berserk --home-dir /app berserk \
+  && mkdir -p /data && chown berserk:berserk /data
+USER berserk
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
 
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.asgi:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.asgi:app --host 0.0.0.0 --port 8000 --proxy-headers"]
