@@ -112,6 +112,58 @@ describe('BkSheet', () => {
 
     wrapper.unmount()
   })
+
+  // item 4: excepción documentada al doctrine "solo entrada" — el sheet
+  // anima también al cerrarse (ver el comentario en BkSheet.vue). Vue Test
+  // Utils stubea <Transition> por defecto (sin eso, nunca se ven las clases
+  // ni corren los hooks) así que estos dos tests lo desactivan explícitamente
+  // para observar el comportamiento real.
+  it('item 4: applies the sheet-specific enter transition classes to panel and backdrop on open', async () => {
+    const wrapper = mount(BkSheet, {
+      props: { open: false, title: 'Con animación' },
+      attachTo: document.body,
+      global: { stubs: { transition: false } },
+    })
+
+    await wrapper.setProps({ open: true })
+    await nextTick()
+
+    const panel = document.querySelector('[role="dialog"]') as HTMLElement
+    expect(panel.classList.contains('bk-sheet-panel-enter-active')).toBe(true)
+
+    const backdrop = document.querySelector('.bg-void\\/70') as HTMLElement
+    expect(backdrop.classList.contains('bk-sheet-backdrop-enter-active')).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('item 4: initiates the leave transition on close (visual only — close still emits immediately) and the panel eventually detaches', async () => {
+    const wrapper = mount(BkSheet, {
+      props: { open: true, title: 'Con animación' },
+      attachTo: document.body,
+      global: { stubs: { transition: false } },
+    })
+    await nextTick()
+    await nextTick()
+
+    await wrapper.setProps({ open: false })
+
+    // la salida es solo visual: el panel sigue montado un instante con la
+    // clase de leave mientras se desliza hacia abajo — @close ya se emitió
+    // de inmediato en cuanto el padre puso open=false, sin esperar a esto
+    const leavingPanel = document.querySelector('[role="dialog"]') as HTMLElement
+    expect(leavingPanel).not.toBeNull()
+    expect(leavingPanel.classList.contains('bk-sheet-panel-leave-active')).toBe(true)
+
+    await vi.waitFor(
+      () => {
+        expect(document.querySelector('[role="dialog"]')).toBeNull()
+      },
+      { timeout: 1000 },
+    )
+
+    wrapper.unmount()
+  })
 })
 
 describe('BkToast', () => {
