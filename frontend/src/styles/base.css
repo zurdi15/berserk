@@ -77,3 +77,13 @@ body::before {
   font-family: var(--bk-font-mono);
   font-variant-numeric: tabular-nums;
 }
+
+/* barras con scroll horizontal (tabs, etc.) sin scrollbar visible: el
+   affordance de "hay más contenido" ya lo da el corte de los items, la
+   scrollbar encima solo añade ruido visual (mismo patrón que turtletrips) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

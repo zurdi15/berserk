@@ -120,14 +120,17 @@ watch(() => athlete.userId, () => {
       <h1 class="text-2xl font-bold text-ink">{{ $t('app.nav.calendar') }}</h1>
     </div>
 
-    <!-- Month navigation -->
-    <div class="flex items-center justify-between">
-      <BkButton variant="ghost" @click="prevMonth">
-        ← {{ $t('calendar.prevMonth') }}
+    <!-- Month navigation: icon-only en móvil (el texto largo con flecha
+         desbordaba y aplastaba el label en 390px), texto de vuelta desde sm -->
+    <div class="flex items-center gap-2">
+      <BkButton variant="ghost" size="sm" :aria-label="$t('calendar.prevMonth')" @click="prevMonth">
+        <span aria-hidden="true">‹</span>
+        <span class="hidden sm:inline">{{ $t('calendar.prevMonth') }}</span>
       </BkButton>
-      <h2 class="text-lg font-semibold text-ink">{{ label }}</h2>
-      <BkButton variant="ghost" @click="nextMonth">
-        {{ $t('calendar.nextMonth') }} →
+      <h2 class="flex-1 px-2 text-center text-lg font-semibold text-ink">{{ label }}</h2>
+      <BkButton variant="ghost" size="sm" :aria-label="$t('calendar.nextMonth')" @click="nextMonth">
+        <span aria-hidden="true">›</span>
+        <span class="hidden sm:inline">{{ $t('calendar.nextMonth') }}</span>
       </BkButton>
     </div>
 
