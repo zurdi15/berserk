@@ -3,7 +3,6 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { monthGrid, weekdayHeaders, todayIso } from '@/utils/dates'
 import { isValidRuneName } from '@/lib/runeResolve'
-import { statusClasses } from './statusClasses'
 import BkRune from '@/lib/BkRune.vue'
 import type { CalendarMonthOut } from '@/api/domain'
 import type { RuneName } from '@/lib/runes'
@@ -26,12 +25,34 @@ const grid = computed(() => monthGrid(props.year, props.monthNum))
 const headers = computed(() => weekdayHeaders(locale.value))
 const today = computed(() => todayIso())
 
-// Agrupar scheduled por fecha
-const scheduledByDate = computed(() => {
-  const map = new Map<string, typeof props.month.scheduled>()
-  for (const s of props.month.scheduled) {
-    if (!map.has(s.date)) map.set(s.date, [])
-    map.get(s.date)!.push(s)
+// v0.3.0 item 3 (bug): "El dot del calendario debería ser un entreno, se
+// haya programado antes o no" + "si añado un entreno sin ejercicios ni
+// grupos, sale en actividad del año pero nada lo identifica en el
+// calendario". Antes el dot de arriba salía de scheduled[] (por status): un
+// entreno standalone (sin sesión programada detrás) no tenía sesión que
+// mirar, así que no dejaba ningún rastro arriba — y sin grupos musculares
+// tampoco dejaba runa abajo. Ahora el dot RELLENO sale de workouts[] (uno
+// por entreno, exista o no una sesión detrás, tenga o no ejercicios), y el
+// dot HUECO sigue reservado a lo que de verdad está solo planificado
+// (status 'planned': algo que aún no ha pasado). 'skipped' no deja dot
+// arriba — ni es un entreno ni es algo pendiente, y ya tiene su propia fila
+// en el sheet del día.
+type DayDot = { key: string; kind: 'done' | 'planned' }
+
+const dotsByDate = computed(() => {
+  const map = new Map<string, DayDot[]>()
+  for (const workout of props.month.workouts) {
+    const existing = map.get(workout.date) ?? []
+    map.set(workout.date, [...existing, { key: `w-${workout.id}`, kind: 'done' }])
+  }
+  for (const session of props.month.scheduled) {
+    if (session.status !== 'planned') continue
+    const existing = map.get(session.date) ?? []
+    map.set(session.date, [...existing, { key: `s-${session.id}`, kind: 'planned' }])
+  }
+  // mismo idiom que runesByDate: máximo 3 dots por día, en línea horizontal
+  for (const [date, dots] of map) {
+    if (dots.length > 3) map.set(date, dots.slice(0, 3))
   }
   return map
 })
@@ -69,8 +90,15 @@ function selectDay(date: string) {
       </div>
     </div>
 
-    <!-- Month grid -->
-    <div class="grid grid-cols-7 gap-1 bk-stagger">
+    <!-- Month grid: --bk-day-dot fija el color de los dots de arriba (item
+         3), con el token aurora como default — una futura ola puede
+         sobreescribirlo aquí mismo para colorear por atleta, sin tocar los
+         dots en sí -->
+    <div
+      class="grid grid-cols-7 gap-1 bk-stagger"
+      data-testid="month-grid"
+      style="--bk-day-dot: var(--color-aurora)"
+    >
       <button
         v-for="(cell, i) in grid"
         :key="`day-${cell.date}`"
@@ -95,16 +123,20 @@ function selectDay(date: string) {
           {{ Number(cell.date.slice(8, 10)) }}
         </span>
 
-        <!-- Status dots: arriba de la celda -->
+        <!-- Workout dots: arriba de la celda, uno por entreno (relleno) +
+             uno por sesión aún planificada (hueco) — ver dotsByDate arriba -->
         <div
-          v-if="scheduledByDate.has(cell.date)"
+          v-if="dotsByDate.has(cell.date)"
           class="absolute inset-x-0 top-1 flex justify-center gap-0.5"
         >
           <span
-            v-for="session in scheduledByDate.get(cell.date)!"
-            :key="`status-${session.id}`"
-            :data-status="session.status"
-            :class="['w-1.5 h-1.5', statusClasses(session.status)]"
+            v-for="dot in dotsByDate.get(cell.date)!"
+            :key="dot.key"
+            :data-status="dot.kind"
+            :class="[
+              'w-1.5 h-1.5 rounded-full',
+              dot.kind === 'done' ? 'bg-[var(--bk-day-dot)]' : 'border-2 border-[var(--bk-day-dot)]',
+            ]"
           />
         </div>
 
