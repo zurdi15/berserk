@@ -181,6 +181,9 @@ describe('BkHeatmap', () => {
     expect(outer.exists()).toBe(true)
     expect(outer.classes()).toContain('gap-3')
     expect(wrapper.find('.overflow-x-auto').exists()).toBe(false)
+    // item 5: centrado para que el hueco sobrante de la última fila se
+    // reparta a los dos lados en vez de quedar todo a la derecha
+    expect(outer.classes()).toContain('justify-center')
     // 12 bloques (uno por mes), cada uno con su propia mini-rejilla de celdas
     const blocks = wrapper.findAll('.flex.flex-col.items-center.gap-1')
     expect(blocks).toHaveLength(12)
