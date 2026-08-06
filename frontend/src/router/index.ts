@@ -4,10 +4,10 @@ import { useAuthStore } from '@/stores/auth'
 import { toastApiError } from '@/utils/apiErrors'
 import BootstrapView from '@/views/BootstrapView.vue'
 import LoginView from '@/views/LoginView.vue'
-import PlaceholderView from '@/views/PlaceholderView.vue'
 import TodayView from '@/views/TodayView.vue'
 import CalendarView from '@/views/CalendarView.vue'
 import ProfileView from '@/views/ProfileView.vue'
+import ProgressView from '@/views/ProgressView.vue'
 import ShellView from '@/views/ShellView.vue'
 import WorkoutView from '@/views/WorkoutView.vue'
 
@@ -24,7 +24,7 @@ export const router = createRouter({
         { path: 'today', name: 'today', component: TodayView },
         { path: 'calendar', name: 'calendar', component: CalendarView },
         { path: 'workout', name: 'workout', component: WorkoutView },
-        { path: 'progress', name: 'progress', component: PlaceholderView },
+        { path: 'progress', name: 'progress', component: ProgressView },
         { path: 'profile', name: 'profile', component: ProfileView },
       ],
     },
