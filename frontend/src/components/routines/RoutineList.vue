@@ -6,6 +6,7 @@ import type { RoutineOut } from '@/api/domain'
 import { deleteRoutine, listRoutines } from '@/api/domain'
 import { isValidRuneName } from '@/lib/runeResolve'
 import { toastApiError } from '@/utils/apiErrors'
+import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
@@ -98,15 +99,15 @@ onMounted(() => {
           {{ routine.exercises.length }} {{ t('routines.exercises') }}
         </div>
 
-        <!-- Actions -->
-        <div class="flex gap-2">
-          <BkButton
-            variant="primary"
-            size="sm"
+        <!-- Actions: icon-only (item 3, round 9) — mismo BkActionBtn que
+             AdminCard/BodySection, en vez de reinventar botones de texto -->
+        <div class="flex items-center gap-2">
+          <BkActionBtn
+            icon="edit"
+            :data-testid="`edit-routine-${routine.id}`"
+            :aria-label="$t('common.edit')"
             @click="openEditor(routine)"
-          >
-            {{ $t('common.edit') }}
-          </BkButton>
+          />
           <div v-if="deleteConfirming === routine.id" class="flex gap-2 flex-1">
             <BkButton
               variant="danger"
@@ -123,14 +124,13 @@ onMounted(() => {
               {{ $t('common.cancel') }}
             </BkButton>
           </div>
-          <BkButton
+          <BkActionBtn
             v-else
-            variant="danger"
-            size="sm"
+            icon="delete"
+            :data-testid="`delete-routine-${routine.id}`"
+            :aria-label="$t('common.delete')"
             @click="deleteConfirming = routine.id"
-          >
-            {{ $t('common.delete') }}
-          </BkButton>
+          />
         </div>
       </div>
     </div>

@@ -84,23 +84,23 @@ describe('RoutineList', () => {
   })
 
   it('opens editor when edit button clicked', async () => {
+    // item 3 (round 9): BkActionBtn icon-only, localizado por data-testid
+    // en vez de por el texto "Editar" que ya no existe en el botón
     const wrapper = build()
     await wrapper.vm.$nextTick()
 
     await new Promise(resolve => setTimeout(resolve, 50))
     await wrapper.vm.$nextTick()
 
-    expect((wrapper.vm as any).editorOpen).toBe(false)
+    const editor = wrapper.findComponent({ name: 'RoutineEditorSheet' })
+    expect(editor.props('open')).toBe(false)
 
-    const editBtn = wrapper.findAll('button').find(el => {
-      const text = (el.element as HTMLButtonElement).textContent || ''
-      return text.includes('Editar')
-    })
-    expect(editBtn).toBeTruthy()
-    await editBtn!.trigger('click')
+    const editBtn = wrapper.find('[data-testid="edit-routine-1"]')
+    expect(editBtn.exists()).toBe(true)
+    await editBtn.trigger('click')
     await wrapper.vm.$nextTick()
 
-    expect((wrapper.vm as any).editorOpen).toBe(true)
+    expect(editor.props('open')).toBe(true)
   })
 
   it('deletes routine when confirm clicked after delete prompt', async () => {
@@ -113,13 +113,10 @@ describe('RoutineList', () => {
     await new Promise(resolve => setTimeout(resolve, 50))
     await wrapper.vm.$nextTick()
 
-    // Click delete button on first routine
-    const deleteBtn = wrapper.findAll('button').find(el => {
-      const text = (el.element as HTMLButtonElement).textContent || ''
-      return text.includes('Borrar') && !text.includes('Editar')
-    })
-    expect(deleteBtn).toBeTruthy()
-    await deleteBtn!.trigger('click')
+    // Click delete (icon-only BkActionBtn) on first routine
+    const deleteBtn = wrapper.find('[data-testid="delete-routine-1"]')
+    expect(deleteBtn.exists()).toBe(true)
+    await deleteBtn.trigger('click')
     await wrapper.vm.$nextTick()
 
     // Confirm delete is now showing
@@ -147,12 +144,9 @@ describe('RoutineList', () => {
     await new Promise(resolve => setTimeout(resolve, 50))
     await wrapper.vm.$nextTick()
 
-    // Click delete button
-    const deleteBtn = wrapper.findAll('button').find(el => {
-      const text = (el.element as HTMLButtonElement).textContent || ''
-      return text.includes('Borrar') && !text.includes('Editar')
-    })
-    await deleteBtn!.trigger('click')
+    // Click delete (icon-only BkActionBtn)
+    const deleteBtn = wrapper.find('[data-testid="delete-routine-1"]')
+    await deleteBtn.trigger('click')
     await wrapper.vm.$nextTick()
 
     // Click cancel
@@ -167,11 +161,23 @@ describe('RoutineList', () => {
     expect(deleteRoutine).not.toHaveBeenCalled()
 
     // Verify delete button is shown again (not confirming state)
-    const deleteBtnAfter = wrapper.findAll('button').find(el => {
-      const text = (el.element as HTMLButtonElement).textContent || ''
-      return text.includes('Borrar') && !text.includes('Editar')
-    })
-    expect(deleteBtnAfter).toBeTruthy()
+    const deleteBtnAfter = wrapper.find('[data-testid="delete-routine-1"]')
+    expect(deleteBtnAfter.exists()).toBe(true)
+  })
+
+  it('item 3: edit/delete render as icon-only BkActionBtn with the correct icon and accessible label', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    await wrapper.vm.$nextTick()
+
+    const editBtn = wrapper.get('[data-testid="edit-routine-1"]')
+    expect(editBtn.attributes('aria-label')).toBe('Editar')
+    expect(editBtn.find('svg').exists()).toBe(true)
+
+    const deleteBtn = wrapper.get('[data-testid="delete-routine-1"]')
+    expect(deleteBtn.attributes('aria-label')).toBe('Borrar')
+    expect(deleteBtn.classes()).toContain('text-danger')
   })
 
   it('renders the rune icon only for a valid RuneName slug, guarding against invalid/legacy seed values', async () => {
