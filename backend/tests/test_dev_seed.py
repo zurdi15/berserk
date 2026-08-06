@@ -110,6 +110,13 @@ def test_dev_seed_generates_coherent_history(db_session):
     for r in routines:
         assert 4 <= len(r.exercises) <= 6
 
+    # el rune debe ser un slug RuneName real del picker del frontend (I7), no
+    # un glifo rúnico suelto que RoutineList no pueda resolver
+    valid_runes = {"chest", "back", "biceps", "triceps", "shoulders", "legs", "core", "berserk"}
+    runes_by_name = {r.name: r.rune for r in routines}
+    assert set(runes_by_name.values()) <= valid_runes
+    assert runes_by_name == {"Push día": "chest", "Pull día": "back", "Pierna A": "legs"}
+
     # segunda pasada: no-op, ni una fila más
     workouts_before = len(workouts)
     prs_before = len(prs)

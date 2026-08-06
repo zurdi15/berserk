@@ -174,6 +174,24 @@ describe('RoutineList', () => {
     expect(deleteBtnAfter).toBeTruthy()
   })
 
+  it('renders the rune icon only for a valid RuneName slug, guarding against invalid/legacy seed values', async () => {
+    const { listRoutines } = await import('@/api/domain')
+    vi.mocked(listRoutines).mockResolvedValueOnce([
+      { id: 1, name: 'Valid Rune Routine', description: null, rune: 'chest', color: null, exercises: [] },
+      { id: 2, name: 'Legacy Rune Routine', description: null, rune: 'ᚦ', color: null, exercises: [] },
+    ] as never)
+
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+    await wrapper.vm.$nextTick()
+
+    const runes = wrapper.findAllComponents({ name: 'BkRune' })
+    expect(runes.length).toBe(1)
+    expect(runes[0].props('name')).toBe('chest')
+  })
+
   it('shows empty state when no routines', async () => {
     const { listRoutines } = await import('@/api/domain')
     vi.mocked(listRoutines).mockResolvedValueOnce([])

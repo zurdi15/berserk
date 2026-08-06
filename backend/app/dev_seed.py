@@ -8,7 +8,8 @@ dependa del día real de ejecución (el historial siempre "termina ayer").
 """
 
 import random
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -34,11 +35,19 @@ from .services.workout_sets import detect_prs, session_volume
 
 SEED = 42
 
+# el timestamp del entreno se ancla a esta zona (misma que el timezone por
+# defecto de User) y se convierte a naive UTC — la convención del resto del
+# backend (ver models.utcnow) — para que un viewer en esa zona siga viendo
+# "entreno de las 18:00" en vez de un desplazamiento arbitrario
+SEED_TZ = ZoneInfo("Europe/Madrid")
+
 # (nombre, rune, color, [(nombre_ejercicio, sets, reps, peso_kg|None, descanso_s)])
+# rune usa los slugs RuneName del picker del frontend (frontend/src/lib/runes.ts),
+# no glifos rúnicos sueltos: RoutineList castea routine.rune a RuneName tal cual
 ROUTINE_DEFS: list[tuple[str, str, str, list[tuple[str, int, int, float | None, int]]]] = [
     (
         "Push día",
-        "ᚦ",
+        "chest",
         "#c0392b",
         [
             ("Press banca", 4, 8, 60.0, 120),
@@ -50,7 +59,7 @@ ROUTINE_DEFS: list[tuple[str, str, str, list[tuple[str, int, int, float | None, 
     ),
     (
         "Pull día",
-        "ᚱ",
+        "back",
         "#2980b9",
         [
             ("Peso muerto", 4, 6, 90.0, 150),
@@ -62,7 +71,7 @@ ROUTINE_DEFS: list[tuple[str, str, str, list[tuple[str, int, int, float | None, 
     ),
     (
         "Pierna A",
-        "ᛚ",
+        "legs",
         "#27ae60",
         [
             ("Sentadilla", 4, 8, 70.0, 150),
@@ -302,7 +311,13 @@ def _build_workout(
     extra_pool: list[Exercise],
     cardio_exercise: Exercise,
 ) -> Workout:
-    started = datetime.combine(day, time(18, 0)) + timedelta(minutes=rng.randint(0, 90))
+    # 18:00 en SEED_TZ (no naive-como-UTC-crudo): así un viewer en esa zona ve
+    # el entreno a última hora de la tarde, igual que el resto de timestamps
+    # reales de la app, que son naive UTC genuinos (utcnow())
+    started_local = datetime.combine(day, time(18, 0), tzinfo=SEED_TZ) + timedelta(
+        minutes=rng.randint(0, 90)
+    )
+    started = started_local.astimezone(UTC).replace(tzinfo=None)
     ended = started + timedelta(minutes=rng.randint(50, 80))
     feeling = rng.choices((2, 3, 4, 5), weights=(1, 2, 4, 2))[0]
     workout = Workout(

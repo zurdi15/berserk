@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 import type { RoutineOut } from '@/api/domain'
 import { deleteRoutine, listRoutines } from '@/api/domain'
+import { isValidRuneName } from '@/components/calendar/groupRune'
 import { toastApiError } from '@/utils/apiErrors'
 import BkButton from '@/lib/BkButton.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -79,7 +80,7 @@ onMounted(() => {
       >
         <!-- Header with name and rune -->
         <div class="flex items-center gap-3">
-          <div v-if="routine.rune" class="text-ink">
+          <div v-if="routine.rune && isValidRuneName(routine.rune)" class="text-ink">
             <BkRune :name="(routine.rune as RuneName)" :size="32" />
           </div>
           <div class="flex-1">
