@@ -49,6 +49,26 @@ describe('BkSheet', () => {
     wrapper.unmount()
   })
 
+  // amendment C (round 10): la utilidad de safe-area a secas (solo env(),
+  // sin sumar nada) competía con p-4 por el mismo lado (padding-bottom) y
+  // perdía frente al orden de utilidades generado, dejando el contenido
+  // pegado al borde inferior del cajón en dispositivos sin inset. La clase
+  // combina el 1rem base (misma escala que p-4) con el inset vía calc(), así
+  // el fondo nunca queda en 0 aunque el inset lo sea.
+  it('amendment C: the panel carries bottom padding that combines the 1rem scale with the safe-area inset, not env() alone', async () => {
+    const wrapper = mount(BkSheet, {
+      props: { open: true, title: 'Con padding' },
+      attachTo: document.body,
+    })
+    await nextTick()
+    await nextTick()
+
+    const panel = document.querySelector('[role="dialog"]') as HTMLElement
+    expect(panel.classList.contains('pb-[calc(1rem+env(safe-area-inset-bottom))]')).toBe(true)
+
+    wrapper.unmount()
+  })
+
   it('closes only the topmost sheet on Escape when sheets are stacked', async () => {
     // flujo real: sheet del editor de rutina, con el sheet de confirmar
     // borrado abierto encima — un solo Escape debe cerrar solo el de arriba
