@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
 
-import { getStreak, getMonth, getDistribution, listWorkouts, getRecords, listExercises, listMuscleGroups } from '@/api/domain'
+import type { PersonalRecordOut, WorkoutOut, ScheduledOut, ExerciseOut, MuscleGroupOut } from '@/api/domain'
+import { getStreak, getMonth, listWorkouts, getRecords, listExercises, listMuscleGroups } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { todayIso, getMondayOfWeek } from '@/utils/dates'
 import { useAthleteStore } from '@/stores/athlete'
@@ -11,16 +11,14 @@ import TodaySessionCard from '@/components/today/TodaySessionCard.vue'
 import WeekSummaryCard from '@/components/today/WeekSummaryCard.vue'
 import RecentPrs from '@/components/today/RecentPrs.vue'
 
-const { t } = useI18n()
 const athlete = useAthleteStore()
 
 const streak = ref<{ weeks: number } | null>(null)
-const schedules = ref<any[]>([])
-const workouts = ref<any[]>([])
-const distribution = ref<any[]>([])
-const records = ref<any[]>([])
-const exercises = ref<any[]>([])
-const muscleGroups = ref<any[]>([])
+const schedules = ref<ScheduledOut[]>([])
+const workouts = ref<WorkoutOut[]>([])
+const records = ref<PersonalRecordOut[]>([])
+const exercises = ref<ExerciseOut[]>([])
+const muscleGroups = ref<MuscleGroupOut[]>([])
 
 async function load() {
   try {
@@ -30,10 +28,11 @@ async function load() {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth() + 1
 
+    // una sola ventana temporal (lunes a hoy) para evitar desajustes entre
+    // datos de entrenamientos y distribución: todo se calcula cliente del mismo conjunto
     const [
       streakData,
       monthData,
-      distributionData,
       workoutsList,
       recordsList,
       exercisesList,
@@ -41,7 +40,6 @@ async function load() {
     ] = await Promise.all([
       getStreak(athlete.userId),
       getMonth(year, month, athlete.userId),
-      getDistribution(1, athlete.userId),
       listWorkouts({ from_date: monday, to_date: today, userId: athlete.userId }),
       getRecords({ userId: athlete.userId }),
       listExercises({ userId: athlete.userId }),
@@ -51,7 +49,6 @@ async function load() {
     streak.value = streakData
     schedules.value = monthData.scheduled
     workouts.value = workoutsList
-    distribution.value = distributionData
     records.value = recordsList
     exercises.value = exercisesList
     muscleGroups.value = muscleGroupsList
@@ -65,9 +62,17 @@ onMounted(() => load())
 
 <template>
   <div class="space-y-4 bk-stagger">
-    <StreakCard :streak="streak" />
-    <TodaySessionCard :schedules="schedules" :exercises="exercises" :muscle-groups="muscleGroups" />
-    <WeekSummaryCard :workouts="workouts" :distribution="distribution" :muscle-groups="muscleGroups" />
-    <RecentPrs :records="records" :exercises="exercises" />
+    <div :style="{ '--bk-stagger-i': 0 }">
+      <StreakCard :streak="streak" />
+    </div>
+    <div :style="{ '--bk-stagger-i': 1 }">
+      <TodaySessionCard :schedules="schedules" />
+    </div>
+    <div :style="{ '--bk-stagger-i': 2 }">
+      <WeekSummaryCard :workouts="workouts" :exercises="exercises" :muscle-groups="muscleGroups" />
+    </div>
+    <div :style="{ '--bk-stagger-i': 3 }">
+      <RecentPrs :records="records" :exercises="exercises" />
+    </div>
   </div>
 </template>

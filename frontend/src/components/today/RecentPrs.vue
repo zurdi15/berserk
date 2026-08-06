@@ -3,28 +3,15 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import BkCard from '@/lib/BkCard.vue'
+import type { PersonalRecordOut, ExerciseOut } from '@/api/domain'
 import { formatWeight } from '@/utils/units'
 import { useAuthStore } from '@/stores/auth'
-
-interface PersonalRecord {
-  id: number
-  exercise_id: number
-  kind: string
-  value: number
-  achieved_at: string
-}
-
-interface Exercise {
-  id: number
-  name_es: string
-  name_en: string
-  measurement: 'strength' | 'bodyweight' | 'timed' | 'cardio'
-}
+import { useAthleteStore } from '@/stores/athlete'
 
 const props = withDefaults(
   defineProps<{
-    records: PersonalRecord[]
-    exercises: Exercise[]
+    records: PersonalRecordOut[]
+    exercises: ExerciseOut[]
   }>(),
   {
     records: () => [],
@@ -32,14 +19,18 @@ const props = withDefaults(
   },
 )
 
-const { t, locale } = useI18n()
+const { locale } = useI18n()
 const auth = useAuthStore()
+const athlete = useAthleteStore()
 
 const recentRecords = computed(() => props.records.slice(0, 5))
 
 const exerciseMap = computed(() => new Map(props.exercises.map((e) => [e.id, e])))
 
-const units = computed(() => (auth.user?.units as 'kg' | 'lb') || 'kg')
+const units = computed(() => {
+  const unitsStr = athlete.viewing?.units ?? auth.user?.units ?? 'kg'
+  return unitsStr as 'kg' | 'lb'
+})
 
 function getExerciseName(exerciseId: number): string {
   const ex = exerciseMap.value.get(exerciseId)
@@ -47,7 +38,7 @@ function getExerciseName(exerciseId: number): string {
   return locale.value === 'es' ? ex.name_es : ex.name_en
 }
 
-function formatRecordValue(record: PersonalRecord): string {
+function formatRecordValue(record: PersonalRecordOut): string {
   if (record.kind === 'max_weight' || record.kind === 'est_1rm') {
     return formatWeight(record.value, units.value)
   }
@@ -63,7 +54,7 @@ function formatAchievedDate(dateStr: string): string {
 <template>
   <BkCard v-if="recentRecords.length > 0" :title="$t('today.recentPrs')">
     <div class="space-y-2">
-      <div v-for="record in recentRecords" :key="record.id" class="flex items-center justify-between py-2 px-3 bg-void-muted rounded">
+      <div v-for="record in recentRecords" :key="record.id" class="flex items-center justify-between py-2 px-3 bg-stone rounded">
         <div class="flex-1">
           <p class="text-sm font-medium text-ink-muted">
             {{ $t(`progress.kinds.${record.kind}`) }}

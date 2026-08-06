@@ -15,9 +15,9 @@ const tone = computed<'ember' | 'ink'>(() => (weeks.value >= 1 ? 'ember' : 'ink'
 </script>
 
 <template>
-  <BkCard :title="$t('today.streakWeeks', { n: weeks })" data-testid="streak-card" :class="{ 'text-ember': weeks >= 1, 'text-ink-faint': weeks === 0 }">
+  <BkCard :title="$t('today.streakWeeks', { n: weeks })" data-testid="streak-card" :class="{ 'text-ember': weeks >= 1 }">
     <div class="flex items-center justify-between">
-      <div class="text-6xl font-display font-semibold text-ink">
+      <div class="bk-metric text-6xl">
         {{ weeks }}
       </div>
       <BkRune name="streak" :size="48" :tone="tone" />

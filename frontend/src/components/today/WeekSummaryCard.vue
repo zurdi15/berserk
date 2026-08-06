@@ -1,36 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { RuneName } from '@/lib/runes'
+import type { WorkoutOut, ExerciseOut, MuscleGroupOut } from '@/api/domain'
 
 import BkCard from '@/lib/BkCard.vue'
 import BkRune from '@/lib/BkRune.vue'
 
-interface Workout {
-  id: number
-  date: string
-}
-
-interface DistributionItem {
-  muscle_group_id: number
-  sets: number
-}
-
-interface MuscleGroup {
-  id: number
-  slug: string
-  name_es: string
-  name_en: string
-}
-
 const props = withDefaults(
   defineProps<{
-    workouts: Workout[]
-    distribution: DistributionItem[]
-    muscleGroups: MuscleGroup[]
+    workouts: WorkoutOut[]
+    exercises: ExerciseOut[]
+    muscleGroups: MuscleGroupOut[]
   }>(),
   {
     workouts: () => [],
-    distribution: () => [],
+    exercises: () => [],
     muscleGroups: () => [],
   },
 )
@@ -42,15 +26,57 @@ const workoutDays = computed(() => {
   return uniqueDates.size
 })
 
-const effectiveSets = computed(() =>
-  props.distribution.reduce((sum, item) => sum + item.sets, 0),
-)
+// calcular series efectivas (no-warmup) desde los entrenamientos ya obtenidos,
+// una única ventana temporal para precisión
+const effectiveSets = computed(() => {
+  let total = 0
+  for (const workout of props.workouts) {
+    for (const exercise of workout.exercises) {
+      for (const set of exercise.sets) {
+        if (!set.is_warmup) {
+          total += 1
+        }
+      }
+    }
+  }
+  return total
+})
 
-const muscleGroupsInDistribution = computed(() => {
+// derivar grupos musculares de muscle_tag_ids + grupos primarios de ejercicios del entrenamiento
+const muscleGroupsInWeek = computed(() => {
   const muscleGroupMap = new Map(props.muscleGroups.map((mg) => [mg.id, mg]))
-  return props.distribution
-    .map((item) => muscleGroupMap.get(item.muscle_group_id))
-    .filter((mg) => mg !== undefined && validRunes.has(mg.slug)) as MuscleGroup[]
+  const exerciseMap = new Map(props.exercises.map((e) => [e.id, e]))
+  const seenMuscleGroupIds = new Set<number>()
+
+  // recolectar de muscle_tag_ids explícitos en entrenamientos
+  for (const workout of props.workouts) {
+    for (const mgId of workout.muscle_tag_ids) {
+      seenMuscleGroupIds.add(mgId)
+    }
+  }
+
+  // recolectar grupos primarios de ejercicios
+  for (const workout of props.workouts) {
+    for (const exercise of workout.exercises) {
+      const ex = exerciseMap.get(exercise.exercise_id)
+      if (ex) {
+        for (const link of ex.muscle_groups) {
+          if (link.is_primary) {
+            seenMuscleGroupIds.add(link.muscle_group_id)
+          }
+        }
+      }
+    }
+  }
+
+  const result: MuscleGroupOut[] = []
+  for (const mgId of seenMuscleGroupIds) {
+    const mg = muscleGroupMap.get(mgId)
+    if (mg && validRunes.has(mg.slug)) {
+      result.push(mg)
+    }
+  }
+  return result
 })
 </script>
 
@@ -68,11 +94,11 @@ const muscleGroupsInDistribution = computed(() => {
         </div>
       </div>
 
-      <div v-if="muscleGroupsInDistribution.length > 0" class="pt-2 border-t border-line">
+      <div v-if="muscleGroupsInWeek.length > 0" class="pt-2 border-t border-line">
         <p class="text-ink-muted text-sm mb-2">{{ $t('today.muscleGroupsTouched') }}</p>
         <div class="flex flex-wrap gap-2">
           <BkRune
-            v-for="mg in muscleGroupsInDistribution"
+            v-for="mg in muscleGroupsInWeek"
             :key="mg.id"
             :name="(mg.slug as RuneName)"
             :size="24"
