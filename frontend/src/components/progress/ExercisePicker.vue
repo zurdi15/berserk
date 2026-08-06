@@ -50,10 +50,11 @@ watch(() => athlete.userId, load)
 </script>
 
 <template>
-  <!-- columna flexible: el campo de búsqueda no crece, la lista se lleva
-       todo el resto del alto disponible (item 3c — el padre le da el hueco
-       vía flex-1 min-h-0) -->
   <div class="h-full flex flex-col gap-2">
+    <!-- columna flexible: el campo de búsqueda no crece, la lista se lleva
+         todo el resto del alto disponible (item 3c — el padre le da el hueco
+         vía flex-1 min-h-0). (comentario dentro de la raíz para no crear un
+         fragmento de dos raíces que rompa el fall-through de atributos) -->
     <BkField v-model="query" :label="t('progress.searchExercise')" class="shrink-0" />
 
     <!-- esqueleto mientras carga: mismo hueco que la lista real -->

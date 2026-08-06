@@ -103,9 +103,11 @@ watch(exerciseId, () => {
 </script>
 
 <template>
-  <!-- h-full: <main> del shell ya acota la altura real (ver ShellView.vue) —
-       sin ese tope, "ocupa el resto del viewport" no tiene contra qué medirse -->
   <div class="h-full flex flex-col gap-4 p-4">
+    <!-- h-full: <main> del shell ya acota la altura real (ver ShellView.vue) —
+         sin ese tope, "ocupa el resto del viewport" no tiene contra qué medirse.
+         (comentario DENTRO de la raíz: como primer hijo del template crearía un
+         fragmento de dos raíces y rompería el fall-through de atributos) -->
     <h1 class="shrink-0 text-2xl font-bold text-ink">{{ $t('app.nav.progress') }}</h1>
 
     <BkTabs class="shrink-0" v-model="tab" :tabs="mainTabs" />
