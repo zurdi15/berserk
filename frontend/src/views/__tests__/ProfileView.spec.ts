@@ -1,6 +1,6 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -36,6 +36,13 @@ vi.mock('@/api/domain', () => ({
 }))
 
 describe('ProfileView', () => {
+  // M9: al menos un test de este archivo abre un panel flotante real
+  // (BkSelect, vía la pestaña de perfil) que se registra en la pila de
+  // capas COMPARTIDA (layerStack.ts) — sin desmontar, ese registro nunca se
+  // limpia (solo onBeforeUnmount lo hace) y queda filtrado para el resto de
+  // tests del proceso. Un afterEach que desmonta cubre este archivo entero.
+  let wrapper: VueWrapper | null = null
+
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
@@ -48,6 +55,11 @@ describe('ProfileView', () => {
       units: 'kg',
       timezone: 'UTC',
     }
+  })
+
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
   })
 
   // por defecto las tarjetas hijas van con el auto-stub de VTU (contenido
@@ -69,7 +81,7 @@ describe('ProfileView', () => {
   }
 
   it('logout button calls auth.logout() store action', async () => {
-    const wrapper = build()
+    wrapper = build()
     const auth = useAuthStore()
     const logoutSpy = vi.spyOn(auth, 'logout').mockResolvedValue(undefined)
 
@@ -81,7 +93,7 @@ describe('ProfileView', () => {
   })
 
   it('logout navigates to login after store action', async () => {
-    const wrapper = build()
+    wrapper = build()
     const auth = useAuthStore()
     vi.spyOn(auth, 'logout').mockResolvedValue(undefined)
 
@@ -93,7 +105,7 @@ describe('ProfileView', () => {
   })
 
   it('renders profile tab by default', async () => {
-    const wrapper = build()
+    wrapper = build()
     await wrapper.vm.$nextTick()
 
     // Verify the first tab is profile
@@ -104,14 +116,14 @@ describe('ProfileView', () => {
   // item 4/7: cada panel de pestaña anima su entrada — bk-stagger en los que
   // tienen varios hijos, bk-rise (vía Transition) en los de un único hijo
   it('item 4: the profile tab panel has bk-stagger on its container', async () => {
-    const wrapper = build()
+    wrapper = build()
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('.bk-stagger').exists()).toBe(true)
   })
 
   it('item 4: the library tab panel gets bk-stagger when switched to', async () => {
-    const wrapper = build()
+    wrapper = build()
     await flushPromises()
 
     const libraryTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
@@ -122,7 +134,7 @@ describe('ProfileView', () => {
   })
 
   it('item 4: the routines tab panel (single child, no stagger) still replays entry via bk-rise on switch', async () => {
-    const wrapper = build()
+    wrapper = build()
     await flushPromises()
 
     const routinesTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Rutinas')
@@ -146,7 +158,7 @@ describe('ProfileView', () => {
       timezone: 'UTC',
     }
 
-    const wrapper = build()
+    wrapper = build()
     await wrapper.vm.$nextTick()
 
     const tabsText = wrapper.text()
@@ -164,7 +176,7 @@ describe('ProfileView', () => {
       timezone: 'UTC',
     }
 
-    const wrapper = build()
+    wrapper = build()
     await wrapper.vm.$nextTick()
 
     const tabsText = wrapper.text()
@@ -176,7 +188,7 @@ describe('ProfileView', () => {
   // un control hijo real (no un stub, no solo el texto de la pestaña).
   describe('C1: cada pestaña monta un control hijo real', () => {
     it('profile tab renders the real settings select (locale/units), not a swallowed slot', async () => {
-      const wrapper = build({ SettingsCard: false })
+      wrapper = build({ SettingsCard: false })
       await flushPromises()
 
       // BkSelect v2 (round 7): ya no es un <select> nativo, sino un botón
@@ -190,7 +202,7 @@ describe('ProfileView', () => {
     })
 
     it('routines tab renders the real RoutineList with its create-routine control', async () => {
-      const wrapper = build()
+      wrapper = build()
       await flushPromises()
 
       const routinesTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Rutinas')
@@ -203,7 +215,7 @@ describe('ProfileView', () => {
     })
 
     it('library tab renders the real ExerciseManager control, not a swallowed slot', async () => {
-      const wrapper = build()
+      wrapper = build()
       await flushPromises()
 
       const libraryTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
@@ -227,7 +239,7 @@ describe('ProfileView', () => {
         timezone: 'UTC',
       }
 
-      const wrapper = build({ AdminCard: false })
+      wrapper = build({ AdminCard: false })
       await flushPromises()
 
       const adminTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Administración')

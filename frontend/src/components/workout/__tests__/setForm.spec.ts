@@ -1,6 +1,6 @@
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Measurement } from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
@@ -18,10 +18,21 @@ function build(measurement: string, units?: 'kg' | 'lb') {
 }
 
 describe('SetForm', () => {
+  // M9: el test de rpe abre un panel flotante real (BkSelect) que se
+  // registra en la pila de capas COMPARTIDA (layerStack.ts) — aunque hoy se
+  // cierra solo (seleccionar una opción cierra el panel), un afterEach que
+  // desmonta es la red de seguridad correcta para cualquier test futuro que
+  // abra uno y no llegue a cerrarlo antes de terminar
+  let wrapper: VueWrapper | null = null
+
   beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
+  })
 
   it('strength emits reps + weight_kg', async () => {
-    const wrapper = build('strength')
+    wrapper = build('strength')
     await wrapper.find('form').trigger('submit')
     const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
     expect(payload).toMatchObject({ is_warmup: false })
@@ -31,7 +42,7 @@ describe('SetForm', () => {
   })
 
   it('timed emits only duration', async () => {
-    const wrapper = build('timed')
+    wrapper = build('timed')
     await wrapper.find('form').trigger('submit')
     const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
     expect(payload.duration_seconds).toBeGreaterThan(0)
@@ -40,7 +51,7 @@ describe('SetForm', () => {
   })
 
   it('bodyweight emits reps only by default (optional weight omitted)', async () => {
-    const wrapper = build('bodyweight')
+    wrapper = build('bodyweight')
     await wrapper.find('form').trigger('submit')
     const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
     expect(payload.reps).toBeGreaterThan(0)
@@ -49,7 +60,7 @@ describe('SetForm', () => {
   })
 
   it('bodyweight includes weight_kg once bumped above zero', async () => {
-    const wrapper = build('bodyweight')
+    wrapper = build('bodyweight')
     const plus = wrapper.findAll('button[aria-label="Aumentar"]')[1]
     await plus.trigger('click', { detail: 0 })
     await wrapper.find('form').trigger('submit')
@@ -58,7 +69,7 @@ describe('SetForm', () => {
   })
 
   it('cardio emits duration only by default (optional distance omitted)', async () => {
-    const wrapper = build('cardio')
+    wrapper = build('cardio')
     await wrapper.find('form').trigger('submit')
     const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
     expect(payload.duration_seconds).toBeGreaterThan(0)
@@ -68,7 +79,7 @@ describe('SetForm', () => {
   })
 
   it('cardio includes distance_m once bumped above zero', async () => {
-    const wrapper = build('cardio')
+    wrapper = build('cardio')
     const plus = wrapper.findAll('button[aria-label="Aumentar"]')[1]
     await plus.trigger('click', { detail: 0 })
     await wrapper.find('form').trigger('submit')
@@ -77,7 +88,7 @@ describe('SetForm', () => {
   })
 
   it('warmup toggle marks the set as warmup', async () => {
-    const wrapper = build('strength')
+    wrapper = build('strength')
     await wrapper.find('[data-testid="warmup-toggle"]').trigger('click')
     await wrapper.find('form').trigger('submit')
     const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
@@ -85,7 +96,7 @@ describe('SetForm', () => {
   })
 
   it('resets the warmup toggle back to false after logging a set', async () => {
-    const wrapper = build('strength')
+    wrapper = build('strength')
     const toggle = wrapper.find('[data-testid="warmup-toggle"]')
     await toggle.trigger('click')
     await wrapper.find('form').trigger('submit')
@@ -98,7 +109,7 @@ describe('SetForm', () => {
   it('rpe select includes the chosen value in the payload', async () => {
     // BkSelect v2 (round 7): listbox propio, no <select> nativo — abrir y
     // hacer click real sobre la opción "8"
-    const wrapper = build('strength')
+    wrapper = build('strength')
     await wrapper.find('[role="combobox"]').trigger('click')
     const option8 = Array.from(document.querySelectorAll('[role="option"]'))
       .find((o) => o.textContent?.trim() === '8') as HTMLElement
@@ -112,14 +123,14 @@ describe('SetForm', () => {
   })
 
   it('rpe defaults to undefined when left at "—"', async () => {
-    const wrapper = build('strength')
+    wrapper = build('strength')
     await wrapper.find('form').trigger('submit')
     const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
     expect(payload.rpe).toBeUndefined()
   })
 
   it('keeps entered values as defaults for the next set', async () => {
-    const wrapper = build('strength')
+    wrapper = build('strength')
     await wrapper.find('form').trigger('submit')
     const first = wrapper.emitted('submit')![0][0] as Record<string, unknown>
 
@@ -133,12 +144,12 @@ describe('SetForm', () => {
   })
 
   it('displays the forwarded units prop as the weight stepper suffix', () => {
-    const wrapper = build('strength', 'lb')
+    wrapper = build('strength', 'lb')
     expect(wrapper.text()).toContain('lb')
   })
 
   it('reps stepper clamps at the backend minimum of 1 (ge=1)', async () => {
-    const wrapper = build('strength')
+    wrapper = build('strength')
     const minus = wrapper.findAll('button[aria-label="Reducir"]')[1]
     for (let i = 0; i < 10; i++) {
       await minus.trigger('click', { detail: 0 })
@@ -149,7 +160,7 @@ describe('SetForm', () => {
   })
 
   it('strength weight stepper clamps at the backend minimum of 2.5 (gt=0)', async () => {
-    const wrapper = build('strength')
+    wrapper = build('strength')
     const minus = wrapper.findAll('button[aria-label="Reducir"]')[0]
     for (let i = 0; i < 10; i++) {
       await minus.trigger('click', { detail: 0 })
@@ -160,7 +171,7 @@ describe('SetForm', () => {
   })
 
   it('timed duration stepper clamps at the backend minimum of 1 (ge=1)', async () => {
-    const wrapper = build('timed')
+    wrapper = build('timed')
     const minus = wrapper.findAll('button[aria-label="Reducir"]')[0]
     for (let i = 0; i < 5; i++) {
       await minus.trigger('click', { detail: 0 })
@@ -171,7 +182,7 @@ describe('SetForm', () => {
   })
 
   it('lb mode: weight stepper starts at a natural 45 with a natural step of 5, not a kg-space value', async () => {
-    const wrapper = build('strength', 'lb')
+    wrapper = build('strength', 'lb')
     expect(wrapper.text()).toContain('45')
 
     const plus = wrapper.findAll('button[aria-label="Aumentar"]')[0]
@@ -183,7 +194,7 @@ describe('SetForm', () => {
 
   it('logs a console warning and emits nothing for an unknown measurement (defensive default)', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const wrapper = build('unknown-measurement')
+    wrapper = build('unknown-measurement')
     await wrapper.find('form').trigger('submit')
     expect(wrapper.emitted('submit')).toBeFalsy()
     expect(warnSpy).toHaveBeenCalled()

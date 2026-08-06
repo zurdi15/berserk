@@ -169,7 +169,10 @@ describe('ShellView active section indicator (item 3)', () => {
 
     const glows = wrapper.findAll('[data-testid="workout-glow"]')
     expect(glows).toHaveLength(2) // desktop + móvil
-    expect(glows[0].classes()).not.toContain('bk-breathe')
+    // M8: la clase bk-breathe ya no existe en ningún sitio (ni en
+    // animations.css ni en ningún consumidor) desde que se quitó la
+    // respiración — un "not.toContain" aquí sería tautológico, no una
+    // prueba real; lo que sí prueba algo es la opacidad asentada
     expect(glows[0].attributes('style')).toContain('opacity: 1')
     expect(glows[1].attributes('style')).toContain('opacity: 1')
   })
