@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import type { ExerciseOut, RoutineOut } from '@/api/domain'
 import { createRoutine, listExercises, listMuscleGroups, replaceRoutineExercises, updateRoutine } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
+import { displayToKg, kgToDisplay } from '@/utils/units'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import BkSheet from '@/lib/BkSheet.vue'
@@ -22,6 +23,10 @@ const emit = defineEmits<{ close: [] }>()
 const { t } = useI18n()
 const auth = useAuthStore()
 const toast = useToastStore()
+
+// kg es el canónico en el store/API; el stepper de peso objetivo se muestra y
+// edita en la unidad del usuario (ver frontend/src/utils/units.ts)
+const units = computed(() => (auth.user?.units as 'kg' | 'lb') || 'kg')
 
 // State
 const name = ref('')
@@ -311,12 +316,12 @@ watch(
             <div>
               <label class="block text-xs text-ink-muted mb-2">{{ $t('routines.targetWeight') }}</label>
               <BkStepper
-                :model-value="exercise.target_weight_kg || 0"
+                :model-value="kgToDisplay(exercise.target_weight_kg || 0, units)"
                 :min="0"
-                :max="300"
+                :max="kgToDisplay(300, units)"
                 :step="2.5"
                 :suffix="`${auth.user?.units || 'kg'}`"
-                @update:model-value="exercise.target_weight_kg = $event > 0 ? $event : null"
+                @update:model-value="exercise.target_weight_kg = $event > 0 ? displayToKg($event, units) : null"
               />
             </div>
 

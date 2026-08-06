@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createI18nInstance } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
+import { displayToKg, kgToDisplay } from '@/utils/units'
 import type { RoutineOut } from '@/api/domain'
 import RoutineEditorSheet from '../RoutineEditorSheet.vue'
 import { exerciseName } from '../exerciseName'
@@ -246,6 +247,66 @@ describe('RoutineEditorSheet', () => {
     expect(replaceRoutineExercises).toHaveBeenCalledWith(5, expect.arrayContaining([
       expect.objectContaining({ target_weight_kg: 50 }),
     ]))
+  })
+
+  it('lb mode: prefills the weight stepper via kgToDisplay and saves canonical kg via displayToKg (C3)', async () => {
+    const auth = useAuthStore()
+    auth.user = {
+      id: 1,
+      username: 'test',
+      is_admin: false,
+      locale: 'es',
+      units: 'lb',
+      timezone: 'UTC',
+    }
+
+    const { replaceRoutineExercises } = await import('@/api/domain')
+    vi.mocked(replaceRoutineExercises).mockClear()
+
+    const routine = {
+      id: 5,
+      name: 'Test Routine',
+      description: null,
+      rune: null,
+      color: null,
+      exercises: [
+        { id: 10, exercise_id: 1, position: 0, target_sets: 3, target_reps: 8, target_weight_kg: 100, rest_seconds: 60 },
+      ],
+    }
+
+    const wrapper = build(routine)
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await wrapper.vm.$nextTick()
+
+    // BkSheet teletransporta su contenido a document.body: hay que buscarlo
+    // ahí (no en wrapper), y tomar el diálogo más reciente por si algún test
+    // previo del archivo dejó el suyo montado
+    const dialogs = document.querySelectorAll('[role="dialog"]')
+    const dialog = dialogs[dialogs.length - 1] as HTMLElement
+    expect(dialog).not.toBeUndefined()
+
+    // prefill: 100 kg canónico se muestra convertido a lb (220.5), no crudo (100)
+    expect(dialog.textContent).toContain(String(kgToDisplay(100, 'lb')))
+
+    // el último stepper "Aumentar" de la fila es el de peso objetivo (sets, reps, peso)
+    const plusButtons = dialog.querySelectorAll('button[aria-label="Aumentar"]')
+    const weightPlus = plusButtons[plusButtons.length - 1] as HTMLButtonElement
+    weightPlus.dispatchEvent(new MouseEvent('click', { detail: 0, bubbles: true, cancelable: true }))
+    await wrapper.vm.$nextTick()
+
+    const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+    expect(saveButton).not.toBeUndefined()
+    saveButton!.click()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const bumpedDisplayLb = kgToDisplay(100, 'lb') + 2.5
+    expect(replaceRoutineExercises).toHaveBeenCalledWith(5, expect.arrayContaining([
+      expect.objectContaining({ target_weight_kg: displayToKg(bumpedDisplayLb, 'lb') }),
+    ]))
+
+    wrapper.unmount()
   })
 
   it('shows validation error when name is empty', async () => {
