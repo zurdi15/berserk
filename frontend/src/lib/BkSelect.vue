@@ -62,7 +62,7 @@ function firstEnabled(list: typeof props.options) {
   return list.find((o) => !o.disabled) ?? null
 }
 
-function open_() {
+async function open_() {
   openPanel()
   // limpiar el filtro ANTES de calcular la opción activa: si quedó un texto
   // de una apertura anterior, la lista "completa" de este cálculo sería la
@@ -71,6 +71,17 @@ function open_() {
   const current = filteredOptions.value.find((o) => o.value === props.modelValue && !o.disabled)
   activeValue.value = (current ?? firstEnabled(filteredOptions.value))?.value ?? null
   scrollActiveIntoView()
+  // I3/C1: con filtro, el foco real pasa al input de texto (si no, es
+  // inalcanzable por teclado). Sin filtro, el trigger se queda con el foco
+  // (patrón combobox estándar, aria-activedescendant sin mover el DOM
+  // focus) — pero un click no garantiza foco en un <button> en todos los
+  // navegadores (Safari/Firefox en macOS no lo dan salvo "acceso total por
+  // teclado" activado, a diferencia de Chromium): sin un focus() explícito
+  // aquí, abrir con el ratón en esos navegadores dejaría el teclado
+  // posterior sin dueño, igual que el bug de foco de BkTimeField/BkDateField.
+  await nextTick()
+  if (isFilterable.value) filterInputEl.value?.focus()
+  else triggerEl.value?.focus()
 }
 
 function close_() {
@@ -195,7 +206,9 @@ watch(filterQuery, () => {
 
 <template>
   <div class="relative">
-    <span :id="labelId" class="block mb-1 text-sm text-ink-muted">{{ label }}</span>
+    <!-- M10: la etiqueta es un span (no un <label for>) asociado por
+         aria-labelledby — un click ahí no enfoca nada por sí solo -->
+    <span :id="labelId" class="block mb-1 text-sm text-ink-muted cursor-pointer" @click="triggerEl?.focus()">{{ label }}</span>
     <button
       ref="triggerEl"
       type="button"
@@ -204,7 +217,7 @@ watch(filterQuery, () => {
       :aria-expanded="open ? 'true' : 'false'"
       :aria-controls="open ? listboxId : undefined"
       :aria-labelledby="labelId"
-      :aria-activedescendant="open && activeValue !== null ? optionId(activeValue) : undefined"
+      :aria-activedescendant="open && !isFilterable && activeValue !== null ? optionId(activeValue) : undefined"
       class="w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink focus:border-aurora"
       @click="onTriggerClick"
       @keydown="onTriggerKeydown"
@@ -230,10 +243,17 @@ watch(filterQuery, () => {
           class="z-(--bk-z-sheet) bk-slab rounded-sm border border-line-strong overflow-hidden shadow-lg"
         >
           <div v-if="isFilterable" class="p-2 border-b border-line">
+            <!-- I3: mientras el filtro existe, ES el elemento con foco real —
+                 aria-activedescendant/aria-controls viven aquí, no en el
+                 trigger (que ya no está enfocado en este estado) -->
             <input
               ref="filterInputEl"
               v-model="filterQuery"
               type="text"
+              role="combobox"
+              aria-expanded="true"
+              :aria-controls="listboxId"
+              :aria-activedescendant="activeValue !== null ? optionId(activeValue) : undefined"
               :placeholder="t('common.filter')"
               class="w-full rounded-sm border border-line bg-void px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint focus:border-aurora"
               @keydown="handleOpenKeydown"
@@ -271,7 +291,7 @@ watch(filterQuery, () => {
                 <path d="M5 13l4 4L19 7" />
               </svg>
             </li>
-            <li v-if="filteredOptions.length === 0" class="px-3 py-2 text-sm text-ink-faint">
+            <li v-if="filteredOptions.length === 0" role="presentation" class="px-3 py-2 text-sm text-ink-faint">
               {{ t('common.noResults') }}
             </li>
           </ul>

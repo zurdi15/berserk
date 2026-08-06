@@ -30,9 +30,17 @@ describe('BkDateField', () => {
     expect(text).toMatch(/2026/)
   })
 
-  it('opens a grid with weekday headers and a multiple-of-7 cell count, heading the viewed month', async () => {
+  it('clicking the label focuses the trigger (M10: span+aria-labelledby, not a wrapping <label>)', async () => {
+    wrapper = build({ modelValue: '2026-08-05' })
+    const label = wrapper.get('span.text-ink-muted')
+    await label.trigger('click')
+    expect(document.activeElement).toBe(wrapper.get('[role="combobox"]').element)
+  })
+
+  it('opens a grid with weekday headers and a multiple-of-7 cell count, heading the viewed month, and moves REAL focus into the grid (C1: without this, keyboard on the panel is dead)', async () => {
     wrapper = build({ modelValue: '2026-08-05' })
     await wrapper.get('[role="combobox"]').trigger('click')
+    await flushPromises()
 
     const grid = document.querySelector('[role="grid"]') as HTMLElement
     expect(grid).not.toBeNull()
@@ -42,6 +50,10 @@ describe('BkDateField', () => {
 
     const heading = document.querySelector(`#${grid.getAttribute('aria-labelledby')}`)
     expect(heading?.textContent?.toLowerCase()).toContain('agosto')
+
+    // el punto crítico: el foco real del DOM (no solo aria-activedescendant)
+    // tiene que estar en la rejilla, o las teclas no llegan a nadie
+    expect(document.activeElement).toBe(grid)
   })
 
   it('marks the selected day with aria-selected and an aurora background', async () => {
@@ -80,12 +92,18 @@ describe('BkDateField', () => {
     expect(document.querySelector('[role="grid"]')).toBeNull()
   })
 
-  it('ArrowRight moves the focused day forward across a month boundary (day-shift trap)', async () => {
+  it('ArrowRight on the REAL focused grid moves the focused day forward across a month boundary (day-shift trap)', async () => {
+    // C1: dispatch sobre document.activeElement — así el test falla si el
+    // foco deja de estar ahí de verdad, en vez de pasar contra un listener
+    // huérfano que nunca recibiría la tecla en un navegador real
     wrapper = build({ modelValue: '2026-08-31' })
     await wrapper.get('[role="combobox"]').trigger('click')
+    await flushPromises()
 
     const grid = document.querySelector('[role="grid"]') as HTMLElement
-    grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+    expect(document.activeElement).toBe(grid)
+
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
     await flushPromises()
 
     expect(grid.getAttribute('aria-activedescendant')).toContain('2026-09-01')
@@ -94,54 +112,66 @@ describe('BkDateField', () => {
     expect(heading?.textContent?.toLowerCase()).toContain('septiembre')
   })
 
-  it('ArrowDown moves the focused day by 7 (one week)', async () => {
+  it('ArrowDown on the REAL focused grid moves the focused day by 7 (one week)', async () => {
     wrapper = build({ modelValue: '2026-08-05' })
     await wrapper.get('[role="combobox"]').trigger('click')
+    await flushPromises()
 
     const grid = document.querySelector('[role="grid"]') as HTMLElement
-    grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    expect(document.activeElement).toBe(grid)
+
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
     await flushPromises()
 
     expect(grid.getAttribute('aria-activedescendant')).toContain('2026-08-12')
   })
 
-  it('PageDown/PageUp move the visible month forward/back a full month', async () => {
+  it('PageDown/PageUp on the REAL focused grid move the visible month forward/back a full month', async () => {
     wrapper = build({ modelValue: '2026-08-05' })
     await wrapper.get('[role="combobox"]').trigger('click')
+    await flushPromises()
 
     const grid = document.querySelector('[role="grid"]') as HTMLElement
-    grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true, cancelable: true }))
+    expect(document.activeElement).toBe(grid)
+
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true, cancelable: true }))
     await flushPromises()
     let heading = document.querySelector(`#${grid.getAttribute('aria-labelledby')}`)
     expect(heading?.textContent?.toLowerCase()).toContain('septiembre')
 
-    grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageUp', bubbles: true, cancelable: true }))
-    grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageUp', bubbles: true, cancelable: true }))
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageUp', bubbles: true, cancelable: true }))
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageUp', bubbles: true, cancelable: true }))
     await flushPromises()
     heading = document.querySelector(`#${grid.getAttribute('aria-labelledby')}`)
     expect(heading?.textContent?.toLowerCase()).toContain('julio')
   })
 
-  it('Enter selects the currently-focused day and closes', async () => {
+  it('Enter on the REAL focused grid selects the currently-focused day and closes', async () => {
     wrapper = build({ modelValue: '2026-08-05' })
     await wrapper.get('[role="combobox"]').trigger('click')
+    await flushPromises()
 
     const grid = document.querySelector('[role="grid"]') as HTMLElement
-    grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
-    grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    expect(document.activeElement).toBe(grid)
+
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
     await flushPromises()
 
     expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual(['2026-08-06'])
     expect(document.querySelector('[role="grid"]')).toBeNull()
   })
 
-  it('Escape closes the panel without emitting a change', async () => {
+  it('Escape on the REAL focused grid closes the panel without emitting a change', async () => {
     wrapper = build({ modelValue: '2026-08-05' })
     await wrapper.get('[role="combobox"]').trigger('click')
+    await flushPromises()
 
     const grid = document.querySelector('[role="grid"]') as HTMLElement
-    grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
-    grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    expect(document.activeElement).toBe(grid)
+
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
     await flushPromises()
 
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()

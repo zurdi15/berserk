@@ -37,6 +37,13 @@ describe('BkSelect', () => {
     expect(trigger.attributes('aria-haspopup')).toBe('listbox')
   })
 
+  it('clicking the label focuses the trigger (M10: span+aria-labelledby, not a wrapping <label>)', async () => {
+    wrapper = build()
+    const label = wrapper.get('span.text-ink-muted')
+    await label.trigger('click')
+    expect(document.activeElement).toBe(wrapper.get('[role="combobox"]').element)
+  })
+
   it('opens the panel on click and exposes it as a listbox with option roles', async () => {
     wrapper = build()
     await wrapper.get('[role="combobox"]').trigger('click')
@@ -83,18 +90,31 @@ describe('BkSelect', () => {
     expect(document.querySelector('[role="listbox"]')).not.toBeNull()
   })
 
+  // C1: el foco real (document.activeElement), no solo dispatch a mano sobre
+  // el nodo consultado — así un futuro regreso al bug de foco muerto (el que
+  // sí tenían BkTimeField/BkDateField) lo detectaría este archivo también.
+  // El trigger se enfoca a mano primero (simula "el usuario llegó aquí con
+  // Tab", que sí da foco real incluso en navegadores que no enfocan
+  // <button> al hacer click — ver open_() en BkSelect.vue) y todas las
+  // teclas se disparan sobre document.activeElement, nunca sobre `trigger`
+  // directamente.
   it('ArrowDown opens the panel when closed, then moves aria-activedescendant to the next enabled option (skipping disabled)', async () => {
     wrapper = build({ modelValue: 'b' })
     const trigger = wrapper.get('[role="combobox"]')
+    const triggerEl = trigger.element as HTMLElement
+    triggerEl.focus()
+    expect(document.activeElement).toBe(trigger.element)
 
-    await trigger.trigger('keydown', { key: 'ArrowDown' })
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    await flushPromises()
     expect(document.querySelector('[role="listbox"]')).not.toBeNull()
     // arranca anclado a la opción actual (b)
     let activeId = trigger.attributes('aria-activedescendant')
     expect(document.getElementById(activeId!)?.textContent).toContain('Option B')
 
     // siguiente: c está disabled, así que salta directo a d
-    await trigger.trigger('keydown', { key: 'ArrowDown' })
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    await flushPromises()
     activeId = trigger.attributes('aria-activedescendant')
     expect(document.getElementById(activeId!)?.textContent).toContain('Option D')
   })
@@ -102,13 +122,17 @@ describe('BkSelect', () => {
   it('Home/End jump to the first/last enabled option', async () => {
     wrapper = build({ modelValue: 'b' })
     const trigger = wrapper.get('[role="combobox"]')
-    await trigger.trigger('keydown', { key: 'ArrowDown' })
+    ;(trigger.element as HTMLElement).focus()
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    await flushPromises()
 
-    await trigger.trigger('keydown', { key: 'End' })
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }))
+    await flushPromises()
     let activeId = trigger.attributes('aria-activedescendant')
     expect(document.getElementById(activeId!)?.textContent).toContain('Option D')
 
-    await trigger.trigger('keydown', { key: 'Home' })
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }))
+    await flushPromises()
     activeId = trigger.attributes('aria-activedescendant')
     expect(document.getElementById(activeId!)?.textContent).toContain('Option A')
   })
@@ -116,9 +140,13 @@ describe('BkSelect', () => {
   it('Enter commits the active option and returns focus to the trigger', async () => {
     wrapper = build({ modelValue: 'a' })
     const trigger = wrapper.get('[role="combobox"]')
-    await trigger.trigger('keydown', { key: 'ArrowDown' }) // abre, activa 'a'
-    await trigger.trigger('keydown', { key: 'ArrowDown' }) // mueve a 'b'
-    await trigger.trigger('keydown', { key: 'Enter' })
+    ;(trigger.element as HTMLElement).focus()
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })) // abre, activa 'a'
+    await flushPromises()
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })) // mueve a 'b'
+    await flushPromises()
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    await flushPromises()
 
     expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual(['b'])
     expect(document.querySelector('[role="listbox"]')).toBeNull()
@@ -128,9 +156,13 @@ describe('BkSelect', () => {
   it('Escape closes the panel without emitting a selection change', async () => {
     wrapper = build({ modelValue: 'a' })
     const trigger = wrapper.get('[role="combobox"]')
-    await trigger.trigger('keydown', { key: 'ArrowDown' })
-    await trigger.trigger('keydown', { key: 'ArrowDown' }) // activa 'b', sin confirmar
-    await trigger.trigger('keydown', { key: 'Escape' })
+    ;(trigger.element as HTMLElement).focus()
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    await flushPromises()
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })) // activa 'b', sin confirmar
+    await flushPromises()
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    await flushPromises()
 
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
     expect(document.querySelector('[role="listbox"]')).toBeNull()
@@ -146,9 +178,12 @@ describe('BkSelect', () => {
     ]
     wrapper = build({ options: fruits, modelValue: 'ap' })
     const trigger = wrapper.get('[role="combobox"]')
-    await trigger.trigger('keydown', { key: 'ArrowDown' }) // abre
+    ;(trigger.element as HTMLElement).focus()
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })) // abre
+    await flushPromises()
 
-    await trigger.trigger('keydown', { key: 'd' })
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true, cancelable: true }))
+    await flushPromises()
     const activeId = trigger.attributes('aria-activedescendant')
     expect(document.getElementById(activeId!)?.textContent).toContain('Date')
   })
@@ -182,6 +217,34 @@ describe('BkSelect', () => {
     vi.unstubAllGlobals()
   })
 
+  it('I4: the settled flip decision uses the REAL measured panel height, not the fallback constant (which would have decided the opposite here)', async () => {
+    // hueco debajo del trigger: 150px. Con el alto de RESERVA (256+8) NO
+    // cabría debajo (decidiría "arriba"). Con el alto REAL de este panel
+    // (4 opciones, ~90px) SÍ cabe debajo — si I4 no recalculara con la
+    // medida real tras montar, esta prueba fallaría con "bottom" seteado
+    // en vez de "top". (La corrección ocurre tan rápido tras abrir —
+    // dentro del mismo nextTick que ya espera trigger('click') — que no es
+    // observable un estado intermedio con la reserva: solo el asentado.)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.getAttribute('role') === 'combobox') {
+        return { top: 620, bottom: 650, left: 10, right: 200, width: 190, height: 30, x: 10, y: 620, toJSON: () => {} } as DOMRect
+      }
+      // el panel (sin role propio — el role="listbox" vive en el <ul> hijo)
+      return { top: 0, bottom: 90, left: 0, right: 200, width: 200, height: 90, x: 0, y: 0, toJSON: () => {} } as DOMRect
+    })
+    vi.stubGlobal('innerHeight', 800)
+
+    wrapper = build()
+    await wrapper.get('[role="combobox"]').trigger('click')
+    await flushPromises()
+
+    const panel = document.querySelector('[role="listbox"]')!.parentElement as HTMLElement
+    expect(panel.style.top).not.toBe('')
+    expect(panel.style.bottom).toBe('')
+
+    vi.unstubAllGlobals()
+  })
+
   it('renders a filter input only when there are more than 15 options, and it narrows the visible list', async () => {
     wrapper = build()
     await wrapper.get('[role="combobox"]').trigger('click')
@@ -204,6 +267,40 @@ describe('BkSelect', () => {
     const visible = document.querySelectorAll('[role="option"]')
     // "Zone 1", "Zone 10".."Zone 19": 11 coincidencias
     expect(visible.length).toBe(11)
+  })
+
+  it('I3: opening a filterable select moves REAL focus to the filter input (unreachable by keyboard otherwise); typing filters and ArrowDown+Enter selects', async () => {
+    // fixture propia (en vez de "Zone N"): con prefijos distintos, filtrar
+    // deja EXACTAMENTE 2 coincidencias y el resultado de ArrowDown+Enter es
+    // inequívoco de leer, sin tener que rastrear el orden de "Zone 1/10..19"
+    const options = [
+      { value: 'other-0', label: 'Other 0' },
+      { value: 'target-0', label: 'Target 0' },
+      { value: 'target-1', label: 'Target 1' },
+      ...Array.from({ length: 17 }, (_, i) => ({ value: `filler-${i}`, label: `Filler ${i}` })),
+    ]
+    wrapper = build({ options, modelValue: 'other-0' })
+    await wrapper.get('[role="combobox"]').trigger('click')
+    await flushPromises()
+
+    const filterInput = document.querySelector('input[type="text"]') as HTMLInputElement
+    expect(document.activeElement).toBe(filterInput)
+    expect(filterInput.getAttribute('aria-controls')).toBe(document.querySelector('[role="listbox"]')!.id)
+
+    filterInput.value = 'Target'
+    filterInput.dispatchEvent(new Event('input', { bubbles: true }))
+    await flushPromises()
+    // el valor actual ('other-0') queda fuera del filtro: se re-ancla a la
+    // primera coincidencia visible, "Target 0"
+    expect(document.querySelectorAll('[role="option"]')).toHaveLength(2)
+
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    await flushPromises()
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    await flushPromises()
+
+    // re-anclado a "Target 0", un ArrowDown mueve a "Target 1", Enter la selecciona
+    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual(['target-1'])
   })
 
   it('shows a no-results row when the filter matches nothing', async () => {

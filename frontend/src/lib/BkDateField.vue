@@ -3,7 +3,7 @@
 // SO, fuera de la estética del sistema. Panel = mini-calendario que reutiliza
 // el lenguaje visual de CalendarView/MonthGrid (headers de días vía locale
 // del viewer, chevrones de mes, día de hoy marcado, seleccionado en aurora).
-import { computed, ref, useId } from 'vue'
+import { computed, nextTick, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFloatingPanel } from '@/composables/useFloatingPanel'
 import { addDays, addMonths, formatDateShort, monthGrid, monthLabel, todayIso, weekdayHeaders } from '@/utils/dates'
@@ -19,6 +19,10 @@ const gridId = useId()
 const monthHeadingId = useId()
 
 const { triggerEl, panelEl, open, panelStyle, openPanel, closePanel } = useFloatingPanel()
+// C1: foco real en la rejilla al abrir — sin él, aria-activedescendant no
+// tiene dueño y las flechas/Enter/PageUp/PageDown no hacían NADA para un
+// usuario real
+const gridEl = ref<HTMLDivElement | null>(null)
 
 const focusedDate = ref(props.modelValue || todayIso())
 const viewYear = ref(0)
@@ -37,10 +41,14 @@ const today = computed(() => todayIso())
 
 function dayId(date: string) { return `${gridId}-${date}` }
 
-function openField() {
+async function openField() {
   focusedDate.value = props.modelValue || todayIso()
   syncViewToFocused()
   openPanel()
+  // C1: nextTick — la rejilla (ref="gridEl") recién se monta tras este tick
+  // (v-if="open")
+  await nextTick()
+  gridEl.value?.focus()
 }
 
 function toggleField() {
@@ -96,13 +104,16 @@ function onTriggerKeydown(event: KeyboardEvent) {
 
 <template>
   <div class="relative">
-    <span :id="labelId" class="block mb-1 text-sm text-ink-muted">{{ label }}</span>
+    <!-- M10: la etiqueta es un span (no un <label for>) asociado por
+         aria-labelledby — un click ahí no enfoca nada por sí solo -->
+    <span :id="labelId" class="block mb-1 text-sm text-ink-muted cursor-pointer" @click="triggerEl?.focus()">{{ label }}</span>
     <button
       ref="triggerEl"
       type="button"
       role="combobox"
       aria-haspopup="dialog"
       :aria-expanded="open ? 'true' : 'false'"
+      :aria-controls="open ? gridId : undefined"
       :aria-labelledby="labelId"
       class="w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink focus:border-aurora"
       @click="toggleField"
@@ -121,7 +132,7 @@ function onTriggerKeydown(event: KeyboardEvent) {
           v-if="open"
           ref="panelEl"
           :style="panelStyle"
-          class="z-(--bk-z-sheet) bk-slab rounded-sm border border-line-strong overflow-hidden shadow-lg p-2 w-72"
+          class="z-(--bk-z-sheet) bk-slab rounded-sm border border-line-strong overflow-hidden shadow-lg p-2"
         >
           <div class="flex items-center gap-2 mb-2">
             <BkButton variant="ghost" size="sm" :aria-label="t('calendar.prevMonth')" @click="moveFocusedMonth(-1)">
@@ -139,6 +150,7 @@ function onTriggerKeydown(event: KeyboardEvent) {
 
           <div
             :id="gridId"
+            ref="gridEl"
             role="grid"
             tabindex="0"
             :aria-labelledby="monthHeadingId"

@@ -21,10 +21,26 @@ const hoursId = useId()
 const minutesId = useId()
 
 const { triggerEl, panelEl, open, panelStyle, openPanel, closePanel } = useFloatingPanel()
+// columna de horas: foco real al abrir (C1) — sin esto nada tenía el foco y
+// las flechas/Enter/Home/End no hacían NADA para un usuario real (el
+// aria-activedescendant apuntaba a una opción "activa" que ningún elemento
+// con foco real reclamaba)
+const hourListEl = ref<HTMLUListElement | null>(null)
+
+// una hora/minuto que no cae en un paso de 5 (p.ej. "14:23" llegado de fuera)
+// no tiene fila en MINUTES: el aria-activedescendant apuntaría a un id que no
+// existe en el DOM. Se snapea al paso más cercano, envolviendo dentro de la
+// misma hora (58 → 00, no a la hora siguiente: solo se toca el minuto)
+function snapMinute(m: string): string {
+  const n = Number(m)
+  if (Number.isNaN(n)) return '00'
+  const snapped = (Math.round(n / 5) * 5) % 60
+  return String(snapped).padStart(2, '0')
+}
 
 const [defaultH, defaultM] = props.modelValue ? props.modelValue.split(':') : ['00', '00']
 const pendingHour = ref(defaultH)
-const pendingMinute = ref(defaultM)
+const pendingMinute = ref(snapMinute(defaultM))
 
 function hourId(h: string) { return `${hoursId}-${h}` }
 function minuteId(m: string) { return `${minutesId}-${m}` }
@@ -37,13 +53,18 @@ async function scrollIntoView(id: string) {
   el.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' })
 }
 
-function openField() {
+async function openField() {
   const [h, m] = props.modelValue ? props.modelValue.split(':') : ['00', '00']
   pendingHour.value = h
-  pendingMinute.value = m
+  pendingMinute.value = snapMinute(m)
   openPanel()
   scrollIntoView(hourId(pendingHour.value))
   scrollIntoView(minuteId(pendingMinute.value))
+  // C1: foco real en la columna de horas — sin él, aria-activedescendant no
+  // tiene dueño y el teclado no mueve nada para un usuario real. nextTick:
+  // el <ul ref="hourListEl"> recién se monta tras este tick (v-if="open").
+  await nextTick()
+  hourListEl.value?.focus()
 }
 
 function toggleField() {
@@ -115,19 +136,23 @@ watch(() => props.modelValue, (value) => {
   if (open.value) return
   const [h, m] = value ? value.split(':') : ['00', '00']
   pendingHour.value = h
-  pendingMinute.value = m
+  pendingMinute.value = snapMinute(m)
 })
 </script>
 
 <template>
   <div class="relative">
-    <span :id="labelId" class="block mb-1 text-sm text-ink-muted">{{ label }}</span>
+    <!-- M10: la etiqueta es un span (no un <label for>, no envuelve al
+         trigger) asociado por aria-labelledby — un click ahí no enfoca nada
+         por sí solo, así que se enfoca el trigger a mano -->
+    <span :id="labelId" class="block mb-1 text-sm text-ink-muted cursor-pointer" @click="triggerEl?.focus()">{{ label }}</span>
     <button
       ref="triggerEl"
       type="button"
       role="combobox"
       aria-haspopup="dialog"
       :aria-expanded="open ? 'true' : 'false'"
+      :aria-controls="open ? hoursId : undefined"
       :aria-labelledby="labelId"
       class="w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink focus:border-aurora bk-metric"
       @click="toggleField"
@@ -152,6 +177,7 @@ watch(() => props.modelValue, (value) => {
           <div class="flex divide-x divide-line">
             <ul
               :id="hoursId"
+              ref="hourListEl"
               role="listbox"
               tabindex="0"
               :aria-label="t('calendar.time') + ' — ' + t('common.hours')"
