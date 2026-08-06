@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { monthLabel } from '@/utils/dates'
-import { getMonth, getHeatmap } from '@/api/domain'
+import { getMonth, getHeatmap, listMuscleGroups } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import BkHeatmap from '@/lib/BkHeatmap.vue'
 import BkButton from '@/lib/BkButton.vue'
+import BkSheet from '@/lib/BkSheet.vue'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
 import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
 import { useAthleteStore } from '@/stores/athlete'
-import type { CalendarMonthOut } from '@/api/domain'
+import type { CalendarMonthOut, MuscleGroupOut } from '@/api/domain'
 
 const athlete = useAthleteStore()
 
@@ -21,9 +22,25 @@ const label = computed(() => monthLabel(year.value, month.value, locale.value))
 
 const monthData = ref<CalendarMonthOut>({ scheduled: [], workouts: [] })
 const heatmapData = ref<{ date: string; count: number }[]>([])
+const muscleGroups = ref<MuscleGroupOut[]>([])
 const loading = ref(false)
 
 const selectedDate = ref<string | null>(null)
+const groupMap = computed(() => {
+  const map = new Map<number, string>()
+  for (const group of muscleGroups.value) {
+    map.set(group.id, group.slug)
+  }
+  return map
+})
+
+async function loadMuscleGroups() {
+  try {
+    muscleGroups.value = await listMuscleGroups(athlete.userId)
+  } catch (error) {
+    toastApiError(error)
+  }
+}
 
 async function loadMonth() {
   try {
@@ -70,8 +87,16 @@ function closeScheduleSheet() {
   selectedDate.value = null
 }
 
+onMounted(() => {
+  loadMuscleGroups()
+})
+
 watch([year, month], () => {
   loadMonth()
+}, { immediate: true })
+
+// heatmap solo se recarga si el año cambia
+watch(year, () => {
   loadHeatmap()
 }, { immediate: true })
 </script>
@@ -99,6 +124,7 @@ watch([year, month], () => {
       :month="monthData"
       :year="year"
       :month-num="month"
+      :group-map="groupMap"
       @select="selectDay"
     />
 
@@ -109,23 +135,13 @@ watch([year, month], () => {
     </div>
 
     <!-- Schedule sheet modal -->
-    <div v-if="selectedDate" class="fixed inset-0 bg-black/50 flex items-center justify-center z-40">
-      <div class="bg-white rounded-lg p-6 max-w-md mx-4 max-h-[80vh] overflow-y-auto">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-ink">{{ $t('calendar.scheduledSessions') }}</h3>
-          <button
-            class="text-ink-muted hover:text-ink"
-            @click="closeScheduleSheet"
-          >
-            ✕
-          </button>
-        </div>
-        <ScheduleSheet
-          :date="selectedDate"
-          :scheduled="monthData.scheduled.filter(s => s.date === selectedDate)"
-          @updated="loadMonth"
-        />
-      </div>
-    </div>
+    <BkSheet :open="selectedDate !== null" :title="$t('calendar.scheduledSessions')" @close="closeScheduleSheet">
+      <ScheduleSheet
+        v-if="selectedDate"
+        :date="selectedDate"
+        :scheduled="monthData.scheduled.filter(s => s.date === selectedDate)"
+        @updated="loadMonth"
+      />
+    </BkSheet>
   </div>
 </template>

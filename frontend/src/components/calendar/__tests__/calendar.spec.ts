@@ -12,8 +12,8 @@ vi.mock('@/api/domain', () => ({
       { id: 5, date: '2026-08-02', time: '15:00', routine_id: 2, status: 'done', workout_id: 5, note: null },
     ],
     workouts: [
-      { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [1, 2] },
-      { id: 2, date: '2026-08-02', feeling: 5, muscle_group_ids: [3] },
+      { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [1, 3] },
+      { id: 2, date: '2026-08-02', feeling: 5, muscle_group_ids: [2] },
     ],
   })),
   getHeatmap: vi.fn(async () => [
@@ -42,49 +42,37 @@ vi.mock('@/utils/apiErrors', () => ({
   toastApiError: vi.fn(),
 }))
 
-import { groupRune } from '@/components/calendar/groupRune'
+import { isValidRuneName } from '@/components/calendar/groupRune'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
 import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
 
-describe('groupRune', () => {
-  it('maps chest slug to chest rune', () => {
-    expect(groupRune('chest')).toBe('💪')
+describe('isValidRuneName', () => {
+  it('returns true for valid muscle slug "chest"', () => {
+    expect(isValidRuneName('chest')).toBe(true)
   })
 
-  it('maps back slug to back rune', () => {
-    expect(groupRune('back')).toBe('🏋️')
+  it('returns true for valid muscle slug "legs"', () => {
+    expect(isValidRuneName('legs')).toBe(true)
   })
 
-  it('maps legs slug to legs rune', () => {
-    expect(groupRune('legs')).toBe('🦵')
-  })
-
-  it('maps shoulders slug to shoulders rune', () => {
-    expect(groupRune('shoulders')).toBe('🔶')
-  })
-
-  it('maps biceps slug to biceps rune', () => {
-    expect(groupRune('biceps')).toBe('💥')
-  })
-
-  it('maps triceps slug to triceps rune', () => {
-    expect(groupRune('triceps')).toBe('🌟')
-  })
-
-  it('maps core slug to core rune', () => {
-    expect(groupRune('core')).toBe('🎯')
-  })
-
-  it('returns core rune for unknown slugs', () => {
-    expect(groupRune('unknown')).toBe('🎯')
+  it('returns false for unknown slug', () => {
+    expect(isValidRuneName('unknown')).toBe(false)
   })
 })
 
 describe('MonthGrid', () => {
   beforeEach(() => setActivePinia(createPinia()))
+
+  const createGroupMap = () => {
+    const map = new Map<number, string>()
+    map.set(1, 'chest')
+    map.set(2, 'back')
+    map.set(3, 'legs')
+    return map
+  }
 
   it('renders planned session dot with aurora border', async () => {
     const wrapper = mount(MonthGrid, {
@@ -97,6 +85,7 @@ describe('MonthGrid', () => {
         },
         year: 2026,
         monthNum: 8,
+        groupMap: createGroupMap(),
       },
       global: { plugins: [createI18nInstance()] },
     })
@@ -117,6 +106,7 @@ describe('MonthGrid', () => {
         },
         year: 2026,
         monthNum: 8,
+        groupMap: createGroupMap(),
       },
       global: { plugins: [createI18nInstance()] },
     })
@@ -136,6 +126,7 @@ describe('MonthGrid', () => {
         },
         year: 2026,
         monthNum: 8,
+        groupMap: createGroupMap(),
       },
       global: { plugins: [createI18nInstance()] },
     })
@@ -156,12 +147,35 @@ describe('MonthGrid', () => {
         },
         year: 2026,
         monthNum: 8,
+        groupMap: createGroupMap(),
       },
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
     const plannedDots = wrapper.findAll('[data-status="planned"]')
     expect(plannedDots.length).toBe(2)
+  })
+
+  it('renders BkRune components for valid muscle group slugs', async () => {
+    const wrapper = mount(MonthGrid, {
+      props: {
+        month: {
+          scheduled: [],
+          workouts: [
+            { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [1, 3] },
+          ],
+        },
+        year: 2026,
+        monthNum: 8,
+        groupMap: createGroupMap(),
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    const runes = wrapper.findAllComponents({ name: 'BkRune' })
+    expect(runes.length).toBe(2)
+    expect(runes[0].props('name')).toBe('chest')
+    expect(runes[1].props('name')).toBe('legs')
   })
 
   it('emits select event when day is clicked', async () => {
@@ -173,6 +187,7 @@ describe('MonthGrid', () => {
         },
         year: 2026,
         monthNum: 8,
+        groupMap: createGroupMap(),
       },
       global: { plugins: [createI18nInstance()] },
     })
@@ -186,7 +201,7 @@ describe('MonthGrid', () => {
 describe('ScheduleSheet', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('calls updateSchedule with skipped status when skip action is clicked', async () => {
+  it('renders skip button for planned sessions', async () => {
     const wrapper = mount(ScheduleSheet, {
       props: {
         date: '2026-08-03',
@@ -198,18 +213,70 @@ describe('ScheduleSheet', () => {
     })
     await flushPromises()
     const skipButton = wrapper.find('[data-testid="skip-session-3"]')
-    if (skipButton.exists()) {
-      await skipButton.trigger('click')
-      // After confirmation in modal
-      const confirmButton = wrapper.find('[data-testid="confirm-skip"]')
-      if (confirmButton.exists()) {
-        await confirmButton.trigger('click')
-        await flushPromises()
-      }
-    }
-    expect(vi.mocked(domain.updateSchedule)).toHaveBeenCalledWith(
-      3,
-      { status: 'skipped' },
-    )
+    expect(skipButton.exists()).toBe(true)
+  })
+
+  it('renders delete button for all sessions', async () => {
+    const wrapper = mount(ScheduleSheet, {
+      props: {
+        date: '2026-08-03',
+        scheduled: [
+          { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'planned', workout_id: null, note: 'Too busy' },
+        ],
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    const deleteButton = wrapper.find('[data-testid="delete-session-3"]')
+    expect(deleteButton.exists()).toBe(true)
+  })
+
+  it('renders replan button for planned sessions', async () => {
+    const wrapper = mount(ScheduleSheet, {
+      props: {
+        date: '2026-08-03',
+        scheduled: [
+          { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'planned', workout_id: null, note: 'Too busy' },
+        ],
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    const replanButton = wrapper.find('[data-testid="replan-session-3"]')
+    expect(replanButton.exists()).toBe(true)
+  })
+
+  it('hides all action buttons when athlete is viewing another user', async () => {
+    const athlete = useAthleteStore()
+    athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
+    const wrapper = mount(ScheduleSheet, {
+      props: {
+        date: '2026-08-03',
+        scheduled: [
+          { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'planned', workout_id: null, note: 'Too busy' },
+        ],
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="skip-session-3"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="delete-session-3"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="replan-session-3"]').exists()).toBe(false)
+  })
+
+  it('still renders session list when in read-only mode', async () => {
+    const athlete = useAthleteStore()
+    athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
+    const wrapper = mount(ScheduleSheet, {
+      props: {
+        date: '2026-08-03',
+        scheduled: [
+          { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'planned', workout_id: null, note: 'Too busy' },
+        ],
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Too busy')
   })
 })

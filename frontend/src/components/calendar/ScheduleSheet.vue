@@ -2,10 +2,10 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import BkCard from '@/lib/BkCard.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkField from '@/lib/BkField.vue'
+import BkSheet from '@/lib/BkSheet.vue'
 import type { ScheduledOut, RoutineOut } from '@/api/domain'
 import { updateSchedule, deleteSchedule, schedule, listRoutines } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
@@ -32,6 +32,11 @@ const loading = ref(false)
 const newTime = ref('')
 const newRoutineId = ref<string>('')
 const newNote = ref('')
+
+// Replan state
+const editingId = ref<number | null>(null)
+const editDate = ref('')
+const editTime = ref('')
 
 // Confirm dialog state
 const confirmAction = ref<{ type: 'skip' | 'delete'; id: number } | null>(null)
@@ -66,6 +71,37 @@ async function confirmSkip() {
 
 async function deleteSession(id: number) {
   confirmAction.value = { type: 'delete', id }
+}
+
+function startReplan(session: ScheduledOut) {
+  editingId.value = session.id
+  editDate.value = session.date
+  editTime.value = session.time || ''
+}
+
+async function saveReplan() {
+  if (!editingId.value) return
+  try {
+    loading.value = true
+    await updateSchedule(editingId.value, {
+      date: editDate.value,
+      time: editTime.value || null,
+    })
+    editingId.value = null
+    editDate.value = ''
+    editTime.value = ''
+    emit('updated')
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    loading.value = false
+  }
+}
+
+function cancelReplan() {
+  editingId.value = null
+  editDate.value = ''
+  editTime.value = ''
 }
 
 async function confirmDelete() {
@@ -129,9 +165,11 @@ loadRoutines()
           <div class="flex-1">
             <p class="font-medium text-ink">{{ session.time || '–' }}</p>
             <p v-if="session.note" class="text-sm text-ink-muted">{{ session.note }}</p>
+            <p v-if="session.status === 'done'" class="text-sm text-ink-muted">{{ $t('calendar.done') }}</p>
           </div>
           <div class="flex items-center gap-2">
             <span
+              :data-status="session.status"
               :class="[
                 'w-2.5 h-2.5 rounded-full',
                 session.status === 'planned' ? 'border-2 border-aurora' : '',
@@ -144,6 +182,15 @@ loadRoutines()
 
         <!-- Actions -->
         <div v-if="isViewingSelf" class="flex gap-2 flex-wrap">
+          <BkButton
+            v-if="session.status === 'planned'"
+            :data-testid="`replan-session-${session.id}`"
+            variant="ghost"
+            size="sm"
+            @click="startReplan(session)"
+          >
+            {{ $t('calendar.replan') }}
+          </BkButton>
           <BkButton
             v-if="session.status === 'planned'"
             :data-testid="`skip-session-${session.id}`"
@@ -161,14 +208,6 @@ loadRoutines()
           >
             {{ $t('common.delete') }}
           </BkButton>
-          <BkButton
-            v-if="session.status === 'done' && session.workout_id"
-            variant="ghost"
-            size="sm"
-            @click="navigateToWorkout(session.workout_id)"
-          >
-            {{ $t('calendar.viewWorkout') }}
-          </BkButton>
         </div>
       </div>
     </div>
@@ -181,16 +220,18 @@ loadRoutines()
           v-model="newTime"
           type="time"
           :label="$t('calendar.time')"
+          :hint="$t('calendar.optional')"
         />
         <BkSelect
           v-model="newRoutineId"
-          :options="routines.map(r => ({ value: String(r.id), label: r.name }))"
+          :options="[{ value: '', label: $t('calendar.selectRoutine') }, ...routines.map(r => ({ value: String(r.id), label: r.name }))]"
           :label="$t('calendar.routine')"
         />
         <BkField
           v-model="newNote"
           type="text"
           :label="$t('calendar.note')"
+          :hint="$t('calendar.optional')"
         />
         <BkButton
           variant="primary"
@@ -203,18 +244,50 @@ loadRoutines()
       </div>
     </div>
 
-    <!-- Confirm modals -->
-    <div v-if="confirmAction" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg p-6 max-w-sm mx-4">
-        <h3 class="font-semibold text-ink mb-2">
-          {{ confirmAction.type === 'skip' ? $t('calendar.confirmSkip') : $t('calendar.confirmDelete') }}
-        </h3>
-        <p class="text-ink-muted mb-4">
-          {{ confirmAction.type === 'skip' ? $t('calendar.confirmSkipMessage') : $t('calendar.confirmDeleteMessage') }}
-        </p>
-        <div class="flex gap-2 justify-end">
+    <!-- Replan sheet -->
+    <BkSheet :open="editingId !== null" :title="$t('calendar.replan')" @close="cancelReplan">
+      <div v-if="editingId !== null" class="space-y-3">
+        <BkField
+          v-model="editDate"
+          type="date"
+          :label="$t('calendar.date')"
+        />
+        <BkField
+          v-model="editTime"
+          type="time"
+          :label="$t('calendar.time')"
+          :hint="$t('calendar.optional')"
+        />
+        <div class="flex gap-2">
           <BkButton
             variant="ghost"
+            block
+            @click="cancelReplan"
+          >
+            {{ $t('common.cancel') }}
+          </BkButton>
+          <BkButton
+            variant="primary"
+            block
+            :disabled="loading"
+            @click="saveReplan"
+          >
+            {{ $t('common.save') }}
+          </BkButton>
+        </div>
+      </div>
+    </BkSheet>
+
+    <!-- Confirm sheet -->
+    <BkSheet :open="confirmAction !== null" :title="confirmAction?.type === 'skip' ? $t('calendar.confirmSkip') : $t('calendar.confirmDelete')" @close="confirmAction = null">
+      <div v-if="confirmAction" class="space-y-4">
+        <p class="text-ink-muted">
+          {{ confirmAction.type === 'skip' ? $t('calendar.confirmSkipMessage') : $t('calendar.confirmDeleteMessage') }}
+        </p>
+        <div class="flex gap-2">
+          <BkButton
+            variant="ghost"
+            block
             @click="confirmAction = null"
           >
             {{ $t('common.cancel') }}
@@ -222,6 +295,7 @@ loadRoutines()
           <BkButton
             :data-testid="`confirm-${confirmAction.type}`"
             variant="primary"
+            block
             :disabled="loading"
             @click="confirmAction.type === 'skip' ? confirmSkip() : confirmDelete()"
           >
@@ -229,6 +303,6 @@ loadRoutines()
           </BkButton>
         </div>
       </div>
-    </div>
+    </BkSheet>
   </div>
 </template>

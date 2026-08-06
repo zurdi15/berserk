@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { monthGrid, weekdayHeaders, todayIso } from '@/utils/dates'
-import { groupRune } from './groupRune'
+import { isValidRuneName } from './groupRune'
+import BkRune from '@/lib/BkRune.vue'
 import type { CalendarMonthOut } from '@/api/domain'
+import type { RuneName } from '@/lib/runes'
 
 const props = defineProps<{
   month: CalendarMonthOut
   year: number
   monthNum: number
+  groupMap: Map<number, string>
 }>()
 
 const emit = defineEmits<{
@@ -35,6 +38,25 @@ const workoutsByDate = computed(() => {
   for (const w of props.month.workouts) {
     if (!map.has(w.date)) map.set(w.date, [])
     map.get(w.date)!.push(w)
+  }
+  return map
+})
+
+// Recolectar runas de grupos musculares por día (máx 3)
+const runesByDate = computed(() => {
+  const map = new Map<string, RuneName[]>()
+  for (const workout of props.month.workouts) {
+    const runes: RuneName[] = []
+    for (const muscleId of workout.muscle_group_ids) {
+      const slug = props.groupMap.get(muscleId)
+      if (slug && isValidRuneName(slug)) {
+        runes.push(slug as RuneName)
+      }
+    }
+    if (runes.length > 0) {
+      const existing = map.get(workout.date) ?? []
+      map.set(workout.date, [...existing, ...runes].slice(0, 3))
+    }
   }
   return map
 })
@@ -75,32 +97,29 @@ function selectDay(date: string) {
         }"
         @click="selectDay(cell.date)"
       >
-        <!-- Date number -->
+        <!-- Date number (timezone-safe) -->
         <span class="text-xs font-semibold">
-          {{ new Date(cell.date).getDate() }}
+          {{ Number(cell.date.slice(8, 10)) }}
         </span>
 
         <!-- Status dots -->
         <div v-if="scheduledByDate.has(cell.date)" class="flex gap-0.5">
           <span
-            v-for="(session, i) in scheduledByDate.get(cell.date)!"
+            v-for="session in scheduledByDate.get(cell.date)!"
             :key="`status-${session.id}`"
             :data-status="session.status"
             :class="['w-1.5 h-1.5', statusClasses(session.status)]"
           />
         </div>
 
-        <!-- Muscle group runes -->
-        <div v-if="workoutsByDate.has(cell.date)" class="flex gap-1 justify-center">
-          <span
-            v-for="(workout, i) in workoutsByDate.get(cell.date)!"
-            :key="`workout-${workout.id}`"
-            class="text-xs"
-          >
-            <template v-for="(muscleId, j) in workout.muscle_group_ids.slice(0, 3)" :key="`muscle-${muscleId}`">
-              {{ groupRune(`muscle-${muscleId}`) }}
-            </template>
-          </span>
+        <!-- Muscle group runes (max 3 per day) -->
+        <div v-if="runesByDate.has(cell.date)" class="flex gap-0.5">
+          <BkRune
+            v-for="runeName in runesByDate.get(cell.date)!"
+            :key="`rune-${runeName}`"
+            :name="runeName"
+            :size="12"
+          />
         </div>
       </button>
     </div>

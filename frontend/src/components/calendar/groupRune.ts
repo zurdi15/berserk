@@ -1,14 +1,7 @@
-// mapeo de slugs de grupos musculares a emojis
-const runeMap: Record<string, string> = {
-  chest: '💪',
-  back: '🏋️',
-  legs: '🦵',
-  shoulders: '🔶',
-  biceps: '💥',
-  triceps: '🌟',
-  core: '🎯',
-}
+import type { RuneName } from '@/lib/runes'
 
-export function groupRune(slug: string): string {
-  return runeMap[slug] ?? runeMap.core
+// validar si un slug es un RuneName válido para renderizar como BkRune
+export function isValidRuneName(slug: string): slug is RuneName {
+  const validRunes: RuneName[] = ['chest', 'back', 'biceps', 'triceps', 'shoulders', 'legs', 'core', 'berserk', 'streak', 'pr']
+  return validRunes.includes(slug as RuneName)
 }
