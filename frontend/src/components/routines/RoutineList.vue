@@ -100,7 +100,7 @@ onMounted(() => {
             size="sm"
             @click="openEditor(routine)"
           >
-            {{ $t('common.save') }}
+            {{ $t('common.edit') }}
           </BkButton>
           <div v-if="deleteConfirming === routine.id" class="flex gap-2 flex-1">
             <BkButton

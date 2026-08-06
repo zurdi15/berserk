@@ -3,9 +3,10 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut, RoutineOut } from '@/api/domain'
-import { createRoutine, deleteRoutine, listExercises, listMuscleGroups, replaceRoutineExercises, updateRoutine } from '@/api/domain'
+import { createRoutine, listExercises, listMuscleGroups, replaceRoutineExercises, updateRoutine } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
@@ -20,6 +21,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const toast = useToastStore()
 
 // State
 const name = ref('')
@@ -30,25 +32,33 @@ const exercises = ref<Array<{
   exercise_id: number
   target_sets: number
   target_reps: number | null
+  target_weight_kg: number | null
   rest_seconds: string | null
 }>>([])
 const allExercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<Array<{ id: number; slug: string; name_es: string; name_en: string; owner_id: number | null }>>([])
 const searchQuery = ref('')
 const loading = ref(false)
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Computed
 const runes: RuneName[] = ['chest', 'back', 'biceps', 'triceps', 'shoulders', 'legs', 'core']
 const berserkerRune: RuneName = 'berserk'
 
-const filteredExercises = computed(() => {
-  if (!searchQuery.value) return allExercises.value
+const groupedExercises = computed(() => {
+  if (!searchQuery.value) return []
 
-  return allExercises.value.filter(e => {
-    const searchLower = searchQuery.value.toLowerCase()
-    const localeName = exerciseName(e, auth.user?.locale || 'es').toLowerCase()
-    return localeName.includes(searchLower)
+  const groups = new Map<number, ExerciseOut[]>()
+  allExercises.value.forEach(exercise => {
+    const primaryMuscle = exercise.muscle_groups.find(m => m.is_primary)
+    if (primaryMuscle) {
+      if (!groups.has(primaryMuscle.muscle_group_id)) {
+        groups.set(primaryMuscle.muscle_group_id, [])
+      }
+      groups.get(primaryMuscle.muscle_group_id)!.push(exercise)
+    }
   })
+  return groups
 })
 
 const restOptions = computed(() => [
@@ -73,6 +83,24 @@ async function loadData() {
   }
 }
 
+async function searchExercises() {
+  if (searchTimeout) clearTimeout(searchTimeout)
+
+  searchTimeout = setTimeout(async () => {
+    try {
+      const query = searchQuery.value.trim()
+      if (!query) {
+        allExercises.value = []
+        return
+      }
+      const results = await listExercises({ q: query })
+      allExercises.value = results
+    } catch (error) {
+      toastApiError(error)
+    }
+  }, 300)
+}
+
 async function initializeForm() {
   if (props.routine) {
     name.value = props.routine.name
@@ -83,6 +111,7 @@ async function initializeForm() {
       exercise_id: e.exercise_id,
       target_sets: e.target_sets,
       target_reps: e.target_reps || 0,
+      target_weight_kg: e.target_weight_kg || null,
       rest_seconds: e.rest_seconds ? String(e.rest_seconds) : '60',
     }))
   } else {
@@ -101,9 +130,11 @@ function addExercise(exercise: ExerciseOut) {
     exercise_id: exercise.id,
     target_sets: 3,
     target_reps: 0,
+    target_weight_kg: null,
     rest_seconds: '60',
   })
   searchQuery.value = ''
+  allExercises.value = []
 }
 
 function removeExercise(id: string) {
@@ -128,7 +159,7 @@ function moveExerciseDown(index: number) {
 
 async function saveRoutine() {
   if (!name.value.trim()) {
-    toastApiError(new Error(t('routines.nameRequired')))
+    toast.push('error', t('routines.nameRequired'))
     return
   }
 
@@ -150,16 +181,14 @@ async function saveRoutine() {
       })
     }
 
-    // Save exercises
-    if (exercises.value.length > 0) {
-      await replaceRoutineExercises(routine.id, exercises.value.map(e => ({
-        exercise_id: e.exercise_id,
-        target_sets: e.target_sets,
-        target_reps: e.target_reps || null,
-        target_weight_kg: null,
-        rest_seconds: e.rest_seconds ? parseInt(e.rest_seconds, 10) : null,
-      })))
-    }
+    // Always save exercises (even if empty)
+    await replaceRoutineExercises(routine.id, exercises.value.map(e => ({
+      exercise_id: e.exercise_id,
+      target_sets: e.target_sets,
+      target_reps: e.target_reps || null,
+      target_weight_kg: e.target_weight_kg || null,
+      rest_seconds: e.rest_seconds ? parseInt(e.rest_seconds, 10) : null,
+    })))
 
     emit('close')
   } catch (error) {
@@ -169,11 +198,23 @@ async function saveRoutine() {
   }
 }
 
-watch(() => props.open, async (open) => {
-  if (open) {
-    await initializeForm()
-  }
-})
+watch(
+  () => props.open,
+  async (open) => {
+    if (open) {
+      await initializeForm()
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => searchQuery.value,
+  () => {
+    searchExercises()
+  },
+  { flush: 'post' }
+)
 </script>
 
 <template>
@@ -236,7 +277,7 @@ watch(() => props.open, async (open) => {
           >
             <!-- Exercise name (read-only) -->
             <div class="text-sm font-medium text-ink">
-              {{ exerciseName(allExercises.find(e => e.id === exercise.exercise_id)!, auth.user?.locale || 'es') }}
+              {{ exerciseName(allExercises.find(e => e.id === exercise.exercise_id), auth.user?.locale || 'es') }}
             </div>
 
             <!-- Target Sets -->
@@ -258,6 +299,19 @@ watch(() => props.open, async (open) => {
                 :min="0"
                 :max="100"
                 @update:model-value="exercise.target_reps = $event"
+              />
+            </div>
+
+            <!-- Target Weight -->
+            <div>
+              <label class="block text-xs text-ink-muted mb-2">{{ $t('routines.targetWeight') }}</label>
+              <BkStepper
+                :model-value="exercise.target_weight_kg || 0"
+                :min="0"
+                :max="300"
+                :step="2.5"
+                :suffix="`${auth.user?.units || 'kg'}`"
+                @update:model-value="exercise.target_weight_kg = $event > 0 ? $event : null"
               />
             </div>
 
@@ -306,16 +360,27 @@ watch(() => props.open, async (open) => {
             type="text"
           />
 
-          <div v-if="searchQuery && filteredExercises.length > 0" class="max-h-40 overflow-y-auto space-y-1">
-            <button
-              v-for="exercise in filteredExercises"
-              :key="exercise.id"
-              type="button"
-              class="w-full text-left p-2 rounded-sm hover:bg-stone transition-colors text-sm text-ink border border-transparent hover:border-line"
-              @click="addExercise(exercise)"
-            >
-              {{ exerciseName(exercise, auth.user?.locale || 'es') }}
-            </button>
+          <!-- Grouped exercises by muscle -->
+          <div v-if="searchQuery && allExercises.length > 0" class="max-h-40 overflow-y-auto space-y-2">
+            <div v-for="[muscleId, groupExercises] in groupedExercises" :key="muscleId" class="space-y-1">
+              <div class="flex items-center gap-2 px-2 text-xs text-ink-muted font-semibold">
+                <BkRune
+                  v-if="muscleGroups.find(m => m.id === muscleId)"
+                  :name="(muscleGroups.find(m => m.id === muscleId)!.slug as RuneName)"
+                  :size="16"
+                />
+                <span>{{ muscleGroups.find(m => m.id === muscleId)?.[auth.user?.locale === 'es' ? 'name_es' : 'name_en'] }}</span>
+              </div>
+              <button
+                v-for="exercise in groupExercises"
+                :key="exercise.id"
+                type="button"
+                class="w-full text-left p-2 pl-6 rounded-sm hover:bg-stone transition-colors text-sm text-ink border border-transparent hover:border-line"
+                @click="addExercise(exercise)"
+              >
+                {{ exerciseName(exercise, auth.user?.locale || 'es') }}
+              </button>
+            </div>
           </div>
         </div>
       </div>

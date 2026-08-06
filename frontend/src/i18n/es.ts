@@ -47,6 +47,7 @@ export const es = {
     decrease: 'Reducir',
     increase: 'Aumentar',
     saved: 'Guardado',
+    edit: 'Editar',
   },
   athlete: {
     viewing: 'Viendo a {name}',
@@ -111,6 +112,7 @@ export const es = {
     exercises: 'Ejercicios',
     targetSets: 'Series objetivo',
     targetReps: 'Reps objetivo',
+    targetWeight: 'Peso objetivo',
     restSeconds: 'Descanso (segundos)',
     addExercise: 'Añadir ejercicio',
     moveUp: 'Arriba',
