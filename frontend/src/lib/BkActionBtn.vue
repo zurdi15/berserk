@@ -13,8 +13,11 @@
 // build. Se deja caer como atributo normal (fallthrough) sobre el único
 // elemento raíz (el <button>), igual que ya hace BkButton; queda como
 // contrato documentado aquí + cubierto por test, no por el tipo.
+// v0.3.0 item 5: 'skip' y 'replan' se suman al catálogo — los botones de
+// acción de una sesión programada (borrar/omitir/replanificar) pasan de
+// texto a icon-only, mismo patrón que edit/key/delete de siempre.
 defineProps<{
-  icon: 'edit' | 'key' | 'delete'
+  icon: 'edit' | 'key' | 'delete' | 'skip' | 'replan'
 }>()
 </script>
 
@@ -58,7 +61,7 @@ defineProps<{
       <path d="M9.5 12 L20 12 M15 12 L15 15 M19 12 L19 16" />
     </svg>
     <svg
-      v-else
+      v-else-if="icon === 'delete'"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -69,6 +72,38 @@ defineProps<{
       aria-hidden="true"
     >
       <path d="M6 6 L18 18 M18 6 L6 18" />
+    </svg>
+    <svg
+      v-else-if="icon === 'skip'"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="w-4 h-4"
+      aria-hidden="true"
+    >
+      <!-- círculo tachado: distinto de la X de "delete" (una sola diagonal,
+           no dos cruzadas) — "esto no va a pasar", no "esto se destruye" -->
+      <circle cx="12" cy="12" r="9" />
+      <path d="M6 6 L18 18" />
+    </svg>
+    <svg
+      v-else
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="w-4 h-4"
+      aria-hidden="true"
+    >
+      <!-- replan: flecha circular (rotate-ccw) — un arco + una sola cabeza
+           de flecha, no el doble-arco de un "refresh" completo -->
+      <path d="M1 4v6h6" />
+      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
     </svg>
   </button>
 </template>
