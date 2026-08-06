@@ -35,7 +35,10 @@ const exercises = ref<Array<{
   target_weight_kg: number | null
   rest_seconds: string | null
 }>>([])
+// Immutable full catalog (loaded once, used for row-name resolution)
 const allExercises = ref<ExerciseOut[]>([])
+// Search results buffer (used only for picker display)
+const searchResults = ref<ExerciseOut[]>([])
 const muscleGroups = ref<Array<{ id: number; slug: string; name_es: string; name_en: string; owner_id: number | null }>>([])
 const searchQuery = ref('')
 const loading = ref(false)
@@ -48,8 +51,9 @@ const berserkerRune: RuneName = 'berserk'
 const groupedExercises = computed(() => {
   if (!searchQuery.value) return []
 
+  // Use searchResults for picker display
   const groups = new Map<number, ExerciseOut[]>()
-  allExercises.value.forEach(exercise => {
+  searchResults.value.forEach(exercise => {
     const primaryMuscle = exercise.muscle_groups.find(m => m.is_primary)
     if (primaryMuscle) {
       if (!groups.has(primaryMuscle.muscle_group_id)) {
@@ -90,11 +94,11 @@ async function searchExercises() {
     try {
       const query = searchQuery.value.trim()
       if (!query) {
-        allExercises.value = []
+        searchResults.value = []
         return
       }
       const results = await listExercises({ q: query })
-      allExercises.value = results
+      searchResults.value = results
     } catch (error) {
       toastApiError(error)
     }
@@ -133,8 +137,9 @@ function addExercise(exercise: ExerciseOut) {
     target_weight_kg: null,
     rest_seconds: '60',
   })
+  // Only clear search query and results, keep allExercises immutable
   searchQuery.value = ''
-  allExercises.value = []
+  searchResults.value = []
 }
 
 function removeExercise(id: string) {

@@ -93,16 +93,8 @@ describe('exerciseName', () => {
     expect(exerciseName(exercise, 'es')).toBe('Press de banca')
   })
 
-  it('handles null-safe fallback when name missing', () => {
-    const exercise = {
-      id: 1,
-      name_es: '',
-      name_en: '',
-      measurement: 'strength' as const,
-      owner_id: null,
-      muscle_groups: [],
-    }
-    const result = exerciseName(exercise, 'en')
+  it('handles null-safe fallback when exercise undefined', () => {
+    const result = exerciseName(undefined, 'en')
     expect(result).toBe('')
   })
 })
@@ -313,5 +305,65 @@ describe('RoutineEditorSheet', () => {
 
     // Assert listExercises called with {q: 'bench'}
     expect(listExercises).toHaveBeenCalledWith({ q: 'bench' })
+  })
+
+  it('keeps row exercise names visible after search', async () => {
+    const routine = {
+      id: 5,
+      name: 'Test Routine',
+      description: null,
+      rune: null,
+      color: null,
+      exercises: [
+        { id: 10, exercise_id: 1, position: 0, target_sets: 3, target_reps: null, target_weight_kg: null, rest_seconds: 60 },
+      ],
+    }
+
+    const wrapper = build(routine)
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await wrapper.vm.$nextTick()
+
+    const vm = wrapper.vm as any
+    const exerciseName1 = vm.allExercises[0]?.name_es || ''
+
+    // Perform a search
+    vm.searchQuery = 'sentadilla'
+    await new Promise(resolve => setTimeout(resolve, 350))
+    await wrapper.vm.$nextTick()
+
+    // Verify allExercises still contains the catalog (row names still render)
+    expect(vm.allExercises).toHaveLength(2)
+    expect(vm.allExercises[0].name_es).toBe(exerciseName1)
+  })
+
+  it('keeps row exercise names visible after adding exercise', async () => {
+    const routine = {
+      id: 5,
+      name: 'Test Routine',
+      description: null,
+      rune: null,
+      color: null,
+      exercises: [
+        { id: 10, exercise_id: 1, position: 0, target_sets: 3, target_reps: null, target_weight_kg: null, rest_seconds: 60 },
+      ],
+    }
+
+    const wrapper = build(routine)
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await wrapper.vm.$nextTick()
+
+    const vm = wrapper.vm as any
+    const allExercisesBefore = vm.allExercises.length
+
+    // Add an exercise
+    const newExercise = vm.allExercises[1]
+    vm.addExercise(newExercise)
+    await wrapper.vm.$nextTick()
+
+    // Verify allExercises unchanged (row names still render)
+    expect(vm.allExercises).toHaveLength(allExercisesBefore)
+    expect(vm.exercises).toHaveLength(2)
   })
 })
