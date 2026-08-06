@@ -272,16 +272,21 @@ describe('BkChart', () => {
     const sizeFn = options.axes[1].size
     expect(typeof sizeFn).toBe('function')
 
-    // self sintético: uPlot pasaría un canvas real (self.ctx.measureText) —
-    // aquí se sustituye por una medida honesta y determinística (ancho ∝
-    // longitud del texto), lo más cerca de la API real que permite el
-    // entorno de test sin un canvas de verdad detrás
+    // self sintético con la forma REAL de uPlot (C2): axis.font es un ARRAY
+    // (pxRatioFont: [fontString, fontSizePx, fontSizeCssPx]), no el string
+    // plano que sugiere el tipo declarado — asignarlo tal cual a ctx.font lo
+    // invalida en silencio y el canvas mide con su 10px por defecto
     const fakeSelf = {
-      axes: [{}, { ticks: { size: 4 }, gap: 4, font: '12px sans-serif' }],
+      axes: [{}, { ticks: { size: 4 }, gap: 4, font: ['36px sans-serif', 36, 12] }],
       ctx: { font: '', measureText: (text: string) => ({ width: text.length * 6 }) },
     } as any
 
     const shortSize = sizeFn(fakeSelf, ['5 kg'], 1, 1)
+    // ctx.font debe quedar con el STRING (primer elemento del array), no el
+    // array entero — si volviera a romperse, esto lo detecta directamente
+    // en vez de solo inferirlo del ancho medido
+    expect(fakeSelf.ctx.font).toBe('36px sans-serif')
+
     const longSize = sizeFn(fakeSelf, ['888.5 kg'], 1, 1)
     expect(longSize).toBeGreaterThan(shortSize)
 

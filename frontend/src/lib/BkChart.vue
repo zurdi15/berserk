@@ -100,7 +100,14 @@ function yAxisSize(self: uPlot, values: string[] | null, axisIdx: number, cycleN
   let size = (axis.ticks?.size ?? 0) + (axis.gap ?? 0)
   const longest = (values ?? []).reduce((acc, v) => (v != null && v.length > acc.length ? v : acc), '')
   if (longest) {
-    self.ctx.font = axis.font || '12px sans-serif'
+    // C2: uPlot guarda axis.font como un ARRAY (pxRatioFont: [fontString,
+    // fontSizePx, fontSizeCssPx]), no como el string plano que sugiere el
+    // tipo declarado — asignar el array tal cual a ctx.font lo invalida en
+    // silencio (el canvas ignora un font inválido y se queda en su 10px por
+    // defecto), midiendo mucho más corto de lo real. En HiDPI (pxRatio 3x en
+    // Android) esa medida corta, encima DIVIDIDA por pxRatio, daba un hueco
+    // MÁS ESTRECHO que el ancho fijo de 50px que este callback reemplazó.
+    self.ctx.font = Array.isArray(axis.font) ? axis.font[0] : (axis.font || '12px sans-serif')
     size += self.ctx.measureText(longest).width / (uPlot.pxRatio || 1)
   }
   return Math.ceil(size)
