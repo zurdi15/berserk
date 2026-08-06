@@ -194,6 +194,12 @@ def _workout_dates(
             d = week_start + timedelta(days=off)
             if d <= end_date:
                 dates.append(d)
+                # día doble ocasional (segunda sesión, ej. cardio de mañana +
+                # rutina por la tarde): sube el heatmap por encima del tier 1;
+                # ambos entrenos quedan cerrados (ended_at), así que el índice
+                # único de "un solo entreno activo" no se ve afectado
+                if rng.random() < 0.12:
+                    dates.append(d)
     return sorted(dates)
 
 
@@ -204,14 +210,20 @@ def _log_set(
     wex: WorkoutExercise,
     set_number: int,
     is_warmup: bool,
+    started_at: datetime,
     **fields,
 ) -> WorkoutSet:
     rpe = fields.pop("rpe", None)
+    # completed_at real, no el instante del seed: sin esto todas las series (y
+    # por tanto todos los PR) colapsan en "ahora" y "PRs recientes" muestra el
+    # historial entero como si fuera de hoy
+    completed_at = started_at + timedelta(minutes=3 * set_number)
     wset = WorkoutSet(
         workout_exercise_id=wex.id,
         set_number=set_number,
         is_warmup=is_warmup,
         rpe=rpe,
+        completed_at=completed_at,
         **fields,
     )
     db.add(wset)
@@ -219,7 +231,7 @@ def _log_set(
     # misma secuencia que el router log_set: volumen de sesión + detect_prs
     # por cada serie (detect_prs ya ignora calentamientos y no-fuerza)
     volume = session_volume(db, wex.workout_id, exercise.id)
-    detect_prs(db, owner_id, exercise, wset, volume)
+    detect_prs(db, owner_id, exercise, wset, volume, achieved_at=completed_at)
     return wset
 
 
@@ -232,6 +244,7 @@ def _log_main_exercise(
     item: RoutineExercise,
     progressions: dict[int, _Progression],
     weight_scale: float,
+    started_at: datetime,
 ) -> None:
     target_reps = item.target_reps or 8
     target_sets = item.target_sets or 3
@@ -243,7 +256,7 @@ def _log_main_exercise(
         working_weight = prog.next()
         warmup_weight = max(_round25(working_weight * 0.6), 10.0)
         _log_set(
-            db, owner_id, exercise, wex, 1, True,
+            db, owner_id, exercise, wex, 1, True, started_at,
             reps=target_reps + 2, weight_kg=warmup_weight,
         )
         for i in range(target_sets):
@@ -251,7 +264,7 @@ def _log_main_exercise(
             reps = max(target_reps + rng.choice((-1, 0, 0, 0, 1)), 1)
             weight = working_weight + (rng.choice((-2.5, 0, 0, 0)) if last else 0)
             _log_set(
-                db, owner_id, exercise, wex, i + 2, False,
+                db, owner_id, exercise, wex, i + 2, False, started_at,
                 reps=reps, weight_kg=weight, rpe=rng.randint(6, 9),
             )
     else:  # bodyweight: aquí la progresión sube repeticiones, no peso
@@ -259,44 +272,48 @@ def _log_main_exercise(
             exercise.id, _Progression(rng, float(target_reps), 1.0)
         )
         top_reps = int(round(prog.next()))
-        _log_set(db, owner_id, exercise, wex, 1, True, reps=max(top_reps - 3, 3))
+        _log_set(db, owner_id, exercise, wex, 1, True, started_at, reps=max(top_reps - 3, 3))
         for i in range(target_sets):
             reps = max(top_reps + rng.choice((-1, 0, 0, 1)), 1)
             _log_set(
-                db, owner_id, exercise, wex, i + 2, False,
+                db, owner_id, exercise, wex, i + 2, False, started_at,
                 reps=reps, rpe=rng.randint(6, 9),
             )
 
 
-def _log_ad_hoc(db: Session, rng: random.Random, owner_id: int, exercise: Exercise, wex: WorkoutExercise) -> None:
+def _log_ad_hoc(
+    db: Session, rng: random.Random, owner_id: int, exercise: Exercise, wex: WorkoutExercise, started_at: datetime
+) -> None:
     sets = rng.choice((2, 3))
     if exercise.measurement == "strength":
         weight = _round25(rng.uniform(10, 40))
         for i in range(sets):
             _log_set(
-                db, owner_id, exercise, wex, i + 1, False,
+                db, owner_id, exercise, wex, i + 1, False, started_at,
                 reps=rng.randint(8, 12), weight_kg=weight, rpe=rng.randint(6, 8),
             )
     elif exercise.measurement == "bodyweight":
         for i in range(sets):
             _log_set(
-                db, owner_id, exercise, wex, i + 1, False,
+                db, owner_id, exercise, wex, i + 1, False, started_at,
                 reps=rng.randint(8, 15), rpe=rng.randint(6, 8),
             )
     elif exercise.measurement == "timed":
         for i in range(sets):
             _log_set(
-                db, owner_id, exercise, wex, i + 1, False,
+                db, owner_id, exercise, wex, i + 1, False, started_at,
                 duration_seconds=rng.randint(30, 60), rpe=rng.randint(6, 8),
             )
     else:  # cardio, raro como extra pero por si el catálogo del pool lo trae
-        _log_set(db, owner_id, exercise, wex, 1, False, duration_seconds=rng.randint(300, 900))
+        _log_set(db, owner_id, exercise, wex, 1, False, started_at, duration_seconds=rng.randint(300, 900))
 
 
-def _log_cardio(db: Session, rng: random.Random, owner_id: int, exercise: Exercise, wex: WorkoutExercise) -> None:
+def _log_cardio(
+    db: Session, rng: random.Random, owner_id: int, exercise: Exercise, wex: WorkoutExercise, started_at: datetime
+) -> None:
     duration = rng.randint(15, 25) * 60
     distance = round(duration / 60 * rng.uniform(120, 170)) if rng.random() < 0.7 else None
-    _log_set(db, owner_id, exercise, wex, 1, False, duration_seconds=duration, distance_m=distance)
+    _log_set(db, owner_id, exercise, wex, 1, False, started_at, duration_seconds=duration, distance_m=distance)
 
 
 def _build_workout(
@@ -337,7 +354,7 @@ def _build_workout(
         wex = WorkoutExercise(workout_id=workout.id, exercise_id=exercise.id, position=position)
         db.add(wex)
         db.flush()
-        _log_main_exercise(db, rng, owner.id, exercise, wex, item, progressions, weight_scale)
+        _log_main_exercise(db, rng, owner.id, exercise, wex, item, progressions, weight_scale, started)
         position += 1
 
     if extra_pool and rng.random() < 0.18:
@@ -350,14 +367,14 @@ def _build_workout(
             )
             db.add(wex)
             db.flush()
-            _log_ad_hoc(db, rng, owner.id, extra, wex)
+            _log_ad_hoc(db, rng, owner.id, extra, wex, started)
             position += 1
 
     if rng.random() < 0.3:
         wex = WorkoutExercise(workout_id=workout.id, exercise_id=cardio_exercise.id, position=position)
         db.add(wex)
         db.flush()
-        _log_cardio(db, rng, owner.id, cardio_exercise, wex)
+        _log_cardio(db, rng, owner.id, cardio_exercise, wex, started)
 
     # commit por entreno, no por serie: esto es una herramienta de desarrollo que
     # corre una vez y termina, no un request handler; la regla de "los servicios
@@ -434,7 +451,9 @@ def _schedule_sessions(
 
     next_idx = len(workouts) % len(routines)
     today = end_date + timedelta(days=1)
-    first_offset = rng.choice((0, 1))
+    # sesión de "hoy" siempre presente, no una moneda al aire: el buzón de la
+    # portada de athlete-mode necesita algo que mostrar sin depender del azar
+    first_offset = 0
     for i, offset in enumerate((first_offset, 3, 6)):
         db.add(
             ScheduledSession(
@@ -502,6 +521,10 @@ def run(db: Session, weeks: int = 12) -> dict:
 
     scheduled_count = _schedule_sessions(db, rng, target, target_workouts, target_routines, end_date)
     _body_entries(db, rng, target, weeks, end_date)
+    # freyja es la atleta compartida de demo (athlete-mode); sin esto tiene
+    # entrenos pero ni sesiones programadas ni peso, y esa vista queda vacía
+    _schedule_sessions(db, rng, freyja, freyja_workouts, freyja_routines, end_date)
+    _body_entries(db, rng, freyja, weeks, end_date)
 
     pr_count = db.scalar(
         select(func.count(PersonalRecord.id)).where(PersonalRecord.owner_id == target.id)

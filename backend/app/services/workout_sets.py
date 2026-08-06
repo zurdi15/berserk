@@ -4,6 +4,8 @@ Ningún método de este módulo hace commit: el router es el dueño de la
 transacción y confirma una sola vez por request.
 """
 
+from datetime import datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -62,8 +64,14 @@ def detect_prs(
     exercise: Exercise,
     wset: WorkoutSet,
     volume: float,
+    achieved_at: datetime | None = None,
 ) -> list[PersonalRecord]:
-    """Records nuevos que provoca esta serie (se devuelven para celebrarlos en el acto)."""
+    """Records nuevos que provoca esta serie (se devuelven para celebrarlos en el acto).
+
+    `achieved_at` es opcional para no tocar los call sites de los routers (siempre
+    "ahora"); el dev seed sí lo pasa explícito para backdatar los PR con el resto
+    del historial en vez de amontonarlos todos en el instante de ejecución del seed.
+    """
     if exercise.measurement not in ("strength", "bodyweight"):
         return []
     if wset.is_warmup or not wset.reps or not wset.weight_kg:
@@ -89,7 +97,7 @@ def detect_prs(
                 kind=kind,
                 value=value,
                 set_id=wset.id,
-                achieved_at=utcnow(),
+                achieved_at=achieved_at or utcnow(),
             )
             db.add(record)
             new_records.append(record)

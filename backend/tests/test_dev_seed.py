@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import date, timedelta
 
 from sqlalchemy import func, select
@@ -155,3 +156,78 @@ def test_dev_seed_noop_when_target_already_has_workouts(db_session):
     assert result == {"created": False, "target_username": "root"}
     assert db_session.scalar(select(func.count(models.User.id))) == 1
     assert db_session.scalar(select(func.count(models.Routine.id))) == 0
+
+
+def test_dev_seed_set_completed_at_matches_workout_date(db_session):
+    """Cada WorkoutSet.completed_at debe caer en la fecha real de su entreno (con
+    ±1 día de margen por el ancla horaria Europe/Madrid -> UTC naive), nunca en
+    el instante de ejecución del seed: si no, "PRs recientes" y cualquier vista
+    por fecha muestran todo el historial como si fuera de hoy."""
+    run(db_session)
+    target = db_session.scalar(select(models.User).where(models.User.is_admin.is_(True)))
+    freyja = db_session.scalar(select(models.User).where(models.User.username == "freyja"))
+
+    checked = 0
+    for owner_id in (target.id, freyja.id):
+        for w, _wex, wset in _all_sets(db_session, owner_id):
+            assert abs((wset.completed_at.date() - w.date).days) <= 1, (w.date, wset.completed_at)
+            checked += 1
+    assert checked > 100
+
+
+def test_dev_seed_personal_records_span_multiple_dates(db_session):
+    """Los achieved_at de los PR deben repartirse a lo largo del historial: hoy
+    detect_prs los sella todos con utcnow(), así que colapsan en el instante del
+    seed en vez de seguir la fecha real de la serie que los logró."""
+    run(db_session)
+    target = db_session.scalar(select(models.User).where(models.User.is_admin.is_(True)))
+    prs = db_session.scalars(
+        select(models.PersonalRecord).where(models.PersonalRecord.owner_id == target.id)
+    ).all()
+    assert prs
+    distinct_dates = {pr.achieved_at.date() for pr in prs}
+    assert len(distinct_dates) >= 4
+
+
+def test_dev_seed_freyja_has_schedule_and_body_entries(db_session):
+    """freyja es la atleta compartida de demo: sin sesiones programadas ni peso
+    registrado, su vista en athlete-mode aparece medio vacía frente al objetivo."""
+    run(db_session)
+    freyja = db_session.scalar(select(models.User).where(models.User.username == "freyja"))
+    scheduled = db_session.scalar(
+        select(func.count(models.ScheduledSession.id)).where(models.ScheduledSession.owner_id == freyja.id)
+    )
+    body_entries = db_session.scalar(
+        select(func.count(models.BodyEntry.id)).where(models.BodyEntry.owner_id == freyja.id)
+    )
+    assert scheduled > 0
+    assert body_entries > 0
+
+
+def test_dev_seed_target_has_planned_session_today(db_session):
+    """La sesión de "hoy" debe existir siempre determinista (first_offset ya no
+    es un rng.choice((0, 1))), no depender de una moneda al aire que a veces
+    deja el buzón de la portada sin nada que mostrar."""
+    run(db_session)
+    target = db_session.scalar(select(models.User).where(models.User.is_admin.is_(True)))
+    today = date.today()
+    planned_today = db_session.scalars(
+        select(models.ScheduledSession).where(
+            models.ScheduledSession.owner_id == target.id,
+            models.ScheduledSession.status == "planned",
+            models.ScheduledSession.date == today,
+        )
+    ).all()
+    assert len(planned_today) == 1
+
+
+def test_dev_seed_some_date_has_two_workouts(db_session):
+    """Al menos una fecha del historial debe tener 2 entrenos: con un máximo de
+    1 entreno/día el heatmap nunca sube del tier 1 de intensidad."""
+    run(db_session)
+    target = db_session.scalar(select(models.User).where(models.User.is_admin.is_(True)))
+    workouts = db_session.scalars(
+        select(models.Workout).where(models.Workout.owner_id == target.id)
+    ).all()
+    counts = Counter(w.date for w in workouts)
+    assert max(counts.values()) >= 2
