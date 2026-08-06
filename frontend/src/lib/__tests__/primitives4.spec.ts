@@ -308,7 +308,7 @@ describe('BkChart', () => {
       vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as MediaQueryList)
     })
 
-    it('tweens setData with growing prefixes of the full series, ending on the exact full arrays', () => {
+    it('tweens with a linearly-advancing, interpolated tip point (no stepwise jumps), ending on the exact full arrays', () => {
       const points = Array.from({ length: 10 }, (_, i) => ({
         date: `2026-08-${String(i + 1).padStart(2, '0')}`,
         value: (i + 1) * 10,
@@ -323,23 +323,32 @@ describe('BkChart', () => {
       expect(mockInstance.setData).not.toHaveBeenCalled()
 
       const duration = parseInt(core.dur[5], 10)
+      const fullXs = points.map((p) => new Date(p.date).getTime() / 1000)
+      const fullYs = points.map((p) => p.value)
 
-      pump(0) // primer frame: al menos 1 punto, nunca los 10
-      const firstSlice = mockInstance.setData.mock.calls[0][0]
-      expect(firstSlice[0].length).toBeGreaterThan(0)
-      expect(firstSlice[0].length).toBeLessThan(points.length)
+      pump(duration * 0.4) // frame intermedio: ni al principio ni al final
+      const [midXs, midYs] = mockInstance.setData.mock.calls.at(-1)![0]
 
-      pump(duration * 0.4) // frame intermedio: más puntos que el primero, aún no todos
-      const midSlice = mockInstance.setData.mock.calls.at(-1)![0]
-      expect(midSlice[0].length).toBeGreaterThan(firstSlice[0].length)
-      expect(midSlice[0].length).toBeLessThan(points.length)
+      // la punta (último elemento del frame) es sintética: no es ninguno de
+      // los x reales, cae ESTRICTAMENTE entre dos consecutivos...
+      const tipX = midXs.at(-1)!
+      const tipY = midYs.at(-1)!
+      expect(fullXs).not.toContain(tipX)
+      let belowIdx = -1
+      for (let i = 0; i < fullXs.length; i++) if (fullXs[i] < tipX) belowIdx = i
+      expect(belowIdx).toBeGreaterThanOrEqual(0)
+      expect(belowIdx).toBeLessThan(fullXs.length - 1)
+      expect(tipX).toBeGreaterThan(fullXs[belowIdx])
+      expect(tipX).toBeLessThan(fullXs[belowIdx + 1])
+      // ...con su Y interpolado LINEALMENTE entre esos dos puntos reales
+      // (no el valor de ninguno de los dos, uno intermedio real)
+      const frac = (tipX - fullXs[belowIdx]) / (fullXs[belowIdx + 1] - fullXs[belowIdx])
+      const expectedTipY = fullYs[belowIdx] + frac * (fullYs[belowIdx + 1] - fullYs[belowIdx])
+      expect(tipY).toBeCloseTo(expectedTipY, 6)
 
-      pump(duration) // tween completo: último setData con los arrays EXACTOS
+      pump(duration) // tween completo: último setData con los arrays EXACTOS, sin punta
       const lastCall = mockInstance.setData.mock.calls.at(-1)![0]
-      expect(lastCall).toEqual([
-        points.map((p) => new Date(p.date).getTime() / 1000),
-        points.map((p) => p.value),
-      ])
+      expect(lastCall).toEqual([fullXs, fullYs])
       expect(callbacks.length).toBe(0) // no queda ningún frame agendado
     })
 

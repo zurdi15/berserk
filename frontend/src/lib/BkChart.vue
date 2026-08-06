@@ -53,6 +53,38 @@ function pinnedRange(values: number[]): [number, number] | undefined {
   return min === max ? undefined : [min, max]
 }
 
+// un frame del tween: todos los puntos reales ya alcanzados por targetX, más
+// una "punta" sintética interpolada linealmente entre el último punto
+// alcanzado y el siguiente — sin esto, el trazo salta a saltos discretos
+// (avanza un punto entero de golpe, nada durante varios frames) en vez de
+// deslizarse continuo. targetX avanza LINEAL sobre el rango del eje X (no
+// eased sobre el índice): con easing sobre el índice, los últimos puntos
+// —muchos o pocos según la densidad— se apelotonaban al final del tween.
+function tweenFrame(xs: number[], ys: (number | null)[], targetX: number): [number[], (number | null)[]] {
+  let i = 0
+  while (i < xs.length && xs[i] <= targetX) i++
+  const outX = xs.slice(0, i)
+  const outY = ys.slice(0, i)
+
+  // punta sintética solo si: queda un segmento real por delante, targetX no
+  // cae justo sobre un punto real (ya incluido tal cual arriba), y ninguno
+  // de los dos extremos del segmento es un hueco null — interpolar a través
+  // de un null no tiene sentido; se deja el trazo clampado al punto real
+  // anterior (el arranque del hueco) hasta que el hueco quede atrás.
+  if (i > 0 && i < xs.length && xs[i - 1] !== targetX) {
+    const x0 = xs[i - 1]
+    const x1 = xs[i]
+    const y0 = ys[i - 1]
+    const y1 = ys[i]
+    if (y0 !== null && y1 !== null) {
+      const frac = (targetX - x0) / (x1 - x0)
+      outX.push(targetX)
+      outY.push(y0 + frac * (y1 - y0))
+    }
+  }
+  return [outX, outY]
+}
+
 function build(animate: boolean) {
   if (!host.value) return
   cancelFrame(raf)
@@ -94,17 +126,20 @@ function build(animate: boolean) {
   // arranca vacío: los ejes/grid ya están completos (rango fijado arriba), la
   // serie crece encima con setData frame a frame
   chart = new uPlot(opts, [[], []], host.value)
-  const total = xs.length
+  const xMin = xs[0]
+  const xMax = xs[xs.length - 1]
   const start = performance.now()
   const step = (now: number) => {
+    // progreso LINEAL en el tiempo, aplicado al RANGO DEL EJE X (no al
+    // índice ni con easing): velocidad de barrido constante en pantalla,
+    // sea cual sea la densidad de puntos en cada tramo
     const t = Math.min(1, (now - start) / duration)
-    const eased = 1 - Math.pow(1 - t, 3)
     if (t < 1) {
-      const n = Math.max(1, Math.round(eased * total))
-      chart?.setData([xs.slice(0, n), ys.slice(0, n)])
+      const targetX = xMin + t * (xMax - xMin)
+      chart?.setData(tweenFrame(xs, ys, targetX))
       raf = requestFrame(step)
     } else {
-      // frame final: los arrays completos exactos, sin depender del redondeo
+      // frame final: los arrays completos exactos, sin punta sintética
       chart?.setData([xs, ys])
     }
   }
