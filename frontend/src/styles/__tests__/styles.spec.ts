@@ -61,6 +61,38 @@ describe('animation system', () => {
     expect(guard).toContain('animation-delay: 0s !important')
   })
 
+  describe('neon pulse (post-0.3.0, 4 fixes from live phone feedback)', () => {
+    it('a: .bk-neon-streak has an opacity:0 base state, so it never paints its non-animated default before the animation engine kicks in', () => {
+      const start = css.indexOf('.bk-neon-streak {')
+      const rule = css.slice(start, css.indexOf('}', start))
+      expect(rule).toMatch(/opacity:\s*0;/)
+    })
+
+    it('a/b: all four streak animations use fill-mode "both", not "forwards" alone — a delayed segment (top-a/top-b) must show its 0% keyframe (invisible, off-screen) during the whole delay, not its unanimated final position', () => {
+      const riserRule = css.slice(css.indexOf('.bk-neon-edge-left,'), css.indexOf('.bk-neon-edge-left {'))
+      const topRule = css.slice(css.indexOf('.bk-neon-edge-top-a,'), css.indexOf('.bk-neon-edge-top-a {'))
+      expect(riserRule).toMatch(/animation:\s*bk-neon-rise[^;]*\bboth\b/)
+      expect(topRule).toMatch(/animation:\s*bk-neon-close[^;]*\bboth\b/)
+      expect(riserRule).not.toMatch(/\bforwards\b/)
+      expect(topRule).not.toMatch(/\bforwards\b/)
+    })
+
+    it('c: both the riser and the top closer use --bk-ease-linear (constant velocity), so the handoff at the corner has no deceleration-then-jolt mismatch', () => {
+      const riserRule = css.slice(css.indexOf('.bk-neon-edge-left,'), css.indexOf('.bk-neon-edge-left {'))
+      const topRule = css.slice(css.indexOf('.bk-neon-edge-top-a,'), css.indexOf('.bk-neon-edge-top-a {'))
+      expect(riserRule).toContain('var(--bk-ease-linear)')
+      expect(topRule).toContain('var(--bk-ease-linear)')
+      expect(riserRule).not.toContain('var(--bk-ease-out)')
+      expect(topRule).not.toContain('var(--bk-ease-out)')
+    })
+
+    it('d: bk-neon-rise fades all the way to opacity 0 by its own 100%, instead of freezing at the old 0.35 afterglow while the top segment keeps running', () => {
+      const keyframe = css.slice(css.indexOf('@keyframes bk-neon-rise'), css.indexOf('@keyframes bk-neon-close'))
+      expect(keyframe).toMatch(/100%\s*\{\s*opacity:\s*0;/)
+      expect(keyframe).not.toContain('opacity: 0.35; transform: translateY(0%); }\n}')
+    })
+  })
+
   it('the reduced-motion guard is universal (*), so it reaches bk-cascade/bk-grow-x too without listing them', () => {
     // el heatmap (item 1) y las barras de distribución (item 6) no necesitan
     // su propia entrada en el guard: al ser `*, *::before, *::after`

@@ -4,7 +4,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import NeonPulse from '../NeonPulse.vue'
 
 // se teletransporta a document.body (mismo patrón que BkCelebration/BkSheet):
-// hay que buscarlo ahí y limpiar el body tras cada test
+// hay que buscarlo ahí y limpiar el body tras cada test.
+// Las 4 correcciones de coreografía (post-0.3.0: fill-mode both, opacity:0
+// base, --bk-ease-linear, el lateral se apaga en vez de congelarse en su
+// afterglow) son puramente CSS/keyframe — jsdom/happy-dom no ejecuta
+// animaciones reales, así que se verifican como contenido de animations.css
+// en styles.spec.ts, no aquí. Este archivo sigue cubriendo lo que SÍ es
+// observable vía DOM: qué se monta, con qué clases, y el emit('done').
 describe('NeonPulse (item 2: aurora de dos estelas)', () => {
   afterEach(() => {
     document.body.innerHTML = ''
