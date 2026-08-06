@@ -674,22 +674,33 @@ describe('ProgressView', () => {
     vi.mocked(domain.getSeries).mockClear().mockResolvedValue({ series: fixtures.series } as never)
     vi.mocked(domain.getStats).mockClear().mockResolvedValue(fixtures.stats as never)
     vi.mocked(domain.listBody).mockClear().mockResolvedValue(fixtures.bodyEntries as never)
+    // item 8: ahora solo se llama al entrar en la pestaña Entrenos (no en el
+    // montaje, Totales es la de arranque) — hay que limpiar las llamadas que
+    // hayan quedado colgando del describe de ExercisePicker de más arriba
+    vi.mocked(domain.getTrainedExercises).mockClear().mockResolvedValue({ exercise_ids: fixtures.trainedExerciseIds } as never)
   })
 
-  it('loads training-tab data with athlete threading on mount', async () => {
-    mount(ProgressView, withI18n())
+  it('loads catalog/distribution/records/stats data on mount regardless of the active tab', async () => {
+    const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
     expect(domain.listExercises).toHaveBeenCalledWith({ userId: undefined })
     expect(domain.listMuscleGroups).toHaveBeenCalledWith(undefined)
     expect(domain.getDistribution).toHaveBeenCalledWith(4, undefined)
     expect(domain.getRecords).toHaveBeenCalledWith({ exercise_id: undefined, userId: undefined })
-    // item 5: ExercisePicker (montado dentro de la pestaña Entrenos) carga el
-    // set de entrenados con el mismo hilo de atleta que el resto
-    expect(domain.getTrainedExercises).toHaveBeenCalledWith(undefined)
     // round 8: getStats se pide de arranque igual que el resto de la vista,
-    // no en diferido al abrir la pestaña Estadísticas
+    // no en diferido al abrir la pestaña Estadísticas (item 8: que además
+    // ahora es la pestaña activa por defecto)
     expect(domain.getStats).toHaveBeenCalledWith(undefined)
+
+    // item 5: ExercisePicker (montado dentro de la pestaña Entrenos) carga el
+    // set de entrenados con el mismo hilo de atleta que el resto — pero solo
+    // una vez esa pestaña está activa (item 8: Totales es la de arranque)
+    expect(domain.getTrainedExercises).not.toHaveBeenCalled()
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click') // Entrenos
+    await flushPromises()
+    expect(domain.getTrainedExercises).toHaveBeenCalledWith(undefined)
   })
 
   it("round 8: threads the viewed athlete's id into getStats", async () => {
@@ -702,16 +713,16 @@ describe('ProgressView', () => {
     expect(domain.getStats).toHaveBeenCalledWith(7)
   })
 
-  it('round 8: adds a stats tab (3rd, after records) labeled with progress.stats.title', async () => {
+  it('item 8: tabs are ordered totales → cuerpo → entreno → récords, with Totales first', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
     const tabLabels = mainTablist.findAll('[role="tab"]').map((tab) => tab.text())
-    expect(tabLabels).toEqual(['Entrenos', 'Récords', 'Totales', 'Cuerpo'])
+    expect(tabLabels).toEqual(['Totales', 'Cuerpo', 'Entrenos', 'Récords'])
   })
 
-  it('round 8: gates the stats grid until getStats resolves, then renders it with the fetched data', async () => {
+  it('round 8/item 8: gates the stats grid until getStats resolves, then renders it with the fetched data (Totales is now the default-active tab, no click needed)', async () => {
     // reduced-motion forzado solo en este test (mock local, restaurado al
     // final): así la aserción del dígito final no depende de que el tween
     // rAF real haya terminado, mismo motivo que en el describe de StatsGrid
@@ -720,10 +731,6 @@ describe('ProgressView', () => {
     vi.mocked(domain.getStats).mockImplementationOnce(() => new Promise((resolve) => { resolveStats = resolve }))
 
     const wrapper = mount(ProgressView, withI18n())
-    await flushPromises()
-
-    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
-    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'StatsGrid' }).exists()).toBe(false)
@@ -745,12 +752,22 @@ describe('ProgressView', () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
+    // item 8: Entrenos ya no es la pestaña activa por defecto (Totales lo
+    // es), así que hay que entrar en ella para ver el picker/chart
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
+    await flushPromises()
+
     expect(wrapper.findComponent({ name: 'BkChart' }).exists()).toBe(false)
     expect(wrapper.findAll('[role="tablist"]')).toHaveLength(1)
   })
 
   it('fetches the series and exercise-scoped records once an exercise is picked', async () => {
     const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click') // Entrenos
     await flushPromises()
 
     await wrapper.find('[data-testid="exercise-option-1"]').trigger('click')
@@ -762,6 +779,10 @@ describe('ProgressView', () => {
 
   it('switches the BkChart points when the metric tab flips to est_1rm', async () => {
     const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click') // Entrenos
     await flushPromises()
 
     await wrapper.find('[data-testid="exercise-option-1"]').trigger('click')
@@ -784,6 +805,10 @@ describe('ProgressView', () => {
 
   it('item 7 exception: flipping the metric tab (peso/volumen/est. 1RM) does NOT remount the chart block — same DOM node, no re-animation', async () => {
     const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click') // Entrenos
     await flushPromises()
 
     await wrapper.find('[data-testid="exercise-option-1"]').trigger('click')
@@ -809,6 +834,10 @@ describe('ProgressView', () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click') // Entrenos
+    await flushPromises()
+
     await wrapper.find('[data-testid="exercise-option-1"]').trigger('click')
     await flushPromises()
     const chartBefore = wrapper.findComponent({ name: 'BkChart' }).element
@@ -820,31 +849,34 @@ describe('ProgressView', () => {
     expect(chartAfter).not.toBe(chartBefore)
   })
 
-  it('switches to the body tab (4th tab, after records and stats — round 8 shifted it one slot) and hides the training-tab content', async () => {
+  it('item 8: switches to the body tab (2nd tab in the totales→cuerpo→entreno→récords order) and hides the training-tab content', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
-    expect(wrapper.findComponent({ name: 'ExercisePicker' }).exists()).toBe(true)
+    // Totales es la pestaña activa por defecto: ni el picker ni Cuerpo
+    // están montados todavía
+    expect(wrapper.findComponent({ name: 'ExercisePicker' }).exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'BodySection' }).exists()).toBe(false)
 
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
-    await mainTablist.findAll('[role="tab"]')[3].trigger('click')
+    await mainTablist.findAll('[role="tab"]')[1].trigger('click')
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'ExercisePicker' }).exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'BodySection' }).exists()).toBe(true)
   })
 
-  it('item 3b: Récords is its own tab (2nd) with PrList and DistributionBars, hidden from training and body', async () => {
+  it('item 3b/item 8: Récords is its own tab (now last) with PrList and DistributionBars, hidden from the default totales tab', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
-    // training: ni PrList ni DistributionBars están montados ahí
+    // Totales (pestaña activa por defecto): ni PrList ni DistributionBars
+    // están montados ahí
     expect(wrapper.findComponent({ name: 'PrList' }).exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'DistributionBars' }).exists()).toBe(false)
 
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
-    await mainTablist.findAll('[role="tab"]')[1].trigger('click')
+    await mainTablist.findAll('[role="tab"]')[3].trigger('click') // Récords (ahora la última)
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'PrList' }).exists()).toBe(true)
@@ -859,7 +891,7 @@ describe('ProgressView', () => {
     await flushPromises()
 
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
-    await mainTablist.findAll('[role="tab"]')[1].trigger('click')
+    await mainTablist.findAll('[role="tab"]')[3].trigger('click') // Récords
     await flushPromises()
 
     // mismo patrón flex que la pestaña Entrenos (item 3c más abajo)
@@ -887,6 +919,12 @@ describe('ProgressView', () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
+    // item 8: Totales (default) también usa bk-stagger, así que hay que
+    // entrar en Entrenos explícitamente para probar SU panel
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
+    await flushPromises()
+
     const trainingPanel = wrapper.find('.bk-stagger')
     expect(trainingPanel.classes()).toContain('flex-1')
     expect(trainingPanel.classes()).toContain('min-h-0')
@@ -909,24 +947,24 @@ describe('ProgressView', () => {
     expect(wrapper.classes()).toContain('flex-col')
   })
 
-  it('item 7: switching tabs replays the entry animation (bk-stagger present per panel; body panel uses bk-rise)', async () => {
+  it('item 7/item 8: switching tabs replays the entry animation (bk-stagger present per panel; body panel uses bk-rise)', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
-    expect(wrapper.find('.bk-stagger').exists()).toBe(true) // panel de entrenos
+    expect(wrapper.find('.bk-stagger').exists()).toBe(true) // panel de totales (default, item 8)
 
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
-    await mainTablist.findAll('[role="tab"]')[1].trigger('click')
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click') // Entrenos
+    await flushPromises()
+    expect(wrapper.find('.bk-stagger').exists()).toBe(true) // panel de entrenos, re-montado
+
+    await mainTablist.findAll('[role="tab"]')[3].trigger('click') // Récords
     await flushPromises()
     expect(wrapper.find('.bk-stagger').exists()).toBe(true) // panel de récords, re-montado
 
-    // round 8: la pestaña Estadísticas se cuela entre récords y cuerpo,
-    // también con su propio bk-stagger
-    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
-    await flushPromises()
-    expect(wrapper.find('.bk-stagger').exists()).toBe(true) // panel de estadísticas, re-montado
-
-    await mainTablist.findAll('[role="tab"]')[3].trigger('click')
+    // Cuerpo es la excepción: bk-rise en vez de bk-stagger (no hay hermanos
+    // que escalonar), ver comentario en ProgressView.vue
+    await mainTablist.findAll('[role="tab"]')[1].trigger('click') // Cuerpo
     await flushPromises()
     expect(wrapper.findComponent({ name: 'BodySection' }).classes()).toContain('flex-1')
   })

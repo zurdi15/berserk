@@ -166,13 +166,20 @@ describe('ProgressView athlete threading', () => {
     vi.mocked(domain.getTrainedExercises).mockClear()
   })
 
-  it('threads the viewed athlete id through distribution and records on mount', async () => {
+  it('threads the viewed athlete id through distribution and records on mount, and getTrainedExercises once the training tab is entered', async () => {
     useAthleteStore().view(ATHLETE)
-    mount(ProgressView, withI18n())
+    const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
     expect(domain.getDistribution).toHaveBeenCalledWith(4, 7)
     expect(domain.getRecords).toHaveBeenCalledWith({ exercise_id: undefined, userId: 7 })
+    // item 8: Totales es la pestaña activa por defecto, ExercisePicker (y su
+    // fetch de entrenados) solo monta al entrar en Entrenos (3ª pestaña
+    // ahora: totales, cuerpo, entrenos, récords)
+    expect(domain.getTrainedExercises).not.toHaveBeenCalled()
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
+    await flushPromises()
     // item 5: el set de "entrenados" de ExercisePicker sigue el mismo hilo de atleta
     expect(domain.getTrainedExercises).toHaveBeenCalledWith(7)
   })
@@ -180,6 +187,10 @@ describe('ProgressView athlete threading', () => {
   it('threads the viewed athlete id into the series fetch once an exercise is picked', async () => {
     useAthleteStore().view(ATHLETE)
     const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click') // Entrenos
     await flushPromises()
 
     await wrapper.find('[data-testid="exercise-option-1"]').trigger('click')
@@ -194,10 +205,9 @@ describe('ProgressView athlete threading', () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
-    // cuerpo es la 4ª pestaña (entrenos, récords, estadísticas, cuerpo) desde
-    // que round 8 metió la pestaña de Estadísticas entre récords y cuerpo
+    // item 8: cuerpo es la 2ª pestaña ahora (totales, cuerpo, entrenos, récords)
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
-    await mainTablist.findAll('[role="tab"]')[3].trigger('click')
+    await mainTablist.findAll('[role="tab"]')[1].trigger('click')
     await flushPromises()
 
     expect(domain.listBody).toHaveBeenCalledWith(7)
