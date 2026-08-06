@@ -43,10 +43,19 @@ const cascadeStepMs = computed(() => MAX_SWEEP_MS / Math.max(1, totalColumns.val
 // Clases COMPLETAS y literales a propósito, sin interpolar el porcentaje:
 // Tailwind extrae utilidades escaneando el texto fuente tal cual, no evalúa
 // JS — una clase montada por interpolación no genera CSS.
-const HEAT_CLASSES = ['bg-aurora/8', 'bg-aurora/15', 'bg-aurora/40', 'bg-aurora/70', 'bg-aurora/100']
+//
+// v0.3.0 item 7: "los cuadraditos deberían ser un poco más brillantes si se
+// ha entrenado al menos un día, no sé por qué hay varios niveles" — el
+// degradado de 4 tramos (15/40/70/100%) era casi imperceptible entre
+// niveles intermedios. Ahora solo 3 clases: vacío (base, sin cambios), UN
+// nivel claramente brillante para "se entrenó ese día" (70%, muy por
+// encima del antiguo tier-1 del 15%), y un único escalón extra para 2+
+// (sesión doble) en vez del degradado completo.
+const HEAT_CLASSES = ['bg-aurora/8', 'bg-aurora/70', 'bg-aurora/100']
 
 function heatClass(count: number): string {
-  return count ? HEAT_CLASSES[Math.min(count, 4)] : HEAT_CLASSES[0]
+  if (count <= 0) return HEAT_CLASSES[0]
+  return count === 1 ? HEAT_CLASSES[1] : HEAT_CLASSES[2]
 }
 
 function monthName(month: number): string {

@@ -107,16 +107,15 @@ describe('BkHeatmap', () => {
     expect(cellGrid[0].classes()).toContain('sm:gap-1')
   })
 
-  it('applies all four color-opacity tiers for counts 0-4 (bg-aurora/N, not element opacity — see item 1/2 why-comment)', () => {
+  it('v0.3.0 item 7: flattens intensity to 3 tiers (empty / trained / 2+), killing the old 4-tier gradient (bg-aurora/N, not element opacity — see item 1/2 why-comment)', () => {
     const wrapper = mount(BkHeatmap, {
       props: {
         year: 2026,
         data: [
-          { date: '2026-01-01', count: 0 }, // bg-aurora/8
-          { date: '2026-01-02', count: 1 }, // bg-aurora/15
-          { date: '2026-01-03', count: 2 }, // bg-aurora/40
-          { date: '2026-01-04', count: 3 }, // bg-aurora/70
-          { date: '2026-01-05', count: 4 }, // bg-aurora/100
+          { date: '2026-01-01', count: 0 }, // bg-aurora/8 (base, sin cambios)
+          { date: '2026-01-02', count: 1 }, // bg-aurora/70 (un único nivel "brillante")
+          { date: '2026-01-03', count: 2 }, // bg-aurora/100 (escalón extra, 2+)
+          { date: '2026-01-04', count: 4 }, // bg-aurora/100 (sigue en el mismo tope, no un 4º tramo)
         ],
       },
       global: { plugins: [createI18nInstance()] },
@@ -130,14 +129,18 @@ describe('BkHeatmap', () => {
     const cell0 = findCell('2026-01-01')!
     const cell1 = findCell('2026-01-02')!
     const cell2 = findCell('2026-01-03')!
-    const cell3 = findCell('2026-01-04')!
-    const cell4 = findCell('2026-01-05')!
+    const cell4 = findCell('2026-01-04')!
 
     expect(cell0.classes()).toContain('bg-aurora/8')
-    expect(cell1.classes()).toContain('bg-aurora/15')
-    expect(cell2.classes()).toContain('bg-aurora/40')
-    expect(cell3.classes()).toContain('bg-aurora/70')
+    expect(cell1.classes()).toContain('bg-aurora/70')
+    expect(cell2.classes()).toContain('bg-aurora/100')
     expect(cell4.classes()).toContain('bg-aurora/100')
+
+    // ninguna clase de los antiguos tramos intermedios (15%/40%) sobrevive
+    for (const cell of [cell0, cell1, cell2, cell4]) {
+      expect(cell.classes()).not.toContain('bg-aurora/15')
+      expect(cell.classes()).not.toContain('bg-aurora/40')
+    }
   })
 
   it('v0.3.0 item 6: cascade delay index is the GLOBAL day-of-week column (block offset + local col), not reset per month block', () => {
