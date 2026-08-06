@@ -17,6 +17,11 @@ const athlete = useAthleteStore()
 
 const allExercises = ref<ExerciseOut[]>([])
 const query = ref('')
+// controla el esqueleto (item 3a), no un gating tipo TodayView: mientras
+// carga se muestran filas shimmer con el mismo hueco que la lista real, para
+// que lo de abajo (chart + selector de métrica) no salte de sitio al llegar
+// los datos. true también en error, para no dejar el esqueleto para siempre.
+const ready = ref(false)
 
 async function load() {
   try {
@@ -25,6 +30,8 @@ async function load() {
     allExercises.value = await listExercises({ userId: athlete.userId })
   } catch (error) {
     toastApiError(error)
+  } finally {
+    ready.value = true
   }
 }
 
@@ -43,9 +50,18 @@ watch(() => athlete.userId, load)
 </script>
 
 <template>
-  <div class="space-y-2">
-    <BkField v-model="query" :label="t('progress.searchExercise')" />
-    <div class="max-h-48 overflow-y-auto space-y-1">
+  <!-- columna flexible: el campo de búsqueda no crece, la lista se lleva
+       todo el resto del alto disponible (item 3c — el padre le da el hueco
+       vía flex-1 min-h-0) -->
+  <div class="h-full flex flex-col gap-2">
+    <BkField v-model="query" :label="t('progress.searchExercise')" class="shrink-0" />
+
+    <!-- esqueleto mientras carga: mismo hueco que la lista real -->
+    <div v-if="!ready" class="flex-1 min-h-0 overflow-y-auto space-y-1" data-testid="exercise-list-skeleton">
+      <div v-for="n in 6" :key="n" class="h-9 rounded-sm bg-stone bk-shimmer" aria-hidden="true" />
+    </div>
+
+    <div v-else class="flex-1 min-h-0 overflow-y-auto space-y-1">
       <button
         type="button"
         data-testid="exercise-option-all"

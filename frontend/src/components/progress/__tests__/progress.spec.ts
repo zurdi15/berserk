@@ -240,6 +240,25 @@ describe('ExercisePicker', () => {
 
     expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([null])
   })
+
+  it('item 3a: shows shimmer skeleton rows (not the real list) while listExercises is pending, swaps to the real list once resolved', async () => {
+    let resolveExercises: (value: never) => void = () => {}
+    vi.mocked(domain.listExercises).mockImplementationOnce(() => new Promise((resolve) => { resolveExercises = resolve }))
+
+    const wrapper = mount(ExercisePicker, { props: { modelValue: null }, ...withI18n() })
+    await wrapper.vm.$nextTick()
+
+    const skeleton = wrapper.find('[data-testid="exercise-list-skeleton"]')
+    expect(skeleton.exists()).toBe(true)
+    expect(skeleton.findAll('.bk-shimmer').length).toBeGreaterThan(0)
+    expect(wrapper.find('[data-testid="exercise-option-all"]').exists()).toBe(false)
+
+    resolveExercises(fixtures.exercises as never)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="exercise-list-skeleton"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="exercise-option-all"]').exists()).toBe(true)
+  })
 })
 
 describe('BodySection', () => {
@@ -541,7 +560,7 @@ describe('ProgressView', () => {
     ])
   })
 
-  it('switches to the body tab and hides the training-tab content', async () => {
+  it('switches to the body tab (3rd tab, after records) and hides the training-tab content', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
@@ -549,10 +568,59 @@ describe('ProgressView', () => {
     expect(wrapper.findComponent({ name: 'BodySection' }).exists()).toBe(false)
 
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
-    await mainTablist.findAll('[role="tab"]')[1].trigger('click')
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'ExercisePicker' }).exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'BodySection' }).exists()).toBe(true)
+  })
+
+  it('item 3b: Récords is its own tab (2nd) with PrList and DistributionBars, hidden from training and body', async () => {
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    // training: ni PrList ni DistributionBars están montados ahí
+    expect(wrapper.findComponent({ name: 'PrList' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'DistributionBars' }).exists()).toBe(false)
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[1].trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'PrList' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'DistributionBars' }).exists()).toBe(true)
+    expect(wrapper.text()).toContain('Press banca') // fila real de PrList
+    expect(wrapper.text()).toContain('Piernas') // fila real de DistributionBars
+    expect(wrapper.findComponent({ name: 'ExercisePicker' }).exists()).toBe(false)
+  })
+
+  it('item 3c: training panel is a bounded flex column with the exercise-list area taking the remaining space', async () => {
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    const trainingPanel = wrapper.find('.bk-stagger')
+    expect(trainingPanel.classes()).toContain('flex-1')
+    expect(trainingPanel.classes()).toContain('min-h-0')
+    expect(trainingPanel.classes()).toContain('flex-col')
+
+    const listArea = trainingPanel.findAll('[style*="--bk-stagger-i: 0"]')[0]
+    expect(listArea.classes()).toContain('flex-1')
+    expect(listArea.classes()).toContain('min-h-0')
+  })
+
+  it('item 7: switching tabs replays the entry animation (bk-stagger present per panel; body panel uses bk-rise)', async () => {
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    expect(wrapper.find('.bk-stagger').exists()).toBe(true) // panel de entrenos
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[1].trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.bk-stagger').exists()).toBe(true) // panel de récords, re-montado
+
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'BodySection' }).classes()).toContain('flex-1')
   })
 })

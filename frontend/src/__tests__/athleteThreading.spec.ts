@@ -175,8 +175,10 @@ describe('ProgressView athlete threading', () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
+    // cuerpo es la 3ª pestaña (entrenos, récords, cuerpo) desde que récords
+    // se separó de entrenos
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
-    await mainTablist.findAll('[role="tab"]')[1].trigger('click')
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
     await flushPromises()
 
     expect(domain.listBody).toHaveBeenCalledWith(7)

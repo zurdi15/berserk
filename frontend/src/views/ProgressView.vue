@@ -21,7 +21,7 @@ import { toastApiError } from '@/utils/apiErrors'
 const { t } = useI18n()
 const athlete = useAthleteStore()
 
-const tab = ref<'training' | 'body'>('training')
+const tab = ref<'training' | 'records' | 'body'>('training')
 const metric = ref<MetricKey>('top_weight')
 const exerciseId = ref<number | null>(null)
 
@@ -33,8 +33,12 @@ const series = ref<SeriesPoint[]>([])
 
 const units = useDisplayUnits()
 
+// Récords (PrList) y Distribución (DistributionBars) tienen su propia pestaña
+// (item 3b) — "Récords" reutiliza progress.records, ya es exactamente ese
+// texto en los dos idiomas (antes era solo el título de la card)
 const mainTabs = computed(() => [
   { value: 'training', label: t('progress.tabs.training') },
+  { value: 'records', label: t('progress.records') },
   { value: 'body', label: t('progress.tabs.body') },
 ])
 
@@ -99,35 +103,47 @@ watch(exerciseId, () => {
 </script>
 
 <template>
-  <div class="space-y-4 p-4">
-    <h1 class="text-2xl font-bold text-ink">{{ $t('app.nav.progress') }}</h1>
+  <!-- h-full: <main> del shell ya acota la altura real (ver ShellView.vue) —
+       sin ese tope, "ocupa el resto del viewport" no tiene contra qué medirse -->
+  <div class="h-full flex flex-col gap-4 p-4">
+    <h1 class="shrink-0 text-2xl font-bold text-ink">{{ $t('app.nav.progress') }}</h1>
 
-    <BkTabs v-model="tab" :tabs="mainTabs" />
+    <BkTabs class="shrink-0" v-model="tab" :tabs="mainTabs" />
 
-    <div v-if="tab === 'training'" class="space-y-6 bk-stagger">
-      <div :style="{ '--bk-stagger-i': 0 }">
+    <!-- Entrenos: la lista de ejercicios ocupa TODO el resto del alto (scroll
+         interno); el chart + selector de métrica quedan anclados abajo, justo
+         encima de la nav — nunca se meten debajo de ella (item 3c) -->
+    <div v-if="tab === 'training'" class="flex-1 min-h-0 flex flex-col gap-4 bk-stagger">
+      <div class="flex-1 min-h-0" :style="{ '--bk-stagger-i': 0 }">
         <ExercisePicker v-model="exerciseId" />
       </div>
 
-      <div v-if="exerciseId !== null" :style="{ '--bk-stagger-i': 1 }" class="space-y-3">
+      <div v-if="exerciseId !== null" class="shrink-0 space-y-3" :style="{ '--bk-stagger-i': 1 }">
         <BkTabs v-model="metric" :tabs="metricTabs" />
         <BkChart v-if="chartPoints.length" :points="chartPoints" color="aurora" :suffix="` ${units}`" />
         <BkEmpty v-else :message="t('progress.noSeries')" />
       </div>
+    </div>
 
-      <div :style="{ '--bk-stagger-i': 2 }">
+    <!-- Récords: PrList + DistributionBars, movidos aquí desde Entrenos (item 3b) -->
+    <div v-else-if="tab === 'records'" class="flex-1 min-h-0 overflow-y-auto space-y-6 bk-stagger">
+      <div :style="{ '--bk-stagger-i': 0 }">
         <BkCard :title="t('progress.records')">
           <PrList :records="records" :exercises="exercises" />
         </BkCard>
       </div>
-
-      <div :style="{ '--bk-stagger-i': 3 }">
+      <div :style="{ '--bk-stagger-i': 1 }">
         <BkCard :title="t('progress.distribution')">
           <DistributionBars :items="distribution" :groups="muscleGroups" />
         </BkCard>
       </div>
     </div>
 
-    <BodySection v-else />
+    <!-- Cuerpo: un único bloque, bk-rise en vez de bk-stagger (no hay
+         hermanos que escalonar) — mismo mecanismo de reproducción al
+         cambiar de pestaña (item 7) -->
+    <Transition v-else name="bk-rise" appear>
+      <BodySection class="flex-1 min-h-0 overflow-y-auto" />
+    </Transition>
   </div>
 </template>

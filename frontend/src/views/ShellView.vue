@@ -27,7 +27,14 @@ const activeIndex = computed(() => {
 </script>
 
 <template>
-  <div class="min-h-dvh flex flex-col">
+  <!-- h-dvh (no min-h-dvh): un tope real de altura es lo que permite que
+       <main> reparta con flex-1 un alto DEFINIDO — sin él, una vista que
+       pida "ocupa el resto del viewport" (progresión, item 3) no tiene contra
+       qué medirse y la página entera crece en vez de scrollear por dentro.
+       El resto de vistas no cambian de comportamiento: su contenido sigue
+       scrolleando igual, solo que ahora el scroll vive en <main> en vez de
+       en el documento. -->
+  <div class="h-dvh flex flex-col">
     <!-- Desktop navbar: barra superior centrada con destinos (identidad por ahora en móvil) -->
     <header class="hidden sm:block border-b border-line">
       <nav :aria-label="$t('app.nav.label')">
@@ -111,7 +118,7 @@ const activeIndex = computed(() => {
         </ul>
       </div>
     </nav>
-    <main class="flex-1 px-4 py-4 pb-24 max-w-3xl w-full mx-auto">
+    <main class="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-24 max-w-3xl w-full mx-auto">
       <RouterView v-slot="{ Component }">
         <Transition name="bk-rise" mode="out-in">
           <component :is="Component" />
