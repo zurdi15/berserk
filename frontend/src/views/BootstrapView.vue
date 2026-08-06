@@ -33,7 +33,7 @@ async function submit() {
 <template>
   <main class="min-h-dvh flex flex-col items-center justify-center gap-8 px-6">
     <Transition name="bk-pop" appear>
-      <BkRune name="berserk" :size="64" carve tone="ember" />
+      <BkRune name="berserk" :size="64" carve tone="aurora" />
     </Transition>
     <Transition name="bk-rise" appear>
       <form class="bk-slab w-full max-w-sm p-6 flex flex-col gap-4" @submit.prevent="submit">
@@ -51,7 +51,7 @@ async function submit() {
           autocomplete="new-password"
           :error="error ? $t(error) : undefined"
         />
-        <BkButton type="submit" variant="ember" :loading="loading" block>
+        <BkButton type="submit" variant="primary" :loading="loading" block>
           {{ $t('auth.create') }}
         </BkButton>
       </form>
