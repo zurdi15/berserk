@@ -8,13 +8,33 @@ import BkStepper from '../BkStepper.vue'
 import { RUNES, RUNE_SEQUENCES } from '../runes'
 
 describe('runes catalog', () => {
-  it('has the logo, the 7 muscle groups and the achievement runes', () => {
+  it('has the logo, the 7 muscle groups and the achievement/nav runes', () => {
+    // item 4 (round 9): +sowilo/+dagaz (nav de Hoy/Perfil) — streak y
+    // shoulders se quedan (StreakCard y el catálogo de grupos musculares
+    // siguen usándolos), el nav solo cambió a qué runa apunta
     expect(Object.keys(RUNES).sort()).toEqual(
-      ['back', 'berserk', 'biceps', 'chest', 'core', 'legs', 'pr', 'shoulders', 'streak', 'triceps'].sort(),
+      ['back', 'berserk', 'biceps', 'chest', 'core', 'dagaz', 'legs', 'pr', 'shoulders', 'sowilo', 'streak', 'triceps'].sort(),
     )
     for (const d of Object.values(RUNES)) {
       expect(d).toMatch(/^M[\d\s.]/) // path data válido que empieza con moveto
     }
+  })
+
+  it('item 4: pr has no underline stroke below the Tyr glyph (round 9 — shared by the Progresión nav and PR-list icons)', () => {
+    expect(RUNES.pr).toBe('M16 4 L16 28 M8 10 L16 4 L24 10')
+    expect(RUNES.pr).not.toContain('M10 28')
+  })
+
+  it('item 4: sowilo and dagaz render as single, non-sequenced carved paths', () => {
+    const sowilo = mount(BkRune, { props: { name: 'sowilo', carve: true } })
+    expect(sowilo.findAll('path')).toHaveLength(1)
+    expect(sowilo.find('path').attributes('d')).toBe(RUNES.sowilo)
+    expect(sowilo.find('path').classes()).toContain('bk-carve-stroke')
+
+    const dagaz = mount(BkRune, { props: { name: 'dagaz', carve: true } })
+    expect(dagaz.findAll('path')).toHaveLength(1)
+    expect(dagaz.find('path').attributes('d')).toBe(RUNES.dagaz)
+    expect(dagaz.find('path').classes()).toContain('bk-carve-stroke')
   })
 })
 

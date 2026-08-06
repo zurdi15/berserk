@@ -7,12 +7,15 @@ import type { RuneName } from '@/lib/runes'
 import AthleteBanner from '@/components/shell/AthleteBanner.vue'
 import TimerPill from '@/components/shell/TimerPill.vue'
 
+// item 4 (round 9): correcciones de runas del nav — streak/shoulders SIGUEN
+// existiendo en runes.ts (streak: StreakCard; shoulders: rune de grupo
+// muscular del catálogo/leyenda), solo cambian los punteros de aquí
 const items: { name: string; label: string; rune: RuneName }[] = [
-  { name: 'today', label: 'app.nav.today', rune: 'streak' },
+  { name: 'today', label: 'app.nav.today', rune: 'sowilo' },
   { name: 'calendar', label: 'app.nav.calendar', rune: 'core' },
   { name: 'workout', label: 'app.nav.workout', rune: 'berserk' },
   { name: 'progress', label: 'app.nav.progress', rune: 'pr' },
-  { name: 'profile', label: 'app.nav.profile', rune: 'shoulders' },
+  { name: 'profile', label: 'app.nav.profile', rune: 'dagaz' },
 ]
 
 const route = useRoute()
