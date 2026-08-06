@@ -21,6 +21,6 @@ check() {
 
 check '#[0-9a-fA-F]{3,8}\b' "hex crudo (usa tokens)"
 check 'cubic-bezier\(' "easing crudo (usa var(--bk-ease-*))"
-check '\[[0-9]+px\]' "tamaño arbitrario de Tailwind (usa la escala)"
+check '\[[0-9.]+(px|rem|em)\]' "valor arbitrario de Tailwind (usa la escala)"
 
 exit $fail

@@ -36,6 +36,7 @@ jobs:
       - run: npm run guard:tokens
       - run: npm run test
       - run: npm run build
+      - run: npm run guard:utilities
 
   docker:
     runs-on: ubuntu-latest

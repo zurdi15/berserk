@@ -366,6 +366,7 @@ watch(
         <div class="space-y-2 border-t border-line pt-3">
           <BkField
             v-model="searchQuery"
+            data-testid="exercise-search"
             :label="$t('routines.addExercise')"
             type="text"
           />

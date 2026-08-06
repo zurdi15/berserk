@@ -25,7 +25,7 @@ const items: { name: string; label: string; rune: RuneName }[] = [
               class="flex flex-col items-center gap-1 px-3 py-2 text-ink-faint hover:text-ink"
               active-class="text-aurora"
             >
-              <span class="text-[0.65rem] uppercase tracking-wide">{{ $t(item.label) }}</span>
+              <span class="text-xs uppercase tracking-wide">{{ $t(item.label) }}</span>
               <span :class="item.name === 'workout' && 'bk-slab relative -mb-5 p-2.5 border-aurora text-aurora'">
                 <span v-if="item.name === 'workout'" class="bk-breathe absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)" aria-hidden="true" />
                 <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
@@ -54,7 +54,7 @@ const items: { name: string; label: string; rune: RuneName }[] = [
               <span v-if="item.name === 'workout'" class="bk-breathe absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)" aria-hidden="true" />
               <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
             </span>
-            <span class="text-[0.65rem] uppercase tracking-wide">{{ $t(item.label) }}</span>
+            <span class="text-xs uppercase tracking-wide">{{ $t(item.label) }}</span>
           </RouterLink>
         </li>
       </ul>

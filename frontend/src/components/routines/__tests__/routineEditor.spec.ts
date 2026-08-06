@@ -162,16 +162,29 @@ describe('RoutineEditorSheet', () => {
     expect(vm.exercises[0].exercise_id).toBe(1)
     expect(vm.exercises[1].exercise_id).toBe(2)
 
-    // Move second exercise up
-    vm.moveExerciseUp(1)
+    // BkSheet teletransporta su contenido a document.body: hay que buscarlo
+    // ahí (no en wrapper), y tomar el diálogo más reciente por si algún test
+    // previo del archivo dejó el suyo montado
+    const dialogs = document.querySelectorAll('[role="dialog"]')
+    const dialog = dialogs[dialogs.length - 1] as HTMLElement
+
+    // Sube el segundo ejercicio vía el botón "Arriba" real (solo la fila con
+    // index > 0 lo muestra, así que es único en este montaje de 2 ejercicios)
+    const moveUpButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Arriba')
+    expect(moveUpButton).not.toBeUndefined()
+    moveUpButton!.click()
+    await wrapper.vm.$nextTick()
 
     // Verify order swapped in local state
     expect(vm.exercises[0].exercise_id).toBe(2)
     expect(vm.exercises[1].exercise_id).toBe(1)
 
-    // Call save method directly
-    await vm.saveRoutine()
+    // Guarda vía el botón real "Guardar"
+    const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+    expect(saveButton).not.toBeUndefined()
+    saveButton!.click()
     await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
 
     // Assert replaceRoutineExercises called with swapped ids
     expect(replaceRoutineExercises).toHaveBeenCalledWith(5, expect.arrayContaining([
@@ -202,13 +215,22 @@ describe('RoutineEditorSheet', () => {
 
     const vm = wrapper.vm as any
 
-    // Remove the exercise
-    vm.removeExercise(vm.exercises[0].id)
+    const dialogs = document.querySelectorAll('[role="dialog"]')
+    const dialog = dialogs[dialogs.length - 1] as HTMLElement
+
+    // Elimina el único ejercicio vía el botón "Quitar" real
+    const removeButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Quitar')
+    expect(removeButton).not.toBeUndefined()
+    removeButton!.click()
+    await wrapper.vm.$nextTick()
     expect(vm.exercises).toHaveLength(0)
 
-    // Call save method
-    await vm.saveRoutine()
+    // Guarda vía el botón real "Guardar"
+    const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+    expect(saveButton).not.toBeUndefined()
+    saveButton!.click()
     await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
 
     // Assert replaceRoutineExercises called with empty array
     expect(replaceRoutineExercises).toHaveBeenCalledWith(5, [])
@@ -239,9 +261,15 @@ describe('RoutineEditorSheet', () => {
     // Verify weight is loaded
     expect(vm.exercises[0].target_weight_kg).toBe(50)
 
-    // Call save method
-    await vm.saveRoutine()
+    const dialogs = document.querySelectorAll('[role="dialog"]')
+    const dialog = dialogs[dialogs.length - 1] as HTMLElement
+
+    // Guarda vía el botón real "Guardar"
+    const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+    expect(saveButton).not.toBeUndefined()
+    saveButton!.click()
     await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
 
     // Assert replaceRoutineExercises called with weight
     expect(replaceRoutineExercises).toHaveBeenCalledWith(5, expect.arrayContaining([
@@ -316,10 +344,13 @@ describe('RoutineEditorSheet', () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
 
-    const vm = wrapper.vm as any
+    const dialogs = document.querySelectorAll('[role="dialog"]')
+    const dialog = dialogs[dialogs.length - 1] as HTMLElement
 
-    // Try to save with empty name by calling method directly
-    await vm.saveRoutine()
+    // Intenta guardar con nombre vacío vía el botón real "Guardar"
+    const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+    expect(saveButton).not.toBeUndefined()
+    saveButton!.click()
     await wrapper.vm.$nextTick()
 
     // Check that error was pushed to toast store with correct message
@@ -341,7 +372,6 @@ describe('RoutineEditorSheet', () => {
 
     // Should not throw
     const wrapper = build(routine)
-    expect(wrapper).toBeTruthy()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 100))
     await wrapper.vm.$nextTick()
@@ -417,10 +447,22 @@ describe('RoutineEditorSheet', () => {
 
     const vm = wrapper.vm as any
     const allExercisesBefore = vm.allExercises.length
+    const newExerciseName = exerciseName(vm.allExercises[1], 'es')
 
-    // Add an exercise
-    const newExercise = vm.allExercises[1]
-    vm.addExercise(newExercise)
+    const dialogs = document.querySelectorAll('[role="dialog"]')
+    const dialog = dialogs[dialogs.length - 1] as HTMLElement
+
+    // Escribe en el buscador real para revelar el picker agrupado
+    const searchInput = dialog.querySelector('[data-testid="exercise-search"] input') as HTMLInputElement
+    searchInput.value = 'sentadilla'
+    searchInput.dispatchEvent(new Event('input'))
+    await new Promise(resolve => setTimeout(resolve, 350))
+    await wrapper.vm.$nextTick()
+
+    // Añade el ejercicio vía el botón real del picker
+    const optionButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === newExerciseName)
+    expect(optionButton).not.toBeUndefined()
+    optionButton!.click()
     await wrapper.vm.$nextTick()
 
     // Verify allExercises unchanged (row names still render)
