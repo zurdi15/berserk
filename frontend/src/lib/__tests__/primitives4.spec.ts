@@ -261,6 +261,36 @@ describe('BkChart', () => {
     expect(formatted[0]).toContain(' kg')
   })
 
+  it('the y-axis gutter width is a callback that grows with the longest rendered label, never a fixed number (fractional values + suffix used to clip)', async () => {
+    mount(BkChart, {
+      props: { points: [{ date: '2026-08-05', value: 83.5 }], suffix: ' kg' },
+      global: { stubs: { teleport: true } },
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    const options = mockUPlot.mock.calls[0][0]
+    const sizeFn = options.axes[1].size
+    expect(typeof sizeFn).toBe('function')
+
+    // self sintético: uPlot pasaría un canvas real (self.ctx.measureText) —
+    // aquí se sustituye por una medida honesta y determinística (ancho ∝
+    // longitud del texto), lo más cerca de la API real que permite el
+    // entorno de test sin un canvas de verdad detrás
+    const fakeSelf = {
+      axes: [{}, { ticks: { size: 4 }, gap: 4, font: '12px sans-serif' }],
+      ctx: { font: '', measureText: (text: string) => ({ width: text.length * 6 }) },
+    } as any
+
+    const shortSize = sizeFn(fakeSelf, ['5 kg'], 1, 1)
+    const longSize = sizeFn(fakeSelf, ['888.5 kg'], 1, 1)
+    expect(longSize).toBeGreaterThan(shortSize)
+
+    // 2º ciclo de layout de uPlot: devuelve el tamaño ya calculado (cacheado
+    // en axis._size) en vez de volver a medir, o el resize entraría en bucle
+    const cachedSelf = { axes: [{}, { _size: 55 }] } as any
+    expect(sizeFn(cachedSelf, ['lo que sea'], 1, 2)).toBe(55)
+  })
+
   it('destroys chart on unmount', async () => {
     const wrapper = mount(BkChart, {
       props: {

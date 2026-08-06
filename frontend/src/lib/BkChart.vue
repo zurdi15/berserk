@@ -85,6 +85,27 @@ function tweenFrame(xs: number[], ys: (number | null)[], targetX: number): [numb
   return [outX, outY]
 }
 
+// hueco del eje Y a medida, no fijo: con decimales + sufijo ("83.5 kg") un
+// ancho fijo se quedaba corto y recortaba el primer dígito de las etiquetas
+// más largas. Mide con el MISMO canvas que uPlot usa para dibujar el texto
+// realmente renderizado (values ya trae el sufijo aplicado, es el array que
+// se pinta) en vez de adivinar un número fijo — así vale para entrenos y
+// cuerpo por igual, sea cual sea la métrica o el sufijo.
+function yAxisSize(self: uPlot, values: string[] | null, axisIdx: number, cycleNum: number): number {
+  const axis = self.axes[axisIdx] as any
+  // uPlot vuelve a pedir el tamaño en un 2º ciclo de layout, ya con todo lo
+  // demás medido: devolver el tamaño ya calculado ahí evita un bucle de
+  // resize infinito (mismo patrón que la propia demo de uPlot para esto)
+  if (cycleNum > 1) return axis._size ?? 40
+  let size = (axis.ticks?.size ?? 0) + (axis.gap ?? 0)
+  const longest = (values ?? []).reduce((acc, v) => (v != null && v.length > acc.length ? v : acc), '')
+  if (longest) {
+    self.ctx.font = axis.font || '12px sans-serif'
+    size += self.ctx.measureText(longest).width / (uPlot.pxRatio || 1)
+  }
+  return Math.ceil(size)
+}
+
 function build(animate: boolean) {
   if (!host.value) return
   cancelFrame(raf)
@@ -110,6 +131,7 @@ function build(animate: boolean) {
         stroke: cssVar('--bk-ink-faint'),
         grid: { stroke: cssVar('--bk-line') },
         values: props.suffix ? (u: any, vals: any[]) => vals.map((v) => v + props.suffix) : undefined,
+        size: yAxisSize,
       },
     ],
     series: [{}, { stroke, width: 2, points: { show: true, size: 5 } }],
