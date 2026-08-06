@@ -51,15 +51,23 @@ const activeIndex = computed(() => {
             >
               <span class="text-xs tracking-wide">{{ $t(item.label) }}</span>
               <span :class="item.name === 'workout' && 'bk-slab relative -mb-5 p-2.5 border-aurora text-aurora'">
-                <!-- activo (en /workout): glow fijo a plena opacidad, sin respirar
-                     (no tendría sentido parpadear la CTA de la sección en la que ya
-                     estás); inactivo: sigue respirando como reclamo -->
+                <!-- dos capas en vez de una (evita el salto de fase): la que respira
+                     vive SIEMPRE encendida; una segunda, estática y a opacity 0/1,
+                     se cruza por encima cuando /workout está activo — un
+                     crossfade real en vez de apagar bk-breathe a mitad de ciclo,
+                     que saltaba de golpe a lo que tocara en ese instante -->
+                <span
+                  v-if="item.name === 'workout'"
+                  class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora) bk-breathe"
+                  aria-hidden="true"
+                  data-testid="workout-glow"
+                />
                 <span
                   v-if="item.name === 'workout'"
                   class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
-                  :class="{ 'bk-breathe': route.name !== 'workout' }"
+                  :style="{ opacity: route.name === 'workout' ? 1 : 0, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
                   aria-hidden="true"
-                  data-testid="workout-glow"
+                  data-testid="workout-glow-static"
                 />
                 <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
               </span>
@@ -87,12 +95,18 @@ const activeIndex = computed(() => {
     >
       <div class="relative max-w-3xl mx-auto">
         <!-- indicador deslizante: una barra por cada 1/5 del ancho, se traslada
-             al índice activo — oculto por completo en /workout, no debe quedar
-             una barra pasando por debajo de la CTA central -->
+             al índice activo — SIEMPRE montado (nunca v-if) para poder cruzar a
+             opacity 0 en vez de desaparecer de golpe al entrar en /workout; ya
+             se traslada solo hasta la posición de la CTA (activeIndex la
+             incluye), así que el fade queda encima de ese movimiento, no en
+             lugar de él -->
         <div
-          v-if="route.name !== 'workout'"
           class="absolute top-0 left-0 h-0.5 w-1/5 rounded-full bg-aurora"
-          :style="{ transform: `translateX(${activeIndex * 100}%)`, transition: 'transform var(--bk-dur-3) var(--bk-ease-out)' }"
+          :style="{
+            transform: `translateX(${activeIndex * 100}%)`,
+            opacity: route.name === 'workout' ? 0 : 1,
+            transition: 'transform var(--bk-dur-3) var(--bk-ease-out), opacity var(--bk-dur-3) var(--bk-ease-out)',
+          }"
           aria-hidden="true"
           data-testid="nav-indicator"
         />
@@ -106,24 +120,26 @@ const activeIndex = computed(() => {
               <span
                 :class="item.name === 'workout' && 'bk-slab relative -mt-5 p-2.5 border-aurora text-aurora'"
               >
-                <!-- mismo criterio que en desktop: glow fijo activo, respira inactivo -->
+                <!-- mismo criterio que en desktop: dos capas, crossfade -->
                 <span
                   v-if="item.name === 'workout'"
-                  class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
-                  :class="{ 'bk-breathe': route.name !== 'workout' }"
+                  class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora) bk-breathe"
                   aria-hidden="true"
                   data-testid="workout-glow"
                 />
+                <span
+                  v-if="item.name === 'workout'"
+                  class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
+                  :style="{ opacity: route.name === 'workout' ? 1 : 0, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
+                  aria-hidden="true"
+                  data-testid="workout-glow-static"
+                />
                 <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
               </span>
-              <!-- las 5 etiquetas a la vez se sentían apretadas: ahora solo se ve
-                   la de la sección activa (fade al cambiar), el resto se queda en
-                   el DOM como sr-only — nunca v-if, así que todos los items
-                   conservan nombre accesible para lectores de pantalla -->
-              <span
-                class="text-2xs tracking-wide"
-                :class="route.name === item.name ? 'bk-nav-label-active' : 'sr-only'"
-              >{{ $t(item.label) }}</span>
+              <!-- revertido (round 7, zurdi): se probó ocultar las inactivas
+                   (sr-only + fade solo en la activa), pero con el token a
+                   0.7rem las 5 etiquetas leen bien tal cual — vuelta al clásico -->
+              <span class="text-2xs tracking-wide">{{ $t(item.label) }}</span>
             </RouterLink>
           </li>
         </ul>

@@ -150,71 +150,65 @@ describe('ShellView active section indicator (item 3)', () => {
     expect(underlines[3].classes()).toContain('scale-x-0')
   })
 
-  it('route=workout: the mobile sliding bar is absent and the desktop underline never renders for the CTA item', async () => {
+  it('route=workout: the mobile sliding bar stays mounted but fades to opacity 0 (no instant pop), and the desktop underline never renders for the CTA item', async () => {
     const wrapper = await mountWithRoute('workout')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="nav-indicator"]').exists()).toBe(false)
+    // ya no se desmonta (round 7: crossfade en vez de v-if) — sigue en el DOM,
+    // oculto a los lectores de pantalla y con opacity 0 para el fundido
+    const indicator = wrapper.get('[data-testid="nav-indicator"]')
+    expect(indicator.attributes('aria-hidden')).toBe('true')
+    expect(indicator.attributes('style')).toContain('opacity: 0')
     // 4 subrayados (today/calendar/progress/profile): ninguno para "workout"
     expect(wrapper.findAll('[data-testid="nav-underline"]')).toHaveLength(4)
   })
 
-  it('route=workout: the CTA glow is static (full opacity, no bk-breathe) on both bars', async () => {
+  it('route=workout: the CTA glow crossfades to the static layer (opacity 1) on top of the breathing layer, which never stops breathing', async () => {
     const wrapper = await mountWithRoute('workout')
     await flushPromises()
 
-    const glows = wrapper.findAll('[data-testid="workout-glow"]')
-    expect(glows).toHaveLength(2) // desktop + móvil
-    expect(glows[0].classes()).not.toContain('bk-breathe')
-    expect(glows[1].classes()).not.toContain('bk-breathe')
+    // round 7: la capa que respira ya NO se apaga (evita el salto de fase a
+    // mitad de ciclo) — una segunda capa estática se cruza encima
+    const breathing = wrapper.findAll('[data-testid="workout-glow"]')
+    expect(breathing).toHaveLength(2) // desktop + móvil
+    expect(breathing[0].classes()).toContain('bk-breathe')
+    expect(breathing[1].classes()).toContain('bk-breathe')
+
+    const static_ = wrapper.findAll('[data-testid="workout-glow-static"]')
+    expect(static_).toHaveLength(2)
+    expect(static_[0].attributes('style')).toContain('opacity: 1')
+    expect(static_[1].attributes('style')).toContain('opacity: 1')
   })
 
-  it('route=today: the mobile sliding bar is visible and the CTA glow keeps breathing on both bars', async () => {
+  it('route=today: the mobile sliding bar is fully visible (opacity 1) and both CTA glow layers read as inactive (breathing shows through, static layer at opacity 0)', async () => {
     const wrapper = await mountWithRoute('today')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="nav-indicator"]').exists()).toBe(true)
+    const indicator = wrapper.get('[data-testid="nav-indicator"]')
+    expect(indicator.attributes('style')).toContain('opacity: 1')
 
-    const glows = wrapper.findAll('[data-testid="workout-glow"]')
-    expect(glows).toHaveLength(2)
-    expect(glows[0].classes()).toContain('bk-breathe')
-    expect(glows[1].classes()).toContain('bk-breathe')
+    const breathing = wrapper.findAll('[data-testid="workout-glow"]')
+    expect(breathing).toHaveLength(2)
+    expect(breathing[0].classes()).toContain('bk-breathe')
+    expect(breathing[1].classes()).toContain('bk-breathe')
+
+    const static_ = wrapper.findAll('[data-testid="workout-glow-static"]')
+    expect(static_).toHaveLength(2)
+    expect(static_[0].attributes('style')).toContain('opacity: 0')
+    expect(static_[1].attributes('style')).toContain('opacity: 0')
   })
 
-  it('mobile bottom bar: only the active item\'s label is visible, the other 4 stay sr-only (accessible name kept, never removed via v-if)', async () => {
+  it('mobile bottom bar: all 5 labels stay visible regardless of which section is active (active-only-label experiment was reverted)', async () => {
     const wrapper = await mountWithRoute('progress')
     await flushPromises()
 
     const mobileNav = wrapper.findAll('nav')[1]
     const labels = mobileNav.findAll('li span.text-2xs')
     expect(labels).toHaveLength(5)
-
-    labels.forEach((label, i) => {
-      const items = ['today', 'calendar', 'workout', 'progress', 'profile']
-      if (items[i] === 'progress') {
-        expect(label.classes()).toContain('bk-nav-label-active')
-        expect(label.classes()).not.toContain('sr-only')
-      } else {
-        expect(label.classes()).toContain('sr-only')
-        expect(label.classes()).not.toContain('bk-nav-label-active')
-      }
-      // sigue en el DOM con su texto pase lo que pase: el nombre accesible
-      // nunca desaparece, solo se oculta visualmente
+    labels.forEach((label) => {
+      expect(label.classes()).not.toContain('sr-only')
       expect(label.text().length).toBeGreaterThan(0)
     })
-  })
-
-  it('mobile bottom bar: the workout CTA label follows the same only-when-active rule as the rest', async () => {
-    const wrapper = await mountWithRoute('workout')
-    await flushPromises()
-
-    const mobileNav = wrapper.findAll('nav')[1]
-    const labels = mobileNav.findAll('li span.text-2xs')
-    // workout es el 3er item (índice 2)
-    expect(labels[2].classes()).toContain('bk-nav-label-active')
-    expect(labels[2].classes()).not.toContain('sr-only')
-    expect(labels[0].classes()).toContain('sr-only')
-    expect(labels[4].classes()).toContain('sr-only')
   })
 
   it('item 4: RouterView renders the matched view directly, with no bk-rise Transition wrapper around it', async () => {

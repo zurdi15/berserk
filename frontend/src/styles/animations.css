@@ -113,17 +113,6 @@
   animation: bk-breathe 3.2s var(--bk-ease-inout) infinite;
 }
 
-/* Nav inferior (ShellView, item "solo la etiqueta activa"): el label de la
-   sección activa entra con fade al cambiar de ruta. No se puede montar vía
-   <Transition> (el span debe seguir SIEMPRE en el DOM por accesibilidad —
-   solo se le añade/quita sr-only, nunca v-if), así que aquí se aplica el
-   keyframe bk-fade ya existente directamente como clase: al añadirse de
-   golpe en el mismo parche reactivo que quita sr-only, el navegador la
-   reproduce igual que si fuera un enter de Transition. */
-.bk-nav-label-active {
-  animation: bk-fade var(--bk-dur-2) var(--bk-ease-out);
-}
-
 .bk-ember-flash {
   background: radial-gradient(circle, var(--bk-ember-glow), transparent 70%);
   animation: bk-ember-flash var(--bk-dur-4) var(--bk-ease-out) forwards;
