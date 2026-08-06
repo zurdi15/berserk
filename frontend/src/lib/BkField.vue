@@ -3,7 +3,9 @@ withDefaults(
   defineProps<{
     label: string
     modelValue: string
-    type?: string
+    // M4: acotado a lo que de verdad se usa (ver noNativeFormControls.spec.ts)
+    // — date/time ya no viven aquí (BkDateField/BkTimeField los sustituyen)
+    type?: 'text' | 'password' | 'number'
     error?: string
     hint?: string
     mono?: boolean

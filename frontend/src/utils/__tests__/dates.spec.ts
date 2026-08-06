@@ -56,11 +56,16 @@ describe('dates', () => {
     expect(formatDateShort('', 'es')).toBe('')
   })
 
-  it('addDays (BkDateField grid nav): 30 days from 2026-03-01 crosses the EU DST boundary (2026-03-29) without a day-shift', () => {
+  it('addDays (BkDateField grid nav — ArrowLeft/PageUp use negative deltas) crosses the EU DST boundary (2026-03-29) backward without a day-shift', () => {
     // construcción LOCAL (nunca new Date(iso)/toISOString): el cambio de
-    // hora de por medio no debe desplazar el resultado ni un día
-    expect(addDays('2026-03-01', 30)).toBe('2026-03-31')
-    expect(addDays('2026-03-01', -1)).toBe('2026-02-28')
+    // hora de por medio no debe desplazar el resultado ni un día.
+    // M3: vitest.config.ts pinea TZ=Europe/Madrid (zona con horario de
+    // verano de verdad) para que este test sea significativo pase lo que
+    // pase en la zona de la máquina que corra el CI. Dirección hacia atrás
+    // (restar), no solo hacia adelante: BkDateField también navega para
+    // atrás (ArrowLeft, PageUp) y esa dirección no estaba cubierta cruzando
+    // el cambio de hora.
+    expect(addDays('2026-03-31', -30)).toBe('2026-03-01')
   })
 
   it('addDays wraps a week (7 days) and a full month cleanly', () => {
