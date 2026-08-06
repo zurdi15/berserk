@@ -159,7 +159,7 @@ describe('ExerciseManager', () => {
     const wrapper = buildExerciseManager()
     await flushPromises()
 
-    await wrapper.find('[data-testid="delete-exercise-btn"]').trigger('click')
+    await wrapper.find('[data-testid="delete-exercise-12"]').trigger('click')
     await flushPromises()
 
     expect(byTestId('delete-exercise-confirm-sheet').exists()).toBe(true)
@@ -168,6 +168,25 @@ describe('ExerciseManager', () => {
     await flushPromises()
 
     expect(deleteExercise).toHaveBeenCalledWith(12)
+  })
+
+  it('item 1: edit/delete render as icon-only BkActionBtn with the correct icon and accessible label', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    const editBtn = wrapper.get('[data-testid="edit-exercise-12"]')
+    expect(editBtn.attributes('aria-label')).toBe('Editar')
+    expect(editBtn.find('svg').exists()).toBe(true)
+
+    const deleteBtn = wrapper.get('[data-testid="delete-exercise-12"]')
+    expect(deleteBtn.attributes('aria-label')).toBe('Borrar')
+    expect(deleteBtn.classes()).toContain('text-danger')
   })
 })
 
@@ -260,6 +279,21 @@ describe('MuscleGroupManager', () => {
     await flushPromises()
 
     expect(deleteMuscleGroup).toHaveBeenCalledWith(2)
+  })
+
+  it('item 1: the own-group delete control is an icon-only BkActionBtn with danger styling and an accessible label', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 2, slug: 'gemelo', name_es: 'Gemelo', name_en: 'Calf', owner_id: 7 },
+    ] as never)
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    const deleteBtn = wrapper.get('[data-testid="delete-muscle-group-btn"]')
+    expect(deleteBtn.attributes('aria-label')).toBe('Borrar')
+    expect(deleteBtn.classes()).toContain('text-danger')
+    expect(deleteBtn.find('svg').exists()).toBe(true)
   })
 
   it('hides the is_global toggle for a non-admin user', async () => {

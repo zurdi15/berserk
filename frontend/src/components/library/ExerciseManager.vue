@@ -9,6 +9,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import BkCard from '@/lib/BkCard.vue'
+import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
 import BkSelect from '@/lib/BkSelect.vue'
@@ -158,26 +159,23 @@ async function confirmDelete() {
             v-for="exercise in ownExercises"
             :key="exercise.id"
             :data-testid="`exercise-row-${exercise.id}`"
-            class="flex items-center justify-between p-2 rounded border border-line text-sm"
+            class="flex items-center justify-between gap-2 p-2 rounded border border-line text-sm"
           >
             <span>{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
-            <div class="flex gap-2">
-              <BkButton
-                variant="ghost"
-                size="sm"
-                data-testid="edit-exercise-btn"
+            <!-- item 1: icon-only, como en RoutineList/AdminCard -->
+            <div class="flex items-center gap-2 shrink-0">
+              <BkActionBtn
+                icon="edit"
+                :data-testid="`edit-exercise-${exercise.id}`"
+                :aria-label="$t('common.edit')"
                 @click="openEdit(exercise)"
-              >
-                {{ $t('common.edit') }}
-              </BkButton>
-              <BkButton
-                variant="danger"
-                size="sm"
-                data-testid="delete-exercise-btn"
+              />
+              <BkActionBtn
+                icon="delete"
+                :data-testid="`delete-exercise-${exercise.id}`"
+                :aria-label="$t('common.delete')"
                 @click="askDelete(exercise.id)"
-              >
-                {{ $t('common.delete') }}
-              </BkButton>
+              />
             </div>
           </div>
         </div>

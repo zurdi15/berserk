@@ -8,6 +8,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import BkCard from '@/lib/BkCard.vue'
+import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
 import BkSheet from '@/lib/BkSheet.vue'
@@ -107,15 +108,14 @@ async function confirmDelete() {
                 {{ $t('library.globalGroup') }}
               </span>
             </span>
-            <BkButton
+            <!-- item 1: icon-only, como en RoutineList/AdminCard -->
+            <BkActionBtn
               v-if="group.owner_id !== null"
-              variant="danger"
-              size="sm"
+              icon="delete"
               data-testid="delete-muscle-group-btn"
+              :aria-label="$t('common.delete')"
               @click="askDelete(group.id)"
-            >
-              {{ $t('common.delete') }}
-            </BkButton>
+            />
           </div>
         </div>
 
