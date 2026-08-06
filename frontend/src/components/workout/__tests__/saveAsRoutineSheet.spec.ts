@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/api/domain', () => ({
   createRoutine: vi.fn(),
   replaceRoutineExercises: vi.fn(),
+  deleteRoutine: vi.fn(),
 }))
 
 import * as domain from '@/api/domain'
@@ -42,6 +43,7 @@ describe('SaveAsRoutineSheet (item 5)', () => {
     setActivePinia(createPinia())
     vi.mocked(domain.createRoutine).mockClear()
     vi.mocked(domain.replaceRoutineExercises).mockClear()
+    vi.mocked(domain.deleteRoutine).mockClear()
   })
 
   afterEach(() => {
@@ -95,5 +97,46 @@ describe('SaveAsRoutineSheet (item 5)', () => {
 
     expect(toast.toasts.length).toBeGreaterThan(0)
     expect(wrapper.emitted('close')).toBeFalsy()
+  })
+
+  it('a rejected createRoutine never calls deleteRoutine (nothing was created to clean up)', async () => {
+    vi.mocked(domain.createRoutine).mockRejectedValueOnce(new Error('boom'))
+
+    wrapper = build()
+    await byTestId('save-as-routine-confirm').click()
+    await flushPromises()
+
+    expect(domain.deleteRoutine).not.toHaveBeenCalled()
+  })
+
+  describe('fix M5: no orphaned routine when replaceRoutineExercises fails', () => {
+    it('deletes the just-created routine in the catch and still surfaces the original error', async () => {
+      vi.mocked(domain.createRoutine).mockResolvedValue({ id: 42, name: 'x', description: null, rune: null, color: null, exercises: [] } as never)
+      vi.mocked(domain.replaceRoutineExercises).mockRejectedValueOnce(new Error('422 invalid'))
+      vi.mocked(domain.deleteRoutine).mockResolvedValue(undefined as never)
+      const toast = useToastStore()
+
+      wrapper = build()
+      await byTestId('save-as-routine-confirm').click()
+      await flushPromises()
+
+      expect(domain.deleteRoutine).toHaveBeenCalledWith(42)
+      expect(toast.toasts.length).toBeGreaterThan(0)
+      expect(wrapper.emitted('close')).toBeFalsy()
+    })
+
+    it('a failed cleanup delete does not throw unhandled — the original error toast still wins', async () => {
+      vi.mocked(domain.createRoutine).mockResolvedValue({ id: 42, name: 'x', description: null, rune: null, color: null, exercises: [] } as never)
+      vi.mocked(domain.replaceRoutineExercises).mockRejectedValueOnce(new Error('422 invalid'))
+      vi.mocked(domain.deleteRoutine).mockRejectedValueOnce(new Error('delete also failed'))
+      const toast = useToastStore()
+
+      wrapper = build()
+      await byTestId('save-as-routine-confirm').click()
+      await flushPromises()
+
+      expect(domain.deleteRoutine).toHaveBeenCalledWith(42)
+      expect(toast.toasts.length).toBeGreaterThan(0)
+    })
   })
 })

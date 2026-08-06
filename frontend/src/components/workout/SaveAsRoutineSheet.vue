@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { WorkoutOut } from '@/api/domain'
-import { createRoutine, replaceRoutineExercises } from '@/api/domain'
+import { createRoutine, deleteRoutine, replaceRoutineExercises } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { useToastStore } from '@/stores/toast'
 import BkButton from '@/lib/BkButton.vue'
@@ -36,8 +36,15 @@ watch(
 async function save() {
   if (!name.value.trim() || saving.value) return
   saving.value = true
+  // fix M5 (revisión): si el PUT de ejercicios falla DESPUÉS de crear la
+  // rutina, esta se queda huérfana — creada, sin ejercicios, invisible para
+  // el usuario porque el flujo entero reportó error. Se recuerda el id para
+  // poder borrarla en el catch; sigue null si el fallo fue en el propio
+  // createRoutine (nada que limpiar en ese caso)
+  let createdRoutineId: number | null = null
   try {
     const routine = await createRoutine({ name: name.value.trim() })
+    createdRoutineId = routine.id
     const items = buildRoutineExercisesFromWorkout(props.workout)
     // rutina sin ejercicios (entreno vacío): createRoutine ya basta, un PUT
     // con lista vacía sería un no-op redundante
@@ -45,6 +52,15 @@ async function save() {
     toast.push('info', t('workout.savedAsRoutine'))
     emit('close')
   } catch (error) {
+    if (createdRoutineId != null) {
+      try {
+        await deleteRoutine(createdRoutineId)
+      } catch {
+        // el borrado de limpieza es best-effort: si también falla, el
+        // toast de abajo ya informa del problema real — no hay una segunda
+        // acción útil que ofrecer aquí
+      }
+    }
     toastApiError(error)
   } finally {
     saving.value = false

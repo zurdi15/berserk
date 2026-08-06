@@ -82,4 +82,38 @@ describe('buildRoutineExercisesFromWorkout (item 5)', () => {
   it('returns an empty array for a workout with no exercises', () => {
     expect(buildRoutineExercisesFromWorkout(workout([]))).toEqual([])
   })
+
+  describe('fix M5: clamps to the backend limits (RoutineExerciseIn: target_sets le=20, target_reps le=200, rest_seconds ge=5/le=900)', () => {
+    it('clamps target_sets to 20 for a high-volume session (dropsets) with more than 20 effective sets', () => {
+      const manySets = Array.from({ length: 25 }, (_, i) => set({ id: i + 1 }))
+      const w = workout([{ id: 20, exercise_id: 5, position: 0, note: null, rest_seconds: null, sets: manySets }])
+      expect(buildRoutineExercisesFromWorkout(w)[0].target_sets).toBe(20)
+    })
+
+    it('clamps target_reps to 200', () => {
+      const w = workout([
+        { id: 20, exercise_id: 5, position: 0, note: null, rest_seconds: null, sets: [set({ reps: 500 })] },
+      ])
+      expect(buildRoutineExercisesFromWorkout(w)[0].target_reps).toBe(200)
+    })
+
+    it('clamps rest_seconds into [5, 900]', () => {
+      const tooLow = workout([
+        { id: 20, exercise_id: 5, position: 0, note: null, rest_seconds: 1, sets: [set()] },
+      ])
+      expect(buildRoutineExercisesFromWorkout(tooLow)[0].rest_seconds).toBe(5)
+
+      const tooHigh = workout([
+        { id: 20, exercise_id: 5, position: 0, note: null, rest_seconds: 3600, sets: [set()] },
+      ])
+      expect(buildRoutineExercisesFromWorkout(tooHigh)[0].rest_seconds).toBe(900)
+    })
+
+    it('clamps target_weight_kg to 1000', () => {
+      const w = workout([
+        { id: 20, exercise_id: 5, position: 0, note: null, rest_seconds: null, sets: [set({ weight_kg: 5000 })] },
+      ])
+      expect(buildRoutineExercisesFromWorkout(w)[0].target_weight_kg).toBe(1000)
+    })
+  })
 })

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/api/domain', () => ({
   updateWorkout: vi.fn(async () => ({})),
   createRoutine: vi.fn(),
+  deleteRoutine: vi.fn(),
   replaceRoutineExercises: vi.fn(),
 }))
 
