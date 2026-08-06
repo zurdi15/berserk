@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { monthGrid, weekdayHeaders, todayIso } from '@/utils/dates'
 import { isValidRuneName } from './groupRune'
+import { statusClasses } from './statusClasses'
 import BkRune from '@/lib/BkRune.vue'
 import type { CalendarMonthOut } from '@/api/domain'
 import type { RuneName } from '@/lib/runes'
@@ -32,16 +33,6 @@ const scheduledByDate = computed(() => {
   return map
 })
 
-// Agrupar workouts por fecha
-const workoutsByDate = computed(() => {
-  const map = new Map<string, typeof props.month.workouts>()
-  for (const w of props.month.workouts) {
-    if (!map.has(w.date)) map.set(w.date, [])
-    map.get(w.date)!.push(w)
-  }
-  return map
-})
-
 // Recolectar runas de grupos musculares por día (máx 3)
 const runesByDate = computed(() => {
   const map = new Map<string, RuneName[]>()
@@ -60,13 +51,6 @@ const runesByDate = computed(() => {
   }
   return map
 })
-
-const statusClasses = (status: string) => {
-  if (status === 'planned') return 'border-2 border-aurora rounded-full'
-  if (status === 'done') return 'bg-aurora rounded-full'
-  if (status === 'skipped') return 'bg-ink-faint rounded-full'
-  return 'bg-ink-faint rounded-full'
-}
 
 function selectDay(date: string) {
   emit('select', date)
@@ -92,7 +76,7 @@ function selectDay(date: string) {
         :class="{
           'border-ink-faint': !cell.inMonth,
           'text-ink-muted': !cell.inMonth,
-          'bg-white border-ink-border': cell.inMonth,
+          'bg-stone border-ink-border': cell.inMonth,
           'border-2 border-aurora': cell.date === today && cell.inMonth,
         }"
         @click="selectDay(cell.date)"

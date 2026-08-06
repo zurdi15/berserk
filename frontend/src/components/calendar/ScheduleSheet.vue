@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
 
 import BkButton from '@/lib/BkButton.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkField from '@/lib/BkField.vue'
 import BkSheet from '@/lib/BkSheet.vue'
+import { statusClasses } from './statusClasses'
 import type { ScheduledOut, RoutineOut } from '@/api/domain'
 import { updateSchedule, deleteSchedule, schedule, listRoutines } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
@@ -20,7 +20,6 @@ const emit = defineEmits<{
   updated: []
 }>()
 
-const router = useRouter()
 const athlete = useAthleteStore()
 
 const isViewingSelf = computed(() => !athlete.isViewing)
@@ -140,10 +139,6 @@ async function createSession() {
   }
 }
 
-function navigateToWorkout(workoutId: number) {
-  router.push({ name: 'workout', query: { id: workoutId } })
-}
-
 loadRoutines()
 </script>
 
@@ -224,7 +219,7 @@ loadRoutines()
         />
         <BkSelect
           v-model="newRoutineId"
-          :options="[{ value: '', label: $t('calendar.selectRoutine') }, ...routines.map(r => ({ value: String(r.id), label: r.name }))]"
+          :options="[{ value: '', label: $t('calendar.selectRoutine'), disabled: true }, ...routines.map(r => ({ value: String(r.id), label: r.name }))]"
           :label="$t('calendar.routine')"
         />
         <BkField
