@@ -90,8 +90,64 @@ def test_delete_workout_frees_its_scheduled_session(client: TestClient, db_sessi
 
     db_session.expire_all()
     refreshed = db_session.get(models.ScheduledSession, session.id)
+    # v0.3.0 item 1: la sesión es de HOY, así que sigue el camino de siempre —
     # un "done" colgando sin workout bloquearía reutilizar la sesión
     assert refreshed.status == "planned" and refreshed.workout_id is None
+
+
+def test_delete_workout_frees_a_future_scheduled_session(client: TestClient, db_session):
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from app import models
+
+    rid = make_routine(client)
+    admin = db_session.scalar(select(models.User).where(models.User.username == "admin"))
+    future_date = date.today() + timedelta(days=3)
+    session = models.ScheduledSession(owner_id=admin.id, date=future_date, routine_id=rid)
+    db_session.add(session)
+    db_session.commit()
+
+    workout = client.post(
+        "/api/v1/workouts",
+        json={"scheduled_session_id": session.id, "date": future_date.isoformat(), "finished": True},
+    ).json()
+
+    assert client.delete(f"/api/v1/workouts/{workout['id']}").status_code == 204
+
+    db_session.expire_all()
+    refreshed = db_session.get(models.ScheduledSession, session.id)
+    assert refreshed.status == "planned" and refreshed.workout_id is None
+
+
+def test_delete_workout_for_a_past_scheduled_session_deletes_it_entirely(client: TestClient, db_session):
+    # v0.3.0 item 1 (bug): "Al borrar un entrenamiento anterior, se pone como
+    # programado. Mal." — un "planned" en el pasado nunca se podrá "hacer"
+    # retroactivamente, así que la sesión debe desaparecer entera, no revivir.
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from app import models
+
+    rid = make_routine(client)
+    admin = db_session.scalar(select(models.User).where(models.User.username == "admin"))
+    past_date = date.today() - timedelta(days=5)
+    session = models.ScheduledSession(owner_id=admin.id, date=past_date, routine_id=rid)
+    db_session.add(session)
+    db_session.commit()
+    session_id = session.id
+
+    workout = client.post(
+        "/api/v1/workouts",
+        json={"scheduled_session_id": session_id, "date": past_date.isoformat(), "finished": True},
+    ).json()
+
+    assert client.delete(f"/api/v1/workouts/{workout['id']}").status_code == 204
+
+    db_session.expire_all()
+    assert db_session.get(models.ScheduledSession, session_id) is None
 
 
 def test_patch_and_delete(client: TestClient, app):

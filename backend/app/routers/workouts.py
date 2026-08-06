@@ -212,8 +212,12 @@ def delete_workout(workout_id: int, user: CurrentUser, db: Session = Depends(get
         WorkoutExercise.workout_id == workout.id
     )
     db.execute(delete(PersonalRecord).where(PersonalRecord.set_id.in_(set_ids)))
-    # borrar el entreno devuelve la sesión a planificada: un "done" colgando
-    # (con workout_id a NULL por el SET NULL de la FK) bloquearía reutilizarla
+    # borrar el entreno de una sesión de HOY/futuro la devuelve a planificada:
+    # un "done" colgando (con workout_id a NULL por el SET NULL de la FK)
+    # bloquearía reutilizarla. Pero un "planned" en el PASADO no tiene ningún
+    # sentido — ese hueco ya no se puede "hacer" retroactivamente, así que la
+    # sesión se borra entera en vez de revivirla zombie (v0.3.0, item 1: "al
+    # borrar un entreno anterior, se pone como programado. Mal.")
     linked_sessions = db.scalars(
         select(ScheduledSession).where(
             ScheduledSession.workout_id == workout.id,
@@ -221,8 +225,11 @@ def delete_workout(workout_id: int, user: CurrentUser, db: Session = Depends(get
         )
     ).all()
     for linked in linked_sessions:
-        linked.status = "planned"
-        linked.workout_id = None
+        if linked.date < date_type.today():
+            db.delete(linked)
+        else:
+            linked.status = "planned"
+            linked.workout_id = None
     db.delete(workout)
     db.commit()
 
