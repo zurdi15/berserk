@@ -106,6 +106,7 @@ export const es = {
     noSharingGiven: 'No compartes con nadie',
     noSharingReceived: 'Nadie te comparte datos',
     grantSharing: 'Conceder acceso',
+    noUsersToGrant: 'No hay más usuarios a los que conceder acceso',
     username: 'Usuario',
     view: 'Ver',
     confirmRevoke: 'Revocar acceso',
@@ -167,7 +168,6 @@ export const es = {
     confirm: 'Confirmar',
   },
   library: {
-    title: 'Biblioteca',
     exercises: 'Ejercicios',
     muscleGroups: 'Grupos musculares',
     newExercise: 'Nuevo ejercicio',
@@ -256,7 +256,7 @@ export const es = {
     // llamado con weeks=4 fijo desde ProgressView) es una ventana de 4
     // semanas por grupo PRIMARIO, no un total histórico — el subtítulo dice
     // exactamente eso en vez de dejar la cifra sin contexto
-    distributionSubtitle: 'Series efectivas por grupo principal — últimas 4 semanas',
+    distributionSubtitle: 'Series efectivas por grupo principal, últimas 4 semanas',
     distributionSetsTitle: '{count} series efectivas',
     noDistribution: 'Aún no hay datos de distribución',
     stats: {

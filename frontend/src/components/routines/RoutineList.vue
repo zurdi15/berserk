@@ -91,8 +91,11 @@ onMounted(() => {
 <template>
   <div class="space-y-4">
     <!-- item 7: sin título "Rutinas" (la pestaña de Perfil ya lo dice) — el
-         botón de crear queda solo, pegado al borde izquierdo de esta fila -->
-    <div class="flex items-center">
+         botón de crear queda solo, pegado al borde izquierdo de esta fila.
+         item 10: en vacío el botón se muda DENTRO del BkEmpty de abajo, así
+         que esta fila solo vive antes de listo (evita el flash "sin botón")
+         o cuando SÍ hay rutinas — nunca los dos botones a la vez. -->
+    <div v-if="!ready || routines.length > 0" class="flex items-center">
       <BkButton
         variant="primary"
         size="sm"
@@ -169,7 +172,9 @@ onMounted(() => {
           >
             <span class="text-ink truncate">{{ exerciseName(resolveExercise(ex.exercise_id), locale) }}</span>
             <span class="text-ink-muted shrink-0 text-right">
-              {{ ex.target_sets }}×{{ ex.target_reps ?? '–' }}
+              <!-- item 9: sin en-dash de relleno cuando no hay reps objetivo
+                   (p.ej. ejercicios por tiempo) — se omite el ×reps entero -->
+              {{ ex.target_sets }}<template v-if="ex.target_reps != null">×{{ ex.target_reps }}</template>
               <template v-if="ex.target_weight_kg != null"> · {{ formatWeight(ex.target_weight_kg, units) }}</template>
               <template v-if="ex.rest_seconds"> · {{ ex.rest_seconds }}s</template>
             </span>
@@ -182,30 +187,40 @@ onMounted(() => {
         <!-- Confirmar borrado: fila completa debajo del contenido, no
              encajada junto al nombre — en 390px, "Confirmar"/"Cancelar"
              dejan solo ~95px para la columna del nombre (frente a ~200px
-             con los dos iconos normales), demasiado apretado con truncate -->
-        <div v-if="deleteConfirming === routine.id" class="flex gap-2">
-          <BkButton
-            variant="danger"
-            size="sm"
-            class="flex-1"
-            @click="confirmDelete(routine.id)"
-          >
-            {{ $t('routines.confirm') }}
-          </BkButton>
-          <BkButton
-            variant="ghost"
-            size="sm"
-            class="flex-1"
-            @click="deleteConfirming = null"
-          >
-            {{ $t('common.cancel') }}
-          </BkButton>
-        </div>
+             con los dos iconos normales), demasiado apretado con truncate.
+             item 7: pop-in al aparecer (mismo idiom que el resto del carril,
+             ver BodySection) — solo entrada, como el resto del sistema. -->
+        <Transition name="bk-pop-soft" mode="out-in">
+          <div v-if="deleteConfirming === routine.id" class="flex gap-2">
+            <BkButton
+              variant="danger"
+              size="sm"
+              class="flex-1"
+              @click="confirmDelete(routine.id)"
+            >
+              {{ $t('routines.confirm') }}
+            </BkButton>
+            <BkButton
+              variant="ghost"
+              size="sm"
+              class="flex-1"
+              @click="deleteConfirming = null"
+            >
+              {{ $t('common.cancel') }}
+            </BkButton>
+          </div>
+        </Transition>
       </div>
     </div>
 
-    <!-- Empty State -->
-    <BkEmpty v-else-if="ready" :message="$t('routines.noRoutines')" />
+    <!-- Empty State: item 10, el botón de crear se muda aquí dentro -->
+    <BkEmpty
+      v-else-if="ready"
+      :message="$t('routines.noRoutines')"
+      :action-label="$t('routines.newRoutine')"
+      action-testid="new-routine-btn"
+      @action="openEditor()"
+    />
 
     <!-- Editor Sheet -->
     <RoutineEditorSheet

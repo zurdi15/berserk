@@ -240,6 +240,69 @@ describe('RoutineList', () => {
     expect(text).toContain('Sin rutinas aún')
   })
 
+  it('item 10: the create-routine button moves into the empty state (only one instance, opens the editor)', async () => {
+    const { listRoutines } = await import('@/api/domain')
+    vi.mocked(listRoutines).mockResolvedValueOnce([])
+
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    await wrapper.vm.$nextTick()
+
+    // un único botón "Nueva rutina" en todo el árbol (no duplicado arriba)
+    const buttons = wrapper.findAll('[data-testid="new-routine-btn"]')
+    expect(buttons).toHaveLength(1)
+
+    const editor = wrapper.findComponent({ name: 'RoutineEditorSheet' })
+    expect(editor.props('open')).toBe(false)
+    await buttons[0].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(editor.props('open')).toBe(true)
+  })
+
+  it('item 9: omits the reps entirely (no en-dash filler) when a routine exercise has no target reps', async () => {
+    const { listRoutines } = await import('@/api/domain')
+    vi.mocked(listRoutines).mockResolvedValueOnce([
+      {
+        id: 1, name: 'Plancha día', description: null, rune: null, color: null,
+        exercises: [
+          { id: 1, exercise_id: 1, position: 0, target_sets: 3, target_reps: null, target_weight_kg: null, rest_seconds: null },
+        ],
+      },
+    ] as never)
+
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('[data-testid="toggle-routine-1"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const list = wrapper.get('[data-testid="exercise-list-1"]')
+    expect(list.text()).not.toContain('–')
+    expect(list.text()).not.toContain('—')
+    expect(list.text()).toContain('3')
+    expect(list.text()).not.toContain('×')
+  })
+
+  it('item 7: the confirm/cancel row is wrapped in the bk-pop-soft transition', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('[data-testid="delete-routine-1"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // VTU auto-stubbea <Transition> como <transition-stub name="...">
+    // (ver memoria del repo): basta para una aserción estructural, sin
+    // necesidad de desactivar el stub para probar timing de animación
+    const transitionStub = wrapper.find('transition-stub[name="bk-pop-soft"]')
+    expect(transitionStub.exists()).toBe(true)
+    expect(transitionStub.text()).toContain('Confirmar')
+  })
+
   describe('expandable exercise list (side-quest 1 follow-up)', () => {
     async function buildReady() {
       const wrapper = build()

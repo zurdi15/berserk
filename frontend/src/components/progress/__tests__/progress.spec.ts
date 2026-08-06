@@ -182,7 +182,8 @@ describe('DistributionBars', () => {
     })
     const subtitle = wrapper.find('[data-testid="distribution-subtitle"]')
     expect(subtitle.exists()).toBe(true)
-    expect(subtitle.text()).toBe('Series efectivas por grupo principal — últimas 4 semanas')
+    // item 9: sin em-dash — coma en su lugar
+    expect(subtitle.text()).toBe('Series efectivas por grupo principal, últimas 4 semanas')
   })
 
   it('STATS-CLARITY: the subtitle is shown even in the empty state, so the empty message reads in context', () => {
@@ -204,6 +205,21 @@ describe('DistributionBars', () => {
   it('shows the empty state when there are no items', () => {
     const wrapper = mount(DistributionBars, { props: { items: [], groups: [] }, ...withI18n() })
     expect(wrapper.text()).toContain('Aún no hay datos de distribución')
+  })
+
+  it('item 14(c): a bar\'s rune icon uses the group\'s dedicated rune, overriding the slug-derived one', () => {
+    const groups = [
+      { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null, rune: 'ansuz' },
+      { id: 2, slug: 'legs', name_es: 'Piernas', name_en: 'Legs', owner_id: null },
+    ]
+    const wrapper = mount(DistributionBars, {
+      props: { items: fixtures.distribution as never, groups: groups as never },
+      ...withI18n(),
+    })
+    const runes = wrapper.findAllComponents({ name: 'BkRune' })
+    // legs primero (40 sets, sin override -> cae al slug), pecho segundo (override)
+    expect(runes[0].props('name')).toBe('legs')
+    expect(runes[1].props('name')).toBe('ansuz')
   })
 
   it('item 6: bars carry the growth animation class with a per-bar --bar-dur proportional to the bar\'s magnitude (longer bar takes longer)', () => {
@@ -689,6 +705,35 @@ describe('BodySection', () => {
 
     expect(wrapper!.find('[data-testid="confirm-delete-body-2026-07-08"]').exists()).toBe(false)
     expect(domain.deleteBody).not.toHaveBeenCalled()
+  })
+
+  it('item 7: the delete/confirm-cancel swap is wrapped in the bk-pop-soft transition, edit stays outside it', async () => {
+    build()
+    await flushPromises()
+
+    await wrapper!.find('[data-testid="delete-body-2026-07-08"]').trigger('click')
+    await wrapper!.vm.$nextTick()
+
+    // VTU auto-stubbea <Transition> como <transition-stub name="...">
+    const transitionStub = wrapper!.find('transition-stub[name="bk-pop-soft"]')
+    expect(transitionStub.exists()).toBe(true)
+    expect(transitionStub.text()).toContain('Confirmar')
+    // editar no forma parte del swap: sigue en el DOM durante la confirmación
+    expect(wrapper!.find('[data-testid="edit-body-2026-07-08"]').exists()).toBe(true)
+  })
+
+  it('item 9: omits the weight entirely (no en-dash filler) for an entry with no weight_kg', async () => {
+    vi.mocked(domain.listBody).mockResolvedValue([
+      { date: '2026-07-01', weight_kg: null, waist_cm: 90, chest_cm: null, arm_cm: null, thigh_cm: null, hip_cm: null },
+    ] as never)
+
+    build()
+    await flushPromises()
+
+    const row = wrapper!.get('[data-testid="body-entry-2026-07-01"]')
+    expect(row.text()).not.toContain('–')
+    expect(row.text()).not.toContain('—')
+    expect(row.find('.bk-metric').exists()).toBe(false)
   })
 
   it('round-trip: editing an lb-mode entry without touching weight resends the original kg exactly (no drift)', async () => {

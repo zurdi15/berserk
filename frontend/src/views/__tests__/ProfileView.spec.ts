@@ -104,6 +104,27 @@ describe('ProfileView', () => {
     expect(push).toHaveBeenCalledWith({ name: 'login' })
   })
 
+  it('item 12: the logout button is full-width and danger-styled', async () => {
+    wrapper = build()
+    await wrapper.vm.$nextTick()
+
+    const logoutBtn = wrapper.get('[data-testid="logout-btn"]')
+    expect(logoutBtn.classes()).toContain('w-full')
+    expect(logoutBtn.classes()).toContain('border-danger')
+  })
+
+  it('item 10: the library tab has no "Biblioteca" heading (the tab already says it — ExerciseManager\'s own "Catálogo predefinido" h2 is unrelated and stays)', async () => {
+    wrapper = build()
+    await flushPromises()
+
+    const libraryTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
+    await libraryTab!.trigger('click')
+    await flushPromises()
+
+    const headings = wrapper.findAll('h2').map((h) => h.text())
+    expect(headings).not.toContain('Biblioteca')
+  })
+
   it('renders profile tab by default', async () => {
     wrapper = build()
     await wrapper.vm.$nextTick()

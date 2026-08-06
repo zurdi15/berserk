@@ -16,7 +16,7 @@ import BkRune from '@/lib/BkRune.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
-import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
+import { groupRune, primaryMuscleGroup } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 
 const { t } = useI18n()
@@ -47,6 +47,13 @@ function groupLabel(group: MuscleGroupOut): string {
 // ExercisePicker, un único punto de verdad para "qué grupo es el primario"
 function primaryGroup(exercise: ExerciseOut): MuscleGroupOut | undefined {
   return primaryMuscleGroup(exercise, muscleGroups.value)
+}
+
+// item 14(c): runa EFECTIVA (rune ?? slug-derivada) vía el resolver
+// centralizado — antes esta tag leía group.slug a pelo, así que un grupo con
+// una runa dedicada distinta de su slug no se veía reflejado aquí
+function primaryGroupRune(exercise: ExerciseOut): RuneName | null {
+  return groupRune(primaryGroup(exercise))
 }
 
 const formOpen = ref(false)
@@ -188,8 +195,8 @@ async function confirmDelete() {
                 :data-testid="`exercise-group-tag-${exercise.id}`"
               >
                 <BkRune
-                  v-if="isValidRuneName(primaryGroup(exercise)!.slug)"
-                  :name="(primaryGroup(exercise)!.slug as RuneName)"
+                  v-if="primaryGroupRune(exercise)"
+                  :name="primaryGroupRune(exercise)!"
                   :size="14"
                 />
                 <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
@@ -213,9 +220,17 @@ async function confirmDelete() {
           </div>
         </div>
 
-        <BkEmpty v-else-if="ready" :message="$t('library.noExercises')" />
+        <!-- item 10: en vacío el botón de crear se muda dentro del BkEmpty;
+             fuera de ahí (aún no listo, o con filas) se queda donde estaba -->
+        <BkEmpty
+          v-else-if="ready"
+          :message="$t('library.noExercises')"
+          :action-label="$t('library.newExercise')"
+          action-testid="new-exercise-btn"
+          @action="openCreate"
+        />
 
-        <BkButton data-testid="new-exercise-btn" @click="openCreate">
+        <BkButton v-if="!ready || ownExercises.length > 0" data-testid="new-exercise-btn" @click="openCreate">
           {{ $t('library.newExercise') }}
         </BkButton>
       </div>
@@ -263,8 +278,8 @@ async function confirmDelete() {
                   :data-testid="`exercise-group-tag-${exercise.id}`"
                 >
                   <BkRune
-                    v-if="isValidRuneName(primaryGroup(exercise)!.slug)"
-                    :name="(primaryGroup(exercise)!.slug as RuneName)"
+                    v-if="primaryGroupRune(exercise)"
+                    :name="primaryGroupRune(exercise)!"
                     :size="14"
                   />
                   <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>

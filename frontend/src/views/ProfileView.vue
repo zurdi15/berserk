@@ -57,8 +57,12 @@ async function handleLogout() {
       <div :style="{ '--bk-stagger-i': 1 }"><PasswordCard /></div>
       <div :style="{ '--bk-stagger-i': 2 }"><SharingCard /></div>
 
+      <!-- item 12: fila completa, danger — cerrar sesión es la acción más
+           "destructiva" visible del perfil, se trata como tal (mismo criterio
+           que el resto de acciones danger de la app, p.ej. borrar cuenta) -->
       <BkButton
-        variant="ghost"
+        variant="danger"
+        block
         data-testid="logout-btn"
         :style="{ '--bk-stagger-i': 3 }"
         @click="handleLogout"
@@ -72,10 +76,11 @@ async function handleLogout() {
       <RoutineList v-if="activeTab === 'routines'" />
     </Transition>
 
+    <!-- item 10: sin título "Biblioteca" (la pestaña de Perfil ya lo dice,
+         mismo tratamiento que Rutinas) -->
     <div v-if="activeTab === 'library'" class="space-y-4 bk-stagger">
-      <h2 class="text-lg font-semibold text-ink" :style="{ '--bk-stagger-i': 0 }">{{ $t('library.title') }}</h2>
-      <div :style="{ '--bk-stagger-i': 1 }"><ExerciseManager /></div>
-      <div :style="{ '--bk-stagger-i': 2 }"><MuscleGroupManager /></div>
+      <div :style="{ '--bk-stagger-i': 0 }"><ExerciseManager /></div>
+      <div :style="{ '--bk-stagger-i': 1 }"><MuscleGroupManager /></div>
     </div>
 
     <Transition name="bk-rise" appear>

@@ -239,43 +239,50 @@ watch(() => athlete.userId, load, { immediate: true })
           <p v-if="measuresLine(entry)" class="text-xs text-ink-faint truncate">{{ measuresLine(entry) }}</p>
         </div>
         <div class="flex items-center gap-3 shrink-0">
-          <span class="bk-metric text-sm text-ink">
-            {{ entry.weight_kg != null ? formatWeight(entry.weight_kg, units) : '–' }}
+          <!-- item 9: sin en-dash de relleno — se omite el peso entero
+               cuando la entrada no lleva weight_kg (solo medidas) -->
+          <span v-if="entry.weight_kg != null" class="bk-metric text-sm text-ink">
+            {{ formatWeight(entry.weight_kg, units) }}
           </span>
           <template v-if="isViewingSelf">
-            <!-- BkActionBtn (item 7): icon-only unificado, mismos
-                 testid/aria-label que antes para no romper progress.spec -->
+            <!-- BkActionBtn (item 7 previo): icon-only unificado, mismos
+                 testid/aria-label que antes para no romper progress.spec —
+                 editar queda FUERA del swap de abajo, siempre visible -->
             <BkActionBtn
               icon="edit"
               :data-testid="`edit-body-${entry.date}`"
               :aria-label="t('common.edit')"
               @click="openEdit(entry)"
             />
-            <BkActionBtn
-              v-if="deleteConfirming !== entry.date"
-              icon="delete"
-              :data-testid="`delete-body-${entry.date}`"
-              :aria-label="t('common.delete')"
-              @click="deleteConfirming = entry.date"
-            />
-            <span v-else class="flex items-center gap-1">
-              <button
-                type="button"
-                :data-testid="`confirm-delete-body-${entry.date}`"
-                class="text-danger text-xs px-2 py-1 border border-danger rounded-sm"
-                @click="confirmDelete(entry.date)"
-              >
-                {{ t('common.confirm') }}
-              </button>
-              <button
-                type="button"
-                :data-testid="`cancel-delete-body-${entry.date}`"
-                class="text-ink-faint text-xs px-2 py-1"
-                @click="deleteConfirming = null"
-              >
-                {{ t('common.cancel') }}
-              </button>
-            </span>
+            <!-- item 7: swap borrar ⟷ confirmar/cancelar con pop-in al
+                 aparecer, mismo idiom que el resto del carril (solo entrada) -->
+            <Transition name="bk-pop-soft" mode="out-in">
+              <BkActionBtn
+                v-if="deleteConfirming !== entry.date"
+                icon="delete"
+                :data-testid="`delete-body-${entry.date}`"
+                :aria-label="t('common.delete')"
+                @click="deleteConfirming = entry.date"
+              />
+              <span v-else class="flex items-center gap-1">
+                <button
+                  type="button"
+                  :data-testid="`confirm-delete-body-${entry.date}`"
+                  class="text-danger text-xs px-2 py-1 border border-danger rounded-sm"
+                  @click="confirmDelete(entry.date)"
+                >
+                  {{ t('common.confirm') }}
+                </button>
+                <button
+                  type="button"
+                  :data-testid="`cancel-delete-body-${entry.date}`"
+                  class="text-ink-faint text-xs px-2 py-1"
+                  @click="deleteConfirming = null"
+                >
+                  {{ t('common.cancel') }}
+                </button>
+              </span>
+            </Transition>
           </template>
         </div>
       </div>

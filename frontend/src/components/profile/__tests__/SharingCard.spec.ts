@@ -1,6 +1,6 @@
-import { mount } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
@@ -27,7 +27,26 @@ vi.mock('@/api/domain', () => ({
     units: 'kg',
     timezone: 'UTC',
   })),
+  // item 11: freyja (id 2) ya está en givenUsers -> el picker debe excluirla
+  listUserDirectory: vi.fn(() => Promise.resolve([
+    { id: 2, username: 'freyja', color: null },
+    { id: 5, username: 'loki', color: '#abc123' },
+    { id: 6, username: 'sif', color: null },
+  ])),
 }))
+
+// BkSelect usa <Teleport to="body">: hay que montar sobre document.body y
+// buscar ahí dentro (mismo patrón que library.spec.ts)
+let mountedWrappers: VueWrapper[] = []
+
+function byTestId(id: string): DOMWrapper<Element> {
+  return new DOMWrapper(document.body.querySelector(`[data-testid="${id}"]`) as Element | null)
+}
+
+afterEach(() => {
+  mountedWrappers.forEach((wrapper) => wrapper.unmount())
+  mountedWrappers = []
+})
 
 describe('SharingCard', () => {
   beforeEach(() => {
@@ -36,11 +55,14 @@ describe('SharingCard', () => {
   })
 
   function build() {
-    return mount(SharingCard, {
+    const wrapper = mount(SharingCard, {
       global: {
         plugins: [createI18nInstance()],
       },
+      attachTo: document.body,
     })
+    mountedWrappers.push(wrapper)
+    return wrapper
   }
 
   it('renders given and received users from getSharing', async () => {
@@ -135,5 +157,60 @@ describe('SharingCard', () => {
     // Verify sheet exists
     const sheet = wrapper.findComponent({ name: 'BkSheet' })
     expect(sheet.exists()).toBe(true)
+  })
+
+  describe('item 11: grant access picker (not a username textfield)', () => {
+    it('offers the directory, excluding users already granted access (freyja, id 2)', async () => {
+      const wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="grant-username-field"]').exists()).toBe(false)
+      await wrapper.get('[data-testid="grant-user-select"] [role="combobox"]').trigger('click')
+
+      const options = Array.from(document.querySelectorAll('[role="option"]')).map((o) => o.textContent?.trim())
+      expect(options).toEqual(['loki', 'sif'])
+    })
+
+    it('DOM-real: open, pick a user, grant is called with the username (existing API contract, unchanged)', async () => {
+      const { grantSharing } = await import('@/api/domain')
+      const wrapper = build()
+      await flushPromises()
+
+      await wrapper.get('[data-testid="grant-user-select"] [role="combobox"]').trigger('click')
+      const lokiOption = Array.from(document.querySelectorAll('[role="option"]'))
+        .find((o) => o.textContent?.trim() === 'loki') as HTMLElement
+      expect(lokiOption).not.toBeUndefined()
+      lokiOption.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+
+      await byTestId('grant-btn').trigger('click')
+      await flushPromises()
+
+      expect(grantSharing).toHaveBeenCalledWith('loki')
+    })
+
+    it('shows a "no one left to grant to" message instead of the picker when the directory has no candidates', async () => {
+      const { listUserDirectory } = await import('@/api/domain')
+      vi.mocked(listUserDirectory).mockResolvedValueOnce([
+        { id: 2, username: 'freyja', color: null }, // ya concedido: el único del directorio
+      ] as never)
+
+      const wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="grant-user-select"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="no-grantable-users"]').text()).toBe('No hay más usuarios a los que conceder acceso')
+    })
+
+    it('does not call grantSharing when nothing is selected', async () => {
+      const { grantSharing } = await import('@/api/domain')
+      const wrapper = build()
+      await flushPromises()
+
+      await byTestId('grant-btn').trigger('click')
+      await flushPromises()
+
+      expect(grantSharing).not.toHaveBeenCalled()
+    })
   })
 })
