@@ -9,9 +9,15 @@ import { core } from '@/tokens'
 // (animations.css) no alcanza a un ref que cambia por rAF sin animation/transition.
 export function useAnimatedNumber(
   source: () => number | null | undefined,
-  options: { duration?: number } = {},
+  options: { duration?: number; decimals?: number } = {},
 ): Ref<number | null> {
   const duration = options.duration ?? parseInt(core.dur[4], 10)
+  // decimales del TWEEN, no del valor final: sin este redondeo por frame, un
+  // valor intermedio como 1567.4972637 (arrastrado de from+(to-from)*eased)
+  // se pinta tal cual y ensancha la card a media animación — el bug que
+  // rompía el layout y desanclaba la bottom bar en móvil (mismo mecanismo
+  // que el desborde de las tabs de Perfil)
+  const decimals = options.decimals ?? 0
   const display = ref<number | null>(null)
   const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame.bind(globalThis) : null
   const caf = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame.bind(globalThis) : () => undefined
@@ -29,7 +35,9 @@ export function useAnimatedNumber(
     const step = (now: number) => {
       const t = Math.min(1, (now - start) / duration)
       const eased = 1 - Math.pow(1 - t, 3)
-      display.value = t < 1 ? from + (to - from) * eased : to
+      // el frame final conserva `to` exacto (sin redondear): el redondeo es
+      // solo cosmético para los frames intermedios del tween
+      display.value = t < 1 ? Number((from + (to - from) * eased).toFixed(decimals)) : to
       if (t < 1) frame = raf(step)
     }
     frame = raf(step)

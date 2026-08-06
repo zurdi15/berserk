@@ -6,9 +6,11 @@ import { useAnimatedNumber } from '@/composables/useAnimatedNumber'
 // función de formato inline en el padre no puede darle — una instancia de
 // componente por fila (keyed) es la unidad de scope que Vue ya gestiona.
 // Sin wrapper propio ni clases: reenvía el valor animado vía slot con ámbito.
-const props = defineProps<{ value: number | null | undefined }>()
+// `decimals` por defecto 0 (conteos); las filas de magnitudes con decimales
+// reales (pesos) lo pasan explícito, ver RecentPrs/PrList.
+const props = withDefaults(defineProps<{ value: number | null | undefined; decimals?: number }>(), { decimals: 0 })
 
-const display = useAnimatedNumber(() => props.value ?? null)
+const display = useAnimatedNumber(() => props.value ?? null, { decimals: props.decimals })
 </script>
 
 <template>

@@ -55,7 +55,10 @@ function formatAchievedDate(dateStr: string): string {
         </div>
       </div>
       <div class="text-right shrink-0">
-        <BkAnimatedNumber :value="record.value" v-slot="{ value }">
+        <!-- decimals=1: formatWeight NO redondea en modo kg (solo lb), así que
+             el propio tween tiene que llegar ya a 1 decimal o pintaría colas
+             de flotante a media animación -->
+        <BkAnimatedNumber :value="record.value" :decimals="1" v-slot="{ value }">
           <p class="text-ember font-semibold tabular-nums" data-testid="pr-value">{{ formatRecordValue(value ?? 0) }}</p>
         </BkAnimatedNumber>
         <p class="text-xs text-ink-faint">{{ formatAchievedDate(record.achieved_at) }}</p>

@@ -51,7 +51,9 @@ const totalVolume = computed(() =>
 )
 
 const animatedTotalSets = useAnimatedNumber(() => totalSets.value)
-const animatedTotalVolume = useAnimatedNumber(() => totalVolume.value)
+// decimals=1: formatWeight no redondea en modo kg (solo lb) — el tween tiene
+// que llegar ya a 1 decimal o pintaría colas de flotante a media animación
+const animatedTotalVolume = useAnimatedNumber(() => totalVolume.value, { decimals: 1 })
 
 // los 3 kinds de PR son magnitudes en kg: todos pasan por formatWeight (ver
 // PrList/RecentPrs/BkCelebration — antes max_volume se mostraba sin convertir)

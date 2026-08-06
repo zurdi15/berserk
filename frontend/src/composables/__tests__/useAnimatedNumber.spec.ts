@@ -99,8 +99,36 @@ describe('useAnimatedNumber', () => {
     const display = scope.run(() => useAnimatedNumber(() => 100))!
     pump(0)
     pump(599)
-    expect(display.value).toBeLessThan(100) // a 599ms de 600ms el tween no ha terminado
+    // el boundary se verifica por el frame pendiente, no por el valor: con el
+    // redondeo a enteros (decimals: 0 por defecto, ver test de arriba) el
+    // ease-out cúbico ya está tan cerca de 100 a 599/600ms que el valor
+    // redondeado puede coincidir con el objetivo sin que el tween haya
+    // terminado de verdad — el frame agendado es la señal fiable
+    expect(callbacks.length).toBe(1) // a 599ms de 600ms el tween aún no ha terminado
     pump(1)
     expect(display.value).toBe(100) // a los 600ms exactos, termina
+    expect(callbacks.length).toBe(0) // y no quedan frames pendientes
+  })
+
+  it('sin decimals (default 0): los frames intermedios del tween son enteros, nunca colas de flotante', () => {
+    const display = scope.run(() => useAnimatedNumber(() => 1567, { duration: 500 }))!
+    pump(0)
+    pump(137) // frame intermedio arbitrario, a medio tween
+    expect(display.value).not.toBeNull()
+    expect(Number.isInteger(display.value)).toBe(true)
+    pump(500)
+    expect(display.value).toBe(1567) // el frame final conserva el objetivo exacto
+  })
+
+  it('con decimals: 1, cada frame intermedio del tween tiene como máximo 1 decimal', () => {
+    const display = scope.run(() => useAnimatedNumber(() => 1567.4972637, { duration: 500, decimals: 1 }))!
+    pump(0)
+    pump(137)
+    expect(display.value).not.toBeNull()
+    // ninguna cola de flotante tipo 1567.4972637 a media animación: el valor
+    // multiplicado por 10 y redondeado debe coincidir con el valor mostrado
+    expect(Math.round((display.value as number) * 10) / 10).toBe(display.value)
+    pump(500)
+    expect(display.value).toBe(1567.4972637) // el frame final conserva `to` exacto, sin redondear
   })
 })
