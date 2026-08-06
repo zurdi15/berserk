@@ -170,6 +170,37 @@ describe('DistributionBars', () => {
     expect(runes[1].props('name')).toBe('chest')
   })
 
+  // STATS-CLARITY: la fuente (services/progress.py muscle_distribution +
+  // routers/progress.py) confirma que el rango es fijo a 4 semanas
+  // (ProgressView llama getDistribution(4, ...)) y solo cuenta el grupo
+  // PRIMARIO de cada ejercicio — el subtítulo debe decir exactamente eso, no
+  // "total histórico"
+  it('STATS-CLARITY: shows a subtitle stating the metric is effective sets by primary group over the last 4 weeks', () => {
+    const wrapper = mount(DistributionBars, {
+      props: { items: fixtures.distribution as never, groups: fixtures.muscleGroups as never },
+      ...withI18n(),
+    })
+    const subtitle = wrapper.find('[data-testid="distribution-subtitle"]')
+    expect(subtitle.exists()).toBe(true)
+    expect(subtitle.text()).toBe('Series efectivas por grupo principal — últimas 4 semanas')
+  })
+
+  it('STATS-CLARITY: the subtitle is shown even in the empty state, so the empty message reads in context', () => {
+    const wrapper = mount(DistributionBars, { props: { items: [], groups: [] }, ...withI18n() })
+    expect(wrapper.find('[data-testid="distribution-subtitle"]').exists()).toBe(true)
+  })
+
+  it('STATS-CLARITY: each per-bar number carries a title attr spelling out the unit (count + "series")', () => {
+    const wrapper = mount(DistributionBars, {
+      props: { items: fixtures.distribution as never, groups: fixtures.muscleGroups as never },
+      ...withI18n(),
+    })
+    const rows = wrapper.findAll('[data-testid^="distribution-row-"]')
+    // legs primero (40 sets), ver el test de orden de arriba
+    expect(rows[0].find('[data-testid="distribution-sets"]').attributes('title')).toBe('40 series efectivas')
+    expect(rows[1].find('[data-testid="distribution-sets"]').attributes('title')).toBe('20 series efectivas')
+  })
+
   it('shows the empty state when there are no items', () => {
     const wrapper = mount(DistributionBars, { props: { items: [], groups: [] }, ...withI18n() })
     expect(wrapper.text()).toContain('Aún no hay datos de distribución')
@@ -290,7 +321,8 @@ describe('StatsGrid', () => {
     expect(wrapper.find('[data-testid="stat-prs"]').text()).toBe('27')
     // 5400s = 90min = 1h 30min: misma pareja h/min que FinishSummary.durationLabel
     expect(wrapper.find('[data-testid="stat-avg-session"]').text()).toBe('1h 30min')
-    expect(wrapper.find('[data-testid="stat-streak"]').text()).toBe('6')
+    // STATS-CLARITY: el número solo se leía como "6 días" — la unidad va pegada al valor
+    expect(wrapper.find('[data-testid="stat-streak"]').text()).toBe('6 semanas')
   })
 
   it('shows the labels under each number', () => {
@@ -300,12 +332,38 @@ describe('StatsGrid', () => {
     expect(wrapper.text()).toContain('Racha máxima')
   })
 
+  // STATS-CLARITY: "Volumen" solo no dice de qué (¿volumen de qué unidad,
+  // corporal?) — el label pasa a ser explícito, la unidad kg ya la pone
+  // formatWeightInt en el número
+  it('STATS-CLARITY: the volume card label clarifies it is lifted volume', () => {
+    const wrapper = mount(StatsGrid, { props: { stats: fixtures.stats as never }, ...withI18n() })
+    expect(wrapper.text()).toContain('Volumen levantado')
+  })
+
+  // STATS-CLARITY: title/sr-only expansions para las tarjetas cuyo
+  // significado exacto solo se ve leyendo el backend (services/progress.py):
+  // sets/volume excluyen calentamiento, prs es la abreviatura de "récords
+  // personales", streak es la racha más larga DE TODA LA HISTORIA (no la
+  // racha vigente, que es otro endpoint: weekly_streak vs longest_streak_weeks)
+  it('STATS-CLARITY: ambiguous cards carry a title attr expanding their meaning', () => {
+    const wrapper = mount(StatsGrid, { props: { stats: fixtures.stats as never }, ...withI18n() })
+    expect(wrapper.find('[data-testid="stat-sets-label"]').attributes('title')).toBe('Series efectivas, sin calentamiento')
+    expect(wrapper.find('[data-testid="stat-volume-label"]').attributes('title')).toBe(
+      'Repeticiones × peso, series efectivas (sin calentamiento)',
+    )
+    expect(wrapper.find('[data-testid="stat-prs-label"]').attributes('title')).toBe('Récords personales')
+    expect(wrapper.find('[data-testid="stat-streak-label"]').attributes('title')).toBe(
+      'Racha más larga de semanas consecutivas entrenando, de toda la historia',
+    )
+  })
+
   it('renders every field at zero when stats is null (first paint before the fetch resolves)', () => {
     const wrapper = mount(StatsGrid, { props: { stats: null }, ...withI18n() })
     expect(wrapper.find('[data-testid="stat-workouts"]').text()).toBe('0')
     expect(wrapper.find('[data-testid="stat-gym-time"]').text()).toBe('0 h')
     expect(wrapper.find('[data-testid="stat-distance"]').text()).toBe('0.0 km')
     expect(wrapper.find('[data-testid="stat-avg-session"]').text()).toBe('0min')
+    expect(wrapper.find('[data-testid="stat-streak"]').text()).toBe('0 semanas')
   })
 
   it('respects the h-full flex scroll model: flex-1/min-h-0/overflow-y-auto on its own root', () => {

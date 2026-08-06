@@ -51,25 +51,40 @@ function groupRune(muscleGroupId: number): RuneName | null {
 </script>
 
 <template>
-  <BkEmpty v-if="!items.length" :message="t('progress.noDistribution')" />
-  <div v-else class="space-y-3">
-    <div
-      v-for="item in sortedItems"
-      :key="item.muscle_group_id"
-      :data-testid="`distribution-row-${item.muscle_group_id}`"
-      class="flex items-center gap-3"
-    >
-      <BkRune v-if="groupRune(item.muscle_group_id)" :name="(groupRune(item.muscle_group_id) as RuneName)" :size="20" />
-      <span class="text-sm text-ink-muted w-24 shrink-0 truncate">{{ groupName(item.muscle_group_id) }}</span>
-      <div class="flex-1 h-2 rounded-xs bg-stone overflow-hidden">
-        <div
-          class="h-full bg-aurora rounded-xs bk-grow-x"
-          :style="{ width: barWidth(item.sets, max), '--bar-dur': barDuration(item.sets, max) }"
-        />
+  <div class="space-y-3">
+    <!-- STATS-CLARITY: subtítulo honesto bajo el título "Distribución muscular"
+         (título que vive en ProgressView vía BkCard, fuera de este componente)
+         — dice la ventana real (4 semanas fijas, ver ProgressView.getDistribution)
+         y que solo cuenta el grupo PRIMARIO de cada ejercicio, no un total
+         histórico ni todos los grupos trabajados -->
+    <p class="text-xs text-ink-muted" data-testid="distribution-subtitle">{{ t('progress.distributionSubtitle') }}</p>
+    <BkEmpty v-if="!items.length" :message="t('progress.noDistribution')" />
+    <div v-else class="space-y-3">
+      <div
+        v-for="item in sortedItems"
+        :key="item.muscle_group_id"
+        :data-testid="`distribution-row-${item.muscle_group_id}`"
+        class="flex items-center gap-3"
+      >
+        <BkRune v-if="groupRune(item.muscle_group_id)" :name="(groupRune(item.muscle_group_id) as RuneName)" :size="20" />
+        <span class="text-sm text-ink-muted w-24 shrink-0 truncate">{{ groupName(item.muscle_group_id) }}</span>
+        <div class="flex-1 h-2 rounded-xs bg-stone overflow-hidden">
+          <div
+            class="h-full bg-aurora rounded-xs bk-grow-x"
+            :style="{ width: barWidth(item.sets, max), '--bar-dur': barDuration(item.sets, max) }"
+          />
+        </div>
+        <BkAnimatedNumber :value="item.sets" v-slot="{ value }">
+          <!-- title en vez de sufijo visible (item 2 del brief): la fila se
+               repite por cada grupo muscular y " series" a cada línea satura
+               la lista; el hover/foco da la unidad sin ensuciar el layout -->
+          <span
+            class="bk-metric text-sm text-ink w-8 text-right"
+            data-testid="distribution-sets"
+            :title="t('progress.distributionSetsTitle', { count: value ?? 0 })"
+          >{{ value ?? 0 }}</span>
+        </BkAnimatedNumber>
       </div>
-      <BkAnimatedNumber :value="item.sets" v-slot="{ value }">
-        <span class="bk-metric text-sm text-ink w-8 text-right" data-testid="distribution-sets">{{ value ?? 0 }}</span>
-      </BkAnimatedNumber>
     </div>
   </div>
 </template>

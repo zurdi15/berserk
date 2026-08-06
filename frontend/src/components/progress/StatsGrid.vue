@@ -83,14 +83,24 @@ function formatMinutes(totalMinutes: number): string {
     </BkCard>
 
     <BkCard>
-      <p class="text-ink-muted text-sm">{{ t('progress.stats.volume') }}</p>
+      <!-- STATS-CLARITY: total_volume_kg suma reps×peso de series efectivas
+           (sin calentamiento, ver effective_set_filters en services/progress.py)
+           — el label ya dice "levantado" y el title expande el cálculo exacto,
+           el kg ya lo pone formatWeightInt en el número -->
+      <p class="text-ink-muted text-sm" data-testid="stat-volume-label" :title="t('progress.stats.volumeTitle')">
+        {{ t('progress.stats.volume') }}
+      </p>
       <BkAnimatedNumber :value="stats?.total_volume_kg ?? 0" v-slot="{ value }">
         <p class="bk-metric text-2xl text-ink" data-testid="stat-volume">{{ formatWeightInt(value ?? 0, units) }}</p>
       </BkAnimatedNumber>
     </BkCard>
 
     <BkCard>
-      <p class="text-ink-muted text-sm">{{ t('progress.stats.sets') }}</p>
+      <!-- STATS-CLARITY: total_sets excluye calentamiento (WorkoutSet.is_warmup
+           is False en lifetime_stats) — no obvio sin leer el backend -->
+      <p class="text-ink-muted text-sm" data-testid="stat-sets-label" :title="t('progress.stats.setsTitle')">
+        {{ t('progress.stats.sets') }}
+      </p>
       <BkAnimatedNumber :value="stats?.total_sets ?? 0" v-slot="{ value }">
         <p class="bk-metric text-2xl text-ink" data-testid="stat-sets">{{ value ?? 0 }}</p>
       </BkAnimatedNumber>
@@ -104,7 +114,11 @@ function formatMinutes(totalMinutes: number): string {
     </BkCard>
 
     <BkCard>
-      <p class="text-ink-muted text-sm">{{ t('progress.stats.prs') }}</p>
+      <!-- STATS-CLARITY: "PRs" es abreviatura — title expande a "Récords
+           personales" sin alargar el label visible de la tarjeta -->
+      <p class="text-ink-muted text-sm" data-testid="stat-prs-label" :title="t('progress.stats.prsTitle')">
+        {{ t('progress.stats.prs') }}
+      </p>
       <BkAnimatedNumber :value="stats?.prs_count ?? 0" v-slot="{ value }">
         <p class="bk-metric text-2xl text-ember" data-testid="stat-prs">{{ value ?? 0 }}</p>
       </BkAnimatedNumber>
@@ -118,9 +132,14 @@ function formatMinutes(totalMinutes: number): string {
     </BkCard>
 
     <BkCard>
-      <p class="text-ink-muted text-sm">{{ t('progress.stats.streak') }}</p>
+      <!-- STATS-CLARITY: longest_streak_weeks es la racha más larga de TODA
+           la historia (no la vigente, esa vive en /progress/streak) y son
+           semanas, no días — el número solo ("6") se leía como días -->
+      <p class="text-ink-muted text-sm" data-testid="stat-streak-label" :title="t('progress.stats.streakTitle')">
+        {{ t('progress.stats.streak') }}
+      </p>
       <BkAnimatedNumber :value="stats?.longest_streak_weeks ?? 0" v-slot="{ value }">
-        <p class="bk-metric text-2xl text-ink" data-testid="stat-streak">{{ value ?? 0 }}</p>
+        <p class="bk-metric text-2xl text-ink" data-testid="stat-streak">{{ value ?? 0 }} {{ t('progress.stats.streakUnit') }}</p>
       </BkAnimatedNumber>
     </BkCard>
   </div>

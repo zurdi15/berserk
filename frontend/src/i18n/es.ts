@@ -244,6 +244,12 @@ export const es = {
     records: 'Récords',
     noRecords: 'Sin récords aún',
     distribution: 'Distribución muscular',
+    // STATS-CLARITY: la fuente real (services/progress.py muscle_distribution,
+    // llamado con weeks=4 fijo desde ProgressView) es una ventana de 4
+    // semanas por grupo PRIMARIO, no un total histórico — el subtítulo dice
+    // exactamente eso en vez de dejar la cifra sin contexto
+    distributionSubtitle: 'Series efectivas por grupo principal — últimas 4 semanas',
+    distributionSetsTitle: '{count} series efectivas',
     noDistribution: 'Aún no hay datos de distribución',
     stats: {
       title: 'Totales',
@@ -251,12 +257,20 @@ export const es = {
       gymTime: 'Horas de gym',
       cardioTime: 'Horas de cardio',
       distance: 'Distancia',
-      volume: 'Volumen',
+      volume: 'Volumen levantado',
+      volumeTitle: 'Repeticiones × peso, series efectivas (sin calentamiento)',
       sets: 'Series',
+      setsTitle: 'Series efectivas, sin calentamiento',
       reps: 'Repeticiones',
       prs: 'PRs',
+      prsTitle: 'Récords personales',
       avgSession: 'Sesión media',
       streak: 'Racha máxima',
+      // STATS-CLARITY: el número solo (p.ej. "6") se leía como días de racha
+      // vigente; longest_streak_weeks es semanas y es la racha MÁS LARGA de
+      // toda la historia, no la actual (esa es /progress/streak)
+      streakUnit: 'semanas',
+      streakTitle: 'Racha más larga de semanas consecutivas entrenando, de toda la historia',
     },
   },
   body: {
