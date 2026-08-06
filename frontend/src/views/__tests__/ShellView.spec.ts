@@ -136,16 +136,48 @@ describe('ShellView active section indicator (item 3)', () => {
     expect(indicator.attributes('style')).toContain('translateX(0%)')
   })
 
-  it('desktop underline: scales in only on the active item (workout = 3rd item, index 2)', async () => {
+  it('desktop underline: scales in on the active item, excluding "workout" which never gets one', async () => {
+    const wrapper = await mountWithRoute('progress')
+    await flushPromises()
+
+    // 4 subrayados, no 5: "workout" (CTA) nunca lleva subrayado, activo o no
+    const underlines = wrapper.findAll('[data-testid="nav-underline"]')
+    expect(underlines).toHaveLength(4)
+    // orden de items sin "workout": today, calendar, progress, profile
+    expect(underlines[0].classes()).toContain('scale-x-0')
+    expect(underlines[1].classes()).toContain('scale-x-0')
+    expect(underlines[2].classes()).toContain('scale-x-100') // progress, activo
+    expect(underlines[3].classes()).toContain('scale-x-0')
+  })
+
+  it('route=workout: the mobile sliding bar is absent and the desktop underline never renders for the CTA item', async () => {
     const wrapper = await mountWithRoute('workout')
     await flushPromises()
 
-    const underlines = wrapper.findAll('[data-testid="nav-underline"]')
-    expect(underlines).toHaveLength(5)
-    expect(underlines[2].classes()).toContain('scale-x-100')
-    expect(underlines[0].classes()).toContain('scale-x-0')
-    expect(underlines[1].classes()).toContain('scale-x-0')
-    expect(underlines[3].classes()).toContain('scale-x-0')
-    expect(underlines[4].classes()).toContain('scale-x-0')
+    expect(wrapper.find('[data-testid="nav-indicator"]').exists()).toBe(false)
+    // 4 subrayados (today/calendar/progress/profile): ninguno para "workout"
+    expect(wrapper.findAll('[data-testid="nav-underline"]')).toHaveLength(4)
+  })
+
+  it('route=workout: the CTA glow is static (full opacity, no bk-breathe) on both bars', async () => {
+    const wrapper = await mountWithRoute('workout')
+    await flushPromises()
+
+    const glows = wrapper.findAll('[data-testid="workout-glow"]')
+    expect(glows).toHaveLength(2) // desktop + móvil
+    expect(glows[0].classes()).not.toContain('bk-breathe')
+    expect(glows[1].classes()).not.toContain('bk-breathe')
+  })
+
+  it('route=today: the mobile sliding bar is visible and the CTA glow keeps breathing on both bars', async () => {
+    const wrapper = await mountWithRoute('today')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="nav-indicator"]').exists()).toBe(true)
+
+    const glows = wrapper.findAll('[data-testid="workout-glow"]')
+    expect(glows).toHaveLength(2)
+    expect(glows[0].classes()).toContain('bk-breathe')
+    expect(glows[1].classes()).toContain('bk-breathe')
   })
 })

@@ -40,11 +40,23 @@ const activeIndex = computed(() => {
             >
               <span class="text-xs uppercase tracking-wide">{{ $t(item.label) }}</span>
               <span :class="item.name === 'workout' && 'bk-slab relative -mb-5 p-2.5 border-aurora text-aurora'">
-                <span v-if="item.name === 'workout'" class="bk-breathe absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)" aria-hidden="true" />
+                <!-- activo (en /workout): glow fijo a plena opacidad, sin respirar
+                     (no tendría sentido parpadear la CTA de la sección en la que ya
+                     estás); inactivo: sigue respirando como reclamo -->
+                <span
+                  v-if="item.name === 'workout'"
+                  class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
+                  :class="{ 'bk-breathe': route.name !== 'workout' }"
+                  aria-hidden="true"
+                  data-testid="workout-glow"
+                />
                 <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
               </span>
-              <!-- subrayado por item: entra con scale-in cuando la sección está activa -->
+              <!-- subrayado por item: entra con scale-in cuando la sección está
+                   activa — la CTA de entreno no lleva subrayado, su affordance
+                   ya es el glow fijo de arriba -->
               <span
+                v-if="item.name !== 'workout'"
                 class="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-aurora"
                 :class="route.name === item.name ? 'scale-x-100' : 'scale-x-0'"
                 style="transition: transform var(--bk-dur-2) var(--bk-ease-out); transform-origin: center"
@@ -63,8 +75,11 @@ const activeIndex = computed(() => {
       :aria-label="$t('app.nav.label')"
     >
       <div class="relative max-w-3xl mx-auto">
-        <!-- indicador deslizante: una barra por cada 1/5 del ancho, se traslada al índice activo -->
+        <!-- indicador deslizante: una barra por cada 1/5 del ancho, se traslada
+             al índice activo — oculto por completo en /workout, no debe quedar
+             una barra pasando por debajo de la CTA central -->
         <div
+          v-if="route.name !== 'workout'"
           class="absolute top-0 left-0 h-0.5 w-1/5 rounded-full bg-aurora"
           :style="{ transform: `translateX(${activeIndex * 100}%)`, transition: 'transform var(--bk-dur-3) var(--bk-ease-out)' }"
           aria-hidden="true"
@@ -80,7 +95,14 @@ const activeIndex = computed(() => {
               <span
                 :class="item.name === 'workout' && 'bk-slab relative -mt-5 p-2.5 border-aurora text-aurora'"
               >
-                <span v-if="item.name === 'workout'" class="bk-breathe absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)" aria-hidden="true" />
+                <!-- mismo criterio que en desktop: glow fijo activo, respira inactivo -->
+                <span
+                  v-if="item.name === 'workout'"
+                  class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
+                  :class="{ 'bk-breathe': route.name !== 'workout' }"
+                  aria-hidden="true"
+                  data-testid="workout-glow"
+                />
                 <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
               </span>
               <span class="text-xs uppercase tracking-wide">{{ $t(item.label) }}</span>
