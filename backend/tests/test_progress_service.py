@@ -152,6 +152,17 @@ def seed_stats_user(db_session):
             workout_exercise_id=wex_b.id, set_number=1, duration_seconds=1800, distance_m=5000
         )
     )
+    # calentamiento de cardio: debe quedar fuera de total_cardio_seconds/
+    # total_distance_m igual que ya quedaba fuera de total_sets/total_reps/
+    # total_volume_kg (bug de revisión: la agregación de cardio no filtraba
+    # is_warmup) — con set_number 2 antes del calentamiento real de A para
+    # que el orden de inserción no oculte el bug
+    db_session.add(
+        models.WorkoutSet(
+            workout_exercise_id=wex_b.id, set_number=2, duration_seconds=300,
+            distance_m=1000, is_warmup=True,
+        )
+    )
 
     # Workout C: ACTIVO (ended_at None) — mismo lunes ISO que B (semana 32),
     # no debe sumar workout ni tiempo de gym

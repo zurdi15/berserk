@@ -198,6 +198,10 @@ def lifetime_stats(db: Session, owner_id: int) -> dict:
     ).one()
     total_sets, total_reps = int(sets_row[0]), int(sets_row[1])
 
+    # calentamientos excluidos aquí también (bug reportado en revisión): sets/reps/
+    # volumen de arriba ya usan effective_set_filters (que descarta is_warmup), pero
+    # esta agregación de cardio los estaba colando sin filtrar — un calentamiento en
+    # cinta inflaba total_cardio_seconds/total_distance_m con datos no efectivos
     cardio_row = db.execute(
         select(
             func.coalesce(func.sum(WorkoutSet.duration_seconds), 0),
@@ -206,7 +210,11 @@ def lifetime_stats(db: Session, owner_id: int) -> dict:
         .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
         .join(Exercise, Exercise.id == WorkoutExercise.exercise_id)
         .join(Workout, Workout.id == WorkoutExercise.workout_id)
-        .where(Workout.owner_id == owner_id, Exercise.measurement == "cardio")
+        .where(
+            Workout.owner_id == owner_id,
+            Exercise.measurement == "cardio",
+            WorkoutSet.is_warmup.is_(False),
+        )
     ).one()
     total_cardio_seconds, total_distance_m = int(cardio_row[0]), float(cardio_row[1])
 
