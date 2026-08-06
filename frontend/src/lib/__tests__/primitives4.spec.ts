@@ -6,7 +6,6 @@ import { core } from '@/tokens'
 import BkChart from '../BkChart.vue'
 import BkHeatmap from '../BkHeatmap.vue'
 import BkTabs from '../BkTabs.vue'
-import { monthBlocksFor } from '../heatmap'
 
 // Mock uPlot module
 vi.mock('uplot', () => ({
@@ -141,40 +140,58 @@ describe('BkHeatmap', () => {
     expect(cell4.classes()).toContain('bg-aurora/100')
   })
 
-  it('item 1: cascade delay index is the GLOBAL column (block offset + local column), not reset per month block', () => {
+  it('v0.3.0 item 6: cascade delay index is the GLOBAL day-of-week column (block offset + local col), not reset per month block', () => {
     const wrapper = mount(BkHeatmap, {
       props: { year: 2026, data: [] },
       global: { plugins: [createI18nInstance()] },
     })
 
-    const blocks = monthBlocksFor(2026, [])
-    const totalColumns = blocks.reduce((sum, b) => sum + b.columnCount, 0)
+    // tras la transposición (item 6) el eje horizontal del bloque es FIJO
+    // (7, días de la semana) para todos los meses — el offset de cada
+    // bloque ya no depende de cuántas semanas tenga (tenía antes, con
+    // columnCount variable), es directamente su índice × 7
+    const totalColumns = 12 * 7
     const expectedStep = 1000 / (totalColumns - 1)
 
     const cells = wrapper.findAll('.bk-cascade')
     expect(cells.length).toBeGreaterThan(0)
     const findCell = (date: string) => cells.find((c) => c.attributes('title')?.startsWith(date))!
 
-    // 1 enero: primera columna del año, índice global 0
-    expect(findCell('2026-01-01').attributes('style')).toContain('--bk-cascade-i: 0')
+    // 1 enero 2026 es jueves (col 3, ver heatmap.spec.ts): índice global = col 3
+    expect(findCell('2026-01-01').attributes('style')).toContain('--bk-cascade-i: 3')
     expect(findCell('2026-01-01').attributes('style')).toContain(`--bk-cascade-step: ${expectedStep}ms`)
 
-    // 31 enero: última columna del bloque de enero (columnCount - 1)
-    const januaryLastColumn = blocks[0].columnCount - 1
-    expect(findCell('2026-01-31').attributes('style')).toContain(`--bk-cascade-i: ${januaryLastColumn}`)
+    // 5 enero 2026 es lunes (col 0, primera semana completa de enero):
+    // índice global = offset de enero (0) + col 0 = 0
+    expect(findCell('2026-01-05').attributes('style')).toContain('--bk-cascade-i: 0')
+    // 12 enero también es lunes (otra semana, misma columna): comparte
+    // índice con el 5 de enero — toda una columna de días de la semana
+    // revela a la vez, no semana a semana
+    expect(findCell('2026-01-12').attributes('style')).toContain('--bk-cascade-i: 0')
 
-    // 1 febrero: primera columna LOCAL de su bloque, pero el índice GLOBAL
-    // sigue acumulado desde enero (no vuelve a 0 al cruzar de mes)
-    expect(findCell('2026-02-01').attributes('style')).toContain(`--bk-cascade-i: ${blocks[0].columnCount}`)
+    // 1 febrero: bloque 1 (índice), offset = 1*7 = 7; 1 feb 2026 es domingo
+    // (col 6): índice global = 7 + 6 = 13
+    expect(findCell('2026-02-01').attributes('style')).toContain('--bk-cascade-i: 13')
   })
 
-  it('item 1: the full sweep (first to last column of the year) never exceeds ~1s regardless of column count', () => {
-    const blocks = monthBlocksFor(2026, [])
-    const totalColumns = blocks.reduce((sum, b) => sum + b.columnCount, 0)
+  it('v0.3.0 item 6: the full sweep (first to last column of the year) never exceeds ~1s, and the column count is now fixed at 12*7 regardless of the year', () => {
+    const totalColumns = 12 * 7
     const expectedStep = 1000 / (totalColumns - 1)
     const maxSweepMs = (totalColumns - 1) * expectedStep
 
     expect(maxSweepMs).toBeLessThanOrEqual(1000)
+
+    // el mismo total de columnas (84) vale para cualquier año, ya no
+    // depende de en qué día de la semana cae cada 1 de enero
+    for (const year of [2024, 2025, 2026, 2027]) {
+      const wrapper = mount(BkHeatmap, {
+        props: { year, data: [] },
+        global: { plugins: [createI18nInstance()] },
+      })
+      const decCell = wrapper.findAll('.bk-cascade').find((c) => c.attributes('title')?.startsWith(`${year}-12-31`))!
+      const cascadeI = Number(decCell.attributes('style')!.match(/--bk-cascade-i: (\d+)/)![1])
+      expect(cascadeI).toBeLessThanOrEqual(totalColumns - 1)
+    }
   })
 
   it('renders one centered label per month block (item 4 redesign: per-month blocks, not a continuous grid)', () => {
@@ -205,9 +222,12 @@ describe('BkHeatmap', () => {
     // 12 bloques (uno por mes), cada uno con su propia mini-rejilla de celdas
     const blocks = wrapper.findAll('.flex.flex-col.items-center.gap-1')
     expect(blocks).toHaveLength(12)
-    // enero (bloque 0) ocupa 5 columnas, tal y como calcula heatmap.spec.ts
+    // v0.3.0 item 6: tras la transposición, el eje horizontal (columnas) es
+    // FIJO a 7 (días de la semana) para TODOS los meses; enero ocupa 5
+    // filas (semanas), tal y como calcula heatmap.spec.ts
     const januaryGrid = blocks[0].find('.grid')
-    expect(januaryGrid.attributes('style')).toContain('repeat(5, auto)')
+    expect(januaryGrid.attributes('style')).toContain('grid-template-columns: repeat(7, auto)')
+    expect(januaryGrid.attributes('style')).toContain('grid-template-rows: repeat(5, auto)')
   })
 })
 
