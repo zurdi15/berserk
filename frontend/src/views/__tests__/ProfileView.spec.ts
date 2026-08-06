@@ -101,6 +101,40 @@ describe('ProfileView', () => {
     expect(tabsText).toContain('Perfil') // First tab should be Perfil
   })
 
+  // item 4/7: cada panel de pestaña anima su entrada — bk-stagger en los que
+  // tienen varios hijos, bk-rise (vía Transition) en los de un único hijo
+  it('item 4: the profile tab panel has bk-stagger on its container', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.bk-stagger').exists()).toBe(true)
+  })
+
+  it('item 4: the library tab panel gets bk-stagger when switched to', async () => {
+    const wrapper = build()
+    await flushPromises()
+
+    const libraryTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
+    await libraryTab!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.bk-stagger').exists()).toBe(true)
+  })
+
+  it('item 4: the routines tab panel (single child, no stagger) still replays entry via bk-rise on switch', async () => {
+    const wrapper = build()
+    await flushPromises()
+
+    const routinesTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Rutinas')
+    await routinesTab!.trigger('click')
+    await flushPromises()
+
+    // el panel de rutinas ya no tiene bk-stagger (un único hijo): el
+    // contenedor bk-stagger de "profile" ya no está en el DOM tras el switch
+    expect(wrapper.find('.bk-stagger').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'RoutineList' }).exists()).toBe(true)
+  })
+
   it('shows admin tab when user is admin', async () => {
     const auth = useAuthStore()
     auth.user = {

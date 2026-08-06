@@ -50,28 +50,36 @@ async function handleLogout() {
   <div class="space-y-4">
     <BkTabs v-model="activeTab" :tabs="tabs" />
 
-    <div v-if="activeTab === 'profile'" class="space-y-4">
-      <SettingsCard />
-      <PasswordCard />
-      <SharingCard />
+    <!-- bk-stagger en cada panel: v-if remonta el panel entero al cambiar de
+         pestaña, y eso por sí solo repite la animación de entrada (item 4/7) -->
+    <div v-if="activeTab === 'profile'" class="space-y-4 bk-stagger">
+      <div :style="{ '--bk-stagger-i': 0 }"><SettingsCard /></div>
+      <div :style="{ '--bk-stagger-i': 1 }"><PasswordCard /></div>
+      <div :style="{ '--bk-stagger-i': 2 }"><SharingCard /></div>
 
       <BkButton
         variant="ghost"
         data-testid="logout-btn"
+        :style="{ '--bk-stagger-i': 3 }"
         @click="handleLogout"
       >
         {{ $t('profile.logout') }}
       </BkButton>
     </div>
 
-    <RoutineList v-if="activeTab === 'routines'" />
+    <!-- un único hijo: bk-rise en vez de bk-stagger (nada que escalonar) -->
+    <Transition name="bk-rise" appear>
+      <RoutineList v-if="activeTab === 'routines'" />
+    </Transition>
 
-    <div v-if="activeTab === 'library'" class="space-y-4">
-      <h2 class="text-lg font-semibold text-ink">{{ $t('library.title') }}</h2>
-      <ExerciseManager />
-      <MuscleGroupManager />
+    <div v-if="activeTab === 'library'" class="space-y-4 bk-stagger">
+      <h2 class="text-lg font-semibold text-ink" :style="{ '--bk-stagger-i': 0 }">{{ $t('library.title') }}</h2>
+      <div :style="{ '--bk-stagger-i': 1 }"><ExerciseManager /></div>
+      <div :style="{ '--bk-stagger-i': 2 }"><MuscleGroupManager /></div>
     </div>
 
-    <AdminCard v-if="activeTab === 'admin' && auth.user?.is_admin" />
+    <Transition name="bk-rise" appear>
+      <AdminCard v-if="activeTab === 'admin' && auth.user?.is_admin" />
+    </Transition>
   </div>
 </template>

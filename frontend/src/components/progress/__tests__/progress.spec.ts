@@ -560,6 +560,26 @@ describe('ProgressView', () => {
     ])
   })
 
+  it('item 7 exception: flipping the metric tab (peso/volumen/est. 1RM) does NOT remount the chart block — same DOM node, no re-animation', async () => {
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    await wrapper.find('[data-testid="exercise-option-1"]').trigger('click')
+    await flushPromises()
+
+    const chartWrapperBefore = wrapper.findAll('[style*="--bk-stagger-i: 1"]')[0].element
+
+    const metricTablist = wrapper.findAll('[role="tablist"]')[1]
+    await metricTablist.findAll('[role="tab"]')[2].trigger('click')
+    await flushPromises()
+
+    const chartWrapperAfter = wrapper.findAll('[style*="--bk-stagger-i: 1"]')[0].element
+    // el metric switch es un cambio de dato, no de sección: el nodo que
+    // dispara la animación de entrada (bk-stagger-i) es el MISMO antes y
+    // después, así que la animación de montaje no se repite en cada tap
+    expect(chartWrapperAfter).toBe(chartWrapperBefore)
+  })
+
   it('switches to the body tab (3rd tab, after records) and hides the training-tab content', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
