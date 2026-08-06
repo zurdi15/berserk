@@ -85,37 +85,40 @@ function selectDay(date: string) {
         }"
         @click="selectDay(cell.date)"
       >
-        <!-- Date number (timezone-safe): único hijo en flujo normal, así que
-             su posición no cambia si el día tiene o no iconos abajo -->
+        <!-- Date number (timezone-safe): único hijo en flujo normal, centrado
+             por el flex del botón — status dots y runas van en overlays
+             absolute propios (arriba/abajo) para no estirar la celda ni
+             empujar el número (item 6: antes compartían un mismo footer
+             abajo y, con ambos presentes, el bloque crecía hacia el centro
+             y tapaba el número) -->
         <span class="text-xs font-semibold">
           {{ Number(cell.date.slice(8, 10)) }}
         </span>
 
-        <!-- Status dots + runas: absolute al fondo de la celda para que el
-             contenido variable nunca estire la celda (las 42 quedan cuadradas
-             e idénticas; overflow-hidden recorta si algún día se satura) -->
+        <!-- Status dots: arriba de la celda -->
         <div
-          v-if="scheduledByDate.has(cell.date) || runesByDate.has(cell.date)"
-          class="absolute inset-x-0 bottom-1 flex flex-col items-center gap-0.5"
+          v-if="scheduledByDate.has(cell.date)"
+          class="absolute inset-x-0 top-1 flex justify-center gap-0.5"
         >
-          <div v-if="scheduledByDate.has(cell.date)" class="flex gap-0.5">
-            <span
-              v-for="session in scheduledByDate.get(cell.date)!"
-              :key="`status-${session.id}`"
-              :data-status="session.status"
-              :class="['w-1.5 h-1.5', statusClasses(session.status)]"
-            />
-          </div>
+          <span
+            v-for="session in scheduledByDate.get(cell.date)!"
+            :key="`status-${session.id}`"
+            :data-status="session.status"
+            :class="['w-1.5 h-1.5', statusClasses(session.status)]"
+          />
+        </div>
 
-          <!-- Muscle group runes (max 3 per day) -->
-          <div v-if="runesByDate.has(cell.date)" class="flex gap-0.5">
-            <BkRune
-              v-for="(runeName, i) in runesByDate.get(cell.date)!"
-              :key="`rune-${cell.date}-${i}`"
-              :name="runeName"
-              :size="12"
-            />
-          </div>
+        <!-- Muscle group runes (max 3 per day): abajo, como antes -->
+        <div
+          v-if="runesByDate.has(cell.date)"
+          class="absolute inset-x-0 bottom-1 flex justify-center gap-0.5"
+        >
+          <BkRune
+            v-for="(runeName, i) in runesByDate.get(cell.date)!"
+            :key="`rune-${cell.date}-${i}`"
+            :name="runeName"
+            :size="12"
+          />
         </div>
       </button>
     </div>
