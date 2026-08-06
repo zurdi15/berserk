@@ -49,7 +49,7 @@ const activeIndex = computed(() => {
               class="relative flex flex-col items-center gap-1 px-3 py-2 text-ink-faint hover:text-ink"
               active-class="text-aurora"
             >
-              <span class="text-xs uppercase tracking-wide">{{ $t(item.label) }}</span>
+              <span class="text-xs tracking-wide">{{ $t(item.label) }}</span>
               <span :class="item.name === 'workout' && 'bk-slab relative -mb-5 p-2.5 border-aurora text-aurora'">
                 <!-- activo (en /workout): glow fijo a plena opacidad, sin respirar
                      (no tendría sentido parpadear la CTA de la sección en la que ya
@@ -116,7 +116,10 @@ const activeIndex = computed(() => {
                 />
                 <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
               </span>
-              <span class="text-xs uppercase tracking-wide">{{ $t(item.label) }}</span>
+              <!-- text-2xs (item 2): en el bottom bar real de un móvil, text-xs
+                   se veía desproporcionado frente al icono de 20px; mayúsculas
+                   fuera también aquí, mismo criterio de coherencia que arriba -->
+              <span class="text-2xs tracking-wide">{{ $t(item.label) }}</span>
             </RouterLink>
           </li>
         </ul>

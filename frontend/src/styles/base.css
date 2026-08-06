@@ -23,6 +23,12 @@
   --radius-xs: var(--bk-radius-xs);
   --radius-sm: var(--bk-radius-sm);
   --radius-md: var(--bk-radius-md);
+  /* la etiqueta del nav inferior en móvil no tiene hueco para text-xs
+     (0.75rem): en pantalla real se ve desproporcionada frente al icono de
+     20px — un escalón más chico, generado de verdad y no arbitrario, para
+     que siga siendo una utilidad real de la escala */
+  --text-2xs: 0.65rem;
+  --text-2xs--line-height: 0.85rem;
 }
 
 /* scrollbar siempre presente (gutter reservado) en vez de aparecer solo
