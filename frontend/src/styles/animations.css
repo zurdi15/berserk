@@ -35,6 +35,15 @@
   50% { opacity: 1; }
 }
 
+/* Ráfaga de ámbar de la celebración de PR: sube de golpe y se asienta en un
+   resplandor tenue mientras dura el overlay. Ningún color nuevo — reutiliza
+   el mismo --bk-ember-glow del tono ember del resto del sistema. */
+@keyframes bk-ember-flash {
+  0% { opacity: 0; }
+  40% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
 /* transiciones de Vue: <Transition name="bk-rise"> etc. — solo entrada */
 .bk-fade-enter-active { animation: bk-fade var(--bk-dur-2) var(--bk-ease-out); }
 .bk-rise-enter-active { animation: bk-rise var(--bk-dur-3) var(--bk-ease-out); }
@@ -65,6 +74,11 @@
 
 .bk-breathe {
   animation: bk-breathe 3.2s var(--bk-ease-inout) infinite;
+}
+
+.bk-ember-flash {
+  background: radial-gradient(circle, var(--bk-ember-glow), transparent 70%);
+  animation: bk-ember-flash var(--bk-dur-4) var(--bk-ease-out) forwards;
 }
 
 .bk-press {

@@ -188,6 +188,7 @@ export const es = {
     totalSets: 'Series',
     totalVolume: 'Volumen',
     newRecords: 'Récords nuevos de esta sesión',
+    newRecord: '¡Nuevo récord!',
     feeling: '¿Cómo te has sentido?',
     note: 'Nota',
     finishClose: 'Cerrar',

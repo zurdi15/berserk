@@ -188,6 +188,7 @@ export const en = {
     totalSets: 'Sets',
     totalVolume: 'Volume',
     newRecords: 'New records this session',
+    newRecord: 'New record!',
     feeling: 'How did it feel?',
     note: 'Note',
     finishClose: 'Close',

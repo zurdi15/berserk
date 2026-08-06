@@ -44,6 +44,20 @@ describe('active workout store', () => {
     expect(domain.getWorkout).toHaveBeenCalledWith(4)
   })
 
+  it('updateSet never touches lastRecords (celebration only fires from live logging via logSet)', async () => {
+    vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+    const store = useActiveWorkoutStore()
+    await store.resume()
+    store.lastRecords = [{ id: 9, kind: 'max_weight', value: 100 }] as never
+    vi.mocked(domain.updateSet).mockResolvedValue(undefined as never)
+    vi.mocked(domain.getWorkout).mockResolvedValue(workout as never)
+
+    await store.updateSet(9, 1, { reps: 5, weight_kg: 100, is_warmup: false })
+
+    expect(store.lastRecords).toHaveLength(1)
+    expect(store.lastRecords[0]).toEqual({ id: 9, kind: 'max_weight', value: 100 })
+  })
+
   it('finish returns the workout and clears state', async () => {
     vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
     const store = useActiveWorkoutStore()

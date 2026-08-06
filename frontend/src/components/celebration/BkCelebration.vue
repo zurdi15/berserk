@@ -1,0 +1,92 @@
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, reactive } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+import type { PersonalRecordOut } from '@/api/domain'
+import BkRune from '@/lib/BkRune.vue'
+import type { RuneName } from '@/lib/runes'
+
+const props = defineProps<{ records: PersonalRecordOut[]; runeName: RuneName }>()
+const emit = defineEmits<{ done: [] }>()
+
+const { t } = useI18n()
+
+// duración del conteo en ms: refleja --bk-dur-4 (600ms). No se puede leer una
+// custom property calculada de forma fiable en jsdom/happy-dom, así que el
+// valor vive también aquí, en sincronía con tokens.css
+const COUNT_UP_MS = 600
+const AUTO_DISMISS_MS = 3000
+
+// cada valor arranca en 0 y cuenta hasta el real; con reduced-motion se salta
+// directo al valor final, sin pasar por frames intermedios
+const displayValues = reactive(props.records.map(() => 0))
+
+let rafId: number | null = null
+let dismissTimer: ReturnType<typeof setTimeout> | null = null
+
+function formatValue(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function countUp() {
+  const start = performance.now()
+  const step = (now: number) => {
+    const progress = Math.min(1, (now - start) / COUNT_UP_MS)
+    props.records.forEach((record, i) => {
+      displayValues[i] = record.value * progress
+    })
+    rafId = progress < 1 ? requestAnimationFrame(step) : null
+  }
+  rafId = requestAnimationFrame(step)
+}
+
+function dismiss() {
+  if (dismissTimer) clearTimeout(dismissTimer)
+  if (rafId !== null) cancelAnimationFrame(rafId)
+  emit('done')
+}
+
+onMounted(() => {
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (reducedMotion) {
+    props.records.forEach((record, i) => {
+      displayValues[i] = record.value
+    })
+  } else {
+    countUp()
+  }
+  dismissTimer = setTimeout(dismiss, AUTO_DISMISS_MS)
+})
+
+onBeforeUnmount(() => {
+  if (rafId !== null) cancelAnimationFrame(rafId)
+  if (dismissTimer) clearTimeout(dismissTimer)
+})
+</script>
+
+<template>
+  <Teleport to="body">
+    <div
+      class="fixed inset-0 z-(--bk-z-timer) bg-void/95 flex flex-col items-center justify-center gap-3 px-6 text-center"
+      data-testid="celebration-overlay"
+      @click="dismiss"
+    >
+      <div class="absolute inset-0 bk-ember-flash pointer-events-none" aria-hidden="true" />
+
+      <BkRune class="relative" :name="runeName" :size="96" carve tone="ember" />
+
+      <h2 class="relative font-display font-semibold uppercase tracking-wider text-ember text-lg">
+        {{ t('workout.newRecord') }}
+      </h2>
+
+      <p
+        v-for="(record, i) in records"
+        :key="record.id"
+        class="relative bk-metric text-ember text-xl"
+        :data-testid="`celebration-record-${record.id}`"
+      >
+        {{ t(`progress.kinds.${record.kind}`) }} — {{ formatValue(displayValues[i]) }}
+      </p>
+    </div>
+  </Teleport>
+</template>

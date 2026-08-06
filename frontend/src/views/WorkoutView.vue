@@ -5,13 +5,16 @@ import { useRoute, useRouter } from 'vue-router'
 
 import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutOut } from '@/api/domain'
 import { listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
+import { primaryRune } from '@/components/calendar/groupRune'
 import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import AddExerciseSheet from '@/components/workout/AddExerciseSheet.vue'
 import FinishSummary from '@/components/workout/FinishSummary.vue'
 import WorkoutExerciseCard from '@/components/workout/WorkoutExerciseCard.vue'
+import BkCelebration from '@/components/celebration/BkCelebration.vue'
 import BkButton from '@/lib/BkButton.vue'
+import type { RuneName } from '@/lib/runes'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -31,6 +34,13 @@ let ticker: ReturnType<typeof setInterval> | null = null
 const units = computed(() => ((auth.user?.units as 'kg' | 'lb') || 'kg'))
 const exerciseMap = computed(() => new Map(exercises.value.map((e) => [e.id, e])))
 const exerciseIds = computed(() => activeWorkout.workout?.exercises.map((e) => e.id) ?? [])
+
+// runa del ejercicio que acaba de batir el récord — 'pr' es el comodín cuando
+// el catálogo no resuelve un grupo muscular primario (nunca dejar el prop sin runa)
+const celebrationRune = computed<RuneName>(() => {
+  const exercise = exerciseMap.value.get(activeWorkout.lastRecords[0]?.exercise_id)
+  return primaryRune(exercise, muscleGroups.value) ?? 'pr'
+})
 
 // ticks cada segundo con setInterval, pero el cálculo parte siempre de started_at:
 // si la pestaña estuvo dormida el número salta a lo correcto en el próximo tick
@@ -96,6 +106,12 @@ function onRecorded(records: PersonalRecordOut[]) {
   sessionRecords.value.push(...records)
 }
 
+// la celebración solo sale del logueo en vivo (logSet rellena lastRecords);
+// al cerrarse, limpiamos para que no reaparezca en el siguiente render
+function onCelebrationDone() {
+  activeWorkout.lastRecords = []
+}
+
 function closeSummary() {
   finishedWorkout.value = null
   sessionRecords.value = []
@@ -131,6 +147,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div>
+    <BkCelebration
+      v-if="activeWorkout.lastRecords.length"
+      :records="activeWorkout.lastRecords"
+      :rune-name="celebrationRune"
+      @done="onCelebrationDone"
+    />
+
     <FinishSummary
       v-if="finishedWorkout"
       :workout="finishedWorkout"

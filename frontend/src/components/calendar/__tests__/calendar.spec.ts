@@ -42,7 +42,7 @@ vi.mock('@/utils/apiErrors', () => ({
   toastApiError: vi.fn(),
 }))
 
-import { isValidRuneName } from '@/components/calendar/groupRune'
+import { isValidRuneName, primaryRune } from '@/components/calendar/groupRune'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
 import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
 import * as domain from '@/api/domain'
@@ -60,6 +60,41 @@ describe('isValidRuneName', () => {
 
   it('returns false for unknown slug', () => {
     expect(isValidRuneName('unknown')).toBe(false)
+  })
+})
+
+describe('primaryRune', () => {
+  const muscleGroups = [
+    { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+    { id: 2, slug: 'back', name_es: 'Espalda', name_en: 'Back', owner_id: null },
+  ]
+
+  it('resolves the rune of the exercise primary muscle group', () => {
+    const exercise = {
+      id: 5,
+      name_es: 'Press banca',
+      name_en: 'Bench press',
+      measurement: 'strength' as const,
+      owner_id: null,
+      muscle_groups: [{ muscle_group_id: 1, is_primary: true }],
+    }
+    expect(primaryRune(exercise as never, muscleGroups as never)).toBe('chest')
+  })
+
+  it('returns null when the exercise has no primary muscle group', () => {
+    const exercise = {
+      id: 5,
+      name_es: 'Press banca',
+      name_en: 'Bench press',
+      measurement: 'strength' as const,
+      owner_id: null,
+      muscle_groups: [{ muscle_group_id: 1, is_primary: false }],
+    }
+    expect(primaryRune(exercise as never, muscleGroups as never)).toBeNull()
+  })
+
+  it('returns null when the exercise is undefined', () => {
+    expect(primaryRune(undefined, muscleGroups as never)).toBeNull()
   })
 })
 

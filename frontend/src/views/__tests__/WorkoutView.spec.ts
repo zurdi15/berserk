@@ -19,6 +19,7 @@ vi.mock('@/api/domain', () => ({
   listMuscleGroups: vi.fn(async () => []),
 }))
 
+import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import WorkoutView from '../WorkoutView.vue'
@@ -108,5 +109,96 @@ describe('WorkoutView', () => {
     await flushPromises()
 
     expect(startSpy).not.toHaveBeenCalled()
+  })
+
+  describe('PR celebration', () => {
+    const exerciseFixture = {
+      id: 5,
+      name_es: 'Press banca',
+      name_en: 'Bench press',
+      measurement: 'strength' as const,
+      owner_id: null,
+      muscle_groups: [{ muscle_group_id: 1, is_primary: true }],
+    }
+    const muscleGroupsFixture = [
+      { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+    ]
+    const workoutFixture = {
+      id: 1,
+      date: '2026-08-06',
+      started_at: '2026-08-06T09:00:00Z',
+      ended_at: null,
+      routine_id: null,
+      note: null,
+      feeling: null,
+      exercises: [{ id: 20, exercise_id: 5, position: 0, note: null, sets: [] }],
+      muscle_tag_ids: [],
+    }
+
+    beforeEach(() => {
+      vi.mocked(domain.listExercises).mockResolvedValue([exerciseFixture] as never)
+      vi.mocked(domain.listMuscleGroups).mockResolvedValue(muscleGroupsFixture as never)
+    })
+
+    it('shows the celebration with the logged exercise\'s primary-group rune when lastRecords fills', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+
+      const wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'BkCelebration' }).exists()).toBe(false)
+
+      activeWorkout.lastRecords = [
+        { id: 9, exercise_id: 5, kind: 'max_weight', value: 100, achieved_at: 'x' },
+      ] as never
+      await flushPromises()
+
+      const celebration = wrapper.findComponent({ name: 'BkCelebration' })
+      expect(celebration.exists()).toBe(true)
+      expect(celebration.props('runeName')).toBe('chest')
+      expect(celebration.props('records')).toEqual(activeWorkout.lastRecords)
+    })
+
+    it('clears activeWorkout.lastRecords when the celebration emits done', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+
+      const wrapper = build()
+      await flushPromises()
+
+      activeWorkout.lastRecords = [
+        { id: 9, exercise_id: 5, kind: 'max_weight', value: 100, achieved_at: 'x' },
+      ] as never
+      await flushPromises()
+
+      wrapper.findComponent({ name: 'BkCelebration' }).vm.$emit('done')
+      await flushPromises()
+
+      expect(activeWorkout.lastRecords).toHaveLength(0)
+    })
+
+    it('falls back to the "pr" rune when the catalog cannot resolve a primary muscle group', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+      // catálogo sin grupos musculares: no hay runa que resolver, así que cae al fallback 'pr'
+      vi.mocked(domain.listMuscleGroups).mockResolvedValue([] as never)
+
+      const wrapper = build()
+      await flushPromises()
+
+      activeWorkout.lastRecords = [
+        { id: 9, exercise_id: 5, kind: 'max_weight', value: 100, achieved_at: 'x' },
+      ] as never
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'BkCelebration' }).props('runeName')).toBe('pr')
+    })
   })
 })

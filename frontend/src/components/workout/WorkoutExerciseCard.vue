@@ -11,7 +11,7 @@ import type {
   SetOut,
   WorkoutExerciseOut,
 } from '@/api/domain'
-import { isValidRuneName } from '@/components/calendar/groupRune'
+import { primaryRune as resolvePrimaryRune } from '@/components/calendar/groupRune'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
@@ -54,12 +54,7 @@ const deleteConfirming = ref<number | null>(null)
 const name = computed(() => exerciseName(props.exercise, props.locale))
 
 // runa del grupo muscular primario del ejercicio, si el catálogo lo resuelve
-const primaryRune = computed<RuneName | null>(() => {
-  const link = props.exercise?.muscle_groups.find((m) => m.is_primary)
-  if (!link) return null
-  const group = props.muscleGroups.find((g) => g.id === link.muscle_group_id)
-  return group && isValidRuneName(group.slug) ? group.slug : null
-})
+const primaryRune = computed<RuneName | null>(() => resolvePrimaryRune(props.exercise, props.muscleGroups))
 
 const index = computed(() => props.exerciseIds.indexOf(props.workoutExercise.id))
 const isFirst = computed(() => index.value <= 0)
