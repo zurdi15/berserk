@@ -127,7 +127,7 @@ function onTriggerKeydown(event: KeyboardEvent) {
     </button>
 
     <Teleport to="body">
-      <Transition name="bk-pop">
+      <Transition name="bk-pop-soft">
         <div
           v-if="open"
           ref="panelEl"

@@ -30,6 +30,19 @@ describe('BkDateField', () => {
     expect(text).toMatch(/2026/)
   })
 
+  it('zurdi: the panel enters with the softer bk-pop-soft transition (no overshoot), not the punchier bk-pop reserved for celebrations/branding', async () => {
+    wrapper = mount(BkDateField, {
+      props: { label: 'Fecha', modelValue: '2026-08-05' },
+      global: { plugins: [createI18nInstance()], stubs: { transition: false } },
+      attachTo: document.body,
+    })
+    await wrapper.get('[role="combobox"]').trigger('click')
+
+    const panel = document.querySelector('[role="grid"]')!.closest('[style]') as HTMLElement
+    expect(panel.classList.contains('bk-pop-soft-enter-active')).toBe(true)
+    expect(panel.classList.contains('bk-pop-enter-active')).toBe(false)
+  })
+
   it('clicking the label focuses the trigger (M10: span+aria-labelledby, not a wrapping <label>)', async () => {
     wrapper = build({ modelValue: '2026-08-05' })
     const label = wrapper.get('span.text-ink-muted')

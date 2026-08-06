@@ -30,6 +30,19 @@ describe('BkTimeField', () => {
     expect(wrapper.get('[role="combobox"]').text()).toContain('14:30')
   })
 
+  it('zurdi: the panel enters with the softer bk-pop-soft transition (no overshoot), not the punchier bk-pop reserved for celebrations/branding', async () => {
+    wrapper = mount(BkTimeField, {
+      props: { label: 'Hora', modelValue: null },
+      global: { plugins: [createI18nInstance()], stubs: { transition: false } },
+      attachTo: document.body,
+    })
+    await wrapper.get('[role="combobox"]').trigger('click')
+
+    const panel = document.querySelectorAll('[role="listbox"]')[0].closest('[style]') as HTMLElement
+    expect(panel.classList.contains('bk-pop-soft-enter-active')).toBe(true)
+    expect(panel.classList.contains('bk-pop-enter-active')).toBe(false)
+  })
+
   it('renders the hint text below the trigger when provided (parity with BkField, needed by ScheduleSheet)', () => {
     wrapper = build({ modelValue: null, hint: 'Opcional' })
     expect(wrapper.text()).toContain('Opcional')

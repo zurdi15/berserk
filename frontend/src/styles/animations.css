@@ -19,6 +19,17 @@
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* zurdi: el overshoot de bk-pop (0.85→1.04→1) es un salto demasiado grande
+   para un control de formulario que se abre — bien para una runa o una
+   marca que "aparece" (RedeemView/BootstrapView/LoginView/TimerPill siguen
+   con el bk-pop de siempre), mal para un panel de BkSelect/BkTimeField/
+   BkDateField, que solo necesita anunciarse, no llamar la atención. Variante
+   más discreta: sin overshoot, escala mínima, dur-2 (más corta que dur-3). */
+@keyframes bk-pop-soft {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 @keyframes bk-carve {
   from { stroke-dashoffset: var(--bk-carve-length, 200); opacity: 0.4; }
   to { stroke-dashoffset: 0; opacity: 1; }
@@ -56,6 +67,7 @@
 .bk-fade-enter-active { animation: bk-fade var(--bk-dur-2) var(--bk-ease-out); }
 .bk-rise-enter-active { animation: bk-rise var(--bk-dur-3) var(--bk-ease-out); }
 .bk-pop-enter-active { animation: bk-pop var(--bk-dur-3) var(--bk-ease-spring); }
+.bk-pop-soft-enter-active { animation: bk-pop-soft var(--bk-dur-2) var(--bk-ease-out); }
 
 /* stagger: el contenedor asigna --bk-stagger-i por hijo */
 .bk-stagger > * {

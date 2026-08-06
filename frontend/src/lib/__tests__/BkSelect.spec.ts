@@ -44,6 +44,21 @@ describe('BkSelect', () => {
     expect(document.activeElement).toBe(wrapper.get('[role="combobox"]').element)
   })
 
+  it('zurdi: the panel enters with the softer bk-pop-soft transition (no overshoot), not the punchier bk-pop reserved for celebrations/branding', async () => {
+    // VTU stubea <Transition> por defecto: hay que desactivarlo para ver la
+    // clase de verdad (mismo patrón que BkSheet.spec.ts)
+    wrapper = mount(BkSelect, {
+      props: { label: 'Choose', modelValue: 'a', options: OPTIONS },
+      global: { plugins: [createI18nInstance()], stubs: { transition: false } },
+      attachTo: document.body,
+    })
+    await wrapper.get('[role="combobox"]').trigger('click')
+
+    const panel = document.querySelector('[role="listbox"]')!.parentElement as HTMLElement
+    expect(panel.classList.contains('bk-pop-soft-enter-active')).toBe(true)
+    expect(panel.classList.contains('bk-pop-enter-active')).toBe(false)
+  })
+
   it('opens the panel on click and exposes it as a listbox with option roles', async () => {
     wrapper = build()
     await wrapper.get('[role="combobox"]').trigger('click')

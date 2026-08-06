@@ -167,7 +167,7 @@ watch(() => props.modelValue, (value) => {
     <span v-if="hint" class="block mt-1 text-sm text-ink-faint">{{ hint }}</span>
 
     <Teleport to="body">
-      <Transition name="bk-pop">
+      <Transition name="bk-pop-soft">
         <div
           v-if="open"
           ref="panelEl"
