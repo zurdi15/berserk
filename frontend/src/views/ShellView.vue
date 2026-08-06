@@ -5,7 +5,8 @@ import { useRoute } from 'vue-router'
 import BkRune from '@/lib/BkRune.vue'
 import type { RuneName } from '@/lib/runes'
 import AthleteBanner from '@/components/shell/AthleteBanner.vue'
-import TimerPill from '@/components/shell/TimerPill.vue'
+import { useActiveWorkoutStore } from '@/stores/activeWorkout'
+import { useRestTimerStore } from '@/stores/restTimer'
 
 // item 4 (round 9): correcciones de runas del nav — streak/shoulders SIGUEN
 // existiendo en runes.ts (streak: StreakCard; shoulders: rune de grupo
@@ -19,6 +20,26 @@ const items: { name: string; label: string; rune: RuneName }[] = [
 ]
 
 const route = useRoute()
+const timer = useRestTimerStore()
+const activeWorkout = useActiveWorkoutStore()
+
+// item 1 (v0.3.0, feedback de gym de zurdi): mientras hay un descanso activo,
+// el hueco de la runa del CTA pasa a mostrar el countdown en su lugar — el
+// slab/glow y la navegación a /workout no cambian, solo lo que hay dentro.
+// TimerPill (pill flotante) se retira: duplicaba este mismo aviso en TODAS
+// las rutas (la nav es chrome persistente, no solo /workout), puro ruido
+// ahora que el CTA ya hace de tap-target siempre visible.
+const resting = computed(() => timer.active)
+
+// item 3 (v0.3.0, addendum zurdi): jerarquía del glow del CTA —
+// ruta /workout activa (opacity 1, ya existía) > entreno en curso en otra
+// ruta (opacity tenue) > apagado. Mientras se descansa, el countdown de
+// arriba ya es la señal; mantener ADEMÁS el glow de "en curso" ahí compite
+// con el propio countdown, así que ese nivel se apaga durante el descanso.
+const workoutGlowOpacity = computed(() => {
+  if (route.name === 'workout') return 1
+  return activeWorkout.workout && !resting.value ? 0.4 : 0
+})
 
 // índice de la sección activa, para el indicador deslizante del bottom bar
 // (móvil): -1 (sin match) cae a 0 en vez de esconder la barra en una posición
@@ -61,11 +82,26 @@ const activeIndex = computed(() => {
                 <span
                   v-if="item.name === 'workout'"
                   class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
-                  :style="{ opacity: route.name === 'workout' ? 1 : 0, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
+                  :style="{ opacity: workoutGlowOpacity, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
                   aria-hidden="true"
                   data-testid="workout-glow"
                 />
-                <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
+                <template v-if="item.name === 'workout'">
+                  <!-- swap rune<->countdown con el idioma de entrada de la app
+                       (bk-fade, entry-only): out-in para que la runa termine de
+                       salir antes de que el countdown entre, nunca los dos a
+                       la vez -->
+                  <Transition name="bk-fade" mode="out-in">
+                    <span
+                      v-if="resting"
+                      key="timer"
+                      data-testid="cta-timer"
+                      class="bk-metric relative text-sm"
+                    >{{ timer.label }}</span>
+                    <BkRune v-else key="rune" :name="item.rune" :size="26" :carve="true" class="relative" />
+                  </Transition>
+                </template>
+                <BkRune v-else :name="item.rune" :size="20" :carve="false" class="relative" />
               </span>
               <!-- subrayado por item: entra con scale-in cuando la sección está
                    activa — la CTA de entreno no lleva subrayado, su affordance
@@ -120,11 +156,26 @@ const activeIndex = computed(() => {
                 <span
                   v-if="item.name === 'workout'"
                   class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
-                  :style="{ opacity: route.name === 'workout' ? 1 : 0, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
+                  :style="{ opacity: workoutGlowOpacity, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
                   aria-hidden="true"
                   data-testid="workout-glow"
                 />
-                <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
+                <template v-if="item.name === 'workout'">
+                  <!-- swap rune<->countdown con el idioma de entrada de la app
+                       (bk-fade, entry-only): out-in para que la runa termine de
+                       salir antes de que el countdown entre, nunca los dos a
+                       la vez -->
+                  <Transition name="bk-fade" mode="out-in">
+                    <span
+                      v-if="resting"
+                      key="timer"
+                      data-testid="cta-timer"
+                      class="bk-metric relative text-sm"
+                    >{{ timer.label }}</span>
+                    <BkRune v-else key="rune" :name="item.rune" :size="26" :carve="true" class="relative" />
+                  </Transition>
+                </template>
+                <BkRune v-else :name="item.rune" :size="20" :carve="false" class="relative" />
               </span>
               <!-- revertido (round 7, zurdi): se probó ocultar las inactivas
                    (sr-only + fade solo en la activa), pero con el token a
@@ -145,6 +196,5 @@ const activeIndex = computed(() => {
            ninguna si no hace falta) — ver auditoría por vista en el informe. -->
       <RouterView />
     </main>
-    <TimerPill />
   </div>
 </template>

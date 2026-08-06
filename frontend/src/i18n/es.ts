@@ -81,6 +81,9 @@ export const es = {
   },
   timer: {
     rest: 'Descanso',
+    notifyTitle: 'Descanso terminado',
+    notifyBody: 'Toca para volver al entreno.',
+    notifyBodyWithExercise: 'Toca para volver a {exercise}.',
   },
   profile: {
     tab: 'Perfil',

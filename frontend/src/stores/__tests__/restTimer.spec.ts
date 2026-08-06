@@ -64,4 +64,154 @@ describe('rest timer store', () => {
     expect(timer.remaining).toBeGreaterThan(50) // 60 - 4 - 5 ≈ 50+
     vi.unstubAllGlobals()
   })
+
+  it('label formats remaining seconds as m:ss (shared by the CTA countdown, item 1)', () => {
+    const timer = useRestTimerStore()
+    timer.start(90)
+    expect(timer.label).toBe('1:30')
+    vi.setSystemTime(1_000_000 + 65_000)
+    vi.advanceTimersByTime(500)
+    expect(timer.label).toBe('0:25')
+  })
+})
+
+// item 2 (v0.3.0, feedback de gym de zurdi: "notificación en mobile del
+// timer"). happy-dom (entorno de test) no expone Notification global — por
+// eso todo lo que sigue mockea Notification/permission a mano.
+describe('rest timer store — mobile notification on rest-over', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000_000)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  // arranca el timer y salta al momento justo después de que expire — deja
+  // el interval disparar el tick que dispara vibración/notificación.
+  // *Async* (advanceTimersByTimeAsync, no advanceTimersByTime): notifyRestOver
+  // puede tener un await real de por medio (getRegistration del SW) y esta
+  // variante sí drena esas promesas antes de devolver el control al test.
+  async function expireAfter(timer: ReturnType<typeof useRestTimerStore>, seconds: number, name?: string) {
+    timer.start(seconds, name)
+    vi.setSystemTime(1_000_000 + seconds * 1000 + 500)
+    await vi.advanceTimersByTimeAsync(600)
+  }
+
+  it('requests permission lazily on the first start() (user gesture), never again after that', () => {
+    const requestPermission = vi.fn()
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission })
+    vi.stubGlobal('navigator', { vibrate: vi.fn() })
+
+    const timer = useRestTimerStore()
+    // nunca al cargar / crear el store — solo cuando arranca un descanso de verdad
+    expect(requestPermission).not.toHaveBeenCalled()
+
+    timer.start(10)
+    expect(requestPermission).toHaveBeenCalledTimes(1)
+
+    timer.start(20)
+    timer.start(30)
+    expect(requestPermission).toHaveBeenCalledTimes(1) // sigue siendo 1: no se repite
+  })
+
+  it('does not re-request when permission is already granted or denied (still only attempted once)', () => {
+    const requestPermission = vi.fn()
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission })
+    vi.stubGlobal('navigator', { vibrate: vi.fn() })
+
+    const timer = useRestTimerStore()
+    timer.start(10)
+    expect(requestPermission).not.toHaveBeenCalled() // ya no está en 'default': nada que pedir
+  })
+
+  it('fires a system notification (title/body/icon) when the rest ends while the page is hidden', async () => {
+    const NotificationMock = vi.fn()
+    Object.assign(NotificationMock, { permission: 'granted', requestPermission: vi.fn() })
+    vi.stubGlobal('Notification', NotificationMock)
+    vi.stubGlobal('navigator', { vibrate: vi.fn() }) // sin serviceWorker: camino síncrono de new Notification()
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    const timer = useRestTimerStore()
+    await expireAfter(timer, 10)
+
+    expect(NotificationMock).toHaveBeenCalledTimes(1)
+    const [title, options] = NotificationMock.mock.calls[0]
+    expect(title).toBe('Descanso terminado')
+    expect(options).toMatchObject({ body: 'Toca para volver al entreno.', icon: '/icons/pwa-192.png' })
+  })
+
+  it('includes the exercise name in the body when start() was given one', async () => {
+    const NotificationMock = vi.fn()
+    Object.assign(NotificationMock, { permission: 'granted', requestPermission: vi.fn() })
+    vi.stubGlobal('Notification', NotificationMock)
+    vi.stubGlobal('navigator', { vibrate: vi.fn() })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    const timer = useRestTimerStore()
+    await expireAfter(timer, 10, 'Press banca')
+
+    const [, options] = NotificationMock.mock.calls[0]
+    expect(options.body).toBe('Toca para volver a Press banca.')
+  })
+
+  it('does NOT notify while the page is visible — the in-app cues (vibration + CTA countdown) are enough', async () => {
+    const NotificationMock = vi.fn()
+    Object.assign(NotificationMock, { permission: 'granted', requestPermission: vi.fn() })
+    vi.stubGlobal('Notification', NotificationMock)
+    const vibrate = vi.fn()
+    vi.stubGlobal('navigator', { vibrate })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+
+    const timer = useRestTimerStore()
+    await expireAfter(timer, 10)
+
+    expect(vibrate).toHaveBeenCalledTimes(1) // la vibración no depende de la visibilidad
+    expect(NotificationMock).not.toHaveBeenCalled()
+  })
+
+  it('permission denied: does not throw, no notification attempted, vibration still fires', async () => {
+    // objeto plano (no vi.fn()): si el guard de permiso fallara y el código
+    // intentara `new Notification()` sobre esto, explotaría con
+    // "not a constructor" — un throw aquí tumba el test igualmente
+    vi.stubGlobal('Notification', { permission: 'denied', requestPermission: vi.fn() })
+    const vibrate = vi.fn()
+    vi.stubGlobal('navigator', { vibrate })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    const timer = useRestTimerStore()
+    await expireAfter(timer, 10)
+    expect(vibrate).toHaveBeenCalledTimes(1)
+  })
+
+  it('no Notification support at all (older browser): does not throw, vibration still fires', async () => {
+    vi.stubGlobal('Notification', undefined)
+    const vibrate = vi.fn()
+    vi.stubGlobal('navigator', { vibrate })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    const timer = useRestTimerStore()
+    await expireAfter(timer, 10)
+    expect(vibrate).toHaveBeenCalledTimes(1)
+  })
+
+  it('prefers the active service worker registration (showNotification) over the bare constructor when one exists', async () => {
+    const showNotification = vi.fn()
+    const NotificationMock = vi.fn()
+    Object.assign(NotificationMock, { permission: 'granted', requestPermission: vi.fn() })
+    vi.stubGlobal('Notification', NotificationMock)
+    vi.stubGlobal('navigator', {
+      vibrate: vi.fn(),
+      serviceWorker: { getRegistration: vi.fn(async () => ({ showNotification })) },
+    })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    const timer = useRestTimerStore()
+    await expireAfter(timer, 10)
+
+    expect(showNotification).toHaveBeenCalledTimes(1)
+    expect(NotificationMock).not.toHaveBeenCalled() // nunca el constructor plano si hay SW
+  })
 })

@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
+import { i18n } from '@/i18n'
+
 // timestamps absolutos: el interval solo refresca la vista; si el móvil se
 // bloquea y los ticks no corren, el tiempo restante sigue siendo exacto
 export const useRestTimerStore = defineStore('restTimer', () => {
@@ -10,12 +12,68 @@ export const useRestTimerStore = defineStore('restTimer', () => {
   let ticker: ReturnType<typeof setInterval> | null = null
   let vibrated = false
   let graceTimeout: ReturnType<typeof setTimeout> | null = null
+  // el ejercicio que originó el descanso, si quien llama a start() lo pasa —
+  // solo se usa para el cuerpo de la notificación (item 2, v0.3.0)
+  let restExerciseName: string | null = null
+  // se pide UNA vez por sesión de página, nunca en cada start(): repetir el
+  // prompt del navegador en cada serie sería spam de permisos
+  let permissionRequested = false
 
   const remaining = computed(() =>
     endsAt.value === null ? 0 : Math.max(0, Math.round((endsAt.value - now.value) / 1000)),
   )
   const progress = computed(() => (total.value ? remaining.value / total.value : 0))
   const active = computed(() => endsAt.value !== null)
+  // m:ss compartido por el CTA del shell (item 1) y quien más lo necesite —
+  // antes vivía duplicado en TimerPill, retirado en este mismo cambio
+  const label = computed(() => {
+    const m = Math.floor(remaining.value / 60)
+    const s = String(remaining.value % 60).padStart(2, '0')
+    return `${m}:${s}`
+  })
+
+  // el permiso solo puede pedirse desde un gesto de usuario real: start()
+  // siempre cuelga de un submit de serie (click), así que es el único sitio
+  // legítimo para esto — jamás se llama al cargar la página
+  function ensureNotificationPermission() {
+    if (permissionRequested) return
+    permissionRequested = true
+    if (typeof Notification === 'undefined' || Notification.permission !== 'default') return
+    void Notification.requestPermission()
+  }
+
+  async function notifyRestOver() {
+    // visible = las señales in-app (vibración + countdown en el CTA) ya
+    // avisan; la notificación del sistema es solo para cuando el móvil está
+    // bloqueado o en otra app — mostrarla también en foreground es ruido
+    if (typeof document === 'undefined' || document.visibilityState !== 'hidden') return
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+
+    const title = i18n.global.t('timer.notifyTitle')
+    const body = restExerciseName
+      ? i18n.global.t('timer.notifyBodyWithExercise', { exercise: restExerciseName })
+      : i18n.global.t('timer.notifyBody')
+    const options: NotificationOptions = { body, icon: '/icons/pwa-192.png', tag: 'berserk-rest-timer' }
+
+    try {
+      // Android en concreto lanza "Illegal constructor" al hacer
+      // `new Notification()` desde una página con un service worker activo:
+      // hay que pasar por el registro cuando existe. vite-pwa (generateSW,
+      // ver vite.config.ts) no necesita código propio para esto —
+      // showNotification() es un método nativo de cualquier
+      // ServiceWorkerRegistration activa, generada o escrita a mano. En dev
+      // (SW deshabilitado) o navegadores sin SW, new Notification() es el
+      // camino pragmático: sigue siendo una PWA funcional sin él. El await
+      // solo se paga cuando de verdad hay SW que consultar — así el camino
+      // sin SW no cede el hilo de más.
+      let registration: ServiceWorkerRegistration | undefined
+      if ('serviceWorker' in navigator) registration = await navigator.serviceWorker.getRegistration()
+      if (registration) await registration.showNotification(title, options)
+      else new Notification(title, options)
+    } catch {
+      // notificación no soportada/bloqueada en este entorno: la vibración ya avisó
+    }
+  }
 
   function tick() {
     now.value = Date.now()
@@ -23,19 +81,22 @@ export const useRestTimerStore = defineStore('restTimer', () => {
       if (!vibrated) {
         vibrated = true
         navigator.vibrate?.([200, 100, 200])
+        void notifyRestOver()
         // el timeout de gracia sobrevivía a un restart y borraba el timer nuevo
         graceTimeout = setTimeout(clear, 3000)
       }
     }
   }
 
-  function start(seconds: number) {
+  function start(seconds: number, exerciseName?: string) {
     // cancelar timeout de gracia anterior si existe
     if (graceTimeout) clearTimeout(graceTimeout)
     total.value = seconds
     endsAt.value = Date.now() + seconds * 1000
     now.value = Date.now()
     vibrated = false
+    restExerciseName = exerciseName ?? null
+    ensureNotificationPermission()
     if (ticker) clearInterval(ticker)
     ticker = setInterval(tick, 500)
   }
@@ -46,10 +107,11 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     endsAt.value = null
     total.value = 0
     vibrated = false
+    restExerciseName = null
     if (ticker) clearInterval(ticker)
     ticker = null
     graceTimeout = null
   }
 
-  return { endsAt, total, remaining, progress, active, start, clear }
+  return { endsAt, total, remaining, progress, active, label, start, clear }
 })

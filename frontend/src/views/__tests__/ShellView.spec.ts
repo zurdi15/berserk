@@ -4,6 +4,9 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { createI18nInstance } from '../../i18n'
+import BkRune from '@/lib/BkRune.vue'
+import { useActiveWorkoutStore } from '@/stores/activeWorkout'
+import { useRestTimerStore } from '@/stores/restTimer'
 import ShellView from '../ShellView.vue'
 
 // router mínimo, propio de este test: las 5 secciones del shell como rutas
@@ -24,6 +27,20 @@ function buildRouter(initialName: string): Router {
   })
   router.push({ name: initialName })
   return router
+}
+
+// compartido por los describes de abajo (activo/CTA/glow): monta el shell ya
+// resuelto en la ruta pedida, con el mismo set de stubs
+function mountWithRoute(name: string) {
+  const router = buildRouter(name)
+  return router.isReady().then(() =>
+    mount(ShellView, {
+      global: {
+        plugins: [router, createI18nInstance()],
+        stubs: { RouterView: true, AthleteBanner: true },
+      },
+    }),
+  )
 }
 
 describe('ShellView nav', () => {
@@ -80,34 +97,22 @@ describe('ShellView nav', () => {
     expect(listItems.length).toBeGreaterThan(0)
   })
 
-  it('renders TimerPill and AthleteBanner components', async () => {
+  it('renders AthleteBanner (TimerPill retired in v0.3.0: the CTA itself is now the persistent countdown surface, see item 1 below)', async () => {
     const router = buildRouter('today')
     await router.isReady()
     const wrapper = mount(ShellView, {
       global: {
         plugins: [router, createI18nInstance()],
-        stubs: { RouterView: true, RouterLink: true, TimerPill: true, AthleteBanner: true },
+        stubs: { RouterView: true, RouterLink: true, AthleteBanner: true },
       },
     })
-    expect(wrapper.findComponent({ name: 'TimerPill' }).exists()).toBe(true)
     expect(wrapper.findComponent({ name: 'AthleteBanner' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'TimerPill' }).exists()).toBe(false)
   })
 })
 
-describe('ShellView active section indicator (item 3)', () => {
+describe('ShellView active section indicator (item 3, round 9)', () => {
   beforeEach(() => setActivePinia(createPinia()))
-
-  function mountWithRoute(name: string) {
-    const router = buildRouter(name)
-    return router.isReady().then(() =>
-      mount(ShellView, {
-        global: {
-          plugins: [router, createI18nInstance()],
-          stubs: { RouterView: true, TimerPill: true, AthleteBanner: true },
-        },
-      }),
-    )
-  }
 
   it('marks the active RouterLink with aria-current="page" on both bars (real RouterLink, no stub)', async () => {
     const wrapper = await mountWithRoute('calendar')
@@ -211,7 +216,7 @@ describe('ShellView active section indicator (item 3)', () => {
     const wrapper = mount(ShellView, {
       global: {
         plugins: [router, createI18nInstance()],
-        stubs: { TimerPill: true, AthleteBanner: true },
+        stubs: { AthleteBanner: true },
       },
     })
     await flushPromises()
@@ -224,5 +229,88 @@ describe('ShellView active section indicator (item 3)', () => {
     expect(routedView.exists()).toBe(true)
     expect(routedView.classes()).not.toContain('bk-rise-enter-active')
     expect(routedView.classes()).not.toContain('bk-rise-enter-from')
+  })
+})
+
+describe('ShellView CTA rest countdown takeover (item 1, v0.3.0)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('shows the rune by default, swaps to the m:ss countdown while resting (route+store montados de verdad), and reverts when the timer clears', async () => {
+    const wrapper = await mountWithRoute('today')
+    await flushPromises()
+
+    // en reposo: 10 runas (5 items x 2 barras desktop+móvil), sin countdown
+    expect(wrapper.findAllComponents(BkRune)).toHaveLength(10)
+    expect(wrapper.findAll('[data-testid="cta-timer"]')).toHaveLength(0)
+
+    useRestTimerStore().start(90)
+    await flushPromises()
+
+    // descansando: el CTA de cada barra deja el hueco de la runa al countdown
+    const countdowns = wrapper.findAll('[data-testid="cta-timer"]')
+    expect(countdowns).toHaveLength(2) // desktop + móvil
+    countdowns.forEach((c) => expect(c.text()).toBe('1:30'))
+    // las 2 runas del CTA (una por barra) desaparecen; quedan las 8 del resto de items
+    expect(wrapper.findAllComponents(BkRune)).toHaveLength(8)
+
+    useRestTimerStore().clear()
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="cta-timer"]')).toHaveLength(0)
+    expect(wrapper.findAllComponents(BkRune)).toHaveLength(10)
+  })
+
+  it('the CTA still navigates to /workout while resting (route behavior unchanged)', async () => {
+    const wrapper = await mountWithRoute('today')
+    useRestTimerStore().start(30)
+    await flushPromises()
+
+    const link = wrapper.findAll('a').find((a) => a.attributes('href') === '/workout')
+    expect(link).toBeTruthy()
+  })
+})
+
+describe('ShellView CTA workout-in-progress glow (item 3, v0.3.0 addendum)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('no active workout: the glow stays off', async () => {
+    const wrapper = await mountWithRoute('today')
+    await flushPromises()
+
+    const glows = wrapper.findAll('[data-testid="workout-glow"]')
+    expect(glows[0].attributes('style')).toContain('opacity: 0')
+    expect(glows[1].attributes('style')).toContain('opacity: 0')
+  })
+
+  it('workout in progress on a different route: the glow sits at the dim in-progress level (0.4), below the full route-active level', async () => {
+    const wrapper = await mountWithRoute('today')
+    useActiveWorkoutStore().workout = { id: 1 } as never
+    await flushPromises()
+
+    const glows = wrapper.findAll('[data-testid="workout-glow"]')
+    expect(glows[0].attributes('style')).toContain('opacity: 0.4')
+    expect(glows[1].attributes('style')).toContain('opacity: 0.4')
+  })
+
+  it('on the workout route itself: full glow (1) regardless of in-progress state — route-active wins the hierarchy', async () => {
+    const wrapper = await mountWithRoute('workout')
+    useActiveWorkoutStore().workout = { id: 1 } as never
+    await flushPromises()
+
+    const glows = wrapper.findAll('[data-testid="workout-glow"]')
+    expect(glows[0].attributes('style')).toContain('opacity: 1')
+    expect(glows[1].attributes('style')).toContain('opacity: 1')
+  })
+
+  it('workout in progress AND resting: the countdown takeover wins — in-progress glow is suppressed while resting', async () => {
+    const wrapper = await mountWithRoute('today')
+    useActiveWorkoutStore().workout = { id: 1 } as never
+    useRestTimerStore().start(30)
+    await flushPromises()
+
+    const glows = wrapper.findAll('[data-testid="workout-glow"]')
+    expect(glows[0].attributes('style')).toContain('opacity: 0')
+    expect(glows[1].attributes('style')).toContain('opacity: 0')
+    expect(wrapper.findAll('[data-testid="cta-timer"]')).toHaveLength(2)
   })
 })
