@@ -9,8 +9,9 @@ vi.mock('@/api/domain', () => ({
   reorderWorkoutExercises: vi.fn(),
   updateSet: vi.fn(),
   deleteSet: vi.fn(),
-  setWorkoutMuscleTags: vi.fn(),
   updateWorkout: vi.fn(),
+  getExerciseHistory: vi.fn(),
+  updateWorkoutExercise: vi.fn(),
 }))
 
 import * as domain from '@/api/domain'
@@ -114,16 +115,53 @@ describe('workout editor store', () => {
     expect(store.workout).toEqual(reordered)
   })
 
-  it('setMuscleTags assigns the workout returned by the endpoint directly', async () => {
+  describe('exerciseHistory (item 3)', () => {
+    // conteos exactos de llamadas: limpiar el mock entre tests de este bloque
+    beforeEach(() => {
+      vi.mocked(domain.getExerciseHistory).mockClear()
+    })
+
+    it('fetches with the loaded workout id as exclude_workout_id and caches the result', async () => {
+      vi.mocked(domain.getWorkout).mockResolvedValue(workout as never)
+      const store = useWorkoutEditorStore()
+      await store.load(4)
+      vi.mocked(domain.getExerciseHistory).mockResolvedValue({
+        workout_id: 1, date: '2026-07-01', sets: [],
+      } as never)
+
+      const first = await store.exerciseHistory(9)
+      const second = await store.exerciseHistory(9)
+
+      expect(domain.getExerciseHistory).toHaveBeenCalledWith(9, { exclude_workout_id: 4 })
+      expect(domain.getExerciseHistory).toHaveBeenCalledTimes(1)
+      expect(first).toEqual(second)
+    })
+
+    it('load() clears the cache since the editor can move on to a different workout id', async () => {
+      vi.mocked(domain.getWorkout).mockResolvedValue(workout as never)
+      const store = useWorkoutEditorStore()
+      await store.load(4)
+      vi.mocked(domain.getExerciseHistory).mockResolvedValue({
+        workout_id: 1, date: '2026-07-01', sets: [],
+      } as never)
+      await store.exerciseHistory(9)
+
+      await store.load(4)
+      await store.exerciseHistory(9)
+
+      expect(domain.getExerciseHistory).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it('setExerciseRest patches the workout exercise and refreshes (item 11)', async () => {
     vi.mocked(domain.getWorkout).mockResolvedValue(workout as never)
     const store = useWorkoutEditorStore()
     await store.load(4)
-    vi.mocked(domain.setWorkoutMuscleTags).mockResolvedValue({ ...workout, muscle_tag_ids: [1] } as never)
+    vi.mocked(domain.updateWorkoutExercise).mockResolvedValue({ id: 9, rest_seconds: null } as never)
 
-    await store.setMuscleTags([1])
+    await store.setExerciseRest(9, null)
 
-    expect(domain.setWorkoutMuscleTags).toHaveBeenCalledWith(4, [1])
-    expect(store.workout?.muscle_tag_ids).toEqual([1])
+    expect(domain.updateWorkoutExercise).toHaveBeenCalledWith(4, 9, { rest_seconds: null })
   })
 
   it('patch sends date/note/feeling to updateWorkout and assigns the response', async () => {

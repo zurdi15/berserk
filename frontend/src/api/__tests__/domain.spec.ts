@@ -64,13 +64,23 @@ describe('domain api paths', () => {
     expect(JSON.parse(opts.body as string)).toEqual(items)
   })
 
-  it('setWorkoutMuscleTags uses muscle-groups path', async () => {
+  // item 11: binding re-añadido tras haberse retirado por falta de consumidor
+  // (round 8) — ahora WorkoutExerciseCard lo usa para el override de descanso
+  it('updateWorkoutExercise PATCHes the nested workout-exercise path', async () => {
     const spy = spyFetch()
-    await domain.setWorkoutMuscleTags(4, [1, 2])
+    await domain.updateWorkoutExercise(4, 9, { rest_seconds: 120 })
     const [url, opts] = spy.mock.calls[0] as any
-    expect(url).toBe('/api/v1/workouts/4/muscle-groups')
-    expect(opts.method).toBe('PUT')
-    expect(JSON.parse(opts.body as string)).toEqual({ muscle_group_ids: [1, 2] })
+    expect(url).toBe('/api/v1/workouts/4/exercises/9')
+    expect(opts.method).toBe('PATCH')
+    expect(JSON.parse(opts.body as string)).toEqual({ rest_seconds: 120 })
+  })
+
+  // item 3: historial de la última sesión terminada de un ejercicio
+  it('getExerciseHistory uses the exercise-history path with exclude/user query params', async () => {
+    const spy = spyFetch()
+    await domain.getExerciseHistory(12, { exclude_workout_id: 4, userId: 7 })
+    const url = (spy.mock.calls[0] as any)?.[0] as string
+    expect(url).toBe('/api/v1/progress/exercise-history/12?exclude_workout_id=4&user_id=7')
   })
 
   it('getDistribution uses muscle-distribution path', async () => {
