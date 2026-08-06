@@ -89,7 +89,7 @@ describe('AdminCard', () => {
     expect(text).toContain('user2')
   })
 
-  it('shows the admin dot (with its accessible label) for admin users only, no separate column', async () => {
+  it('shows the admin star (with its accessible label) for admin users only, no separate column', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
@@ -102,9 +102,10 @@ describe('AdminCard', () => {
     const adminRow = wrapper.find('[data-testid="user-row-1"]')
     const badgeInAdminRow = adminRow.find('[data-testid="admin-badge"]')
     expect(badgeInAdminRow.exists()).toBe(true)
-    expect(badgeInAdminRow.classes()).toContain('bg-aurora')
-    expect(badgeInAdminRow.classes()).toContain('rounded-full')
-    expect(badgeInAdminRow.text()).toBe('Administrador') // sr-only, mismo texto que admin.isAdmin
+    expect(badgeInAdminRow.classes()).toContain('text-aurora')
+    expect(badgeInAdminRow.classes()).toContain('font-semibold')
+    expect(badgeInAdminRow.text()).toContain('✦')
+    expect(badgeInAdminRow.find('.sr-only').text()).toBe('Administrador') // mismo texto que admin.isAdmin
 
     const nonAdminRow = wrapper.find('[data-testid="user-row-2"]')
     const badgeInNonAdminRow = nonAdminRow.find('[data-testid="admin-badge"]')

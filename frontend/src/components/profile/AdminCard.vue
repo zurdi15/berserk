@@ -234,11 +234,12 @@ function redeemUrl(token: string): string {
                 <td class="py-2 px-2">
                   <span class="inline-flex items-center gap-2">
                     {{ user.username }}
-                    <!-- punto en vez de columna: la columna "Administrador"
+                    <!-- estrella en vez de columna: la columna "Administrador"
                          ensanchaba la tabla en móvil sin aportar mucho más que
                          esto — la etiqueta accesible reutiliza admin.isAdmin,
                          ya tiene exactamente el texto que hacía falta -->
-                    <span v-if="user.is_admin" class="w-2 h-2 rounded-full bg-aurora shrink-0" data-testid="admin-badge">
+                    <span v-if="user.is_admin" class="text-aurora font-semibold" data-testid="admin-badge">
+                      ✦
                       <span class="sr-only">{{ $t('admin.isAdmin') }}</span>
                     </span>
                   </span>
