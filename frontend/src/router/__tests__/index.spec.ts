@@ -28,4 +28,10 @@ describe('router catch-all', () => {
     await router.push('/this/route/does/not/exist')
     expect(router.currentRoute.value.name).toBe('today')
   })
+
+  it('an authed user can reach /workout/:id/edit, with the id threaded through as a route param', async () => {
+    await router.push('/workout/42/edit')
+    expect(router.currentRoute.value.name).toBe('workout-edit')
+    expect(router.currentRoute.value.params.id).toBe('42')
+  })
 })

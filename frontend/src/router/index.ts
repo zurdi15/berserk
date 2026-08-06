@@ -10,6 +10,7 @@ import CalendarView from '@/views/CalendarView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import ProgressView from '@/views/ProgressView.vue'
 import ShellView from '@/views/ShellView.vue'
+import WorkoutEditView from '@/views/WorkoutEditView.vue'
 import WorkoutView from '@/views/WorkoutView.vue'
 
 export const router = createRouter({
@@ -26,6 +27,7 @@ export const router = createRouter({
         { path: 'today', name: 'today', component: TodayView },
         { path: 'calendar', name: 'calendar', component: CalendarView },
         { path: 'workout', name: 'workout', component: WorkoutView },
+        { path: 'workout/:id/edit', name: 'workout-edit', component: WorkoutEditView },
         { path: 'progress', name: 'progress', component: ProgressView },
         { path: 'profile', name: 'profile', component: ProfileView },
       ],

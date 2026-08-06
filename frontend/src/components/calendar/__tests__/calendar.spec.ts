@@ -36,8 +36,12 @@ vi.mock('@/api/domain', () => ({
   updateSchedule: vi.fn(async () => ({ id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'skipped', workout_id: null, note: 'Too busy' })),
   deleteSchedule: vi.fn(async () => {}),
   schedule: vi.fn(async () => ({ id: 6, date: '2026-08-04', time: '20:00', routine_id: 1, status: 'planned', workout_id: null, note: null })),
+  startWorkout: vi.fn(async () => ({ id: 77, date: '2026-08-01', started_at: null, ended_at: null, routine_id: null, note: null, feeling: null, exercises: [], muscle_tag_ids: [] })),
 }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+// push compartido (no un vi.fn() nuevo por llamada a useRouter): así los
+// tests de navegación (ScheduleSheet → editor) pueden aserir sobre él
+const push = vi.fn()
+vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
 vi.mock('@/utils/apiErrors', () => ({
   toastApiError: vi.fn(),
 }))
@@ -338,12 +342,15 @@ describe('MonthGrid', () => {
 })
 
 describe('ScheduleSheet', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    push.mockClear()
+  })
 
   it('create: picking a time and scheduling calls the API with it, then the trigger resets to the placeholder (I2: null, not the old "" that rendered blank)', async () => {
     vi.mocked(domain.schedule).mockClear()
     const wrapper = mount(ScheduleSheet, {
-      props: { date: '2026-08-20', scheduled: [] },
+      props: { date: '2026-08-20', scheduled: [], workouts: [] },
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
@@ -383,6 +390,7 @@ describe('ScheduleSheet', () => {
         scheduled: [
           { id: 7, date: '2026-08-20', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
         ],
+        workouts: [],
       },
       global: { plugins: [createI18nInstance()] },
     })
@@ -409,6 +417,7 @@ describe('ScheduleSheet', () => {
         scheduled: [
           { id: 7, date: '2026-08-20', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
         ],
+        workouts: [],
       },
       global: { plugins: [createI18nInstance()] },
     })
@@ -435,6 +444,7 @@ describe('ScheduleSheet', () => {
         scheduled: [
           { id: 7, date: '2026-08-20', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
         ],
+        workouts: [],
       },
       global: { plugins: [createI18nInstance()] },
     })
@@ -464,6 +474,7 @@ describe('ScheduleSheet', () => {
           // fixture usa el formato REAL de la API, no el "18:00" cómodo
           { id: 7, date: '2026-08-20', time: '18:00:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
         ],
+        workouts: [],
       },
       global: { plugins: [createI18nInstance()] },
     })
@@ -528,6 +539,7 @@ describe('ScheduleSheet', () => {
         scheduled: [
           { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'planned', workout_id: null, note: 'Too busy' },
         ],
+        workouts: [],
       },
       global: { plugins: [createI18nInstance()] },
     })
@@ -546,6 +558,7 @@ describe('ScheduleSheet', () => {
         scheduled: [
           { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'planned', workout_id: null, note: 'Too busy' },
         ],
+        workouts: [],
       },
       global: { plugins: [createI18nInstance()] },
     })
@@ -555,7 +568,7 @@ describe('ScheduleSheet', () => {
 
   it('renders a localized day label in the header, not the raw ISO date', async () => {
     const wrapper = mount(ScheduleSheet, {
-      props: { date: '2026-08-25', scheduled: [] },
+      props: { date: '2026-08-25', scheduled: [], workouts: [] },
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
@@ -570,12 +583,77 @@ describe('ScheduleSheet', () => {
         scheduled: [
           { id: 7, date: '2026-08-20', time: '19:30:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
         ],
+        workouts: [],
       },
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
     expect(wrapper.text()).toContain('19:30')
     expect(wrapper.text()).not.toContain('19:30:00')
+  })
+
+  describe('round 8: retro workout entry points', () => {
+    afterEach(() => vi.useRealTimers())
+
+    it('edit button on a logged workout navigates to its editor', async () => {
+      const wrapper = mount(ScheduleSheet, {
+        props: {
+          date: '2026-08-01',
+          scheduled: [],
+          workouts: [{ id: 42, date: '2026-08-01', feeling: 4, muscle_group_ids: [] }],
+        },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      await wrapper.find('[data-testid="edit-workout-42"]').trigger('click')
+
+      expect(push).toHaveBeenCalledWith({ name: 'workout-edit', params: { id: 42 } })
+    })
+
+    it('"Registrar entreno" on a past day creates a finished workout via startWorkout({date, finished:true}) and navigates to its editor', async () => {
+      vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
+      vi.mocked(domain.startWorkout).mockResolvedValueOnce({
+        id: 88, date: '2026-08-01', started_at: '2026-08-01T12:00:00', ended_at: '2026-08-01T12:00:00',
+        routine_id: null, note: null, feeling: null, exercises: [], muscle_tag_ids: [],
+      } as never)
+
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-01', scheduled: [], workouts: [] },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      const button = wrapper.find('[data-testid="log-past-workout"]')
+      expect(button.exists()).toBe(true)
+      await button.trigger('click')
+      await flushPromises()
+
+      expect(domain.startWorkout).toHaveBeenCalledWith({ date: '2026-08-01', finished: true })
+      expect(push).toHaveBeenCalledWith({ name: 'workout-edit', params: { id: 88 } })
+    })
+
+    it('"Registrar entreno" is present for today', async () => {
+      vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-06', scheduled: [], workouts: [] },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="log-past-workout"]').exists()).toBe(true)
+    })
+
+    it('"Registrar entreno" is absent on a future day', async () => {
+      vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-20', scheduled: [], workouts: [] },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="log-past-workout"]').exists()).toBe(false)
+    })
   })
 })
 

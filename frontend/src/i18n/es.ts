@@ -40,6 +40,7 @@ export const es = {
     session_already_done: 'Esta sesión ya está completada.',
     workout_already_finished: 'Este entreno ya ha terminado.',
     no_active_workout: 'No hay ningún entreno activo.',
+    date_required: 'Elige una fecha para este entreno.',
     invalid_set_fields: 'Esos campos no son válidos para este tipo de ejercicio.',
     order_invalid: 'Ese orden no es válido.',
     cannot_delete_self: 'No puedes borrar tu propia cuenta.',
@@ -218,6 +219,8 @@ export const es = {
     confirmDeleteMessage: '¿Estás seguro de que quieres borrar esta sesión?',
     runeLegend: 'Leyenda de runas',
     runeLegendHint: 'Cada runa marca el grupo muscular principal trabajado ese día.',
+    logPastWorkout: 'Registrar entreno',
+    workoutEntry: 'Entreno registrado',
   },
   progress: {
     kinds: {
@@ -300,5 +303,8 @@ export const es = {
     discardTitle: '¿Descartar el entreno?',
     discardHint: 'Se borra el entreno y sus series. Los récords se recalculan.',
     muscleTags: 'Grupos musculares',
+    editTitle: 'Editar entreno',
+    backToCalendar: 'Volver al calendario',
+    retroPrs: 'Récords recalculados: {n}',
   },
 } as const

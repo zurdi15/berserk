@@ -40,6 +40,7 @@ export const en = {
     session_already_done: 'This session is already done.',
     workout_already_finished: 'This workout has already finished.',
     no_active_workout: 'No active workout.',
+    date_required: 'Pick a date for this workout.',
     invalid_set_fields: 'Those fields are not valid for this exercise type.',
     order_invalid: 'That order is invalid.',
     cannot_delete_self: 'You cannot delete your own account.',
@@ -218,6 +219,8 @@ export const en = {
     confirmDeleteMessage: 'Are you sure you want to delete this session?',
     runeLegend: 'Rune legend',
     runeLegendHint: 'Each rune marks the main muscle group trained that day.',
+    logPastWorkout: 'Log workout',
+    workoutEntry: 'Logged workout',
   },
   progress: {
     kinds: {
@@ -300,5 +303,8 @@ export const en = {
     discardTitle: 'Discard this workout?',
     discardHint: 'The workout and its sets will be deleted. Records will be recalculated.',
     muscleTags: 'Muscle groups',
+    editTitle: 'Edit workout',
+    backToCalendar: 'Back to calendar',
+    retroPrs: 'Records recalculated: {n}',
   },
 } as const

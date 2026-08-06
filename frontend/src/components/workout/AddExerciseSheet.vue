@@ -6,17 +6,18 @@ import type { ExerciseOut } from '@/api/domain'
 import { listExercises } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
-import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import BkField from '@/lib/BkField.vue'
 import BkSheet from '@/lib/BkSheet.vue'
+import type { WorkoutActions } from './workoutActions'
 
-const props = defineProps<{ open: boolean }>()
+// store-agnóstico (round 8): solo necesita addExercise, pero se tipa contra
+// el mismo contrato que WorkoutExerciseCard para no inventar otra interfaz
+const props = defineProps<{ open: boolean; actions: Pick<WorkoutActions, 'addExercise'> }>()
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 const auth = useAuthStore()
-const activeWorkout = useActiveWorkoutStore()
 
 const query = ref('')
 const results = ref<ExerciseOut[]>([])
@@ -40,7 +41,7 @@ function search() {
 
 async function pick(exercise: ExerciseOut) {
   try {
-    await activeWorkout.addExercise(exercise.id)
+    await props.actions.addExercise(exercise.id)
     query.value = ''
     results.value = []
     emit('close')

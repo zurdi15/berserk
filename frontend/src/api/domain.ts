@@ -283,6 +283,9 @@ export const startWorkout = (body: {
   date?: string
   routine_id?: number
   scheduled_session_id?: number
+  // entreno retroactivo: crea ya cerrado (ver backend WorkoutStartIn) — date
+  // pasa a ser obligatorio en ese caso, el backend 422 si falta
+  finished?: boolean
 }) =>
   api<WorkoutOut>('/workouts', { method: 'POST', body })
 

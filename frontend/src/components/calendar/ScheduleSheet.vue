@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
+import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkField from '@/lib/BkField.vue'
@@ -8,24 +10,32 @@ import BkTimeField from '@/lib/BkTimeField.vue'
 import BkDateField from '@/lib/BkDateField.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import { statusClasses } from './statusClasses'
-import type { ScheduledOut, RoutineOut } from '@/api/domain'
-import { updateSchedule, deleteSchedule, schedule, listRoutines } from '@/api/domain'
+import type { ScheduledOut, RoutineOut, WorkoutSummaryOut } from '@/api/domain'
+import { updateSchedule, deleteSchedule, schedule, listRoutines, startWorkout } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
-import { formatDayLabel, formatTimeShort } from '@/utils/dates'
+import { formatDayLabel, formatTimeShort, todayIso } from '@/utils/dates'
 import { useAthleteStore } from '@/stores/athlete'
 
 const props = defineProps<{
   date: string
   scheduled: ScheduledOut[]
+  workouts: WorkoutSummaryOut[]
 }>()
 
 const emit = defineEmits<{
   updated: []
 }>()
 
+const router = useRouter()
 const athlete = useAthleteStore()
 
 const isViewingSelf = computed(() => !athlete.isViewing)
+// registrar un entreno retroactivo solo tiene sentido hasta hoy — un día
+// futuro no tiene nada que "registrar" todavía (el backend además 422 sin
+// date, pero para un futuro sí hay date: se oculta en el cliente para no
+// ofrecer una acción que no encaja conceptualmente)
+const isPastOrToday = computed(() => props.date <= todayIso())
+const loggingPastWorkout = ref(false)
 
 const routines = ref<RoutineOut[]>([])
 const loading = ref(false)
@@ -126,6 +136,22 @@ async function confirmDelete() {
   }
 }
 
+function editWorkout(id: number) {
+  router.push({ name: 'workout-edit', params: { id } })
+}
+
+async function logPastWorkout() {
+  try {
+    loggingPastWorkout.value = true
+    const workout = await startWorkout({ date: props.date, finished: true })
+    router.push({ name: 'workout-edit', params: { id: workout.id } })
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    loggingPastWorkout.value = false
+  }
+}
+
 async function createSession() {
   try {
     loading.value = true
@@ -207,6 +233,38 @@ loadRoutines()
           </BkButton>
         </div>
       </div>
+    </div>
+
+    <!-- Workouts already logged this day: cada uno con su affordance de editar -->
+    <div v-if="workouts.length" class="space-y-3">
+      <h4 class="font-medium text-ink">{{ $t('app.nav.workout') }}</h4>
+      <div
+        v-for="workout in workouts"
+        :key="workout.id"
+        class="border border-line rounded-sm p-3 flex items-center justify-between"
+      >
+        <p class="text-sm text-ink-muted">{{ $t('calendar.workoutEntry') }}</p>
+        <BkActionBtn
+          v-if="isViewingSelf"
+          icon="edit"
+          :data-testid="`edit-workout-${workout.id}`"
+          :aria-label="$t('common.edit')"
+          @click="editWorkout(workout.id)"
+        />
+      </div>
+    </div>
+
+    <!-- Registrar un entreno pasado: solo hoy/pasado (ver isPastOrToday) -->
+    <div v-if="isViewingSelf && isPastOrToday" class="border border-line rounded-sm p-3">
+      <BkButton
+        variant="ghost"
+        block
+        data-testid="log-past-workout"
+        :disabled="loggingPastWorkout"
+        @click="logPastWorkout"
+      >
+        {{ $t('calendar.logPastWorkout') }}
+      </BkButton>
     </div>
 
     <!-- Create new session form -->

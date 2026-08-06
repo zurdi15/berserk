@@ -10,7 +10,6 @@ vi.mock('@/api/domain', () => ({
 
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
-import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import AddExerciseSheet from '../AddExerciseSheet.vue'
 
 // BkSheet teletransporta el contenido a document.body: hay que buscarlo ahí,
@@ -36,7 +35,7 @@ describe('AddExerciseSheet', () => {
 
   it('searches via listExercises with the typed query', async () => {
     mount(AddExerciseSheet, {
-      props: { open: true },
+      props: { open: true, actions: { addExercise: vi.fn() } },
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
@@ -46,12 +45,11 @@ describe('AddExerciseSheet', () => {
     expect(domain.listExercises).toHaveBeenCalledWith({ q: 'banca' })
   })
 
-  it('picking a search result calls activeWorkout.addExercise with its id and emits close', async () => {
-    const activeWorkout = useActiveWorkoutStore()
-    const addSpy = vi.spyOn(activeWorkout, 'addExercise').mockResolvedValue(undefined)
+  it('picking a search result calls actions.addExercise with its id and emits close', async () => {
+    const addSpy = vi.fn().mockResolvedValue(undefined)
 
     const wrapper = mount(AddExerciseSheet, {
-      props: { open: true },
+      props: { open: true, actions: { addExercise: addSpy } },
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
