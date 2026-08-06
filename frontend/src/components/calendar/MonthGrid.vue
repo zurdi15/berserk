@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { monthGrid, weekdayHeaders, todayIso } from '@/utils/dates'
 import { isValidRuneName } from './groupRune'
 import { statusClasses } from './statusClasses'
@@ -18,7 +19,9 @@ const emit = defineEmits<{
   select: [date: string]
 }>()
 
-const locale = computed(() => 'es')
+// el locale de los headers es el del VIEWER, no el del atleta que se está
+// viendo (ver CalendarView.vue: el label del mes también usa useI18n().locale)
+const { locale } = useI18n()
 const grid = computed(() => monthGrid(props.year, props.monthNum))
 const headers = computed(() => weekdayHeaders(locale.value))
 const today = computed(() => todayIso())
@@ -67,16 +70,17 @@ function selectDay(date: string) {
     </div>
 
     <!-- Month grid -->
-    <div class="grid grid-cols-7 gap-1">
+    <div class="grid grid-cols-7 gap-1 bk-stagger">
       <button
-        v-for="cell in grid"
+        v-for="(cell, i) in grid"
         :key="`day-${cell.date}`"
         :data-testid="`day-cell-${cell.date}`"
-        class="aspect-square rounded-sm border p-1 flex flex-col items-center justify-center gap-1 transition-colors hover:bg-ink-subtle"
+        :style="{ '--bk-stagger-i': i % 7 }"
+        class="aspect-square rounded-sm border p-1 flex flex-col items-center justify-center gap-1 transition-colors hover:bg-slab"
         :class="{
           'border-ink-faint': !cell.inMonth,
           'text-ink-muted': !cell.inMonth,
-          'bg-stone border-ink-border': cell.inMonth,
+          'bg-stone border-line': cell.inMonth,
           'border-2 border-aurora': cell.date === today && cell.inMonth,
         }"
         @click="selectDay(cell.date)"
@@ -109,31 +113,3 @@ function selectDay(date: string) {
     </div>
   </div>
 </template>
-
-<style scoped>
-/* entry animation cascade */
-@keyframes cascade {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.grid > button {
-  animation: cascade 0.3s ease-out;
-  animation-fill-mode: both;
-}
-
-.grid > button:nth-child(1) { animation-delay: 0ms; }
-.grid > button:nth-child(2) { animation-delay: 30ms; }
-.grid > button:nth-child(3) { animation-delay: 60ms; }
-.grid > button:nth-child(4) { animation-delay: 90ms; }
-.grid > button:nth-child(5) { animation-delay: 120ms; }
-.grid > button:nth-child(6) { animation-delay: 150ms; }
-.grid > button:nth-child(7) { animation-delay: 180ms; }
-.grid > button:nth-child(n+8) { animation-delay: calc((var(--nth, 8) - 7) * 30ms); }
-</style>

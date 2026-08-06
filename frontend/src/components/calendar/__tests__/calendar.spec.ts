@@ -48,6 +48,7 @@ import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
+import CalendarView from '@/views/CalendarView.vue'
 
 describe('isValidRuneName', () => {
   it('returns true for valid muscle slug "chest"', () => {
@@ -255,7 +256,7 @@ describe('ScheduleSheet', () => {
     await flushPromises()
 
     const confirmButtonEl = document.querySelector('[data-testid="confirm-skip"]') as HTMLElement
-    expect(confirmButtonEl).toBeDefined()
+    expect(confirmButtonEl).not.toBeNull()
     confirmButtonEl?.click()
     await flushPromises()
 
@@ -281,7 +282,7 @@ describe('ScheduleSheet', () => {
     await flushPromises()
 
     const confirmButtonEl = document.querySelector('[data-testid="confirm-delete"]') as HTMLElement
-    expect(confirmButtonEl).toBeDefined()
+    expect(confirmButtonEl).not.toBeNull()
     confirmButtonEl?.click()
     await flushPromises()
 
@@ -308,7 +309,7 @@ describe('ScheduleSheet', () => {
     // Find cancel button - first Cancel button in the confirm sheet
     const allButtons = Array.from(document.querySelectorAll('button'))
     const cancelButton = allButtons.find(b => b.textContent?.includes('Cancel') && b.closest('[role="dialog"]'))
-    expect(cancelButton).toBeDefined()
+    expect(cancelButton).not.toBeUndefined()
     cancelButton?.click()
     await flushPromises()
 
@@ -335,26 +336,28 @@ describe('ScheduleSheet', () => {
 
     // Find and fill date and time fields in the teleported replan sheet
     const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-    expect(dateInput).toBeDefined()
+    expect(dateInput).not.toBeNull()
     dateInput.value = '2026-08-25'
     dateInput.dispatchEvent(new Event('input', { bubbles: true }))
 
     const timeInputs = Array.from(document.querySelectorAll('input[type="time"]')) as HTMLInputElement[]
-    if (timeInputs.length > 0) {
-      const timeInput = timeInputs[timeInputs.length - 1]
-      timeInput.value = '19:30'
-      timeInput.dispatchEvent(new Event('input', { bubbles: true }))
-    }
+    expect(timeInputs.length).toBeGreaterThan(0)
+    const timeInput = timeInputs[timeInputs.length - 1]
+    timeInput.value = '19:30'
+    timeInput.dispatchEvent(new Event('input', { bubbles: true }))
     await flushPromises()
 
     // Find and click the Save button in the teleported replan sheet
     const allButtons = Array.from(document.querySelectorAll('button'))
     const saveButton = allButtons.find(b => b.textContent?.includes('Guardar') && b.closest('[role="dialog"]'))
-    expect(saveButton).toBeDefined()
+    expect(saveButton).not.toBeUndefined()
     saveButton?.click()
     await flushPromises()
 
-    expect(vi.mocked(domain.updateSchedule)).toHaveBeenCalledWith(7, expect.objectContaining({ date: '2026-08-25' }))
+    expect(vi.mocked(domain.updateSchedule)).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({ date: '2026-08-25', time: '19:30' }),
+    )
   })
 
   it('hides all action buttons when athlete is viewing another user', async () => {
@@ -389,5 +392,30 @@ describe('ScheduleSheet', () => {
     })
     await flushPromises()
     expect(wrapper.text()).toContain('Too busy')
+  })
+})
+
+describe('CalendarView locale (I2)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('renders the month label and weekday headers in the VIEWER locale, not the viewed athlete\'s', async () => {
+    const athlete = useAthleteStore()
+    // el atleta visto es hispanohablante; el viewer (esta sesión) está en inglés
+    athlete.view({ id: 9, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
+
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance('en')] },
+    })
+    await flushPromises()
+
+    // label del mes: "August 2026", no "agosto de 2026"
+    expect(wrapper.text()).toContain('August')
+    expect(wrapper.text()).not.toContain('agosto')
+
+    // headers de días de la semana (narrow) en inglés: miércoles es "W", nunca
+    // la "X" que usa el formateador en español
+    const headers = wrapper.findAll('.grid.grid-cols-7 > div').map((h) => h.text())
+    expect(headers).toContain('W')
+    expect(headers).not.toContain('X')
   })
 })

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { monthLabel } from '@/utils/dates'
 import { getMonth, getHeatmap, listMuscleGroups } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
@@ -12,12 +13,14 @@ import { useAthleteStore } from '@/stores/athlete'
 import type { CalendarMonthOut, MuscleGroupOut } from '@/api/domain'
 
 const athlete = useAthleteStore()
+const { locale } = useI18n()
 
 const today = new Date()
 const year = ref(today.getFullYear())
 const month = ref(today.getMonth() + 1)
 
-const locale = computed(() => athlete.viewing?.locale ?? 'es')
+// el idioma de la UI es el del VIEWER, no el del atleta que se está viendo
+// (ver también MonthGrid.vue, mismo criterio para los headers de días)
 const label = computed(() => monthLabel(year.value, month.value, locale.value))
 
 const monthData = ref<CalendarMonthOut>({ scheduled: [], workouts: [] })

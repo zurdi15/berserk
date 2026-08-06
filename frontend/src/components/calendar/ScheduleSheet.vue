@@ -154,7 +154,7 @@ loadRoutines()
       <div
         v-for="session in scheduled"
         :key="session.id"
-        class="border border-ink-border rounded-sm p-3 space-y-2"
+        class="border border-line rounded-sm p-3 space-y-2"
       >
         <div class="flex items-center justify-between">
           <div class="flex-1">
@@ -203,7 +203,7 @@ loadRoutines()
     </div>
 
     <!-- Create new session form -->
-    <div v-if="isViewingSelf" class="border border-ink-border rounded-sm p-3 space-y-3">
+    <div v-if="isViewingSelf" class="border border-line rounded-sm p-3 space-y-3">
       <h4 class="font-medium text-ink">{{ $t('calendar.newSession') }}</h4>
       <div class="space-y-2">
         <BkField
