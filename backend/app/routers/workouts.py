@@ -137,9 +137,7 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
         # item 4: los grupos musculares del entreno se derivan desde el
         # instante en que trae ejercicios de la rutina, no solo al añadirlos
         # uno a uno luego
-        sync_derived_muscle_groups(
-            db, workout.id, [item.exercise_id for item in routine.exercises]
-        )
+        sync_derived_muscle_groups(db, workout.id)
     if session is not None:
         session.status = "done"
         session.workout_id = workout.id
@@ -280,10 +278,10 @@ def add_exercise(
     )
     db.add(wex)
     db.flush()
-    exercise_ids = db.scalars(
-        select(WorkoutExercise.exercise_id).where(WorkoutExercise.workout_id == workout.id)
-    ).all()
-    sync_derived_muscle_groups(db, workout.id, exercise_ids)
+    # fix M9 (revisión): sync_derived_muscle_groups ahora consulta
+    # workout_exercises ella misma (ver services/workouts.py), así que ya no
+    # hace falta precomputar exercise_ids aquí solo para pasárselo
+    sync_derived_muscle_groups(db, workout.id)
     db.commit()
     return wex
 
@@ -317,10 +315,7 @@ def remove_exercise(
     ):
         item.position = position
     db.flush()
-    remaining_ids = db.scalars(
-        select(WorkoutExercise.exercise_id).where(WorkoutExercise.workout_id == workout.id)
-    ).all()
-    sync_derived_muscle_groups(db, workout.id, remaining_ids)
+    sync_derived_muscle_groups(db, workout.id)
     db.commit()
 
 

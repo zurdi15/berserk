@@ -191,6 +191,8 @@ class Workout(Base):
     feeling: Mapped[int | None] = mapped_column(default=None)
     # item 8 (round v0.3.0): "check en el entreno" — si el usuario ha
     # estirado, sin más semántica que esa (no hay minutos/tipo de estiramiento)
+    # TODO ronda siguiente: mostrarlo en WorkoutDayInfo (calendario) — surface
+    # de un sibling, no tocada por este lane; el campo ya viaja en WorkoutOut
     stretched: Mapped[bool] = mapped_column(default=False)
 
     exercises: Mapped[list["WorkoutExercise"]] = relationship(

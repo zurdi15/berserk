@@ -16,26 +16,18 @@ from ..models import (
     WorkoutSet,
 )
 from .workout_sets import effective_set_filters, estimate_1rm
+from .workouts import primary_muscle_groups_by_workout
 
 
 def workout_muscle_group_ids(db: Session, workout_ids: list[int]) -> dict[int, set[int]]:
-    """Grupos por workout: primarios de los ejercicios registrados ∪ tags manuales."""
-    result: dict[int, set[int]] = {wid: set() for wid in workout_ids}
+    """Grupos por workout: primarios de los ejercicios registrados ∪ tags
+    manuales. La mitad "derivada" vive en services/workouts.py (fix M9:
+    antes duplicada aquí como una query casi idéntica a
+    sync_derived_muscle_groups) — esta función solo le suma la mitad manual,
+    que sync_derived_muscle_groups no necesita conocer."""
+    result = primary_muscle_groups_by_workout(db, workout_ids)
     if not workout_ids:
         return result
-    derived = db.execute(
-        select(WorkoutExercise.workout_id, ExerciseMuscleGroup.muscle_group_id)
-        .join(
-            ExerciseMuscleGroup,
-            ExerciseMuscleGroup.exercise_id == WorkoutExercise.exercise_id,
-        )
-        .where(
-            WorkoutExercise.workout_id.in_(workout_ids),
-            ExerciseMuscleGroup.is_primary.is_(True),
-        )
-    ).all()
-    for workout_id, group_id in derived:
-        result[workout_id].add(group_id)
     manual = db.execute(
         select(WorkoutMuscleGroup.workout_id, WorkoutMuscleGroup.muscle_group_id).where(
             WorkoutMuscleGroup.workout_id.in_(workout_ids)
