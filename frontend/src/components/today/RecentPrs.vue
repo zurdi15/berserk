@@ -29,7 +29,7 @@ const exerciseMap = computed(() => new Map(props.exercises.map((e) => [e.id, e])
 
 function getExerciseName(exerciseId: number): string {
   const ex = exerciseMap.value.get(exerciseId)
-  if (!ex) return '–'
+  if (!ex) return ''
   return locale.value === 'es' ? ex.name_es : ex.name_en
 }
 

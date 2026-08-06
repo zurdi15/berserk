@@ -21,7 +21,7 @@ const units = useDisplayUnits()
 const exerciseMap = computed(() => new Map(props.exercises.map((e) => [e.id, e])))
 
 function getExerciseName(exerciseId: number): string {
-  return exerciseName(exerciseMap.value.get(exerciseId), locale.value) || '–'
+  return exerciseName(exerciseMap.value.get(exerciseId), locale.value) || ''
 }
 
 // los 3 kinds de PR (max_weight, est_1rm, max_volume) son magnitudes en kg —

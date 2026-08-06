@@ -34,7 +34,7 @@ const saveAsRoutineOpen = ref(false)
 let noteTimeout: ReturnType<typeof setTimeout> | null = null
 
 const durationLabel = computed(() => {
-  if (!props.workout.started_at || !props.workout.ended_at) return '–'
+  if (!props.workout.started_at || !props.workout.ended_at) return ''
   const ms = new Date(props.workout.ended_at).getTime() - new Date(props.workout.started_at).getTime()
   const totalMinutes = Math.max(0, Math.round(ms / 60000))
   const h = Math.floor(totalMinutes / 60)
@@ -132,7 +132,7 @@ watch(note, () => {
       <div v-for="record in records" :key="record.id" class="flex items-center gap-2 text-ember">
         <BkRune name="pr" :size="20" tone="ember" />
         <span class="text-sm font-medium">
-          {{ t(`progress.kinds.${record.kind}`) }} — {{ formatRecordValue(record) }}
+          {{ t(`progress.kinds.${record.kind}`) }} · {{ formatRecordValue(record) }}
         </span>
       </div>
     </div>
