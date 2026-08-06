@@ -15,34 +15,79 @@ const { locale } = useI18n()
 
 const blocks = computed(() => monthBlocksFor(props.year, props.data))
 
-const levels = [0.15, 0.4, 0.7, 1]
+// offset de columna GLOBAL de cada bloque (acumulado, no reinicia por mes):
+// el barrido celda a celda cruza TODO el layout envuelto como una sola ola,
+// con la columna de cada celda = offset de su bloque + su columna local
+const blockColumnOffsets = computed(() => {
+  const offsets: number[] = []
+  let acc = 0
+  for (const block of blocks.value) {
+    offsets.push(acc)
+    acc += block.columnCount
+  }
+  return offsets
+})
+const totalColumns = computed(() => blocks.value.reduce((sum, b) => sum + b.columnCount, 0))
+
+// paso por columna en ms: se comprime si hay muchas columnas para que el
+// barrido COMPLETO (primera a última columna) no pase de ~1s sea cual sea
+// el nº de columnas del año (365 celdas no cambian la duración, solo cuánto
+// se comprime el paso)
+const MAX_SWEEP_MS = 1000
+const cascadeStepMs = computed(() => MAX_SWEEP_MS / Math.max(1, totalColumns.value - 1))
+
+// niveles como porcentaje de opacidad de color (utilidad de color con
+// modificador de opacidad), no como opacity del elemento: opacity queda
+// libre para el barrido de entrada (bk-cascade) — si el nivel también fuera
+// opacity inline, competiría con la animación (ver why-comment de
+// .bk-cascade en animations.css).
+// Clases COMPLETAS y literales a propósito, sin interpolar el porcentaje:
+// Tailwind extrae utilidades escaneando el texto fuente tal cual, no evalúa
+// JS — una clase montada por interpolación no genera CSS.
+const HEAT_CLASSES = ['bg-aurora/8', 'bg-aurora/15', 'bg-aurora/40', 'bg-aurora/70', 'bg-aurora/100']
+
+function heatClass(count: number): string {
+  return count ? HEAT_CLASSES[Math.min(count, 4)] : HEAT_CLASSES[0]
+}
 
 function monthName(month: number): string {
   return new Intl.DateTimeFormat(locale.value, { month: 'short' }).format(new Date(props.year, month - 1, 1))
 }
+
+// bloques por mes que se envuelven en varias filas (flex-wrap) en vez de
+// desbordar en scroll lateral: llenan el ancho disponible bajo "Actividad
+// del año", centrados (justify-center) para que el hueco sobrante quede
+// repartido a los dos lados en vez de solo a la derecha. Cada bloque es su
+// propia mini-rejilla, label centrado encima. Sin Transition propia en el
+// contenedor: el barrido celda a celda de abajo YA es la entrada de este
+// componente — envolverlo en otra sería la misma doble animación que el
+// bug de item 4 en ShellView, a menor escala. (Nota: este comentario vive
+// en <script>, no en <template>, a propósito — un comentario HTML como
+// primer hijo del template lo convierte en fragmento de dos raíces y rompe
+// wrapper.classes()/fallthrough de atributos de un solo elemento raíz.)
 </script>
 
 <template>
-  <Transition name="bk-fade" appear>
-    <!-- bloques por mes que se envuelven en varias filas (flex-wrap) en vez de
-         desbordar en scroll lateral: llenan el ancho disponible bajo "Actividad
-         del año" — cada bloque es su propia mini-rejilla, label centrado encima -->
-    <div class="flex flex-wrap items-start gap-3">
-      <div v-for="block in blocks" :key="`month-${block.month}`" class="flex flex-col items-center gap-1">
-        <span class="text-xs text-ink-faint text-center whitespace-nowrap">{{ monthName(block.month) }}</span>
+  <div class="flex flex-wrap justify-center items-start gap-3">
+    <div v-for="(block, blockIdx) in blocks" :key="`month-${block.month}`" class="flex flex-col items-center gap-1">
+      <span class="text-xs text-ink-faint text-center whitespace-nowrap">{{ monthName(block.month) }}</span>
+      <div
+        class="grid gap-1"
+        :style="{ gridTemplateColumns: `repeat(${block.columnCount}, auto)`, gridTemplateRows: 'repeat(7, 1fr)' }"
+      >
         <div
-          class="grid gap-1"
-          :style="{ gridTemplateColumns: `repeat(${block.columnCount}, auto)`, gridTemplateRows: 'repeat(7, 1fr)' }"
-        >
-          <div
-            v-for="cell in block.cells"
-            :key="cell.date"
-            :title="`${cell.date}: ${cell.count}`"
-            class="w-2.5 h-2.5 rounded-xs bg-aurora"
-            :style="{ gridColumn: cell.column + 1, gridRow: cell.day + 1, opacity: cell.count ? levels[Math.min(cell.count - 1, 3)] : 0.08 }"
-          />
-        </div>
+          v-for="cell in block.cells"
+          :key="cell.date"
+          :title="`${cell.date}: ${cell.count}`"
+          :class="['w-2.5 h-2.5 rounded-xs bk-cascade', heatClass(cell.count)]"
+          :style="{
+            gridColumn: cell.column + 1,
+            gridRow: cell.day + 1,
+            '--bk-cascade-i': blockColumnOffsets[blockIdx] + cell.column,
+            '--bk-cascade-step': `${cascadeStepMs}ms`,
+          }"
+        />
       </div>
     </div>
-  </Transition>
+  </div>
 </template>

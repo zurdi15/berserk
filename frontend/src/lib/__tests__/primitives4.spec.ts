@@ -6,6 +6,7 @@ import BkChart from '../BkChart.vue'
 import BkHeatmap from '../BkHeatmap.vue'
 import BkSelect from '../BkSelect.vue'
 import BkTabs from '../BkTabs.vue'
+import { monthBlocksFor } from '../heatmap'
 
 // Mock uPlot module
 vi.mock('uplot', () => ({
@@ -46,22 +47,23 @@ describe('BkHeatmap', () => {
     expect(cells.length).toBe(365)
   })
 
-  it('applies all four opacity tiers for counts 0-4', () => {
+  it('applies all four color-opacity tiers for counts 0-4 (bg-aurora/N, not element opacity — see item 1/2 why-comment)', () => {
     const wrapper = mount(BkHeatmap, {
       props: {
         year: 2026,
         data: [
-          { date: '2026-01-01', count: 0 }, // opacity: 0.08
-          { date: '2026-01-02', count: 1 }, // opacity: 0.15 (levels[0])
-          { date: '2026-01-03', count: 2 }, // opacity: 0.4 (levels[1])
-          { date: '2026-01-04', count: 3 }, // opacity: 0.7 (levels[2])
-          { date: '2026-01-05', count: 4 }, // opacity: 1 (levels[3])
+          { date: '2026-01-01', count: 0 }, // bg-aurora/8
+          { date: '2026-01-02', count: 1 }, // bg-aurora/15
+          { date: '2026-01-03', count: 2 }, // bg-aurora/40
+          { date: '2026-01-04', count: 3 }, // bg-aurora/70
+          { date: '2026-01-05', count: 4 }, // bg-aurora/100
         ],
       },
       global: { plugins: [createI18nInstance()] },
     })
-    const cells = wrapper.findAll('[style*="opacity"]')
-    // Find cells matching our test dates
+    // los cells ya no se distinguen por [style*="opacity"] (eso quedó libre
+    // para bk-cascade) — se buscan por title y se comprueba la clase de color
+    const cells = wrapper.findAll('[title]')
     const findCell = (date: string) =>
       cells.find((c) => c.attributes('title')?.startsWith(date))
 
@@ -71,11 +73,47 @@ describe('BkHeatmap', () => {
     const cell3 = findCell('2026-01-04')!
     const cell4 = findCell('2026-01-05')!
 
-    expect(cell0.attributes('style')).toContain('opacity: 0.08')
-    expect(cell1.attributes('style')).toContain('opacity: 0.15')
-    expect(cell2.attributes('style')).toContain('opacity: 0.4')
-    expect(cell3.attributes('style')).toContain('opacity: 0.7')
-    expect(cell4.attributes('style')).toContain('opacity: 1')
+    expect(cell0.classes()).toContain('bg-aurora/8')
+    expect(cell1.classes()).toContain('bg-aurora/15')
+    expect(cell2.classes()).toContain('bg-aurora/40')
+    expect(cell3.classes()).toContain('bg-aurora/70')
+    expect(cell4.classes()).toContain('bg-aurora/100')
+  })
+
+  it('item 1: cascade delay index is the GLOBAL column (block offset + local column), not reset per month block', () => {
+    const wrapper = mount(BkHeatmap, {
+      props: { year: 2026, data: [] },
+      global: { plugins: [createI18nInstance()] },
+    })
+
+    const blocks = monthBlocksFor(2026, [])
+    const totalColumns = blocks.reduce((sum, b) => sum + b.columnCount, 0)
+    const expectedStep = 1000 / (totalColumns - 1)
+
+    const cells = wrapper.findAll('.bk-cascade')
+    expect(cells.length).toBeGreaterThan(0)
+    const findCell = (date: string) => cells.find((c) => c.attributes('title')?.startsWith(date))!
+
+    // 1 enero: primera columna del año, índice global 0
+    expect(findCell('2026-01-01').attributes('style')).toContain('--bk-cascade-i: 0')
+    expect(findCell('2026-01-01').attributes('style')).toContain(`--bk-cascade-step: ${expectedStep}ms`)
+
+    // 31 enero: última columna del bloque de enero (columnCount - 1)
+    const januaryLastColumn = blocks[0].columnCount - 1
+    expect(findCell('2026-01-31').attributes('style')).toContain(`--bk-cascade-i: ${januaryLastColumn}`)
+
+    // 1 febrero: primera columna LOCAL de su bloque, pero el índice GLOBAL
+    // sigue acumulado desde enero (no vuelve a 0 al cruzar de mes)
+    expect(findCell('2026-02-01').attributes('style')).toContain(`--bk-cascade-i: ${blocks[0].columnCount}`)
+  })
+
+  it('item 1: the full sweep (first to last column of the year) never exceeds ~1s regardless of column count', () => {
+    const blocks = monthBlocksFor(2026, [])
+    const totalColumns = blocks.reduce((sum, b) => sum + b.columnCount, 0)
+    const expectedStep = 1000 / (totalColumns - 1)
+    const maxSweepMs = (totalColumns - 1) * expectedStep
+
+    expect(maxSweepMs).toBeLessThanOrEqual(1000)
   })
 
   it('renders one centered label per month block (item 4 redesign: per-month blocks, not a continuous grid)', () => {

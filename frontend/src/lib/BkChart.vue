@@ -9,6 +9,11 @@ const props = withDefaults(
   { color: 'aurora', suffix: '' },
 )
 
+// bk-reveal (clase en el template): uPlot no anima su trazo de forma
+// nativa, así que el propio contenedor se revela con un barrido clip-path
+// (ver animations.css) — entrada única en el montaje; para repetirla al
+// cambiar de ejercicio, quien use este componente debe forzar el remonte
+// con :key (ver ProgressView.vue), no cambia por su cuenta con las props
 const host = ref<HTMLElement | null>(null)
 let chart: uPlot | null = null
 let observer: ResizeObserver | null = null
@@ -59,5 +64,5 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="host" class="bk-metric text-sm" />
+  <div ref="host" class="bk-metric text-sm bk-reveal" />
 </template>

@@ -312,6 +312,8 @@ describe('BodySection', () => {
       { date: '2026-07-01', value: 84 },
       { date: '2026-07-08', value: 83 },
     ])
+    // item 2: el chart de Cuerpo también revela con clip-path al montar
+    expect(chart.classes()).toContain('bk-reveal')
   })
 
   it('blocks submission and shows an error when every field is empty (mirrors backend empty_entry)', async () => {
@@ -568,6 +570,7 @@ describe('ProgressView', () => {
     await flushPromises()
 
     const chartWrapperBefore = wrapper.findAll('[style*="--bk-stagger-i: 1"]')[0].element
+    const chartBefore = wrapper.findComponent({ name: 'BkChart' }).element
 
     const metricTablist = wrapper.findAll('[role="tablist"]')[1]
     await metricTablist.findAll('[role="tab"]')[2].trigger('click')
@@ -578,6 +581,23 @@ describe('ProgressView', () => {
     // dispara la animación de entrada (bk-stagger-i) es el MISMO antes y
     // después, así que la animación de montaje no se repite en cada tap
     expect(chartWrapperAfter).toBe(chartWrapperBefore)
+    // item 2: tampoco el propio BkChart (:key="exerciseId", no lleva metric)
+    expect(wrapper.findComponent({ name: 'BkChart' }).element).toBe(chartBefore)
+  })
+
+  it('item 2: selecting a DIFFERENT exercise DOES remount the chart (key=exerciseId) so bk-reveal plays again', async () => {
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    await wrapper.find('[data-testid="exercise-option-1"]').trigger('click')
+    await flushPromises()
+    const chartBefore = wrapper.findComponent({ name: 'BkChart' }).element
+
+    await wrapper.find('[data-testid="exercise-option-2"]').trigger('click')
+    await flushPromises()
+    const chartAfter = wrapper.findComponent({ name: 'BkChart' }).element
+
+    expect(chartAfter).not.toBe(chartBefore)
   })
 
   it('switches to the body tab (3rd tab, after records) and hides the training-tab content', async () => {

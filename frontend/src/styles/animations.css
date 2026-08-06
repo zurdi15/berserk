@@ -1,5 +1,8 @@
-/* Sistema de animación: solo entradas, solo transform/opacity (y el trazo de
-   la runa). Un único guard de reduced-motion cubre todo el sistema. */
+/* Sistema de animación: solo entradas, solo transform/opacity, con DOS
+   excepciones puntuales y documentadas (no una puerta abierta a animar
+   cualquier propiedad): el trazo de la runa (stroke-dashoffset, bk-carve) y
+   el revelado del chart (clip-path, bk-reveal — ver más abajo). Un único
+   guard de reduced-motion cubre todo el sistema, excepciones incluidas. */
 
 @keyframes bk-rise {
   from { opacity: 0; transform: translateY(12px); }
@@ -20,6 +23,16 @@
 @keyframes bk-carve {
   from { stroke-dashoffset: var(--bk-carve-length, 200); opacity: 0.4; }
   to { stroke-dashoffset: 0; opacity: 1; }
+}
+
+/* Segunda excepción sancionada al transform/opacity: uPlot no anima su
+   trazo de forma nativa, así que clip-path revela el chart de izquierda a
+   derecha sin deformar sus proporciones (deformar con scaleX distorsionaría
+   los puntos/ejes) — mismo espíritu puntual que el stroke-dashoffset del
+   tallado de runas. */
+@keyframes bk-reveal {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
 }
 
 @keyframes bk-shimmer {
@@ -55,9 +68,29 @@
   animation-delay: calc(var(--bk-stagger-i, 0) * 40ms);
 }
 
+/* barrido celda a celda del heatmap (BkHeatmap.vue): variable propia
+   (--bk-cascade-i/--bk-cascade-step) en vez de reutilizar --bk-stagger-i,
+   porque aquí el índice es la columna GLOBAL acumulada entre bloques de mes
+   (no un hijo directo de un único contenedor bk-stagger) y el paso por
+   columna se calcula en JS para acotar el barrido completo a ~1s sea cual
+   sea el nº de columnas del año. Reutiliza bk-fade tal cual (opacity 0→1) a
+   propósito: el nivel de actividad de cada celda va en el color
+   (bg-aurora/N, ver BkHeatmap.vue), NUNCA en opacity — si el nivel también
+   fuera opacity inline, competiría con la animación y la celda haría un
+   parpadeo/salto visible al terminar el fade (fill-mode no-forwards revierte
+   al valor en cascada, que sería ese opacity inline en vez de 1). */
+.bk-cascade {
+  animation: bk-fade var(--bk-dur-2) var(--bk-ease-out) backwards;
+  animation-delay: calc(var(--bk-cascade-i, 0) * var(--bk-cascade-step, 20ms));
+}
+
 .bk-carve-stroke {
   stroke-dasharray: var(--bk-carve-length, 200);
   animation: bk-carve var(--bk-dur-5) var(--bk-ease-carve) backwards;
+}
+
+.bk-reveal {
+  animation: bk-reveal var(--bk-dur-5) var(--bk-ease-out) backwards;
 }
 
 .bk-shimmer {

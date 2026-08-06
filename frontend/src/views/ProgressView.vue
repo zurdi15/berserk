@@ -120,7 +120,11 @@ watch(exerciseId, () => {
 
       <div v-if="exerciseId !== null" class="shrink-0 space-y-3" :style="{ '--bk-stagger-i': 1 }">
         <BkTabs v-model="metric" :tabs="metricTabs" />
-        <BkChart v-if="chartPoints.length" :points="chartPoints" color="aurora" :suffix="` ${units}`" />
+        <!-- :key="exerciseId" (item 2): remonta el chart al cambiar de
+             ejercicio para repetir el barrido bk-reveal — el metric NO va en
+             la key, así que cambiar peso/volumen/1RM solo actualiza :points
+             sin remontar (progress.spec.ts:563 fija justo eso) -->
+        <BkChart v-if="chartPoints.length" :key="exerciseId" :points="chartPoints" color="aurora" :suffix="` ${units}`" />
         <BkEmpty v-else :message="t('progress.noSeries')" />
       </div>
     </div>
