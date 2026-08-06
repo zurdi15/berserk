@@ -181,6 +181,42 @@ describe('ShellView active section indicator (item 3)', () => {
     expect(glows[1].classes()).toContain('bk-breathe')
   })
 
+  it('mobile bottom bar: only the active item\'s label is visible, the other 4 stay sr-only (accessible name kept, never removed via v-if)', async () => {
+    const wrapper = await mountWithRoute('progress')
+    await flushPromises()
+
+    const mobileNav = wrapper.findAll('nav')[1]
+    const labels = mobileNav.findAll('li span.text-2xs')
+    expect(labels).toHaveLength(5)
+
+    labels.forEach((label, i) => {
+      const items = ['today', 'calendar', 'workout', 'progress', 'profile']
+      if (items[i] === 'progress') {
+        expect(label.classes()).toContain('bk-nav-label-active')
+        expect(label.classes()).not.toContain('sr-only')
+      } else {
+        expect(label.classes()).toContain('sr-only')
+        expect(label.classes()).not.toContain('bk-nav-label-active')
+      }
+      // sigue en el DOM con su texto pase lo que pase: el nombre accesible
+      // nunca desaparece, solo se oculta visualmente
+      expect(label.text().length).toBeGreaterThan(0)
+    })
+  })
+
+  it('mobile bottom bar: the workout CTA label follows the same only-when-active rule as the rest', async () => {
+    const wrapper = await mountWithRoute('workout')
+    await flushPromises()
+
+    const mobileNav = wrapper.findAll('nav')[1]
+    const labels = mobileNav.findAll('li span.text-2xs')
+    // workout es el 3er item (índice 2)
+    expect(labels[2].classes()).toContain('bk-nav-label-active')
+    expect(labels[2].classes()).not.toContain('sr-only')
+    expect(labels[0].classes()).toContain('sr-only')
+    expect(labels[4].classes()).toContain('sr-only')
+  })
+
   it('item 4: RouterView renders the matched view directly, with no bk-rise Transition wrapper around it', async () => {
     // RouterView SIN stub a propósito: el stub oculta justo lo que hay que
     // comprobar (si el contenido routeado lleva o no clases de Transition)

@@ -27,11 +27,11 @@
      (0.75rem): en pantalla real se ve desproporcionada frente al icono de
      20px — un escalón más chico, generado de verdad y no arbitrario, para
      que siga siendo una utilidad real de la escala.
-     0.65rem (primer intento) resultó insuficiente en un móvil real: quitar
-     uppercase a la vez agranda visualmente las minúsculas, así que el ~13%
-     de reducción quedaba compensado casi del todo. Bajado a 0.6rem. */
-  --text-2xs: 0.6rem;
-  --text-2xs--line-height: 0.8rem;
+     0.65rem (primer intento) resultó insuficiente en un móvil real, bajado
+     a 0.6rem — pero con el patrón de "solo la etiqueta activa se ve" (las
+     otras 4 quedan sr-only) hay hueco de sobra, así que sube a 0.7rem. */
+  --text-2xs: 0.7rem;
+  --text-2xs--line-height: 0.9rem;
 }
 
 /* scrollbar siempre presente (gutter reservado) en vez de aparecer solo

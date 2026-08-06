@@ -116,10 +116,14 @@ const activeIndex = computed(() => {
                 />
                 <BkRune :name="item.rune" :size="item.name === 'workout' ? 26 : 20" :carve="item.name === 'workout'" class="relative" />
               </span>
-              <!-- text-2xs (item 2): en el bottom bar real de un móvil, text-xs
-                   se veía desproporcionado frente al icono de 20px; mayúsculas
-                   fuera también aquí, mismo criterio de coherencia que arriba -->
-              <span class="text-2xs tracking-wide">{{ $t(item.label) }}</span>
+              <!-- las 5 etiquetas a la vez se sentían apretadas: ahora solo se ve
+                   la de la sección activa (fade al cambiar), el resto se queda en
+                   el DOM como sr-only — nunca v-if, así que todos los items
+                   conservan nombre accesible para lectores de pantalla -->
+              <span
+                class="text-2xs tracking-wide"
+                :class="route.name === item.name ? 'bk-nav-label-active' : 'sr-only'"
+              >{{ $t(item.label) }}</span>
             </RouterLink>
           </li>
         </ul>
