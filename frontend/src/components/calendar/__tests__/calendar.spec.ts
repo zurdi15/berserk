@@ -340,6 +340,41 @@ describe('MonthGrid', () => {
 describe('ScheduleSheet', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
+  it('create: picking a time and scheduling calls the API with it, then the trigger resets to the placeholder (I2: null, not the old "" that rendered blank)', async () => {
+    vi.mocked(domain.schedule).mockClear()
+    const wrapper = mount(ScheduleSheet, {
+      props: { date: '2026-08-20', scheduled: [] },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    // BkTimeField (hora) va antes que BkSelect (rutina) en "Nueva sesión":
+    // el primer role=combobox del formulario es el de hora
+    const timeTrigger = wrapper.findAll('[role="combobox"]')[0]
+    expect(timeTrigger.text()).toContain('--:--')
+
+    await timeTrigger.trigger('click')
+    await flushPromises()
+    const [hourList, minuteList] = document.querySelectorAll('[role="listbox"]')
+    const hour9 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '09')!
+    const minute15 = Array.from(minuteList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '15')!
+    hour9.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    minute15.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    const applyBtn = document.querySelector('[data-testid="time-field-apply"]') as HTMLElement
+    applyBtn.click()
+    await flushPromises()
+    expect(timeTrigger.text()).toContain('09:15')
+
+    const scheduleBtn = wrapper.findAll('button').find((b) => b.text() === 'Programar')!
+    await scheduleBtn.trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(domain.schedule)).toHaveBeenCalledWith(expect.objectContaining({ time: '09:15' }))
+    // I2: tras crear, newTime vuelve a null (no '' — con el '' antiguo el
+    // trigger se quedaba en blanco en vez de mostrar el placeholder)
+    expect(timeTrigger.text()).toContain('--:--')
+  })
+
   it('skip: click skip button → confirm → updateSchedule called with status skipped', async () => {
     vi.mocked(domain.updateSchedule).mockClear()
     const wrapper = mount(ScheduleSheet, {
@@ -425,7 +460,9 @@ describe('ScheduleSheet', () => {
       props: {
         date: '2026-08-20',
         scheduled: [
-          { id: 7, date: '2026-08-20', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
+          // I1: pydantic serializa con segundos de verdad ("18:00:00") — la
+          // fixture usa el formato REAL de la API, no el "18:00" cómodo
+          { id: 7, date: '2026-08-20', time: '18:00:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
         ],
       },
       global: { plugins: [createI18nInstance()] },
@@ -442,6 +479,11 @@ describe('ScheduleSheet', () => {
     // BkTimeField (hora) — mismo orden que en el template.
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement
     const [dateTrigger, timeTrigger] = dialog.querySelectorAll('[role="combobox"]')
+
+    // I1: el trigger de hora precargado muestra "18:00", nunca los segundos
+    // crudos de la API ("18:00:00") — startReplan() pasa por formatTimeShort
+    expect(timeTrigger.textContent).toContain('18:00')
+    expect(timeTrigger.textContent).not.toContain('18:00:00')
 
     // sesión original del 2026-08-20: el panel de fecha abre ya en agosto,
     // así que el día 25 se puede clicar directamente sin navegar de mes

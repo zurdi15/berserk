@@ -80,7 +80,9 @@ async function deleteSession(id: number) {
 function startReplan(session: ScheduledOut) {
   editingId.value = session.id
   editDate.value = session.date
-  editTime.value = session.time
+  // I1: pydantic serializa la hora con segundos ("18:00:00") — pasarla tal
+  // cual al trigger de BkTimeField enseñaría "18:00:00" en vez de "18:00"
+  editTime.value = formatTimeShort(session.time)
 }
 
 async function saveReplan() {
@@ -129,11 +131,11 @@ async function createSession() {
     loading.value = true
     await schedule({
       date: props.date,
-      time: newTime.value || null,
+      time: newTime.value,
       routine_id: newRoutineId.value ? Number(newRoutineId.value) : null,
       note: newNote.value || null,
     })
-    newTime.value = ''
+    newTime.value = null
     newRoutineId.value = ''
     newNote.value = ''
     emit('updated')

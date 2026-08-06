@@ -40,6 +40,10 @@ export function formatDayLabel(iso: string, locale: string): string {
 // variante corta (BkDateField, gatillo del trigger): sin día de la semana,
 // mes abreviado — formatDayLabel es demasiado largo para caber en un campo
 export function formatDateShort(iso: string, locale: string): string {
+  // BkDateField.modelValue no admite null, pero antes de que el consumidor
+  // tenga un valor real ('' momentáneo) new Date(NaN, ...) formatearía
+  // "Invalid Date" — mejor una cadena vacía que ese texto en el trigger
+  if (!iso) return ''
   const [y, m, d] = iso.split('-').map(Number)
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(y, m - 1, d))
 }

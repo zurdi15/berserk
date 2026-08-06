@@ -52,6 +52,10 @@ describe('dates', () => {
     expect(short).toMatch(/2026/)
   })
 
+  it('M1: formatDateShort guards an empty string, returning "" instead of "Invalid Date"', () => {
+    expect(formatDateShort('', 'es')).toBe('')
+  })
+
   it('addDays (BkDateField grid nav): 30 days from 2026-03-01 crosses the EU DST boundary (2026-03-29) without a day-shift', () => {
     // construcción LOCAL (nunca new Date(iso)/toISOString): el cambio de
     // hora de por medio no debe desplazar el resultado ni un día
