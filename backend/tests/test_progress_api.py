@@ -65,6 +65,44 @@ def test_trained_exercises_respects_athlete_threading(client: TestClient, app):
     assert freyja.get("/api/v1/progress/trained-exercises").json()["exercise_ids"] == []
 
 
+def test_stats(client: TestClient):
+    log_workout(client, date.today().isoformat(), reps=5, weight=100)
+    log_workout(client, date.today().isoformat(), reps=5, weight=110)
+
+    result = client.get("/api/v1/progress/stats").json()
+    assert result["total_workouts"] == 2
+    assert result["total_sets"] == 2
+    assert result["total_reps"] == 10
+    assert result["total_volume_kg"] == 500 + 550
+    # cada set bate los 3 tipos de récord del anterior (peso, 1RM y volumen
+    # suben en el segundo entreno): 3 PRs por set logeado, 6 en total
+    assert result["prs_count"] == 6
+    assert result["total_cardio_seconds"] == 0
+    assert result["total_distance_m"] == 0.0
+    assert result["total_gym_seconds"] >= 0
+    assert result["avg_session_seconds"] == result["total_gym_seconds"] / 2
+
+
+def test_stats_respects_athlete_threading(client: TestClient, app):
+    from tests.conftest import login, make_user
+
+    make_user(client, "freyja")
+    log_workout(client, date.today().isoformat(), reps=5, weight=100)  # admin entrena
+
+    freyja = login(app, "freyja")
+    # freyja no ha entrenado nada todavía: su propia vista está en cero
+    own = freyja.get("/api/v1/progress/stats").json()
+    assert own["total_workouts"] == 0
+    assert own["total_volume_kg"] == 0.0
+    assert own["prs_count"] == 0
+
+    client.post("/api/v1/sharing", json={"username": "freyja"})
+    admin_id = client.get("/api/v1/auth/me").json()["id"]
+    shared = freyja.get(f"/api/v1/progress/stats?user_id={admin_id}").json()
+    assert shared["total_workouts"] == 1
+    assert shared["total_volume_kg"] == 500.0
+
+
 def test_series_of_invisible_exercise_404(client: TestClient, app):
     from tests.conftest import login, make_user
 

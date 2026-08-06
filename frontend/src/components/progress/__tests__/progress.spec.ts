@@ -46,6 +46,21 @@ const fixtures = vi.hoisted(() => ({
     { date: '2026-07-01', weight_kg: 84, waist_cm: 90, chest_cm: null, arm_cm: null, thigh_cm: null, hip_cm: null },
     { date: '2026-07-08', weight_kg: 83, waist_cm: null, chest_cm: null, arm_cm: null, thigh_cm: null, hip_cm: null },
   ],
+  // números elegidos para que cada derivación caiga en un valor exacto y sin
+  // ambigüedad de redondeo: 457200s = 127h en punto, 36000s = 10h en punto,
+  // 52340m -> 52.3km (redondeo a 1 decimal), 5400s = 90min = "1h 30min"
+  stats: {
+    total_workouts: 12,
+    total_gym_seconds: 457200,
+    total_cardio_seconds: 36000,
+    total_distance_m: 52340,
+    total_volume_kg: 102345,
+    total_sets: 480,
+    total_reps: 3600,
+    prs_count: 27,
+    avg_session_seconds: 5400,
+    longest_streak_weeks: 6,
+  },
 }))
 
 vi.mock('uplot', () => ({
@@ -64,6 +79,7 @@ vi.mock('@/api/domain', () => ({
   getRecords: vi.fn(async () => fixtures.records),
   getSeries: vi.fn(async () => ({ series: fixtures.series })),
   getTrainedExercises: vi.fn(async () => ({ exercise_ids: fixtures.trainedExerciseIds })),
+  getStats: vi.fn(async () => fixtures.stats),
   listBody: vi.fn(async () => fixtures.bodyEntries),
   upsertBody: vi.fn(async () => fixtures.bodyEntries[0]),
   deleteBody: vi.fn(async () => undefined),
@@ -75,6 +91,7 @@ import BodySection from '@/components/progress/BodySection.vue'
 import DistributionBars from '@/components/progress/DistributionBars.vue'
 import ExercisePicker from '@/components/progress/ExercisePicker.vue'
 import PrList from '@/components/progress/PrList.vue'
+import StatsGrid from '@/components/progress/StatsGrid.vue'
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
@@ -245,6 +262,58 @@ describe('PrList', () => {
   it('shows the empty state when there are no records', () => {
     const wrapper = mount(PrList, { props: { records: [], exercises: [] }, ...withI18n() })
     expect(wrapper.text()).toContain('Sin récords aún')
+  })
+})
+
+describe('StatsGrid', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    // reduced-motion forzado: mismo motivo que DistributionBars/PrList arriba
+    // — useAnimatedNumber salta directo al valor final sin esperar el rAF
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('renders every stat card with the formatted value from the mock (round/derive rules per field)', () => {
+    const wrapper = mount(StatsGrid, { props: { stats: fixtures.stats as never }, ...withI18n() })
+
+    expect(wrapper.find('[data-testid="stat-workouts"]').text()).toBe('12')
+    // 457200s = 127h en punto: horas enteras, sin desglose de minutos
+    expect(wrapper.find('[data-testid="stat-gym-time"]').text()).toBe('127 h')
+    expect(wrapper.find('[data-testid="stat-cardio-time"]').text()).toBe('10 h')
+    // 52340m -> 52.34km, redondeado a 1 decimal
+    expect(wrapper.find('[data-testid="stat-distance"]').text()).toBe('52.3 km')
+    // volumen: mismo formatWeightInt que FinishSummary/PrList (derivado, sin decimales)
+    expect(wrapper.find('[data-testid="stat-volume"]').text()).toBe('102345 kg')
+    expect(wrapper.find('[data-testid="stat-sets"]').text()).toBe('480')
+    expect(wrapper.find('[data-testid="stat-reps"]').text()).toBe('3600')
+    expect(wrapper.find('[data-testid="stat-prs"]').text()).toBe('27')
+    // 5400s = 90min = 1h 30min: misma pareja h/min que FinishSummary.durationLabel
+    expect(wrapper.find('[data-testid="stat-avg-session"]').text()).toBe('1h 30min')
+    expect(wrapper.find('[data-testid="stat-streak"]').text()).toBe('6')
+  })
+
+  it('shows the labels under each number', () => {
+    const wrapper = mount(StatsGrid, { props: { stats: fixtures.stats as never }, ...withI18n() })
+    expect(wrapper.text()).toContain('Entrenos')
+    expect(wrapper.text()).toContain('Horas de gym')
+    expect(wrapper.text()).toContain('Racha máxima')
+  })
+
+  it('renders every field at zero when stats is null (first paint before the fetch resolves)', () => {
+    const wrapper = mount(StatsGrid, { props: { stats: null }, ...withI18n() })
+    expect(wrapper.find('[data-testid="stat-workouts"]').text()).toBe('0')
+    expect(wrapper.find('[data-testid="stat-gym-time"]').text()).toBe('0 h')
+    expect(wrapper.find('[data-testid="stat-distance"]').text()).toBe('0.0 km')
+    expect(wrapper.find('[data-testid="stat-avg-session"]').text()).toBe('0min')
+  })
+
+  it('respects the h-full flex scroll model: flex-1/min-h-0/overflow-y-auto on its own root', () => {
+    const wrapper = mount(StatsGrid, { props: { stats: fixtures.stats as never }, ...withI18n() })
+    expect(wrapper.classes()).toContain('flex-1')
+    expect(wrapper.classes()).toContain('min-h-0')
+    expect(wrapper.classes()).toContain('overflow-y-auto')
+    expect(wrapper.classes()).toContain('grid-cols-2')
   })
 })
 
@@ -603,6 +672,7 @@ describe('ProgressView', () => {
     vi.mocked(domain.getDistribution).mockClear().mockResolvedValue(fixtures.distribution as never)
     vi.mocked(domain.getRecords).mockClear().mockResolvedValue(fixtures.records as never)
     vi.mocked(domain.getSeries).mockClear().mockResolvedValue({ series: fixtures.series } as never)
+    vi.mocked(domain.getStats).mockClear().mockResolvedValue(fixtures.stats as never)
     vi.mocked(domain.listBody).mockClear().mockResolvedValue(fixtures.bodyEntries as never)
   })
 
@@ -617,6 +687,58 @@ describe('ProgressView', () => {
     // item 5: ExercisePicker (montado dentro de la pestaña Entrenos) carga el
     // set de entrenados con el mismo hilo de atleta que el resto
     expect(domain.getTrainedExercises).toHaveBeenCalledWith(undefined)
+    // round 8: getStats se pide de arranque igual que el resto de la vista,
+    // no en diferido al abrir la pestaña Estadísticas
+    expect(domain.getStats).toHaveBeenCalledWith(undefined)
+  })
+
+  it("round 8: threads the viewed athlete's id into getStats", async () => {
+    const athlete = useAthleteStore()
+    athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
+
+    mount(ProgressView, withI18n())
+    await flushPromises()
+
+    expect(domain.getStats).toHaveBeenCalledWith(7)
+  })
+
+  it('round 8: adds a stats tab (3rd, after records) labeled with progress.stats.title', async () => {
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    const tabLabels = mainTablist.findAll('[role="tab"]').map((tab) => tab.text())
+    expect(tabLabels).toEqual(['Entrenos', 'Récords', 'Totales', 'Cuerpo'])
+  })
+
+  it('round 8: gates the stats grid until getStats resolves, then renders it with the fetched data', async () => {
+    // reduced-motion forzado solo en este test (mock local, restaurado al
+    // final): así la aserción del dígito final no depende de que el tween
+    // rAF real haya terminado, mismo motivo que en el describe de StatsGrid
+    const matchMediaSpy = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+    let resolveStats: (value: never) => void = () => {}
+    vi.mocked(domain.getStats).mockImplementationOnce(() => new Promise((resolve) => { resolveStats = resolve }))
+
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'StatsGrid' }).exists()).toBe(false)
+
+    resolveStats(fixtures.stats as never)
+    await flushPromises()
+
+    const grid = wrapper.findComponent({ name: 'StatsGrid' })
+    expect(grid.exists()).toBe(true)
+    expect(grid.props('stats')).toEqual(fixtures.stats)
+    // el dato real ya está montado de una: la card renderiza el número final,
+    // no un 0 pendiente de un segundo repintado
+    expect(wrapper.find('[data-testid="stat-workouts"]').text()).toBe('12')
+
+    matchMediaSpy.mockRestore()
   })
 
   it('hides the metric switch and chart until an exercise is picked', async () => {
@@ -698,7 +820,7 @@ describe('ProgressView', () => {
     expect(chartAfter).not.toBe(chartBefore)
   })
 
-  it('switches to the body tab (3rd tab, after records) and hides the training-tab content', async () => {
+  it('switches to the body tab (4th tab, after records and stats — round 8 shifted it one slot) and hides the training-tab content', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
@@ -706,7 +828,7 @@ describe('ProgressView', () => {
     expect(wrapper.findComponent({ name: 'BodySection' }).exists()).toBe(false)
 
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
-    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
+    await mainTablist.findAll('[role="tab"]')[3].trigger('click')
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'ExercisePicker' }).exists()).toBe(false)
@@ -798,7 +920,13 @@ describe('ProgressView', () => {
     await flushPromises()
     expect(wrapper.find('.bk-stagger').exists()).toBe(true) // panel de récords, re-montado
 
+    // round 8: la pestaña Estadísticas se cuela entre récords y cuerpo,
+    // también con su propio bk-stagger
     await mainTablist.findAll('[role="tab"]')[2].trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.bk-stagger').exists()).toBe(true) // panel de estadísticas, re-montado
+
+    await mainTablist.findAll('[role="tab"]')[3].trigger('click')
     await flushPromises()
     expect(wrapper.findComponent({ name: 'BodySection' }).classes()).toContain('flex-1')
   })

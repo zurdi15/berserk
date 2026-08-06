@@ -7,13 +7,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..models import (
+    Exercise,
     ExerciseMuscleGroup,
+    PersonalRecord,
     Workout,
     WorkoutExercise,
     WorkoutMuscleGroup,
     WorkoutSet,
 )
-from .workout_sets import estimate_1rm
+from .workout_sets import effective_set_filters, estimate_1rm
 
 
 def workout_muscle_group_ids(db: Session, workout_ids: list[int]) -> dict[int, set[int]]:
@@ -96,6 +98,27 @@ def weekly_streak(dates: Iterable[date], today: date) -> int:
     return streak
 
 
+def longest_streak_weeks(dates: Iterable[date]) -> int:
+    """Racha más larga de semanas ISO consecutivas en TODO el histórico (item
+    de round 8: "stats de por vida"), a diferencia de weekly_streak que solo
+    mira la racha actual/vigente. Mismo criterio de semana ISO: se ordenan los
+    lunes de cada semana entrenada y se busca la tirada más larga de saltos de
+    7 días exactos — los lunes ISO siempre distan 7 días entre semanas
+    consecutivas, incluso al cruzar de año, así que basta comparar fechas."""
+    weeks = {(d.isocalendar()[0], d.isocalendar()[1]) for d in dates}
+    if not weeks:
+        return 0
+    mondays = sorted(date.fromisocalendar(year, number, 1) for year, number in weeks)
+    best = current = 1
+    for prev, curr in zip(mondays, mondays[1:]):
+        if curr - prev == timedelta(weeks=1):
+            current += 1
+            best = max(best, current)
+        else:
+            current = 1
+    return best
+
+
 def annual_heatmap(db: Session, owner_id: int, year: int) -> list[tuple[date, int]]:
     """Workouts por día en el año: lista de (fecha, count)."""
     rows = db.execute(
@@ -143,3 +166,74 @@ def muscle_distribution(db: Session, owner_id: int, start: date, end: date) -> d
         .group_by(ExerciseMuscleGroup.muscle_group_id)
     ).all()
     return {row[0]: row[1] for row in rows}
+
+
+def lifetime_stats(db: Session, owner_id: int) -> dict:
+    """Totales de por vida para la pestaña Estadísticas de Progresión (round 8,
+    "stats que mole"): entrenos, tiempo, cardio, volumen, series/reps, PRs y
+    la racha histórica más larga. Todo cero-safe para un usuario sin datos."""
+    finished = db.execute(
+        select(Workout.started_at, Workout.ended_at).where(
+            Workout.owner_id == owner_id, Workout.ended_at.is_not(None)
+        )
+    ).all()
+    total_workouts = len(finished)
+    # started_at siempre se rellena al crear el entreno (ver routers/workouts.py
+    # start_workout), pero el modelo lo permite NULL: se filtra defensivo en
+    # vez de asumirlo y reventar con un TypeError al restar None
+    total_gym_seconds = sum(
+        int((ended - started).total_seconds())
+        for started, ended in finished
+        if started is not None
+    )
+
+    # series/reps "efectivos" (sin calentamiento) de TODA la historia, no solo
+    # de fuerza: cuenta también las series de cardio/timed, igual que el
+    # "effectiveSets" de WeekSummaryCard en el frontend
+    sets_row = db.execute(
+        select(func.count(WorkoutSet.id), func.coalesce(func.sum(WorkoutSet.reps), 0))
+        .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .join(Workout, Workout.id == WorkoutExercise.workout_id)
+        .where(Workout.owner_id == owner_id, WorkoutSet.is_warmup.is_(False))
+    ).one()
+    total_sets, total_reps = int(sets_row[0]), int(sets_row[1])
+
+    cardio_row = db.execute(
+        select(
+            func.coalesce(func.sum(WorkoutSet.duration_seconds), 0),
+            func.coalesce(func.sum(WorkoutSet.distance_m), 0.0),
+        )
+        .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .join(Exercise, Exercise.id == WorkoutExercise.exercise_id)
+        .join(Workout, Workout.id == WorkoutExercise.workout_id)
+        .where(Workout.owner_id == owner_id, Exercise.measurement == "cardio")
+    ).one()
+    total_cardio_seconds, total_distance_m = int(cardio_row[0]), float(cardio_row[1])
+
+    # mismo criterio de "volumen efectivo" que session_volume (item 5 de este
+    # módulo): se reutiliza effective_set_filters en vez de repetir la tripleta
+    total_volume_kg = db.scalar(
+        select(func.coalesce(func.sum(WorkoutSet.reps * WorkoutSet.weight_kg), 0.0))
+        .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .join(Workout, Workout.id == WorkoutExercise.workout_id)
+        .where(Workout.owner_id == owner_id, *effective_set_filters())
+    )
+
+    prs_count = db.scalar(
+        select(func.count(PersonalRecord.id)).where(PersonalRecord.owner_id == owner_id)
+    )
+
+    dates = db.scalars(select(Workout.date).where(Workout.owner_id == owner_id)).all()
+
+    return {
+        "total_workouts": total_workouts,
+        "total_gym_seconds": total_gym_seconds,
+        "total_cardio_seconds": total_cardio_seconds,
+        "total_distance_m": total_distance_m,
+        "total_volume_kg": float(total_volume_kg),
+        "total_sets": total_sets,
+        "total_reps": total_reps,
+        "prs_count": int(prs_count),
+        "avg_session_seconds": (total_gym_seconds / total_workouts) if total_workouts else 0.0,
+        "longest_streak_weeks": longest_streak_weeks(dates),
+    }

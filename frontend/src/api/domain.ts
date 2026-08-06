@@ -158,6 +158,19 @@ export interface DistributionItem {
   sets: number
 }
 
+export interface StatsOut {
+  total_workouts: number
+  total_gym_seconds: number
+  total_cardio_seconds: number
+  total_distance_m: number
+  total_volume_kg: number
+  total_sets: number
+  total_reps: number
+  prs_count: number
+  avg_session_seconds: number
+  longest_streak_weeks: number
+}
+
 // Body types
 export interface BodyEntryOut {
   date: string
@@ -370,6 +383,9 @@ export const getDistribution = (weeks?: number, userId?: number) =>
 
 export const getTrainedExercises = (userId?: number) =>
   api<{ exercise_ids: number[] }>(`/progress/trained-exercises${qs({ userId })}`)
+
+export const getStats = (userId?: number) =>
+  api<StatsOut>(`/progress/stats${qs({ userId })}`)
 
 // Body endpoints
 export const listBody = (userId?: number) =>

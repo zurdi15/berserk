@@ -12,6 +12,7 @@ from ..schemas.progress import (
     DistributionItem,
     HeatmapDay,
     SeriesOut,
+    StatsOut,
     StreakOut,
     TrainedExercisesOut,
 )
@@ -19,6 +20,7 @@ from ..schemas.workouts import PersonalRecordOut
 from ..services.progress import (
     annual_heatmap,
     exercise_series,
+    lifetime_stats,
     muscle_distribution,
     trained_exercise_ids,
     weekly_streak,
@@ -66,6 +68,11 @@ def streak(target: TargetUser, db: Session = Depends(get_db)):
 @router.get("/trained-exercises", response_model=TrainedExercisesOut)
 def trained_exercises(target: TargetUser, db: Session = Depends(get_db)):
     return TrainedExercisesOut(exercise_ids=sorted(trained_exercise_ids(db, target.id)))
+
+
+@router.get("/stats", response_model=StatsOut)
+def stats(target: TargetUser, db: Session = Depends(get_db)):
+    return StatsOut(**lifetime_stats(db, target.id))
 
 
 @router.get("/muscle-distribution", response_model=list[DistributionItem])

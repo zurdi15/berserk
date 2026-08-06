@@ -33,6 +33,21 @@ vi.mock('@/api/domain', () => ({
   getRecords: vi.fn(async () => []),
   getSeries: vi.fn(async () => ({ series: [{ workout_id: 1, date: '2026-08-01', top_weight: 80, volume: 800, est_1rm: 90 }] })),
   getTrainedExercises: vi.fn(async () => ({ exercise_ids: [] })),
+  // round 8: ProgressView pide getStats de arranque igual que el resto de
+  // pestañas — sin este mock, la llamada real revienta con un TypeError
+  // silencioso (capturado por el try/catch de loadStats, pero deja ruido)
+  getStats: vi.fn(async () => ({
+    total_workouts: 0,
+    total_gym_seconds: 0,
+    total_cardio_seconds: 0,
+    total_distance_m: 0,
+    total_volume_kg: 0,
+    total_sets: 0,
+    total_reps: 0,
+    prs_count: 0,
+    avg_session_seconds: 0,
+    longest_streak_weeks: 0,
+  })),
   listWorkouts: vi.fn(async () => []),
   listExercises: vi.fn(async () => [EXERCISE]),
   listMuscleGroups: vi.fn(async () => []),
@@ -179,10 +194,10 @@ describe('ProgressView athlete threading', () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
-    // cuerpo es la 3ª pestaña (entrenos, récords, cuerpo) desde que récords
-    // se separó de entrenos
+    // cuerpo es la 4ª pestaña (entrenos, récords, estadísticas, cuerpo) desde
+    // que round 8 metió la pestaña de Estadísticas entre récords y cuerpo
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
-    await mainTablist.findAll('[role="tab"]')[2].trigger('click')
+    await mainTablist.findAll('[role="tab"]')[3].trigger('click')
     await flushPromises()
 
     expect(domain.listBody).toHaveBeenCalledWith(7)
