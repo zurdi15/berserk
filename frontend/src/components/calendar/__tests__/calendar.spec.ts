@@ -992,6 +992,48 @@ describe('CalendarView heatmap empty state', () => {
   })
 })
 
+describe('CalendarView heatmap refetch on mutation (v0.3.0 item 2)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => vi.useRealTimers())
+
+  it('deleting a scheduled session from the day sheet refetches the heatmap, not just the month (bug: "Actividad del año no parece actualizarse")', async () => {
+    vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
+    vi.mocked(domain.getHeatmap).mockClear()
+    vi.mocked(domain.getMonth).mockClear()
+    vi.mocked(domain.deleteSchedule).mockClear()
+
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(domain.getHeatmap).toHaveBeenCalledTimes(1)
+    expect(domain.getMonth).toHaveBeenCalledTimes(1)
+
+    const dayCell = wrapper.get('[data-testid="day-cell-2026-08-01"]')
+    await dayCell.trigger('click')
+    await flushPromises()
+
+    const deleteButton = document.querySelector('[data-testid="delete-session-1"]') as HTMLElement
+    expect(deleteButton).not.toBeNull()
+    deleteButton.click()
+    await flushPromises()
+
+    const confirmButtonEl = document.querySelector('[data-testid="confirm-delete"]') as HTMLElement
+    expect(confirmButtonEl).not.toBeNull()
+    confirmButtonEl.click()
+    await flushPromises()
+
+    expect(domain.deleteSchedule).toHaveBeenCalledWith(1)
+    // el bug: solo se recargaba el mes, el heatmap se quedaba con los datos
+    // con los que se montó la vista
+    expect(domain.getHeatmap).toHaveBeenCalledTimes(2)
+    expect(domain.getMonth).toHaveBeenCalledTimes(2)
+
+    wrapper.unmount()
+  })
+})
+
 describe('CalendarView layout (round 6, items 3/4)', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
