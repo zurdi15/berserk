@@ -64,6 +64,28 @@ describe('RoutineList', () => {
     })
   }
 
+  it('item 7: has no "Rutinas" heading, and the new-routine button sits alone at the left edge of its row, opening the editor in create mode', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('h2').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Rutinas')
+
+    const button = wrapper.get('[data-testid="new-routine-btn"]')
+    // única hija de su fila: nada a la izquierda que la empuje
+    expect(button.element.parentElement?.children).toHaveLength(1)
+
+    const editor = wrapper.findComponent({ name: 'RoutineEditorSheet' })
+    expect(editor.props('open')).toBe(false)
+    await button.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(editor.props('open')).toBe(true)
+    expect(editor.props('routine')).toBeUndefined()
+  })
+
   it('displays routines after loading', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()

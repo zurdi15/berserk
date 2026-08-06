@@ -90,12 +90,13 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4">
-    <!-- Header -->
-    <div class="flex justify-between items-center">
-      <h2 class="text-lg font-semibold text-ink">{{ $t('profile.routinesTab') }}</h2>
+    <!-- item 7: sin título "Rutinas" (la pestaña de Perfil ya lo dice) — el
+         botón de crear queda solo, pegado al borde izquierdo de esta fila -->
+    <div class="flex items-center">
       <BkButton
         variant="primary"
         size="sm"
+        data-testid="new-routine-btn"
         @click="openEditor()"
       >
         {{ $t('routines.newRoutine') }}
