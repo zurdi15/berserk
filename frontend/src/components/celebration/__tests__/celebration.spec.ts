@@ -76,6 +76,51 @@ describe('BkCelebration', () => {
 
       expect(w.emitted('done')).toHaveLength(1)
     })
+
+    it('emits done when pressing Escape', async () => {
+      const w = mountCelebration()
+      await flushPromises()
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
+
+      expect(w.emitted('done')).toHaveLength(1)
+    })
+
+    it('emits done at most once even when tapped twice before it unmounts', async () => {
+      const w = mountCelebration()
+      await flushPromises()
+
+      const overlay = document.querySelector('[data-testid="celebration-overlay"]') as HTMLElement
+      overlay.click()
+      overlay.click()
+      await flushPromises()
+
+      expect(w.emitted('done')).toHaveLength(1)
+    })
+
+    it('moves focus into the overlay on mount and restores it to the previously focused element on unmount', async () => {
+      const trigger = document.createElement('button')
+      document.body.appendChild(trigger)
+      trigger.focus()
+      expect(document.activeElement).toBe(trigger)
+
+      wrapper = mount(BkCelebration, {
+        props: { records: records as never, runeName: 'chest' },
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await flushPromises()
+
+      const overlay = document.querySelector('[data-testid="celebration-overlay"]') as HTMLElement
+      expect(document.activeElement).toBe(overlay)
+
+      wrapper.unmount()
+      wrapper = null
+      expect(document.activeElement).toBe(trigger)
+
+      trigger.remove()
+    })
   })
 
   describe('without reduced motion', () => {

@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const push = vi.fn()
 const routeQuery: Record<string, unknown> = {}
@@ -135,9 +135,18 @@ describe('WorkoutView', () => {
       muscle_tag_ids: [],
     }
 
+    // BkCelebration se teletransporta a document.body: si no se desmonta,
+    // el siguiente test hereda el overlay huérfano del anterior
+    let wrapper: ReturnType<typeof build> | null = null
+
     beforeEach(() => {
       vi.mocked(domain.listExercises).mockResolvedValue([exerciseFixture] as never)
       vi.mocked(domain.listMuscleGroups).mockResolvedValue(muscleGroupsFixture as never)
+    })
+
+    afterEach(() => {
+      wrapper?.unmount()
+      wrapper = null
     })
 
     it('shows the celebration with the logged exercise\'s primary-group rune when lastRecords fills', async () => {
@@ -146,7 +155,7 @@ describe('WorkoutView', () => {
         activeWorkout.workout = workoutFixture as never
       })
 
-      const wrapper = build()
+      wrapper = build()
       await flushPromises()
 
       expect(wrapper.findComponent({ name: 'BkCelebration' }).exists()).toBe(false)
@@ -168,7 +177,7 @@ describe('WorkoutView', () => {
         activeWorkout.workout = workoutFixture as never
       })
 
-      const wrapper = build()
+      wrapper = build()
       await flushPromises()
 
       activeWorkout.lastRecords = [
@@ -190,7 +199,7 @@ describe('WorkoutView', () => {
       // catálogo sin grupos musculares: no hay runa que resolver, así que cae al fallback 'pr'
       vi.mocked(domain.listMuscleGroups).mockResolvedValue([] as never)
 
-      const wrapper = build()
+      wrapper = build()
       await flushPromises()
 
       activeWorkout.lastRecords = [
