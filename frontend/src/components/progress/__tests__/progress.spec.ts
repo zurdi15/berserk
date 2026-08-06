@@ -47,7 +47,7 @@ const fixtures = vi.hoisted(() => ({
 }))
 
 vi.mock('uplot', () => ({
-  default: vi.fn(() => ({ destroy: vi.fn(), setSize: vi.fn() })),
+  default: vi.fn(() => ({ destroy: vi.fn(), setSize: vi.fn(), setData: vi.fn() })),
   tzDate: vi.fn((date: Date) => date),
 }))
 
@@ -76,6 +76,7 @@ import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
 import { useAuthStore } from '@/stores/auth'
+import { core } from '@/tokens'
 import { todayIso } from '@/utils/dates'
 import { kgToDisplay } from '@/utils/units'
 import ProgressView from '@/views/ProgressView.vue'
@@ -152,6 +153,44 @@ describe('DistributionBars', () => {
   it('shows the empty state when there are no items', () => {
     const wrapper = mount(DistributionBars, { props: { items: [], groups: [] }, ...withI18n() })
     expect(wrapper.text()).toContain('Aún no hay datos de distribución')
+  })
+
+  it('item 6: bars carry the growth animation class with a per-bar --bar-dur proportional to the bar\'s magnitude (longer bar takes longer)', () => {
+    const wrapper = mount(DistributionBars, {
+      props: { items: fixtures.distribution as never, groups: fixtures.muscleGroups as never },
+      ...withI18n(),
+    })
+    const rows = wrapper.findAll('[data-testid^="distribution-row-"]')
+    // legs (40/40 sets = 100% del máximo) primero, pecho (20/40 = 50%) segundo
+    // — mismo orden que el test de arriba
+    const legsBar = rows[0].find('.bk-grow-x')
+    const chestBar = rows[1].find('.bk-grow-x')
+    expect(legsBar.exists()).toBe(true)
+    expect(chestBar.exists()).toBe(true)
+
+    const legsDur = parseInt((legsBar.element as HTMLElement).style.getPropertyValue('--bar-dur'), 10)
+    const chestDur = parseInt((chestBar.element as HTMLElement).style.getPropertyValue('--bar-dur'), 10)
+
+    // barra al 100% del máximo: la duración completa del token base (dur[5])
+    expect(legsDur).toBe(parseInt(core.dur[5], 10))
+    // barra al 50%: la mitad — y por tanto más corta que la de legs (100%)
+    expect(chestDur).toBeLessThan(legsDur)
+    expect(chestDur).toBe(Math.round(parseInt(core.dur[5], 10) * 0.5))
+  })
+
+  it('item 6: a tiny bar still gets a floor duration (dur[1]) instead of an instant/near-zero animation', () => {
+    const tinyItems = [
+      { muscle_group_id: 1, sets: 1 },
+      { muscle_group_id: 2, sets: 1000 },
+    ]
+    const wrapper = mount(DistributionBars, {
+      props: { items: tinyItems as never, groups: fixtures.muscleGroups as never },
+      ...withI18n(),
+    })
+    const rows = wrapper.findAll('[data-testid^="distribution-row-"]')
+    const tinyBar = rows[1].find('.bk-grow-x') // 1/1000 sets: la barra minúscula, ordenada al final (desc)
+    const tinyDur = parseInt((tinyBar.element as HTMLElement).style.getPropertyValue('--bar-dur'), 10)
+    expect(tinyDur).toBe(parseInt(core.dur[1], 10))
   })
 })
 
@@ -328,8 +367,11 @@ describe('BodySection', () => {
       { date: '2026-07-01', value: 84 },
       { date: '2026-07-08', value: 83 },
     ])
-    // item 2: el chart de Cuerpo también revela con clip-path al montar
-    expect(chart.classes()).toContain('bk-reveal')
+    // item 2: el chart de Cuerpo revela su serie progresivamente (BkChart lo
+    // resuelve internamente vía setData, no con una clase CSS de barrido) —
+    // la propia lógica del tween/rango de escala vive y se prueba en BkChart,
+    // no aquí; este componente solo verifica que le pasa los puntos correctos
+    expect(chart.classes()).not.toContain('bk-reveal')
   })
 
   it('blocks submission and shows an error when every field is empty (mirrors backend empty_entry)', async () => {
@@ -601,7 +643,7 @@ describe('ProgressView', () => {
     expect(wrapper.findComponent({ name: 'BkChart' }).element).toBe(chartBefore)
   })
 
-  it('item 2: selecting a DIFFERENT exercise DOES remount the chart (key=exerciseId) so bk-reveal plays again', async () => {
+  it('item 2: selecting a DIFFERENT exercise DOES remount the chart (key=exerciseId) so the progressive reveal plays again', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
@@ -648,6 +690,35 @@ describe('ProgressView', () => {
     expect(wrapper.text()).toContain('Press banca') // fila real de PrList
     expect(wrapper.text()).toContain('Piernas') // fila real de DistributionBars
     expect(wrapper.findComponent({ name: 'ExercisePicker' }).exists()).toBe(false)
+  })
+
+  it('item 8: records panel is a bounded flex column with PrList taking the remaining space and DistributionBars pinned at the bottom', async () => {
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[1].trigger('click')
+    await flushPromises()
+
+    // mismo patrón flex que la pestaña Entrenos (item 3c más abajo)
+    const recordsPanel = wrapper.find('.bk-stagger')
+    expect(recordsPanel.classes()).toContain('flex-1')
+    expect(recordsPanel.classes()).toContain('min-h-0')
+    expect(recordsPanel.classes()).toContain('flex-col')
+
+    const recordsArea = recordsPanel.findAll('[style*="--bk-stagger-i: 0"]')[0]
+    expect(recordsArea.classes()).toContain('flex-1')
+    expect(recordsArea.classes()).toContain('min-h-0')
+
+    const distributionArea = recordsPanel.findAll('[style*="--bk-stagger-i: 1"]')[0]
+    expect(distributionArea.classes()).toContain('shrink-0')
+
+    // PrList: sin tope max-h-72, se lleva el resto del alto con scroll interno
+    const prList = wrapper.findComponent({ name: 'PrList' })
+    expect(prList.classes()).toContain('flex-1')
+    expect(prList.classes()).toContain('min-h-0')
+    expect(prList.classes()).toContain('overflow-y-auto')
+    expect(prList.classes()).not.toContain('max-h-72')
   })
 
   it('item 3c: training panel is a bounded flex column with the exercise-list area taking the remaining space', async () => {

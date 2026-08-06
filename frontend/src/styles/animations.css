@@ -1,8 +1,7 @@
-/* Sistema de animación: solo entradas, solo transform/opacity, con DOS
-   excepciones puntuales y documentadas (no una puerta abierta a animar
-   cualquier propiedad): el trazo de la runa (stroke-dashoffset, bk-carve) y
-   el revelado del chart (clip-path, bk-reveal — ver más abajo). Un único
-   guard de reduced-motion cubre todo el sistema, excepciones incluidas. */
+/* Sistema de animación: solo entradas, solo transform/opacity, con UNA
+   excepción puntual y documentada (no una puerta abierta a animar cualquier
+   propiedad): el trazo de la runa (stroke-dashoffset, bk-carve). Un único
+   guard de reduced-motion cubre todo el sistema, excepción incluida. */
 
 @keyframes bk-rise {
   from { opacity: 0; transform: translateY(12px); }
@@ -25,14 +24,18 @@
   to { stroke-dashoffset: 0; opacity: 1; }
 }
 
-/* Segunda excepción sancionada al transform/opacity: uPlot no anima su
-   trazo de forma nativa, así que clip-path revela el chart de izquierda a
-   derecha sin deformar sus proporciones (deformar con scaleX distorsionaría
-   los puntos/ejes) — mismo espíritu puntual que el stroke-dashoffset del
-   tallado de runas. */
-@keyframes bk-reveal {
-  from { clip-path: inset(0 100% 0 0); }
-  to { clip-path: inset(0 0 0 0); }
+/* DistributionBars (item 6): cada barra crece de 0 a su ancho final con
+   transform-origin izquierda (scaleX, transform puro — sin excepción, cabe
+   en la disciplina transform/opacity del sistema). La duración es
+   proporcional a la magnitud de la barra (--bar-dur, calculada en JS a
+   partir de dur[5]/dur[1], ver DistributionBars.vue) para que TODAS crezcan
+   a la MISMA velocidad visual: cuanto más larga, más tarda en terminar. (El
+   barrido de revelado que antes ocupaba este hueco, item 2, se sustituyó por
+   el crecimiento progresivo de datos del propio chart — ver BkChart.vue —
+   así que ya no queda ninguna animación basada en recortar el área visible.) */
+@keyframes bk-grow-x {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 @keyframes bk-shimmer {
@@ -89,8 +92,9 @@
   animation: bk-carve var(--bk-dur-5) var(--bk-ease-carve) backwards;
 }
 
-.bk-reveal {
-  animation: bk-reveal var(--bk-dur-5) var(--bk-ease-out) backwards;
+.bk-grow-x {
+  transform-origin: left;
+  animation: bk-grow-x var(--bar-dur, var(--bk-dur-4)) var(--bk-ease-out) backwards;
 }
 
 .bk-shimmer {

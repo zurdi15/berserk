@@ -14,11 +14,12 @@ describe('animation system', () => {
     expect(css.match(/prefers-reduced-motion/g)?.length).toBe(1)
   })
 
-  it('animates only transform and opacity (plus the two documented exceptions)', () => {
-    // dentro de keyframes solo se permiten transform/opacity y las dos
-    // excepciones puntuales documentadas: stroke-dashoffset (bk-carve) y
-    // clip-path (bk-reveal)
-    const banned = /(width|height|margin|top|left|font-size)\s*:/
+  it('animates only transform and opacity (plus the one documented exception)', () => {
+    // dentro de keyframes solo se permiten transform/opacity y la única
+    // excepción puntual documentada: stroke-dashoffset (bk-carve). clip-path
+    // ya no es una excepción sancionada (item 2: el barrido bk-reveal se
+    // sustituyó por el revelado progresivo de datos en BkChart.vue)
+    const banned = /(width|height|margin|top|left|font-size|clip-path)\s*:/
     for (const block of css.split('@keyframes').slice(1)) {
       expect(block.split('}')[0]).not.toMatch(banned)
     }
@@ -30,10 +31,17 @@ describe('animation system', () => {
     expect(css).toContain('.bk-fade-enter-active')
   })
 
-  it('defines the chart-reveal keyframe (clip-path) as the second documented exception', () => {
-    expect(css).toContain('@keyframes bk-reveal')
-    expect(css).toContain('clip-path: inset(0 100% 0 0)')
-    expect(css).toContain('.bk-reveal')
+  it('item 2: the old chart-reveal wipe (bk-reveal/clip-path) is gone — BkChart now reveals its series progressively via setData, not CSS', () => {
+    expect(css).not.toContain('bk-reveal')
+    expect(css).not.toContain('clip-path')
+  })
+
+  it('item 6: defines the distribution-bar growth keyframe (scaleX, transform-only) with a per-bar duration custom property', () => {
+    expect(css).toContain('@keyframes bk-grow-x')
+    expect(css).toContain('transform: scaleX(0)')
+    expect(css).toContain('transform: scaleX(1)')
+    expect(css).toContain('.bk-grow-x')
+    expect(css).toContain('--bar-dur')
   })
 
   it('defines the heatmap cell cascade with its own step/index custom properties', () => {
@@ -53,10 +61,11 @@ describe('animation system', () => {
     expect(guard).toContain('animation-delay: 0s !important')
   })
 
-  it('the reduced-motion guard is universal (*), so it reaches bk-cascade/bk-reveal too without listing them', () => {
-    // el heatmap (item 1) y el chart (item 2) no necesitan su propia entrada
-    // en el guard: al ser `*, *::before, *::after` cualquier animation-delay/
-    // duration nuevo queda a 0s/0.01ms igual, sin mantenimiento extra
+  it('the reduced-motion guard is universal (*), so it reaches bk-cascade/bk-grow-x too without listing them', () => {
+    // el heatmap (item 1) y las barras de distribución (item 6) no necesitan
+    // su propia entrada en el guard: al ser `*, *::before, *::after`
+    // cualquier animation-delay/duration nuevo queda a 0s/0.01ms igual, sin
+    // mantenimiento extra
     const guard = css.slice(css.indexOf('@media (prefers-reduced-motion'))
     expect(guard).toContain('*, *::before, *::after')
   })
