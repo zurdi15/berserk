@@ -645,6 +645,36 @@ describe('ScheduleSheet', () => {
     )
   })
 
+  it('v0.3.0 item 5: planned-session actions are icon-only (BkActionBtn), with an accessible aria-label instead of visible text', async () => {
+    const wrapper = mount(ScheduleSheet, {
+      props: {
+        date: '2026-08-20',
+        scheduled: [
+          { id: 7, date: '2026-08-20', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
+        ],
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const replanBtn = wrapper.get('[data-testid="replan-session-7"]')
+    const skipBtn = wrapper.get('[data-testid="skip-session-7"]')
+    const deleteBtn = wrapper.get('[data-testid="delete-session-7"]')
+
+    expect(replanBtn.element.tagName).toBe('BUTTON')
+    expect(replanBtn.find('svg').exists()).toBe(true)
+    expect(replanBtn.text()).toBe('')
+    expect(replanBtn.attributes('aria-label')).toBe('Replanificar')
+
+    expect(skipBtn.find('svg').exists()).toBe(true)
+    expect(skipBtn.text()).toBe('')
+    expect(skipBtn.attributes('aria-label')).toBe('Omitir')
+
+    expect(deleteBtn.find('svg').exists()).toBe(true)
+    expect(deleteBtn.text()).toBe('')
+    expect(deleteBtn.attributes('aria-label')).toBe('Borrar')
+  })
+
   it('hides all action buttons when athlete is viewing another user', async () => {
     const athlete = useAthleteStore()
     athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
