@@ -371,6 +371,31 @@ describe('MonthGrid', () => {
     expect(grid.attributes('style')).toContain('--bk-day-dot: var(--color-aurora)')
   })
 
+  it('v0.3.0 item 4: today\'s cell gets an aurora border AND an aurora day number ("el número en color aurora o borde en aurora")', async () => {
+    vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
+    const wrapper = mount(MonthGrid, {
+      props: {
+        month: { scheduled: [], workouts: [] },
+        year: 2026,
+        monthNum: 8,
+        groupMap: createGroupMap(),
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const todayCell = wrapper.get('[data-testid="day-cell-2026-08-15"]')
+    expect(todayCell.classes()).toContain('border-aurora')
+    const dayNumber = todayCell.get('.text-xs.font-semibold')
+    expect(dayNumber.classes()).toContain('text-aurora')
+
+    const otherCell = wrapper.get('[data-testid="day-cell-2026-08-16"]')
+    expect(otherCell.classes()).not.toContain('border-aurora')
+    expect(otherCell.get('.text-xs.font-semibold').classes()).not.toContain('text-aurora')
+
+    vi.useRealTimers()
+  })
+
   it('emits select event when day is clicked', async () => {
     const wrapper = mount(MonthGrid, {
       props: {

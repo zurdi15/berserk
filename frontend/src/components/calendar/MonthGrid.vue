@@ -119,7 +119,13 @@ function selectDay(date: string) {
              empujar el número (item 6: antes compartían un mismo footer
              abajo y, con ambos presentes, el bloque crecía hacia el centro
              y tapaba el número) -->
-        <span class="text-xs font-semibold">
+        <!-- v0.3.0 item 4: "el número en color aurora o borde en aurora" —
+             hoy ya tenía borde aurora (arriba), ahora además el número en
+             sí va en aurora: más visible en el vistazo rápido en el gym -->
+        <span
+          class="text-xs font-semibold"
+          :class="{ 'text-aurora': cell.date === today && cell.inMonth }"
+        >
           {{ Number(cell.date.slice(8, 10)) }}
         </span>
 
