@@ -1,14 +1,17 @@
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { Measurement } from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import SetForm from '../SetForm.vue'
 
-function build(measurement: string) {
+function build(measurement: string, units?: 'kg' | 'lb') {
   setActivePinia(createPinia())
   return mount(SetForm, {
-    props: { measurement },
+    // measurement viaja como Measurement en producción; aquí se castea en el
+    // harness (no se afloja el tipo del componente) para simular valores libres
+    props: { measurement: measurement as Measurement, units },
     global: { plugins: [createI18nInstance()] },
   })
 }
@@ -118,5 +121,52 @@ describe('SetForm', () => {
 
     expect(second.weight_kg).toBe((first.weight_kg as number) + 2.5)
     expect(second.reps).toBe(first.reps)
+  })
+
+  it('displays the forwarded units prop as the weight stepper suffix', () => {
+    const wrapper = build('strength', 'lb')
+    expect(wrapper.text()).toContain('lb')
+  })
+
+  it('reps stepper clamps at the backend minimum of 1 (ge=1)', async () => {
+    const wrapper = build('strength')
+    const minus = wrapper.findAll('button[aria-label="Reducir"]')[1]
+    for (let i = 0; i < 10; i++) {
+      await minus.trigger('click', { detail: 0 })
+    }
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')!.at(-1)![0] as Record<string, unknown>
+    expect(payload.reps).toBe(1)
+  })
+
+  it('strength weight stepper clamps at the backend minimum of 2.5 (gt=0)', async () => {
+    const wrapper = build('strength')
+    const minus = wrapper.findAll('button[aria-label="Reducir"]')[0]
+    for (let i = 0; i < 10; i++) {
+      await minus.trigger('click', { detail: 0 })
+    }
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')!.at(-1)![0] as Record<string, unknown>
+    expect(payload.weight_kg).toBe(2.5)
+  })
+
+  it('timed duration stepper clamps at the backend minimum of 1 (ge=1)', async () => {
+    const wrapper = build('timed')
+    const minus = wrapper.findAll('button[aria-label="Reducir"]')[0]
+    for (let i = 0; i < 5; i++) {
+      await minus.trigger('click', { detail: 0 })
+    }
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')!.at(-1)![0] as Record<string, unknown>
+    expect(payload.duration_seconds).toBe(1)
+  })
+
+  it('logs a console warning and emits nothing for an unknown measurement (defensive default)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const wrapper = build('unknown-measurement')
+    await wrapper.find('form').trigger('submit')
+    expect(wrapper.emitted('submit')).toBeFalsy()
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
 })

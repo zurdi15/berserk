@@ -139,7 +139,7 @@ onBeforeUnmount(() => {
     />
 
     <div v-else-if="activeWorkout.workout" class="space-y-4 bk-stagger">
-      <div class="bk-slab p-4 flex items-center justify-between">
+      <div class="bk-slab p-4 flex items-center justify-between" :style="{ '--bk-stagger-i': 0 }">
         <div>
           <p class="text-sm text-ink-muted capitalize">{{ dateLabel }}</p>
           <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
@@ -148,8 +148,9 @@ onBeforeUnmount(() => {
       </div>
 
       <WorkoutExerciseCard
-        v-for="we in activeWorkout.workout.exercises"
+        v-for="(we, i) in activeWorkout.workout.exercises"
         :key="we.id"
+        :style="{ '--bk-stagger-i': i + 1 }"
         :workout-exercise="we"
         :exercise="exerciseMap.get(we.exercise_id)"
         :muscle-groups="muscleGroups"
@@ -160,13 +161,22 @@ onBeforeUnmount(() => {
         @recorded="onRecorded"
       />
 
-      <BkButton variant="ghost" block @click="addSheetOpen = true">{{ t('workout.addExercise') }}</BkButton>
+      <BkButton
+        variant="ghost"
+        block
+        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 1 }"
+        @click="addSheetOpen = true"
+      >
+        {{ t('workout.addExercise') }}
+      </BkButton>
 
       <AddExerciseSheet :open="addSheetOpen" @close="addSheetOpen = false" />
     </div>
 
     <div v-else class="space-y-4">
-      <BkButton variant="primary" block @click="startFree">{{ t('workout.freeWorkout') }}</BkButton>
+      <BkButton variant="primary" block data-testid="start-free" @click="startFree">
+        {{ t('workout.freeWorkout') }}
+      </BkButton>
 
       <div v-if="routines.length" class="space-y-2">
         <p class="text-sm text-ink-muted">{{ t('workout.startFromRoutine') }}</p>
@@ -175,6 +185,7 @@ onBeforeUnmount(() => {
           :key="routine.id"
           variant="ghost"
           block
+          :data-testid="`start-routine-${routine.id}`"
           @click="startFromRoutine(routine.id)"
         >
           {{ routine.name }}

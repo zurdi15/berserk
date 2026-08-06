@@ -27,6 +27,7 @@ import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useRestTimerStore } from '@/stores/restTimer'
+import { useToastStore } from '@/stores/toast'
 import { restFor } from '../rest'
 import WorkoutExerciseCard from '../WorkoutExerciseCard.vue'
 
@@ -168,7 +169,22 @@ describe('WorkoutExerciseCard', () => {
     expect(startSpy).toHaveBeenCalledWith(120)
   })
 
-  it('deletes a set via activeWorkout.deleteSet', async () => {
+  it('deletes a set via activeWorkout.deleteSet after confirming with a real click', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    activeWorkout.workout = freeWorkout as never
+    const wrapper = mountCard()
+
+    await wrapper.find('[data-testid="delete-set-1"]').trigger('click')
+    await flushPromises()
+    expect(domain.deleteSet).not.toHaveBeenCalled()
+
+    await wrapper.find('[data-testid="confirm-delete-set-1"]').trigger('click')
+    await flushPromises()
+
+    expect(domain.deleteSet).toHaveBeenCalledWith(7, 20, 1)
+  })
+
+  it('cancelling the delete-set confirm never calls activeWorkout.deleteSet', async () => {
     const activeWorkout = useActiveWorkoutStore()
     activeWorkout.workout = freeWorkout as never
     const wrapper = mountCard()
@@ -176,7 +192,12 @@ describe('WorkoutExerciseCard', () => {
     await wrapper.find('[data-testid="delete-set-1"]').trigger('click')
     await flushPromises()
 
-    expect(domain.deleteSet).toHaveBeenCalledWith(7, 20, 1)
+    await wrapper.find('[data-testid="cancel-delete-set-1"]').trigger('click')
+    await flushPromises()
+
+    expect(domain.deleteSet).not.toHaveBeenCalled()
+    // el cancelar debe devolver el botón de borrar, no dejar la fila colgada en confirmación
+    expect(wrapper.find('[data-testid="delete-set-1"]').exists()).toBe(true)
   })
 
   it('removes the exercise via activeWorkout.removeExercise after confirming with a real click', async () => {
@@ -211,5 +232,37 @@ describe('WorkoutExerciseCard', () => {
     const wrapper = mountCard({ exerciseIds: [20, 30] })
     expect(wrapper.find('[data-testid="move-up-20"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="move-down-20"]').exists()).toBe(true)
+  })
+
+  it('a rejected logSet surfaces a toast and leaves the form usable', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    activeWorkout.workout = freeWorkout as never
+    const toast = useToastStore()
+    vi.mocked(domain.logSet).mockRejectedValueOnce(new Error('network down'))
+
+    const wrapper = mountCard()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(toast.toasts.length).toBeGreaterThan(0)
+    // no wedge: el formulario sigue montado y se puede reintentar el envío
+    expect(wrapper.find('form').exists()).toBe(true)
+    vi.mocked(domain.logSet).mockClear()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(domain.logSet).toHaveBeenCalled()
+  })
+
+  it('a rejected reorder (move-down) surfaces a toast instead of failing silently', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    activeWorkout.workout = freeWorkout as never
+    const toast = useToastStore()
+    vi.mocked(domain.reorderWorkoutExercises).mockRejectedValueOnce(new Error('conflict'))
+
+    const wrapper = mountCard({ exerciseIds: [20, 30] })
+    await wrapper.find('[data-testid="move-down-20"]').trigger('click')
+    await flushPromises()
+
+    expect(toast.toasts.length).toBeGreaterThan(0)
   })
 })

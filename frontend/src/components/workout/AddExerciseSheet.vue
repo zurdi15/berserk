@@ -71,6 +71,7 @@ watch(query, search)
           v-for="exercise in results"
           :key="exercise.id"
           type="button"
+          :data-testid="`exercise-result-${exercise.id}`"
           class="w-full text-left p-2 rounded-sm hover:bg-stone transition-colors text-sm text-ink border border-transparent hover:border-line"
           @click="pick(exercise)"
         >

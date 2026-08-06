@@ -89,15 +89,15 @@ watch(note, () => {
     <div class="grid grid-cols-2 gap-4">
       <div>
         <p class="text-ink-muted text-sm">{{ t('workout.duration') }}</p>
-        <p class="bk-metric text-xl text-ink">{{ durationLabel }}</p>
+        <p class="bk-metric text-xl text-ink" data-testid="summary-duration">{{ durationLabel }}</p>
       </div>
       <div>
         <p class="text-ink-muted text-sm">{{ t('workout.totalSets') }}</p>
-        <p class="bk-metric text-xl text-ink">{{ totalSets }}</p>
+        <p class="bk-metric text-xl text-ink" data-testid="summary-sets">{{ totalSets }}</p>
       </div>
       <div class="col-span-2">
         <p class="text-ink-muted text-sm">{{ t('workout.totalVolume') }}</p>
-        <p class="bk-metric text-xl text-ink">{{ formatWeight(totalVolume, units) }}</p>
+        <p class="bk-metric text-xl text-ink" data-testid="summary-volume">{{ formatWeight(totalVolume, units) }}</p>
       </div>
     </div>
 

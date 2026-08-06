@@ -13,6 +13,7 @@ import type {
 } from '@/api/domain'
 import { isValidRuneName } from '@/components/calendar/groupRune'
 import { exerciseName } from '@/components/routines/exerciseName'
+import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { formatWeight } from '@/utils/units'
@@ -48,6 +49,7 @@ const activeWorkout = useActiveWorkoutStore()
 const restTimer = useRestTimerStore()
 
 const removeConfirming = ref(false)
+const deleteConfirming = ref<number | null>(null)
 
 const name = computed(() => exerciseName(props.exercise, props.locale))
 
@@ -64,9 +66,10 @@ const isFirst = computed(() => index.value <= 0)
 const isLast = computed(() => index.value === -1 || index.value === props.exerciseIds.length - 1)
 
 function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60)
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
   const s = String(seconds % 60).padStart(2, '0')
-  return `${m}:${s}`
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
 }
 
 function formatSetValue(set: SetOut): string {
@@ -87,21 +90,36 @@ function formatSetValue(set: SetOut): string {
   return ''
 }
 
+// las 4 acciones de escritura de esta tarjeta comparten el mismo contrato: si
+// el backend rechaza, un toast lo cuenta — nunca un fallo silencioso en consola
 async function onSubmitSet(value: SetIn) {
-  const result = await activeWorkout.logSet(props.workoutExercise.id, value)
-  // el descanso depende de si el entreno viene de una rutina (su rest_seconds) o es libre (default)
-  const seconds = restFor(activeWorkout.workout, props.routines, props.workoutExercise.exercise_id)
-  restTimer.start(seconds)
-  if (result.new_records.length) emit('recorded', result.new_records)
+  try {
+    const result = await activeWorkout.logSet(props.workoutExercise.id, value)
+    // el descanso depende de si el entreno viene de una rutina (su rest_seconds) o es libre (default)
+    const seconds = restFor(activeWorkout.workout, props.routines, props.workoutExercise.exercise_id)
+    restTimer.start(seconds)
+    if (result.new_records.length) emit('recorded', result.new_records)
+  } catch (error) {
+    toastApiError(error)
+  }
 }
 
 async function onDeleteSet(setId: number) {
-  await activeWorkout.deleteSet(props.workoutExercise.id, setId)
+  deleteConfirming.value = null
+  try {
+    await activeWorkout.deleteSet(props.workoutExercise.id, setId)
+  } catch (error) {
+    toastApiError(error)
+  }
 }
 
 async function confirmRemove() {
   removeConfirming.value = false
-  await activeWorkout.removeExercise(props.workoutExercise.id)
+  try {
+    await activeWorkout.removeExercise(props.workoutExercise.id)
+  } catch (error) {
+    toastApiError(error)
+  }
 }
 
 function swap(a: number, b: number): number[] {
@@ -112,12 +130,20 @@ function swap(a: number, b: number): number[] {
 
 async function moveUp() {
   if (isFirst.value) return
-  await activeWorkout.reorder(swap(index.value, index.value - 1))
+  try {
+    await activeWorkout.reorder(swap(index.value, index.value - 1))
+  } catch (error) {
+    toastApiError(error)
+  }
 }
 
 async function moveDown() {
   if (isLast.value) return
-  await activeWorkout.reorder(swap(index.value, index.value + 1))
+  try {
+    await activeWorkout.reorder(swap(index.value, index.value + 1))
+  } catch (error) {
+    toastApiError(error)
+  }
 }
 </script>
 
@@ -164,19 +190,40 @@ async function moveDown() {
           {{ set.set_number }}. {{ formatSetValue(set) }}
           <span v-if="set.rpe"> · RPE {{ set.rpe }}</span>
         </span>
-        <button
-          type="button"
-          :data-testid="`delete-set-${set.id}`"
-          class="text-ink-faint hover:text-danger text-sm px-2"
-          :aria-label="t('workout.deleteSet')"
-          @click="onDeleteSet(set.id)"
-        >
-          ×
-        </button>
+
+        <div v-if="deleteConfirming !== set.id">
+          <button
+            type="button"
+            :data-testid="`delete-set-${set.id}`"
+            class="text-ink-faint hover:text-danger text-sm px-2"
+            :aria-label="t('workout.deleteSet')"
+            @click="deleteConfirming = set.id"
+          >
+            ×
+          </button>
+        </div>
+        <div v-else class="flex items-center gap-1">
+          <button
+            type="button"
+            :data-testid="`confirm-delete-set-${set.id}`"
+            class="text-danger text-xs px-2 py-1 border border-danger rounded-sm"
+            @click="onDeleteSet(set.id)"
+          >
+            {{ t('common.confirm') }}
+          </button>
+          <button
+            type="button"
+            :data-testid="`cancel-delete-set-${set.id}`"
+            class="text-ink-faint text-xs px-2 py-1"
+            @click="deleteConfirming = null"
+          >
+            {{ t('common.cancel') }}
+          </button>
+        </div>
       </div>
     </div>
 
-    <SetForm v-if="exercise" :measurement="exercise.measurement" @submit="onSubmitSet" />
+    <SetForm v-if="exercise" :measurement="exercise.measurement" :units="units" @submit="onSubmitSet" />
 
     <div class="mt-3 pt-3 border-t border-line">
       <div v-if="!removeConfirming">

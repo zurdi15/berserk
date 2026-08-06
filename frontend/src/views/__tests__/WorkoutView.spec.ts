@@ -1,0 +1,112 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const push = vi.fn()
+const routeQuery: Record<string, unknown> = {}
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push }),
+  useRoute: () => ({ query: routeQuery }),
+}))
+
+const routines = [
+  { id: 7, name: 'Push day', description: null, rune: null, color: null, exercises: [] },
+]
+
+vi.mock('@/api/domain', () => ({
+  listRoutines: vi.fn(async () => routines),
+  listExercises: vi.fn(async () => []),
+  listMuscleGroups: vi.fn(async () => []),
+}))
+
+import { createI18nInstance } from '@/i18n'
+import { useActiveWorkoutStore } from '@/stores/activeWorkout'
+import WorkoutView from '../WorkoutView.vue'
+
+function build() {
+  return mount(WorkoutView, {
+    global: { plugins: [createI18nInstance()] },
+  })
+}
+
+describe('WorkoutView', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    push.mockClear()
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key]
+  })
+
+  it('calls activeWorkout.resume on mount to survive reloads', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    const resumeSpy = vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+
+    build()
+    await flushPromises()
+
+    expect(resumeSpy).toHaveBeenCalled()
+  })
+
+  it('starts a free workout when clicking the free-workout button (start({}))', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+    const startSpy = vi.spyOn(activeWorkout, 'start').mockResolvedValue(undefined)
+
+    const wrapper = build()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="start-free"]').trigger('click')
+    await flushPromises()
+
+    expect(startSpy).toHaveBeenCalledWith({})
+  })
+
+  it('starts from a routine when clicking a routine button (start({routine_id}))', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+    const startSpy = vi.spyOn(activeWorkout, 'start').mockResolvedValue(undefined)
+
+    const wrapper = build()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="start-routine-7"]').trigger('click')
+    await flushPromises()
+
+    expect(startSpy).toHaveBeenCalledWith({ routine_id: 7 })
+  })
+
+  it('auto-starts from the ?session= query when there is no active workout (start({scheduled_session_id}))', async () => {
+    routeQuery.session = '42'
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+    const startSpy = vi.spyOn(activeWorkout, 'start').mockResolvedValue(undefined)
+
+    build()
+    await flushPromises()
+
+    expect(startSpy).toHaveBeenCalledWith({ scheduled_session_id: 42 })
+  })
+
+  it('does not auto-start when resume already found an active workout', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    routeQuery.session = '42'
+    vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+      activeWorkout.workout = {
+        id: 1,
+        date: '2026-08-06',
+        started_at: '2026-08-06T09:00:00Z',
+        ended_at: null,
+        routine_id: null,
+        note: null,
+        feeling: null,
+        exercises: [],
+        muscle_tag_ids: [],
+      } as never
+    })
+    const startSpy = vi.spyOn(activeWorkout, 'start').mockResolvedValue(undefined)
+
+    build()
+    await flushPromises()
+
+    expect(startSpy).not.toHaveBeenCalled()
+  })
+})
