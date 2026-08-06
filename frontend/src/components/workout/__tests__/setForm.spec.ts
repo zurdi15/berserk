@@ -1,0 +1,122 @@
+import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { createI18nInstance } from '@/i18n'
+import SetForm from '../SetForm.vue'
+
+function build(measurement: string) {
+  setActivePinia(createPinia())
+  return mount(SetForm, {
+    props: { measurement },
+    global: { plugins: [createI18nInstance()] },
+  })
+}
+
+describe('SetForm', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('strength emits reps + weight_kg', async () => {
+    const wrapper = build('strength')
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload).toMatchObject({ is_warmup: false })
+    expect(payload.reps).toBeGreaterThan(0)
+    expect(payload.weight_kg).toBeGreaterThan(0)
+    expect(payload.duration_seconds).toBeUndefined()
+  })
+
+  it('timed emits only duration', async () => {
+    const wrapper = build('timed')
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload.duration_seconds).toBeGreaterThan(0)
+    expect(payload.reps).toBeUndefined()
+    expect(payload.weight_kg).toBeUndefined()
+  })
+
+  it('bodyweight emits reps only by default (optional weight omitted)', async () => {
+    const wrapper = build('bodyweight')
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload.reps).toBeGreaterThan(0)
+    expect(payload.weight_kg).toBeUndefined()
+    expect(payload.duration_seconds).toBeUndefined()
+  })
+
+  it('bodyweight includes weight_kg once bumped above zero', async () => {
+    const wrapper = build('bodyweight')
+    const plus = wrapper.findAll('button[aria-label="Aumentar"]')[1]
+    await plus.trigger('click', { detail: 0 })
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload.weight_kg).toBeGreaterThan(0)
+  })
+
+  it('cardio emits duration only by default (optional distance omitted)', async () => {
+    const wrapper = build('cardio')
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload.duration_seconds).toBeGreaterThan(0)
+    expect(payload.distance_m).toBeUndefined()
+    expect(payload.reps).toBeUndefined()
+    expect(payload.weight_kg).toBeUndefined()
+  })
+
+  it('cardio includes distance_m once bumped above zero', async () => {
+    const wrapper = build('cardio')
+    const plus = wrapper.findAll('button[aria-label="Aumentar"]')[1]
+    await plus.trigger('click', { detail: 0 })
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload.distance_m).toBeGreaterThan(0)
+  })
+
+  it('warmup toggle marks the set as warmup', async () => {
+    const wrapper = build('strength')
+    await wrapper.find('[data-testid="warmup-toggle"]').trigger('click')
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload.is_warmup).toBe(true)
+  })
+
+  it('resets the warmup toggle back to false after logging a set', async () => {
+    const wrapper = build('strength')
+    const toggle = wrapper.find('[data-testid="warmup-toggle"]')
+    await toggle.trigger('click')
+    await wrapper.find('form').trigger('submit')
+    expect(toggle.attributes('aria-pressed')).toBe('false')
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![1][0] as Record<string, unknown>
+    expect(payload.is_warmup).toBe(false)
+  })
+
+  it('rpe select includes the chosen value in the payload', async () => {
+    const wrapper = build('strength')
+    await wrapper.find('select').setValue('8')
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload.rpe).toBe(8)
+  })
+
+  it('rpe defaults to undefined when left at "—"', async () => {
+    const wrapper = build('strength')
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload.rpe).toBeUndefined()
+  })
+
+  it('keeps entered values as defaults for the next set', async () => {
+    const wrapper = build('strength')
+    await wrapper.find('form').trigger('submit')
+    const first = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+
+    const plus = wrapper.findAll('button[aria-label="Aumentar"]')[0]
+    await plus.trigger('click', { detail: 0 })
+    await wrapper.find('form').trigger('submit')
+    const second = wrapper.emitted('submit')![1][0] as Record<string, unknown>
+
+    expect(second.weight_kg).toBe((first.weight_kg as number) + 2.5)
+    expect(second.reps).toBe(first.reps)
+  })
+})

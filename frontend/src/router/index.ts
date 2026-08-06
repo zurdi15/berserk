@@ -9,6 +9,7 @@ import TodayView from '@/views/TodayView.vue'
 import CalendarView from '@/views/CalendarView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import ShellView from '@/views/ShellView.vue'
+import WorkoutView from '@/views/WorkoutView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -22,7 +23,7 @@ export const router = createRouter({
       children: [
         { path: 'today', name: 'today', component: TodayView },
         { path: 'calendar', name: 'calendar', component: CalendarView },
-        { path: 'workout', name: 'workout', component: PlaceholderView },
+        { path: 'workout', name: 'workout', component: WorkoutView },
         { path: 'progress', name: 'progress', component: PlaceholderView },
         { path: 'profile', name: 'profile', component: ProfileView },
       ],
