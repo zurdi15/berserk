@@ -1,56 +1,53 @@
-export interface HeatCell {
-  date: string
-  count: number
-  week: number
-  day: number
-}
-
 import { isoDate } from '@/utils/dates'
 
-export function cellsFor(year: number, data: { date: string; count: number }[]): HeatCell[] {
-  const byDate = new Map(data.map((d) => [d.date, d.count]))
-  const cells: HeatCell[] = []
-  const jan1 = new Date(year, 0, 1)
-  const offset = (jan1.getDay() + 6) % 7 // columnas ancladas a lunes
-  for (let i = 0; ; i++) {
-    const d = new Date(year, 0, 1 + i)
-    if (d.getFullYear() !== year) break
-    cells.push({
-      date: isoDate(d),
-      count: byDate.get(isoDate(d)) ?? 0,
-      week: Math.floor((i + offset) / 7),
-      day: (i + offset) % 7,
-    })
-  }
-  return cells
+export interface MonthCell {
+  date: string
+  count: number
+  column: number // columna LOCAL dentro del bloque de SU mes (0-based, no del año)
+  day: number // fila de la semana: 0 lunes .. 6 domingo
 }
 
-export interface MonthLabel {
+export interface MonthBlock {
   month: number // 1-12
-  column: number // índice de semana (misma columna que usa cellsFor) donde cae el día 1 de ese mes
+  columnCount: number // nº de columnas (semanas) que ocupa el bloque de este mes
+  cells: MonthCell[] // solo los días de este mes — las semanas de frontera no
+  // traen huecos del mes vecino, cada bloque solo sabe de sí mismo
 }
 
-// una etiqueta cada ~4-5 semanas no se pisa nunca en la práctica, pero el
-// offset de enero (ancla a lunes) puede dejar la primera columna muy
-// estrecha — el hueco mínimo protege ese caso sin necesitar medir texto real
-const MIN_LABEL_COLUMN_GAP = 2
+// fila de la semana anclada a lunes (mismo criterio que el resto del
+// calendario: MonthGrid.vue, monthGrid() en utils/dates.ts)
+function weekdayRow(date: Date): number {
+  return (date.getDay() + 6) % 7
+}
 
-export function monthLabelsFor(year: number): MonthLabel[] {
-  const jan1 = new Date(year, 0, 1)
-  const offset = (jan1.getDay() + 6) % 7
-  const all: MonthLabel[] = []
+// bloques por mes en vez de una rejilla continua estilo GitHub: la rejilla
+// continua dejaba columnas vacías a mitad de año y las etiquetas de mes no
+// quedaban centradas sobre "su" tramo — con bloques independientes cada mes
+// es su propia mini-rejilla (día 1 siempre en la columna 0) y el hueco entre
+// bloques (flex gap en BkHeatmap.vue) separa visualmente los meses de verdad.
+// Una semana de frontera (a caballo entre dos meses) aparece partida: cada
+// bloque solo rellena SUS días de esa semana, el resto de filas quedan vacías
+// (sin celda, no con un hueco explícito) en ese bloque.
+export function monthBlocksFor(year: number, data: { date: string; count: number }[]): MonthBlock[] {
+  const byDate = new Map(data.map((d) => [d.date, d.count]))
+  const blocks: MonthBlock[] = []
   for (let month = 1; month <= 12; month++) {
-    const first = new Date(year, month - 1, 1)
-    const dayIndex = Math.round((first.getTime() - jan1.getTime()) / 86400000)
-    all.push({ month, column: Math.floor((dayIndex + offset) / 7) })
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const firstRow = weekdayRow(new Date(year, month - 1, 1))
+    const cells: MonthCell[] = []
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month - 1, day)
+      const position = firstRow + (day - 1)
+      const iso = isoDate(date)
+      cells.push({
+        date: iso,
+        count: byDate.get(iso) ?? 0,
+        column: Math.floor(position / 7),
+        day: position % 7,
+      })
+    }
+    const columnCount = Math.floor((firstRow + daysInMonth - 1) / 7) + 1
+    blocks.push({ month, columnCount, cells })
   }
-  // si un label cae demasiado cerca del anterior YA aceptado, se omite (se
-  // queda el primero, más natural de lectura izquierda-derecha que al revés)
-  const kept: MonthLabel[] = []
-  for (const label of all) {
-    const prev = kept.at(-1)
-    if (prev && label.column - prev.column < MIN_LABEL_COLUMN_GAP) continue
-    kept.push(label)
-  }
-  return kept
+  return blocks
 }

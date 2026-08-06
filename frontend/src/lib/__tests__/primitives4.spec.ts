@@ -6,7 +6,6 @@ import BkChart from '../BkChart.vue'
 import BkHeatmap from '../BkHeatmap.vue'
 import BkSelect from '../BkSelect.vue'
 import BkTabs from '../BkTabs.vue'
-import { cellsFor } from '../heatmap'
 
 // Mock uPlot module
 vi.mock('uplot', () => ({
@@ -31,17 +30,6 @@ describe('BkTabs', () => {
   it('marks aria-selected', () => {
     const wrapper = mount(BkTabs, { props: { modelValue: 'b', tabs } })
     expect(wrapper.findAll('[role="tab"]')[1].attributes('aria-selected')).toBe('true')
-  })
-})
-
-describe('heatmap cells', () => {
-  it('covers the full year with week/day coordinates', () => {
-    const cells = cellsFor(2026, [{ date: '2026-08-05', count: 2 }])
-    expect(cells).toHaveLength(365)
-    const hit = cells.find((c) => c.date === '2026-08-05')!
-    expect(hit.count).toBe(2)
-    expect(hit.day).toBeGreaterThanOrEqual(0)
-    expect(hit.day).toBeLessThan(7)
   })
 })
 
@@ -90,20 +78,34 @@ describe('BkHeatmap', () => {
     expect(cell4.attributes('style')).toContain('opacity: 1')
   })
 
-  it('renders a month-label row (item 6), one span per kept label, sharing the grid column of its day 1 cell', () => {
+  it('renders one centered label per month block (item 4 redesign: per-month blocks, not a continuous grid)', () => {
     const wrapper = mount(BkHeatmap, {
       props: { year: 2026, data: [] },
       global: { plugins: [createI18nInstance()] },
     })
-    // 2026: jan=col0, feb=col4 (ver src/lib/__tests__/heatmap.spec.ts) — ninguna
-    // colisión ese año, así que se conservan los 12 labels
     const labels = wrapper.findAll('span.text-ink-faint')
     expect(labels).toHaveLength(12)
     expect(labels[0].text()).toBe('ene')
     expect(labels[0].classes()).toContain('text-xs')
-    expect(labels[0].attributes('style')).toContain('grid-column: 1')
+    expect(labels[0].classes()).toContain('text-center')
     expect(labels[1].text()).toBe('feb')
-    expect(labels[1].attributes('style')).toContain('grid-column: 5')
+  })
+
+  it('renders each month as its own grid block, separated by a real gap (not one continuous grid)', () => {
+    const wrapper = mount(BkHeatmap, {
+      props: { year: 2026, data: [] },
+      global: { plugins: [createI18nInstance()] },
+    })
+    // contenedor exterior: flex con gap real entre bloques de mes
+    const outer = wrapper.find('.overflow-x-auto > div')
+    expect(outer.classes()).toContain('flex')
+    expect(outer.classes()).toContain('gap-3')
+    // 12 bloques (uno por mes), cada uno con su propia mini-rejilla de celdas
+    const blocks = wrapper.findAll('.flex.flex-col.items-center.gap-1')
+    expect(blocks).toHaveLength(12)
+    // enero (bloque 0) ocupa 5 columnas, tal y como calcula heatmap.spec.ts
+    const januaryGrid = blocks[0].find('.grid')
+    expect(januaryGrid.attributes('style')).toContain('repeat(5, auto)')
   })
 })
 
