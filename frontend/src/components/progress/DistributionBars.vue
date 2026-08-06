@@ -6,7 +6,7 @@ import type { DistributionItem, MuscleGroupOut } from '@/api/domain'
 import BkAnimatedNumber from '@/lib/BkAnimatedNumber.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkRune from '@/lib/BkRune.vue'
-import { isValidRuneName } from '@/lib/runeResolve'
+import { groupRune as resolveGroupRune } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 import { core } from '@/tokens'
 import { barWidth } from './distribution'
@@ -44,9 +44,10 @@ function groupName(muscleGroupId: number): string {
   return locale.value === 'es' ? group.name_es : group.name_en
 }
 
+// item 14(c): resolución centralizada (rune ?? slug-derivada) — antes leía
+// group.slug a pelo, así que una runa dedicada distinta del slug no se veía
 function groupRune(muscleGroupId: number): RuneName | null {
-  const group = groupMap.value.get(muscleGroupId)
-  return group && isValidRuneName(group.slug) ? group.slug : null
+  return resolveGroupRune(groupMap.value.get(muscleGroupId))
 }
 </script>
 
