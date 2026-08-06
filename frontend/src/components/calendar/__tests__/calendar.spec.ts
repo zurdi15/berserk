@@ -121,7 +121,7 @@ describe('MonthGrid', () => {
     return map
   }
 
-  it('renders planned session dot with aurora border', async () => {
+  it('renders planned session dot as a hollow ring (border, no fill) colored by --bk-day-dot', async () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
@@ -137,19 +137,20 @@ describe('MonthGrid', () => {
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
-    expect(wrapper.find('[data-status="planned"]').exists()).toBe(true)
-    expect(wrapper.find('[data-status="planned"]').classes()).toContain('border-2')
-    expect(wrapper.find('[data-status="planned"]').classes()).toContain('border-aurora')
+    const dot = wrapper.get('[data-status="planned"]')
+    expect(dot.classes()).toContain('border-2')
+    expect(dot.classes()).toContain('border-[var(--bk-day-dot)]')
+    expect(dot.classes()).not.toContain('bg-[var(--bk-day-dot)]')
   })
 
-  it('renders done session dot with solid aurora', async () => {
+  it('v0.3.0 item 3 (bug fix): a workout dot ("done") comes from workouts[], not from a scheduled session status — a standalone workout (no schedule behind it) still gets a filled dot', async () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
-          scheduled: [
-            { id: 2, date: '2026-08-02', time: '10:00', routine_id: 2, status: 'done', workout_id: 5, note: null },
+          scheduled: [],
+          workouts: [
+            { id: 5, date: '2026-08-02', feeling: null, muscle_group_ids: [] },
           ],
-          workouts: [],
         },
         year: 2026,
         monthNum: 8,
@@ -158,11 +159,34 @@ describe('MonthGrid', () => {
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
-    expect(wrapper.find('[data-status="done"]').exists()).toBe(true)
-    expect(wrapper.find('[data-status="done"]').classes()).toContain('bg-aurora')
+    const dot = wrapper.get('[data-status="done"]')
+    expect(dot.classes()).toContain('bg-[var(--bk-day-dot)]')
+    expect(dot.classes()).not.toContain('border-2')
   })
 
-  it('renders skipped session dot with ink-faint', async () => {
+  it('v0.3.0 item 3 (bug fix): a workout with zero exercises/muscle groups still gets identified by a top dot (dots derive from workouts[], not from muscle groups)', async () => {
+    const wrapper = mount(MonthGrid, {
+      props: {
+        month: {
+          scheduled: [],
+          workouts: [
+            { id: 9, date: '2026-08-09', feeling: null, muscle_group_ids: [] },
+          ],
+        },
+        year: 2026,
+        monthNum: 8,
+        groupMap: createGroupMap(),
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    // sin runa (sin grupos musculares), pero SÍ con dot arriba
+    const cell = wrapper.get('[data-testid="day-cell-2026-08-09"]')
+    expect(cell.find('[data-status="done"]').exists()).toBe(true)
+    expect(cell.findComponent({ name: 'BkRune' }).exists()).toBe(false)
+  })
+
+  it('v0.3.0 item 3 (bug fix): a skipped session leaves no top dot (it is neither a workout nor still pending)', async () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
@@ -178,11 +202,11 @@ describe('MonthGrid', () => {
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
-    expect(wrapper.find('[data-status="skipped"]').exists()).toBe(true)
-    expect(wrapper.find('[data-status="skipped"]').classes()).toContain('bg-ink-faint')
+    const cell = wrapper.get('[data-testid="day-cell-2026-08-03"]')
+    expect(cell.find('[data-status]').exists()).toBe(false)
   })
 
-  it('renders multiple session dots per day', async () => {
+  it('renders multiple planned-session dots per day', async () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
@@ -201,6 +225,54 @@ describe('MonthGrid', () => {
     await flushPromises()
     const plannedDots = wrapper.findAll('[data-status="planned"]')
     expect(plannedDots.length).toBe(2)
+  })
+
+  it('v0.3.0 item 3: "si hay más de un entreno, más de un dot en línea horizontal" — one dot per workout, in a horizontal row', async () => {
+    const wrapper = mount(MonthGrid, {
+      props: {
+        month: {
+          scheduled: [],
+          workouts: [
+            { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [] },
+            { id: 2, date: '2026-08-01', feeling: 3, muscle_group_ids: [] },
+          ],
+        },
+        year: 2026,
+        monthNum: 8,
+        groupMap: createGroupMap(),
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    const cell = wrapper.get('[data-testid="day-cell-2026-08-01"]')
+    const dots = cell.findAll('[data-status="done"]')
+    expect(dots).toHaveLength(2)
+    const row = dots[0].element.parentElement as HTMLElement
+    expect(row.className).toContain('flex')
+    expect(dots[1].element.parentElement).toBe(row)
+  })
+
+  it('v0.3.0 item 3: caps the top dot row at 3, even with more workouts that day', async () => {
+    const wrapper = mount(MonthGrid, {
+      props: {
+        month: {
+          scheduled: [],
+          workouts: [
+            { id: 1, date: '2026-08-01', feeling: null, muscle_group_ids: [] },
+            { id: 2, date: '2026-08-01', feeling: null, muscle_group_ids: [] },
+            { id: 3, date: '2026-08-01', feeling: null, muscle_group_ids: [] },
+            { id: 4, date: '2026-08-01', feeling: null, muscle_group_ids: [] },
+          ],
+        },
+        year: 2026,
+        monthNum: 8,
+        groupMap: createGroupMap(),
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    const cell = wrapper.get('[data-testid="day-cell-2026-08-01"]')
+    expect(cell.findAll('[data-status="done"]')).toHaveLength(3)
   })
 
   it('renders BkRune components for valid muscle group slugs', async () => {
@@ -282,6 +354,46 @@ describe('MonthGrid', () => {
     expect(runeContainer.className).toContain('bottom-1')
     // el número del día sigue presente, sin ser desplazado por ninguno de los dos overlays
     expect(cell.find('.text-xs.font-semibold').exists()).toBe(true)
+  })
+
+  it('v0.3.0 item 3: wires --bk-day-dot on the grid container, defaulting to the aurora token (so a future wave can recolor per athlete)', async () => {
+    const wrapper = mount(MonthGrid, {
+      props: {
+        month: { scheduled: [], workouts: [] },
+        year: 2026,
+        monthNum: 8,
+        groupMap: createGroupMap(),
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+    const grid = wrapper.get('[data-testid="month-grid"]')
+    expect(grid.attributes('style')).toContain('--bk-day-dot: var(--color-aurora)')
+  })
+
+  it('v0.3.0 item 4: today\'s cell gets an aurora border AND an aurora day number ("el número en color aurora o borde en aurora")', async () => {
+    vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
+    const wrapper = mount(MonthGrid, {
+      props: {
+        month: { scheduled: [], workouts: [] },
+        year: 2026,
+        monthNum: 8,
+        groupMap: createGroupMap(),
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const todayCell = wrapper.get('[data-testid="day-cell-2026-08-15"]')
+    expect(todayCell.classes()).toContain('border-aurora')
+    const dayNumber = todayCell.get('.text-xs.font-semibold')
+    expect(dayNumber.classes()).toContain('text-aurora')
+
+    const otherCell = wrapper.get('[data-testid="day-cell-2026-08-16"]')
+    expect(otherCell.classes()).not.toContain('border-aurora')
+    expect(otherCell.get('.text-xs.font-semibold').classes()).not.toContain('text-aurora')
+
+    vi.useRealTimers()
   })
 
   it('emits select event when day is clicked', async () => {
@@ -531,6 +643,36 @@ describe('ScheduleSheet', () => {
       7,
       expect.objectContaining({ date: '2026-08-25', time: '19:30' }),
     )
+  })
+
+  it('v0.3.0 item 5: planned-session actions are icon-only (BkActionBtn), with an accessible aria-label instead of visible text', async () => {
+    const wrapper = mount(ScheduleSheet, {
+      props: {
+        date: '2026-08-20',
+        scheduled: [
+          { id: 7, date: '2026-08-20', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
+        ],
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const replanBtn = wrapper.get('[data-testid="replan-session-7"]')
+    const skipBtn = wrapper.get('[data-testid="skip-session-7"]')
+    const deleteBtn = wrapper.get('[data-testid="delete-session-7"]')
+
+    expect(replanBtn.element.tagName).toBe('BUTTON')
+    expect(replanBtn.find('svg').exists()).toBe(true)
+    expect(replanBtn.text()).toBe('')
+    expect(replanBtn.attributes('aria-label')).toBe('Replanificar')
+
+    expect(skipBtn.find('svg').exists()).toBe(true)
+    expect(skipBtn.text()).toBe('')
+    expect(skipBtn.attributes('aria-label')).toBe('Omitir')
+
+    expect(deleteBtn.find('svg').exists()).toBe(true)
+    expect(deleteBtn.text()).toBe('')
+    expect(deleteBtn.attributes('aria-label')).toBe('Borrar')
   })
 
   it('hides all action buttons when athlete is viewing another user', async () => {
@@ -989,6 +1131,48 @@ describe('CalendarView heatmap empty state', () => {
     const heading = wrapper.get('h3')
     expect(heading.text()).toBe('Actividad del año')
     expect(heading.classes()).toContain('text-center')
+  })
+})
+
+describe('CalendarView heatmap refetch on mutation (v0.3.0 item 2)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => vi.useRealTimers())
+
+  it('deleting a scheduled session from the day sheet refetches the heatmap, not just the month (bug: "Actividad del año no parece actualizarse")', async () => {
+    vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
+    vi.mocked(domain.getHeatmap).mockClear()
+    vi.mocked(domain.getMonth).mockClear()
+    vi.mocked(domain.deleteSchedule).mockClear()
+
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(domain.getHeatmap).toHaveBeenCalledTimes(1)
+    expect(domain.getMonth).toHaveBeenCalledTimes(1)
+
+    const dayCell = wrapper.get('[data-testid="day-cell-2026-08-01"]')
+    await dayCell.trigger('click')
+    await flushPromises()
+
+    const deleteButton = document.querySelector('[data-testid="delete-session-1"]') as HTMLElement
+    expect(deleteButton).not.toBeNull()
+    deleteButton.click()
+    await flushPromises()
+
+    const confirmButtonEl = document.querySelector('[data-testid="confirm-delete"]') as HTMLElement
+    expect(confirmButtonEl).not.toBeNull()
+    confirmButtonEl.click()
+    await flushPromises()
+
+    expect(domain.deleteSchedule).toHaveBeenCalledWith(1)
+    // el bug: solo se recargaba el mes, el heatmap se quedaba con los datos
+    // con los que se montó la vista
+    expect(domain.getHeatmap).toHaveBeenCalledTimes(2)
+    expect(domain.getMonth).toHaveBeenCalledTimes(2)
+
+    wrapper.unmount()
   })
 })
 

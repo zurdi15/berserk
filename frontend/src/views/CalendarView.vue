@@ -102,6 +102,17 @@ function selectDay(date: string) {
   selectedDate.value = date
 }
 
+// v0.3.0 item 2 (bug): "Actividad del año no parece actualizarse con los
+// entrenamientos añadidos o borrados" — el sheet emite "updated" tras
+// CUALQUIER mutación que cambia workouts (borrar la tarjeta unificada,
+// omitir/replanificar/crear una sesión), pero solo se recargaba el mes; el
+// heatmap se quedaba con los datos con los que se montó la vista. Ambos
+// fetches dependen de la misma mutación, así que ambos se recargan juntos.
+function reloadCalendar() {
+  loadMonth()
+  loadHeatmap()
+}
+
 function closeScheduleSheet() {
   selectedDate.value = null
 }
@@ -188,7 +199,7 @@ watch(() => athlete.userId, () => {
         v-if="selectedDate"
         :date="selectedDate"
         :scheduled="monthData.scheduled.filter(s => s.date === selectedDate)"
-        @updated="loadMonth"
+        @updated="reloadCalendar"
       />
     </BkSheet>
 

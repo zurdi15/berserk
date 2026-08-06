@@ -3,22 +3,22 @@ import { describe, expect, it } from 'vitest'
 import { monthBlocksFor } from '../heatmap'
 
 describe('monthBlocksFor', () => {
-  it('returns 12 blocks, one per month, each with day 1 in column 0', () => {
+  it('returns 12 blocks, one per month, each with day 1 in row 0', () => {
     const blocks = monthBlocksFor(2026, [])
     expect(blocks).toHaveLength(12)
     for (let i = 0; i < 12; i++) {
       expect(blocks[i].month).toBe(i + 1)
       const day1 = blocks[i].cells[0]
-      expect(day1.column).toBe(0)
+      expect(day1.row).toBe(0)
     }
   })
 
-  it('enero 2026 (1 ene = jueves, fila 3): día 1 en columna 0 fila 3, y el bloque ocupa 5 columnas', () => {
+  it('enero 2026 (1 ene = jueves, columna 3): día 1 en fila 0 columna 3, y el bloque ocupa 5 filas', () => {
     const [january] = monthBlocksFor(2026, [])
-    expect(january.columnCount).toBe(5)
+    expect(january.rowCount).toBe(5)
     const day1 = january.cells.find((c) => c.date === '2026-01-01')!
-    expect(day1.column).toBe(0)
-    expect(day1.day).toBe(3) // jueves: 0=lunes..6=domingo
+    expect(day1.row).toBe(0)
+    expect(day1.col).toBe(3) // jueves: 0=lunes..6=domingo
     // 31 días de enero, todos presentes
     expect(january.cells).toHaveLength(31)
   })
@@ -26,20 +26,20 @@ describe('monthBlocksFor', () => {
   it('la semana de frontera enero/febrero 2026 se reparte entre los dos bloques: cada uno solo trae sus propios días', () => {
     const [january, february] = monthBlocksFor(2026, [])
 
-    // última columna de enero (col 4): 26-31 ene, lunes a sábado (filas 0-5) —
+    // última fila de enero (fila 4): 26-31 ene, lunes a sábado (columnas 0-5) —
     // el domingo de esa misma semana (1 feb) NO aparece en el bloque de enero
-    const lastJanColumn = january.cells.filter((c) => c.column === 4)
-    expect(lastJanColumn).toHaveLength(6)
-    expect(lastJanColumn.map((c) => c.date).sort()).toEqual([
+    const lastJanRow = january.cells.filter((c) => c.row === 4)
+    expect(lastJanRow).toHaveLength(6)
+    expect(lastJanRow.map((c) => c.date).sort()).toEqual([
       '2026-01-26', '2026-01-27', '2026-01-28', '2026-01-29', '2026-01-30', '2026-01-31',
     ])
-    expect(lastJanColumn.every((c) => c.day >= 0 && c.day <= 5)).toBe(true)
+    expect(lastJanRow.every((c) => c.col >= 0 && c.col <= 5)).toBe(true)
 
-    // primera columna de febrero (col 0): SOLO el domingo 1 feb (fila 6) — los
-    // días lunes-sábado de esa semana pertenecen a enero, no a este bloque
-    const firstFebColumn = february.cells.filter((c) => c.column === 0)
-    expect(firstFebColumn).toHaveLength(1)
-    expect(firstFebColumn[0]).toEqual({ date: '2026-02-01', count: 0, column: 0, day: 6 })
+    // primera fila de febrero (fila 0): SOLO el domingo 1 feb (columna 6) —
+    // los días lunes-sábado de esa semana pertenecen a enero, no a este bloque
+    const firstFebRow = february.cells.filter((c) => c.row === 0)
+    expect(firstFebRow).toHaveLength(1)
+    expect(firstFebRow[0]).toEqual({ date: '2026-02-01', count: 0, row: 0, col: 6 })
   })
 
   it('cada bloque cubre exactamente los días del mes, sin huecos ni duplicados', () => {
@@ -52,11 +52,20 @@ describe('monthBlocksFor', () => {
     })
   })
 
-  it('columnCount es siempre exactamente la columna más alta usada + 1 (sin columnas colgando de más)', () => {
+  it('rowCount es siempre exactamente la fila más alta usada + 1 (sin filas colgando de más)', () => {
     for (const year of [2024, 2025, 2026, 2027, 2028]) {
       for (const block of monthBlocksFor(year, [])) {
-        const maxColumn = Math.max(...block.cells.map((c) => c.column))
-        expect(block.columnCount).toBe(maxColumn + 1)
+        const maxRow = Math.max(...block.cells.map((c) => c.row))
+        expect(block.rowCount).toBe(maxRow + 1)
+      }
+    }
+  })
+
+  it('col nunca sale de 0-6 (día de la semana): el eje horizontal es fijo tras la transposición', () => {
+    for (const block of monthBlocksFor(2026, [])) {
+      for (const cell of block.cells) {
+        expect(cell.col).toBeGreaterThanOrEqual(0)
+        expect(cell.col).toBeLessThanOrEqual(6)
       }
     }
   })

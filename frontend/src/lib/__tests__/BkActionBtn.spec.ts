@@ -39,6 +39,46 @@ describe('BkActionBtn', () => {
     expect(svg.find('circle').exists()).toBe(false)
   })
 
+  it('v0.3.0 item 5: renders a crossed-circle icon (circle + ONE diagonal path, unlike delete\'s two crossing paths) for icon="skip"', () => {
+    const wrapper = mount(BkActionBtn, {
+      props: { icon: 'skip' },
+      attrs: { 'aria-label': 'Omitir' },
+    })
+
+    const svg = wrapper.find('svg')
+    expect(svg.find('circle').exists()).toBe(true)
+    expect(svg.findAll('path')).toHaveLength(1)
+    expect(svg.find('path').attributes('d')).toBe('M6 6 L18 18')
+  })
+
+  it('v0.3.0 item 5: renders a circular-arrow icon (two paths, no circle) for icon="replan"', () => {
+    const wrapper = mount(BkActionBtn, {
+      props: { icon: 'replan' },
+      attrs: { 'aria-label': 'Replanificar' },
+    })
+
+    const svg = wrapper.find('svg')
+    expect(svg.find('circle').exists()).toBe(false)
+    expect(svg.findAll('path')).toHaveLength(2)
+    expect(svg.find('circle').exists()).toBe(false)
+  })
+
+  it('v0.3.0 item 5: skip and replan get the ink-muted styling, same as edit/key (only delete is danger)', () => {
+    const skipBtn = mount(BkActionBtn, {
+      props: { icon: 'skip' },
+      attrs: { 'aria-label': 'Omitir' },
+    })
+    expect(skipBtn.find('button').classes()).toContain('text-ink-muted')
+    expect(skipBtn.find('button').classes()).not.toContain('text-danger')
+
+    const replanBtn = mount(BkActionBtn, {
+      props: { icon: 'replan' },
+      attrs: { 'aria-label': 'Replanificar' },
+    })
+    expect(replanBtn.find('button').classes()).toContain('text-ink-muted')
+    expect(replanBtn.find('button').classes()).not.toContain('text-danger')
+  })
+
   it('is a single square button (w-8 h-8) with a type="button" root and a ~w-4 h-4 icon, regardless of variant', () => {
     const wrapper = mount(BkActionBtn, {
       props: { icon: 'edit' },

@@ -348,34 +348,30 @@ loadDayInfo()
           </div>
         </div>
 
-        <!-- Actions -->
-        <div v-if="isViewingSelf" class="flex gap-2 flex-wrap">
-          <BkButton
+        <!-- Actions: v0.3.0 item 5 — "Botón en calendario de borrar, omitir y
+             replanificar con iconos", mismo patrón icon-only que las tarjetas
+             de entreno (WorkoutDayInfo) en vez de botones de texto -->
+        <div v-if="isViewingSelf" class="flex items-center gap-1">
+          <BkActionBtn
             v-if="session.status === 'planned'"
+            icon="replan"
             :data-testid="`replan-session-${session.id}`"
-            variant="ghost"
-            size="sm"
+            :aria-label="$t('calendar.replan')"
             @click="startReplan(session)"
-          >
-            {{ $t('calendar.replan') }}
-          </BkButton>
-          <BkButton
+          />
+          <BkActionBtn
             v-if="session.status === 'planned'"
+            icon="skip"
             :data-testid="`skip-session-${session.id}`"
-            variant="ghost"
-            size="sm"
+            :aria-label="$t('calendar.skip')"
             @click="skipSession(session.id)"
-          >
-            {{ $t('calendar.skip') }}
-          </BkButton>
-          <BkButton
+          />
+          <BkActionBtn
+            icon="delete"
             :data-testid="`delete-session-${session.id}`"
-            variant="ghost"
-            size="sm"
+            :aria-label="$t('common.delete')"
             @click="deleteSession(session.id)"
-          >
-            {{ $t('common.delete') }}
-          </BkButton>
+          />
         </div>
       </div>
     </div>

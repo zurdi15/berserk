@@ -15,19 +15,18 @@ const { locale } = useI18n()
 
 const blocks = computed(() => monthBlocksFor(props.year, props.data))
 
-// offset de columna GLOBAL de cada bloque (acumulado, no reinicia por mes):
-// el barrido celda a celda cruza TODO el layout envuelto como una sola ola,
-// con la columna de cada celda = offset de su bloque + su columna local
-const blockColumnOffsets = computed(() => {
-  const offsets: number[] = []
-  let acc = 0
-  for (const block of blocks.value) {
-    offsets.push(acc)
-    acc += block.columnCount
-  }
-  return offsets
-})
-const totalColumns = computed(() => blocks.value.reduce((sum, b) => sum + b.columnCount, 0))
+// v0.3.0 item 6: "las semanas están en vertical. Deberían estar en
+// horizontal" — el eje de días de la semana (col, 0-6) pasa a ser el eje
+// HORIZONTAL del bloque (antes era el vertical); las semanas (row) se
+// apilan ahora hacia abajo. Ese eje horizontal es FIJO (siempre 7, ya no
+// varía por mes como el viejo columnCount de 4-6 semanas), así que el
+// offset de cada bloque para el barrido es simplemente su índice × 7 — el
+// barrido sigue leyéndose de izquierda a derecha, ahora avanzando por día
+// de la semana (todas las semanas de una misma columna revelan a la vez)
+// en vez de por semana completa.
+const BLOCK_WIDTH = 7
+const blockOffsets = computed(() => blocks.value.map((_, i) => i * BLOCK_WIDTH))
+const totalColumns = computed(() => blocks.value.length * BLOCK_WIDTH)
 
 // paso por columna en ms: se comprime si hay muchas columnas para que el
 // barrido COMPLETO (primera a última columna) no pase de ~1s sea cual sea
@@ -44,10 +43,19 @@ const cascadeStepMs = computed(() => MAX_SWEEP_MS / Math.max(1, totalColumns.val
 // Clases COMPLETAS y literales a propósito, sin interpolar el porcentaje:
 // Tailwind extrae utilidades escaneando el texto fuente tal cual, no evalúa
 // JS — una clase montada por interpolación no genera CSS.
-const HEAT_CLASSES = ['bg-aurora/8', 'bg-aurora/15', 'bg-aurora/40', 'bg-aurora/70', 'bg-aurora/100']
+//
+// v0.3.0 item 7: "los cuadraditos deberían ser un poco más brillantes si se
+// ha entrenado al menos un día, no sé por qué hay varios niveles" — el
+// degradado de 4 tramos (15/40/70/100%) era casi imperceptible entre
+// niveles intermedios. Ahora solo 3 clases: vacío (base, sin cambios), UN
+// nivel claramente brillante para "se entrenó ese día" (70%, muy por
+// encima del antiguo tier-1 del 15%), y un único escalón extra para 2+
+// (sesión doble) en vez del degradado completo.
+const HEAT_CLASSES = ['bg-aurora/8', 'bg-aurora/70', 'bg-aurora/100']
 
 function heatClass(count: number): string {
-  return count ? HEAT_CLASSES[Math.min(count, 4)] : HEAT_CLASSES[0]
+  if (count <= 0) return HEAT_CLASSES[0]
+  return count === 1 ? HEAT_CLASSES[1] : HEAT_CLASSES[2]
 }
 
 function monthName(month: number): string {
@@ -67,18 +75,19 @@ function monthName(month: number): string {
 // de dos raíces y rompe wrapper.classes()/fallthrough de atributos de un
 // solo elemento raíz.)
 //
-// round-7 re-review (side-fix 2): grid-cols-4 reparte el ancho en 4 columnas
-// de igual fracción (1fr), pero cada mini-rejilla interna usa columnas "auto"
-// (no se encoge). El bloque más ancho posible tiene 6 columnas (un mes de 31
-// días que empieza en domingo: firstRow=6, floor((6+31-1)/7)+1=6 — ver
-// heatmap.ts). Con el tamaño ORIGINAL (celda 10px + gap 4px) ese bloque mide
-// 6*10 + 5*4 = 80px. <main> pone px-4 (32px totales) y el grid exterior
-// gap-3 (12px × 3 huecos = 36px): a 375px de viewport solo quedan
-// (375-32-36)/4 ≈ 76.75px por columna — menos que los 80px que el bloque más
-// ancho necesita, así que desborda (y peor aún a 360px). Por debajo de `sm`
-// (640px) la celda baja a 8px + gap 2px: 6*8 + 5*2 = 58px, que cabe con
-// margen incluso a 360px ((360-32-36)/4 = 73px). Desde `sm` hay de sobra para
-// volver al tamaño original (10px/4px, 80px de bloque máximo).
+// round-7 re-review (side-fix 2), recalculado tras la transposición del
+// item 6: grid-cols-4 reparte el ancho en 4 columnas de igual fracción
+// (1fr), pero cada mini-rejilla interna usa columnas "auto" (no se encoge).
+// El eje horizontal del bloque es ahora FIJO (7 días de la semana, para
+// TODOS los meses — ya no varía 4-6 como el viejo eje de semanas). Con el
+// tamaño ORIGINAL (celda 10px + gap 4px) el bloque mide 7*10 + 6*4 = 94px.
+// <main> pone px-4 (32px totales) y el grid exterior gap-3 (12px × 3 huecos
+// = 36px): a 375px de viewport solo quedan (375-32-36)/4 ≈ 76.75px por
+// columna — menos que los 94px que el bloque necesita, así que desborda (y
+// peor aún a 360px). Por debajo de `sm` (640px) la celda baja a 8px + gap
+// 2px: 7*8 + 6*2 = 68px, que cabe con margen incluso a 360px
+// ((360-32-36)/4 = 73px). Desde `sm` hay de sobra para volver al tamaño
+// original (10px/4px, 94px de bloque, frente a ~143px de columna disponible).
 </script>
 
 <template>
@@ -87,7 +96,7 @@ function monthName(month: number): string {
       <span class="text-xs text-ink-faint text-center whitespace-nowrap">{{ monthName(block.month) }}</span>
       <div
         class="grid gap-0.5 sm:gap-1"
-        :style="{ gridTemplateColumns: `repeat(${block.columnCount}, auto)`, gridTemplateRows: 'repeat(7, 1fr)' }"
+        :style="{ gridTemplateColumns: 'repeat(7, auto)', gridTemplateRows: `repeat(${block.rowCount}, auto)` }"
       >
         <div
           v-for="cell in block.cells"
@@ -95,9 +104,9 @@ function monthName(month: number): string {
           :title="`${cell.date}: ${cell.count}`"
           :class="['w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-xs bk-cascade', heatClass(cell.count)]"
           :style="{
-            gridColumn: cell.column + 1,
-            gridRow: cell.day + 1,
-            '--bk-cascade-i': blockColumnOffsets[blockIdx] + cell.column,
+            gridColumn: cell.col + 1,
+            gridRow: cell.row + 1,
+            '--bk-cascade-i': blockOffsets[blockIdx] + cell.col,
             '--bk-cascade-step': `${cascadeStepMs}ms`,
           }"
         />
