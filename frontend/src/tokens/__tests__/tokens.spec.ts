@@ -29,9 +29,12 @@ describe('token pipeline', () => {
     expect(css).toMatch(/^html\.bk-light \{/m)
   })
 
-  it('generated css contains core tokens (spacing, durations, easings)', () => {
-    expect(css).toContain('--bk-space-4:')
+  it('generated css contains core tokens (durations, easings)', () => {
     expect(css).toContain('--bk-dur-3: 320ms')
     expect(css).toContain('--bk-ease-spring: cubic-bezier(0.34, 1.4, 0.44, 1)')
+  })
+
+  it('spacing is not a token: Tailwind\'s own scale is the spacing system', () => {
+    expect(css).not.toContain('--bk-space-')
   })
 })

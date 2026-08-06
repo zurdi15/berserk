@@ -15,6 +15,9 @@ export default defineConfig({
         // el fallback de navegación del SW no debe interceptar /api/*: si no,
         // una petición fetch a la API que falle de red cae al index.html
         navigateFallbackDenylist: [/^\/api\//],
+        // el shell offline necesita las fuentes latin en el precache (por defecto
+        // workbox solo mete js/css/html); los demás subsets quedan online-only
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}', 'assets/*-latin-[0-9w]*.woff2'],
       },
       manifest: {
         name: 'berserk',
