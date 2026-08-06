@@ -13,6 +13,12 @@ export interface MuscleGroupOut {
   name_es: string
   name_en: string
   owner_id: number | null
+  // item 14: runa dedicada, opcional en el tipo aunque el backend siempre
+  // manda la clave (mismo criterio que UserOut.color) — así los fixtures de
+  // test ya existentes (sin rune) siguen tipando sin tocarlos. Resolución
+  // efectiva SIEMPRE vía runeResolve.groupRune (rune ?? slug), nunca leyendo
+  // este campo a pelo.
+  rune?: string | null
 }
 
 export interface ExerciseMuscleLink {
@@ -221,6 +227,14 @@ export interface SharingOut {
   received: UserOut[]
 }
 
+// item 11: ficha mínima del picker de "conceder acceso" — nunca lleva
+// is_admin/locale/timezone (ver backend/app/schemas/users.py UserDirectoryOut)
+export interface UserDirectoryEntry {
+  id: number
+  username: string
+  color: string | null
+}
+
 export interface InviteOut {
   id: number
   created_at: string
@@ -245,15 +259,19 @@ export const createMuscleGroup = (body: {
   name_es: string
   name_en: string
   is_global?: boolean
+  rune?: string | null
 }) =>
   api<MuscleGroupOut>('/muscle-groups', { method: 'POST', body })
 
 // item 5: no existía PATCH para grupos musculares — un admin lo usa para
-// editar nombre y "runa" (slug, ver runeResolve.ts) de una fila predefinida
+// editar nombre de una fila predefinida. item 14: slug ya no dobla como
+// "runa" (columna dedicada abajo); el dueño de un grupo propio también
+// puede patchear el suyo, no solo un admin sobre uno global (ver _can_edit)
 export const updateMuscleGroup = (id: number, body: {
   slug?: string
   name_es?: string
   name_en?: string
+  rune?: string | null
 }) =>
   api<MuscleGroupOut>(`/muscle-groups/${id}`, { method: 'PATCH', body })
 
@@ -458,6 +476,11 @@ export const grantSharing = (username: string) =>
 
 export const revokeSharing = (viewerId: number) =>
   api<void>(`/sharing/${viewerId}`, { method: 'DELETE' })
+
+// item 11: listado (autenticado, NO admin-only) para el picker de conceder
+// acceso — no hay username-guessing, se elige de una lista real
+export const listUserDirectory = () =>
+  api<UserDirectoryEntry[]>('/users/directory')
 
 // Admin endpoints
 export const adminListUsers = () =>
