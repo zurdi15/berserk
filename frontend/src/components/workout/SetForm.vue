@@ -63,7 +63,7 @@ const rpe = ref(props.initialSet?.rpe != null ? String(props.initialSet.rpe) : '
 const countdownActive = ref(false)
 
 const rpeOptions = computed(() => [
-  { value: '', label: '—' },
+  { value: '', label: '' },
   ...[6, 7, 8, 9, 10].map((n) => ({ value: String(n), label: String(n) })),
 ])
 
@@ -126,41 +126,50 @@ function onCountdownDone() {
     @cancel="countdownActive = false"
   />
 
-  <form v-else class="space-y-3" @submit.prevent="submit(false)">
-    <div v-if="measurement === 'strength'" class="flex flex-wrap gap-4">
-      <div>
+  <form v-else class="space-y-3 flex flex-col items-center" @submit.prevent="submit(false)">
+    <!-- item 4a: todo el contenido del formulario se centra (flex-col
+         items-center en el <form>) — antes quedaba pegado al borde
+         izquierdo del cajón -->
+    <!-- item 4b: peso y reps SIEMPRE en dos columnas fijas (grid, no
+         flex-wrap) — con flex-wrap, un valor x.5 ("22.5 kg" vs "20 kg")
+         ensanchaba el bloque de peso lo justo para tirar el de reps a su
+         propia línea. Con grid grid-cols-2 cada columna tiene un ancho FIJO
+         (independiente del contenido); min-w-0 es la garantía estándar de
+         Tailwind para que ese contenido nunca fuerce la columna a crecer -->
+    <div v-if="measurement === 'strength'" class="w-full grid grid-cols-2 gap-3 bk-set-grid">
+      <div class="min-w-0 flex flex-col items-center">
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weight') }}</span>
         <BkStepper v-model="weightDisplay" :step="WEIGHT_UI[units].step" :min="2.5" :max="WEIGHT_UI[units].max" :suffix="units" />
       </div>
-      <div>
+      <div class="min-w-0 flex flex-col items-center">
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
         <BkStepper v-model="reps" :step="1" :min="1" :max="100" />
       </div>
     </div>
 
-    <div v-else-if="measurement === 'bodyweight'" class="flex flex-wrap gap-4">
-      <div>
+    <div v-else-if="measurement === 'bodyweight'" class="w-full grid grid-cols-2 gap-3 bk-set-grid">
+      <div class="min-w-0 flex flex-col items-center">
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
         <BkStepper v-model="reps" :step="1" :min="1" :max="100" />
       </div>
-      <div>
+      <div class="min-w-0 flex flex-col items-center">
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weightOptional') }}</span>
         <BkStepper v-model="weightDisplay" :step="WEIGHT_UI[units].step" :min="0" :max="WEIGHT_UI[units].max" :suffix="units" />
       </div>
     </div>
 
-    <div v-else-if="measurement === 'timed'">
+    <div v-else-if="measurement === 'timed'" class="flex flex-col items-center">
       <span class="block text-xs text-ink-muted mb-2">{{ t('workout.duration') }}</span>
       <BkStepper v-model="durationSeconds" :step="15" :min="1" :max="3600" suffix="s" />
     </div>
 
-    <div v-else-if="measurement === 'cardio'" class="space-y-3">
-      <div class="flex flex-wrap gap-4">
-        <div>
+    <div v-else-if="measurement === 'cardio'" class="w-full space-y-3 flex flex-col items-center">
+      <div class="w-full grid grid-cols-2 gap-3 bk-set-grid">
+        <div class="min-w-0 flex flex-col items-center">
           <span class="block text-xs text-ink-muted mb-2">{{ t('workout.duration') }}</span>
           <BkStepper v-model="durationSeconds" :step="60" :min="1" :max="21600" suffix="s" />
         </div>
-        <div>
+        <div class="min-w-0 flex flex-col items-center">
           <span class="block text-xs text-ink-muted mb-2">{{ t('workout.distanceOptional') }}</span>
           <BkStepper v-model="distanceM" :step="100" :min="0" :max="100000" suffix="m" />
         </div>
@@ -176,24 +185,24 @@ function onCountdownDone() {
       </BkButton>
     </div>
 
-    <div class="flex items-center gap-3 flex-wrap">
-      <button
-        type="button"
-        data-testid="warmup-toggle"
-        class="bk-press px-3 py-1.5 rounded-sm border text-sm"
-        :class="isWarmup ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
-        :aria-pressed="isWarmup ? 'true' : 'false'"
-        @click="isWarmup = !isWarmup"
-      >
-        {{ t('workout.warmup') }}
-      </button>
+    <!-- item 4c: el calentamiento ya no comparte fila con el RPE, cada uno
+         en la suya -->
+    <button
+      type="button"
+      data-testid="warmup-toggle"
+      class="bk-press px-3 py-1.5 rounded-sm border text-sm"
+      :class="isWarmup ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+      :aria-pressed="isWarmup ? 'true' : 'false'"
+      @click="isWarmup = !isWarmup"
+    >
+      {{ t('workout.warmup') }}
+    </button>
 
-      <div class="min-w-24">
-        <BkSelect v-model="rpe" :label="t('workout.rpe')" :options="rpeOptions" />
-      </div>
+    <div class="w-full max-w-32">
+      <BkSelect v-model="rpe" :label="t('workout.rpe')" :options="rpeOptions" />
     </div>
 
-    <div class="flex gap-2">
+    <div class="flex gap-2 w-full">
       <BkButton
         v-if="!editing"
         type="button"
@@ -210,3 +219,19 @@ function onCountdownDone() {
     </div>
   </form>
 </template>
+
+<style scoped>
+/* item 4b: BkStepper.vue (primitivo compartido, fuera del alcance de este
+   lane — lo usa también RoutineEditorSheet) le da al valor un min-width, no
+   un ancho fijo: con pesos x.5 ("22.5 kg" frente a "20 kg") la fila entera
+   del stepper cambiaba de tamaño, que era la causa real del salto de
+   layout. Aquí, solo para las dos columnas del cajón de series
+   (.bk-set-grid), se fija un ancho constante al slot del valor con :deep()
+   — acotado a este componente (Vue solo aplica el selector a los
+   descendientes DENTRO de .bk-set-grid, así que no alcanza al
+   CardioCountdown, que también vive en este archivo pero fuera de esa
+   rejilla) sin tocar BkStepper.vue ni afectar a sus otros consumidores. */
+.bk-set-grid :deep(.bk-metric) {
+  width: 6rem;
+}
+</style>

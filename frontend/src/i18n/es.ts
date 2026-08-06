@@ -333,7 +333,7 @@ export const es = {
     addCardio: 'Añadir cardio',
     logSetAndAnother: 'Registrar y otra',
     startCountdown: 'Empezar',
-    lastTime: 'Última vez — {date}',
+    lastTime: 'Última vez ({date})',
     lastTimeHint: 'Última vez: {line}',
     stretched: 'He estirado',
     saveAsRoutine: 'Guardar como rutina',

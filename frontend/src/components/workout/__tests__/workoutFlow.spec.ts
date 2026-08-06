@@ -397,7 +397,29 @@ describe('WorkoutExerciseCard', () => {
       expect(wrapper.find('[data-testid="card-history-hint"]').exists()).toBe(false)
     })
 
-    it('shows the dense "Última vez" line inside the drawer, under the form', async () => {
+    it('item 4d: shows a multi-line "Última vez" block inside the drawer, date on its own line + one "Sn · reps × peso" line per set', async () => {
+      const actions = makeActions({
+        exerciseHistory: vi.fn(async () => ({
+          workout_id: 9,
+          date: '2026-07-20',
+          sets: [
+            { reps: 8, weight_kg: 80, duration_seconds: null, distance_m: null, is_warmup: false },
+            { reps: 8, weight_kg: 82.5, duration_seconds: null, distance_m: null, is_warmup: false },
+          ],
+        })),
+      })
+      mountCard({ actions })
+      await flushPromises()
+      await openDrawer(20)
+
+      const hint = byTestId('drawer-history-hint')
+      const lines = hint.findAll('p')
+      expect(lines[0].text()).toContain('20 jul')
+      expect(lines[1].text()).toBe('S1 · 8 × 80 kg')
+      expect(lines[2].text()).toBe('S2 · 8 × 82.5 kg')
+    })
+
+    it('item 4d: the "Última vez" block never contains an em-dash or en-dash (zurdi: "quita el m-dash")', async () => {
       const actions = makeActions({
         exerciseHistory: vi.fn(async () => ({
           workout_id: 9,
@@ -410,7 +432,7 @@ describe('WorkoutExerciseCard', () => {
       await openDrawer(20)
 
       const hint = byTestId('drawer-history-hint')
-      expect(hint.text()).toContain('8·80 kg')
+      expect(hint.text()).not.toMatch(/[—–]/)
     })
 
     it('fetches history once per exercise id (cache lives in the store, not refetched per drawer open)', async () => {
@@ -647,6 +669,52 @@ describe('WorkoutExerciseCard', () => {
     expect(actions.deleteSet).not.toHaveBeenCalled()
     // el cancelar debe devolver el botón de borrar, no dejar la fila colgada en confirmación
     expect(wrapper.find('[data-testid="delete-set-1"]').exists()).toBe(true)
+  })
+
+  describe('item 7: confirm/cancel swap animation', () => {
+    // VTU stubea <Transition> por defecto: hay que desactivarlo para ver la
+    // clase real (mismo patrón que BkSelect.spec.ts) — cheap/estructural:
+    // solo confirma que el swap vive dentro de la Transition con el nombre
+    // correcto, no la coreografía CSS en sí
+    function mountReal(overrides: Partial<Record<string, unknown>> = {}) {
+      const actions = (overrides.actions as ReturnType<typeof makeActions>) ?? makeActions()
+      return mount(WorkoutExerciseCard, {
+        props: {
+          workoutExercise: pushExercise as never,
+          exercise: exercise as never,
+          muscleGroups: muscleGroups as never,
+          routines: [] as never,
+          routineId: null,
+          exerciseIds: [20],
+          units: 'kg',
+          locale: 'es',
+          ...overrides,
+          actions,
+        },
+        global: { plugins: [createI18nInstance()], stubs: { transition: false } },
+        attachTo: document.body,
+      })
+    }
+
+    it('the delete-set swap enters via bk-pop-soft when confirming', async () => {
+      const wrapper = mountReal()
+      await wrapper.find('[data-testid="delete-set-1"]').trigger('click')
+      await flushPromises()
+
+      const confirmBtn = document.querySelector('[data-testid="confirm-delete-set-1"]')
+      expect(confirmBtn?.closest('.bk-pop-soft-enter-active, [class*="bk-pop-soft"]')).not.toBeNull()
+      wrapper.unmount()
+    })
+
+    it('the remove-exercise swap enters via bk-pop-soft when confirming', async () => {
+      const wrapper = mountReal()
+      await wrapper.find('[data-testid="remove-exercise-20"]').trigger('click')
+      await flushPromises()
+
+      const confirmBtn = document.querySelector('[data-testid="confirm-remove-exercise-20"]')
+      expect(confirmBtn?.closest('.bk-pop-soft-enter-active, [class*="bk-pop-soft"]')).not.toBeNull()
+      wrapper.unmount()
+    })
   })
 
   it('removes the exercise via actions.removeExercise after confirming with a real click', async () => {
