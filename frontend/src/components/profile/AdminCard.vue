@@ -13,6 +13,7 @@ import {
   type UserOut,
   type InviteOut,
 } from '@/api/domain'
+import { restoreBackup, BACKUP_EXPORT_URL } from '@/api/backup'
 import { toastApiError } from '@/utils/apiErrors'
 import { parseUtc } from '@/utils/datetime'
 import { ApiError } from '@/api/client'
@@ -52,6 +53,12 @@ const newToken = ref<string | null>(null)
 const isCreatingInvite = ref(false)
 const deleteInviteConfirmOpen = ref(false)
 const deleteInviteId = ref<number | null>(null)
+
+// Backup section
+const restoreFileInput = ref<HTMLInputElement | null>(null)
+const restoreFile = ref<File | null>(null)
+const restoreConfirmOpen = ref(false)
+const isRestoring = ref(false)
 
 // cada tabla se gatea con su propia bandera (no una compartida): users e
 // invites cargan en paralelo lógico pero secuenciados abajo, y la tabla de
@@ -204,6 +211,43 @@ async function confirmDeleteInvite() {
     toast.push('info', t('common.saved'))
   } catch (error) {
     toastApiError(error)
+  }
+}
+
+function openRestorePicker() {
+  restoreFileInput.value?.click()
+}
+
+function onRestoreFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  if (!file) return
+  restoreFile.value = file
+  restoreConfirmOpen.value = true
+}
+
+function cancelRestore() {
+  restoreConfirmOpen.value = false
+  restoreFile.value = null
+  if (restoreFileInput.value) restoreFileInput.value.value = ''
+}
+
+async function confirmRestore() {
+  if (!restoreFile.value) return
+
+  isRestoring.value = true
+  try {
+    await restoreBackup(restoreFile.value)
+    restoreConfirmOpen.value = false
+    toast.push('info', t('admin.backup.restoreSuccess'))
+    // la DB restaurada decide quién sigue con sesión: recargar es la única
+    // forma fiable de que el resto de la app vea el estado nuevo de golpe
+    window.location.reload()
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    isRestoring.value = false
+    if (restoreFileInput.value) restoreFileInput.value.value = ''
   }
 }
 
@@ -376,6 +420,39 @@ function redeemUrl(token: string): string {
       </div>
     </BkCard>
 
+    <!-- Backup section -->
+    <BkCard :title="$t('admin.backup.title')">
+      <div class="flex flex-wrap gap-2">
+        <!-- anchor real (no fetch+blob): mismas clases que BkButton variant
+             primary/md para que se vea igual, pero navega de verdad — un
+             ZIP puede pesar cientos de MB y el navegador ya sabe transmitir
+             una descarga de FileResponse sin que JS tenga que bufferearla -->
+        <a
+          :href="BACKUP_EXPORT_URL"
+          download
+          data-testid="export-backup-link"
+          class="bk-press inline-flex items-center justify-center gap-2 font-display font-semibold uppercase tracking-wide rounded-sm border transition-colors px-5 py-2.5 bg-aurora-deep border-aurora text-ink hover:bg-aurora hover:text-void"
+        >
+          {{ $t('admin.backup.export') }}
+        </a>
+        <BkButton
+          variant="ghost"
+          data-testid="restore-backup-btn"
+          @click="openRestorePicker"
+        >
+          {{ $t('admin.backup.restore') }}
+        </BkButton>
+        <input
+          ref="restoreFileInput"
+          type="file"
+          accept=".zip"
+          class="hidden"
+          data-testid="restore-backup-input"
+          @change="onRestoreFileSelected"
+        />
+      </div>
+    </BkCard>
+
     <!-- Create user sheet -->
     <BkSheet
       :open="createUserOpen"
@@ -505,6 +582,35 @@ function redeemUrl(token: string): string {
             data-testid="delete-invite-confirm-btn"
           >
             {{ $t('common.delete') }}
+          </BkButton>
+        </div>
+      </div>
+    </BkSheet>
+
+    <!-- Restore backup confirmation sheet -->
+    <BkSheet
+      :open="restoreConfirmOpen"
+      :title="$t('admin.backup.confirmTitle')"
+      @close="cancelRestore"
+      data-testid="restore-backup-confirm-sheet"
+    >
+      <div class="space-y-4 p-4">
+        <p>{{ $t('admin.backup.confirmHint') }}</p>
+        <div class="flex gap-2">
+          <BkButton
+            variant="ghost"
+            @click="cancelRestore"
+            data-testid="restore-backup-cancel-btn"
+          >
+            {{ $t('common.cancel') }}
+          </BkButton>
+          <BkButton
+            variant="danger"
+            :loading="isRestoring"
+            @click="confirmRestore"
+            data-testid="restore-backup-confirm-btn"
+          >
+            {{ $t('admin.backup.restore') }}
           </BkButton>
         </div>
       </div>

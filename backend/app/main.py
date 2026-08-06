@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -8,7 +9,7 @@ from sqlalchemy.engine import Engine
 from .auth import get_current_user, require_admin
 from .config import get_settings
 from .db import make_engine, make_sessionmaker
-from .routers import admin, auth, body, calendar as calendar_router, exercises, progress as progress_router, routines, sharing, users, workouts
+from .routers import admin, auth, backup, body, calendar as calendar_router, exercises, progress as progress_router, routines, sharing, users, workouts
 from .seed import ensure_catalog
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -29,6 +30,9 @@ def create_app(engine: Engine | None = None) -> FastAPI:
     )
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
+    # candado no-reentrante: export y restore lo adquieren sin bloquear (409
+    # si ya hay una restauración en curso) en vez de encolar peticiones
+    app.state.backup_lock = threading.Lock()
 
     # sembrar el catálogo global (idempotente)
     with app.state.sessionmaker() as session:
@@ -62,6 +66,10 @@ def create_app(engine: Engine | None = None) -> FastAPI:
     # solo admin: gestión de usuarios e invitaciones
     app.include_router(
         admin.router, prefix=API_PREFIX, dependencies=[Depends(require_admin)]
+    )
+    # solo admin: exportar/restaurar la copia de seguridad completa
+    app.include_router(
+        backup.router, prefix=API_PREFIX, dependencies=[Depends(require_admin)]
     )
     # públicos: auth gestiona su propia protección endpoint a endpoint
     app.include_router(auth.router, prefix=API_PREFIX)

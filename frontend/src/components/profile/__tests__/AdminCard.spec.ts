@@ -4,7 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
+import { ApiError } from '@/api/client'
 import AdminCard from '../AdminCard.vue'
+
+vi.mock('@/api/backup', () => ({
+  BACKUP_EXPORT_URL: '/api/v1/backup/export',
+  restoreBackup: vi.fn(() => Promise.resolve({ restored: true, workouts: 3, previous_revision: 'abc123' })),
+}))
 
 vi.mock('@/api/domain', () => ({
   adminListUsers: vi.fn(() => Promise.resolve([
@@ -439,5 +446,144 @@ describe('AdminCard', () => {
     // tras el éxito, el dialog se cierra y el form ya no está en el DOM
     await wrapper.vm.$nextTick()
     expect(document.querySelector('[data-testid="create-username-field"] input')).toBeNull()
+  })
+
+  describe('backup', () => {
+    function selectRestoreFile(file: File) {
+      const input = document.querySelector('[data-testid="restore-backup-input"]') as HTMLInputElement
+      Object.defineProperty(input, 'files', { value: [file], configurable: true })
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+
+    it('renders a real download link for the backup export pointing at the API URL', async () => {
+      const w = build()
+      await w.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      const link = w.find('[data-testid="export-backup-link"]')
+      expect(link.exists()).toBe(true)
+      expect(link.attributes('href')).toBe('/api/v1/backup/export')
+      expect(link.attributes('download')).toBe('')
+    })
+
+    it('clicking "Restaurar copia" opens the native file picker (click on the hidden input)', async () => {
+      const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click')
+      const w = build()
+      await w.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      await w.find('[data-testid="restore-backup-btn"]').trigger('click')
+
+      expect(clickSpy).toHaveBeenCalled()
+      clickSpy.mockRestore()
+    })
+
+    it('selecting a .zip file opens the restore confirmation sheet with the destructive hint', async () => {
+      wrapper = mount(AdminCard, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      // se busca por el botón de cancelar propio del sheet de restore, no por
+      // [role="dialog"] a secas: otros tests de este fichero teletransportan
+      // sus propios sheets a document.body (Teleport ignora el attachTo del
+      // wrapper) y nunca los desmontan, así que un selector genérico picaría
+      // diálogos ajenos que quedaron colgando de tests anteriores
+      expect(document.querySelector('[data-testid="restore-backup-cancel-btn"]')).toBeNull()
+
+      const file = new File(['zip-bytes'], 'backup.zip', { type: 'application/zip' })
+      selectRestoreFile(file)
+      await wrapper.vm.$nextTick()
+
+      const cancelBtn = document.querySelector('[data-testid="restore-backup-cancel-btn"]')
+      expect(cancelBtn).not.toBeNull()
+      const dialog = cancelBtn!.closest('[role="dialog"]')
+      expect(dialog).not.toBeNull()
+      expect(dialog!.textContent).toContain('reemplaza todos los datos actuales')
+    })
+
+    it('canceling the restore confirmation does not call restoreBackup and closes the sheet', async () => {
+      const { restoreBackup } = await import('@/api/backup')
+      wrapper = mount(AdminCard, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      const file = new File(['zip-bytes'], 'backup.zip', { type: 'application/zip' })
+      selectRestoreFile(file)
+      await wrapper.vm.$nextTick()
+
+      const cancelBtn = document.querySelector('[data-testid="restore-backup-cancel-btn"]') as HTMLElement
+      expect(cancelBtn).not.toBeNull()
+      cancelBtn.click()
+      await new Promise(resolve => setTimeout(resolve, 0))
+      await wrapper.vm.$nextTick()
+
+      expect(restoreBackup).not.toHaveBeenCalled()
+      expect(document.querySelector('[data-testid="restore-backup-cancel-btn"]')).toBeNull()
+    })
+
+    it('confirming restore calls restoreBackup with the selected file, toasts success and reloads the page', async () => {
+      const { restoreBackup } = await import('@/api/backup')
+      const reloadSpy = vi.spyOn(window.location, 'reload').mockImplementation(() => {})
+      const toastStore = useToastStore()
+
+      wrapper = mount(AdminCard, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      const file = new File(['zip-bytes'], 'backup.zip', { type: 'application/zip' })
+      selectRestoreFile(file)
+      await wrapper.vm.$nextTick()
+
+      const confirmBtn = document.querySelector('[data-testid="restore-backup-confirm-btn"]') as HTMLElement
+      expect(confirmBtn).not.toBeNull()
+      confirmBtn.click()
+      await new Promise(resolve => setTimeout(resolve, 0))
+      await wrapper.vm.$nextTick()
+
+      expect(restoreBackup).toHaveBeenCalledWith(file)
+      expect(reloadSpy).toHaveBeenCalled()
+      expect(toastStore.toasts.at(-1)?.kind).toBe('info')
+      expect(toastStore.toasts.at(-1)?.message).toBe('Copia restaurada. Recargando…')
+
+      reloadSpy.mockRestore()
+    })
+
+    it('shows an error toast and does not reload when restoreBackup rejects with an ApiError', async () => {
+      const { restoreBackup } = await import('@/api/backup')
+      vi.mocked(restoreBackup).mockImplementationOnce(() => Promise.reject(new ApiError(400, 'backup_invalid')))
+      const reloadSpy = vi.spyOn(window.location, 'reload').mockImplementation(() => {})
+      const toastStore = useToastStore()
+
+      wrapper = mount(AdminCard, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      const file = new File(['zip-bytes'], 'backup.zip', { type: 'application/zip' })
+      selectRestoreFile(file)
+      await wrapper.vm.$nextTick()
+
+      const confirmBtn = document.querySelector('[data-testid="restore-backup-confirm-btn"]') as HTMLElement
+      confirmBtn.click()
+      await new Promise(resolve => setTimeout(resolve, 0))
+      await wrapper.vm.$nextTick()
+
+      expect(reloadSpy).not.toHaveBeenCalled()
+      expect(toastStore.toasts.at(-1)?.kind).toBe('error')
+      expect(toastStore.toasts.at(-1)?.message).toBe('El fichero de copia no es válido.')
+
+      reloadSpy.mockRestore()
+    })
   })
 })
