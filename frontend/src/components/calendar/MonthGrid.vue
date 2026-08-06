@@ -121,13 +121,11 @@ function selectDay(date: string) {
              empujar el número (item 6: antes compartían un mismo footer
              abajo y, con ambos presentes, el bloque crecía hacia el centro
              y tapaba el número) -->
-        <!-- v0.3.0 item 4: "el número en color aurora o borde en aurora" —
-             hoy ya tenía borde aurora (arriba), ahora además el número en
-             sí va en aurora: más visible en el vistazo rápido en el gym -->
-        <span
-          class="text-xs font-semibold"
-          :class="{ 'text-aurora': cell.date === today && cell.inMonth }"
-        >
+        <!-- polish wave item 1: v0.3.0 item 4 había puesto también el número
+             en aurora; zurdi pide que SOLO el borde de la celda brille — el
+             número vuelve a su tinta normal, el borde (arriba) es lo único
+             que marca "hoy" -->
+        <span class="text-xs font-semibold">
           {{ Number(cell.date.slice(8, 10)) }}
         </span>
 

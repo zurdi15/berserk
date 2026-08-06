@@ -226,7 +226,6 @@ export const en = {
     confirmDelete: 'Delete session',
     confirmDeleteMessage: 'Are you sure you want to delete this session?',
     runeLegend: 'Rune legend',
-    runeLegendHint: 'Each rune marks the main muscle group trained that day.',
     logPastWorkout: 'Log workout',
     prsOfDay: 'PRs of the day',
     plannedEyebrow: 'Planned',

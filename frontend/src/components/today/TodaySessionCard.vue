@@ -48,8 +48,12 @@ function startWorkout() {
   }
 }
 
+// polish wave item 8: "programar sesión" antes solo aterrizaba en el
+// calendario sin abrir nada — ahora manda el día de hoy por query, que
+// CalendarView lee al montar (o al cambiar de query) para abrir su sheet
+// directamente en ese día.
 function goToCalendar() {
-  router.push({ name: 'calendar' })
+  router.push({ name: 'calendar', query: { day: today.value } })
 }
 </script>
 
@@ -71,7 +75,8 @@ function goToCalendar() {
       >
         <span :class="['w-2.5 h-2.5', statusClasses(session.status)]" />
         <div class="flex-1 min-w-0">
-          <p class="font-medium text-ink">{{ formatTimeShort(session.time) || '–' }}</p>
+          <!-- item 9: sin em-dash de relleno cuando no hay hora — se omite -->
+          <p v-if="formatTimeShort(session.time)" class="font-medium text-ink">{{ formatTimeShort(session.time) }}</p>
           <p v-if="session.note" class="text-sm text-ink-muted truncate">{{ session.note }}</p>
         </div>
       </div>

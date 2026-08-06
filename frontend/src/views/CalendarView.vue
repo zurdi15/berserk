@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { monthLabel } from '@/utils/dates'
 import { getMonth, getHeatmap, listMuscleGroups } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
@@ -17,6 +18,8 @@ import type { CalendarMonthOut, MuscleGroupOut } from '@/api/domain'
 
 const athlete = useAthleteStore()
 const { locale } = useI18n()
+const route = useRoute()
+const router = useRouter()
 
 const today = new Date()
 const year = ref(today.getFullYear())
@@ -117,6 +120,26 @@ function closeScheduleSheet() {
   selectedDate.value = null
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+// polish wave item 8: "programar sesión" en Hoy navega aquí con ?day=<iso>
+// para abrir directamente el sheet del día de hoy. watch con immediate
+// (no solo onMounted) porque también cubre volver a esta misma vista con
+// una query nueva sin remontar el componente (rutas hijas del mismo shell).
+// La query se limpia con router.replace tras abrir: si no, un back/refresh
+// reabriría el sheet en bucle.
+watch(
+  () => route.query.day,
+  (day) => {
+    if (typeof day !== 'string' || !ISO_DATE_RE.test(day)) return
+    selectedDate.value = day
+    const query = { ...route.query }
+    delete query.day
+    router.replace({ query })
+  },
+  { immediate: true },
+)
+
 onMounted(() => {
   loadMuscleGroups()
 })
@@ -149,9 +172,9 @@ watch(() => athlete.userId, () => {
   <div class="space-y-6">
     <!-- Month navigation: icon-only en móvil (el texto largo con flecha
          desbordaba y aplastaba el label en 390px), texto de vuelta desde sm.
-         La leyenda de runas (item 3) vive aquí ahora: el h1 de sección que la
-         acompañaba se quitó (Hoy nunca tuvo uno, es el patrón a seguir), así
-         que el botón se reubica a la derecha, a la altura de los chevrons. -->
+         La leyenda de runas ya no vive aquí (item 13): se baja entre la
+         rejilla y la actividad del año, como un enlace suelto en vez de un
+         icono en esta fila. -->
     <div class="flex items-center gap-2">
       <BkButton variant="ghost" size="sm" :aria-label="$t('calendar.prevMonth')" @click="prevMonth">
         <span aria-hidden="true">‹</span>
@@ -162,16 +185,6 @@ watch(() => athlete.userId, () => {
         <span aria-hidden="true">›</span>
         <span class="hidden sm:inline">{{ $t('calendar.nextMonth') }}</span>
       </BkButton>
-      <!-- las runas de los squares no se autoexplican: leyenda a un toque -->
-      <button
-        type="button"
-        class="bk-press flex items-center justify-center w-6 h-6 rounded-full border border-line-strong text-xs text-ink-muted hover:text-ink hover:border-aurora shrink-0"
-        :aria-label="$t('calendar.runeLegend')"
-        data-testid="rune-legend-btn"
-        @click="runeLegendOpen = true"
-      >
-        i
-      </button>
     </div>
 
     <!-- Month grid -->
@@ -183,6 +196,21 @@ watch(() => athlete.userId, () => {
       :dot-color="athlete.viewing?.color"
       @select="selectDay"
     />
+
+    <!-- Rune legend trigger (item 13): las runas de los squares no se
+         autoexplican, pero ya no es un botón-icono junto a los chevrons —
+         un texto pequeño y subtle, mismo idiom que otros enlaces menores de
+         la app (ver el toggle de descanso en WorkoutExerciseCard.vue) -->
+    <div class="flex justify-center">
+      <button
+        type="button"
+        class="bk-press text-xs text-ink-faint underline decoration-dotted"
+        data-testid="rune-legend-btn"
+        @click="runeLegendOpen = true"
+      >
+        {{ $t('calendar.runeLegend') }}
+      </button>
+    </div>
 
     <!-- Heatmap: siempre visible, incluso con datos vacíos (BkHeatmap ya
          tolera [] y dibuja la rejilla del año en blanco) -->
@@ -204,10 +232,10 @@ watch(() => athlete.userId, () => {
       />
     </BkSheet>
 
-    <!-- Rune legend sheet -->
+    <!-- Rune legend sheet: solo la lista runa+nombre (item 13, se quita el
+         párrafo explicativo) -->
     <BkSheet :open="runeLegendOpen" :title="$t('calendar.runeLegend')" @close="runeLegendOpen = false">
       <div class="space-y-3 p-4">
-        <p class="text-sm text-ink-muted">{{ $t('calendar.runeLegendHint') }}</p>
         <ul class="space-y-2">
           <li v-for="group in legendGroups" :key="group.id" class="flex items-center gap-3">
             <BkRune :name="group.rune" :size="20" />

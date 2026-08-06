@@ -14,7 +14,10 @@ vi.mock('@/api/domain', () => ({
   listExercises: vi.fn(async () => []),
   listMuscleGroups: vi.fn(async () => []),
 }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+// push compartido (no un vi.fn() nuevo por llamada a useRouter): item 8
+// necesita aserir con qué se llamó router.push desde TodaySessionCard
+const push = vi.fn()
+vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
 
 import type { ScheduledOut } from '@/api/domain'
 import * as domain from '@/api/domain'
@@ -74,7 +77,15 @@ describe('TodayView', () => {
 })
 
 describe('TodaySessionCard status dots', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  // reloj pineado: todaySessions filtra props.schedules por fecha === HOY, y
+  // las fixtures de este bloque usan '2026-08-06' — sin pinear, estos tests
+  // se vuelven fecha-dependientes del reloj real (ya han roto así antes)
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
+    push.mockClear()
+  })
+  afterEach(() => vi.useRealTimers())
 
   it('renders planned session with aurora border dot', async () => {
     const schedules: ScheduledOut[] = [
@@ -125,5 +136,32 @@ describe('TodaySessionCard status dots', () => {
     })
     expect(wrapper.text()).toContain('18:00')
     expect(wrapper.text()).not.toContain('18:00:00')
+  })
+
+  it('polish wave item 9: omits the time line entirely when the session has no time (no em-dash placeholder)', async () => {
+    const schedules: ScheduledOut[] = [
+      { id: 3, date: '2026-08-06', time: null, routine_id: 3, status: 'skipped', workout_id: null, note: 'Too busy' },
+    ]
+    const wrapper = mount(TodaySessionCard, {
+      props: { schedules },
+      global: { plugins: [createI18nInstance()] },
+    })
+    expect(wrapper.text()).not.toContain('–')
+    expect(wrapper.text()).not.toContain('—')
+    expect(wrapper.text()).toContain('Too busy')
+  })
+
+  it('polish wave item 8: "Programar Sesión" pushes to the calendar with today\'s date as a query (so it auto-opens the day sheet)', async () => {
+    const wrapper = mount(TodaySessionCard, {
+      props: { schedules: [] },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const scheduleBtn = wrapper.findAll('button').find((b) => b.text() === 'Programar Sesión')!
+    expect(scheduleBtn).not.toBeUndefined()
+    await scheduleBtn.trigger('click')
+
+    expect(push).toHaveBeenCalledWith({ name: 'calendar', query: { day: '2026-08-06' } })
   })
 })

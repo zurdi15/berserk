@@ -226,7 +226,6 @@ export const es = {
     confirmDelete: 'Borrar sesión',
     confirmDeleteMessage: '¿Estás seguro de que quieres borrar esta sesión?',
     runeLegend: 'Leyenda de runas',
-    runeLegendHint: 'Cada runa marca el grupo muscular principal trabajado ese día.',
     logPastWorkout: 'Registrar entreno',
     prsOfDay: 'Récords del día',
     plannedEyebrow: 'Planificado',

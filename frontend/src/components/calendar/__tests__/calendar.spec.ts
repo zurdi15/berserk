@@ -1,5 +1,6 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { reactive } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/api/domain', () => ({
@@ -45,13 +46,36 @@ vi.mock('@/api/domain', () => ({
   listExercises: vi.fn(async () => []),
   deleteWorkout: vi.fn(async () => {}),
 }))
-// push compartido (no un vi.fn() nuevo por llamada a useRouter): así los
-// tests de navegación (ScheduleSheet → editor) pueden aserir sobre él
+// push/replace compartidos (no un vi.fn() nuevo por llamada a useRouter):
+// así los tests de navegación (ScheduleSheet → editor, item 8 → replace de
+// la query) pueden aserir sobre ellos
 const push = vi.fn()
-vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
+const replace = vi.fn()
+// route reactiva: item 8 lee route.query.day con un watch inmediato —
+// reactive() (no un objeto plano) para poder probar también el caso de
+// cambio de query en caliente, no solo el de montaje. `let` + REASIGNAR (no
+// mutar) un objeto nuevo en cada test, ver más abajo: este fichero tiene
+// muchos CalendarView montados en otros describes que nunca se desmontan
+// (deuda de tests previa a este ítem), así que siguen "vivos" con su propio
+// watch sobre route.query.day — si currentRoute fuera un único objeto
+// reactive() mutado en sitio, escribir en su .query dispararía TAMBIÉN el
+// watcher de esos zombies (comparten la misma referencia), abriendo su
+// propio day-sheet y contaminando document.body con diálogos ajenos. Con
+// reasignación, cada test tiene su propio objeto: los zombies de otros
+// tests se quedan enganchados al suyo, ya huérfano, y no reaccionan.
+let currentRoute = reactive<{ query: Record<string, string> }>({ query: {} })
+vi.mock('vue-router', () => ({ useRouter: () => ({ push, replace }), useRoute: () => currentRoute }))
 vi.mock('@/utils/apiErrors', () => ({
   toastApiError: vi.fn(),
 }))
+
+// reset compartido: sin esto, la query de un test (p.ej. item 8) se filtra
+// al siguiente CalendarView montado en otro describe
+beforeEach(() => {
+  currentRoute = reactive({ query: {} })
+  push.mockClear()
+  replace.mockClear()
+})
 
 import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
@@ -371,7 +395,7 @@ describe('MonthGrid', () => {
     expect(grid.attributes('style')).toContain('--bk-day-dot: var(--color-aurora)')
   })
 
-  it('v0.3.0 item 4: today\'s cell gets an aurora border AND an aurora day number ("el número en color aurora o borde en aurora")', async () => {
+  it('polish wave item 1: today\'s cell glows on the BORDER only — the day number stays in normal ink', async () => {
     vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
     const wrapper = mount(MonthGrid, {
       props: {
@@ -386,8 +410,9 @@ describe('MonthGrid', () => {
 
     const todayCell = wrapper.get('[data-testid="day-cell-2026-08-15"]')
     expect(todayCell.classes()).toContain('border-aurora')
+    expect(todayCell.classes()).toContain('border-2')
     const dayNumber = todayCell.get('.text-xs.font-semibold')
-    expect(dayNumber.classes()).toContain('text-aurora')
+    expect(dayNumber.classes()).not.toContain('text-aurora')
 
     const otherCell = wrapper.get('[data-testid="day-cell-2026-08-16"]')
     expect(otherCell.classes()).not.toContain('border-aurora')
@@ -1216,16 +1241,45 @@ describe('CalendarView layout (round 6, items 3/4)', () => {
     expect(wrapper.classes().some((c) => c === 'p-4' || c.startsWith('px-'))).toBe(false)
   })
 
-  it('keeps the rune-legend button in the month-navigation row, next to the chevrons', async () => {
+  it('polish wave item 13: the rune-legend trigger is NOT in the month-navigation row anymore (only prev/next live there)', async () => {
     const wrapper = mount(CalendarView, {
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
 
     const infoButton = wrapper.get('[data-testid="rune-legend-btn"]')
-    const monthNavRow = infoButton.element.parentElement as HTMLElement
-    // el mismo row contiene los botones de mes anterior/siguiente + la leyenda
-    expect(monthNavRow.querySelectorAll('button').length).toBeGreaterThanOrEqual(3)
+    const monthNavRow = wrapper.get('.flex.items-center.gap-2')
+    expect(monthNavRow.element.contains(infoButton.element)).toBe(false)
+    // el nav row solo tiene los dos chevrons
+    expect(monthNavRow.findAll('button').length).toBe(2)
+  })
+
+  it('polish wave item 13: places the rune-legend trigger between the month grid and "Actividad del año"', async () => {
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const monthGrid = wrapper.getComponent({ name: 'MonthGrid' })
+    const infoButton = wrapper.get('[data-testid="rune-legend-btn"]')
+    const heading = wrapper.get('h3')
+
+    // orden en el DOM: rejilla del mes → botón de leyenda → "Actividad del año"
+    const position = monthGrid.element.compareDocumentPosition(infoButton.element)
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const headingPosition = infoButton.element.compareDocumentPosition(heading.element)
+    expect(headingPosition & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('polish wave item 13: the rune-legend trigger is a small text button (ghost/subtle), not an icon circle', async () => {
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const infoButton = wrapper.get('[data-testid="rune-legend-btn"]')
+    expect(infoButton.text()).toBe('Leyenda de runas')
+    expect(infoButton.classes()).not.toContain('rounded-full')
   })
 })
 
@@ -1252,9 +1306,84 @@ describe('CalendarView rune legend (item 7)', () => {
     infoButton.click()
     await flushPromises()
 
+    // BkSheet teletransporta con <Teleport to="body">: wrapper.find() no ve
+    // ese contenido (VTU no lo resuelve de vuelta al árbol del wrapper), así
+    // que la aserción va sobre el document real, como en el resto del fichero
     const sheet = document.querySelector('[role="dialog"]') as HTMLElement
     expect(sheet).not.toBeNull()
     expect(sheet.textContent).toContain('Pecho')
     expect(sheet.querySelector('svg')).not.toBeNull()
+  })
+
+  it('polish wave item 13: the legend sheet no longer shows the explanatory hint, just the rune+name list', async () => {
+    wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const infoButton = document.querySelector('[data-testid="rune-legend-btn"]') as HTMLElement
+    infoButton.click()
+    await flushPromises()
+
+    const sheet = document.querySelector('[role="dialog"]') as HTMLElement
+    expect(sheet).not.toBeNull()
+    expect(sheet.textContent).not.toContain('Cada runa marca el grupo muscular principal trabajado ese día.')
+    expect(sheet.querySelectorAll('li').length).toBeGreaterThan(0)
+  })
+})
+
+describe('CalendarView item 8: opens today\'s day sheet from a ?day= query', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => vi.useRealTimers())
+
+  it('mounting with a valid ?day= query opens the day sheet for that date and clears the query', async () => {
+    currentRoute.query = { day: '2026-08-01' }
+
+    // BkSheet teletransporta a document.body: wrapper.find() no ve ese
+    // contenido, así que se comprueba sobre el document real, igual que el
+    // resto del fichero (ver "CalendarView rune legend" arriba)
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(replace).toHaveBeenCalledWith({ query: {} })
+
+    wrapper.unmount()
+  })
+
+  it('ignores a junk day value: no sheet opens and the query is left untouched', async () => {
+    currentRoute.query = { day: 'not-a-date' }
+
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(replace).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('reacts to the query changing after mount (not just on the initial mount)', async () => {
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+
+    currentRoute.query = { day: '2026-08-02' }
+    await flushPromises()
+
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(replace).toHaveBeenCalledWith({ query: {} })
+
+    wrapper.unmount()
   })
 })
