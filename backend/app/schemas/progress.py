@@ -31,3 +31,16 @@ class DistributionItem(BaseModel):
 
 class TrainedExercisesOut(BaseModel):
     exercise_ids: list[int]
+
+
+class StatsOut(BaseModel):
+    total_workouts: int
+    total_gym_seconds: int
+    total_cardio_seconds: int
+    total_distance_m: float
+    total_volume_kg: float
+    total_sets: int
+    total_reps: int
+    prs_count: int
+    avg_session_seconds: float
+    longest_streak_weeks: int

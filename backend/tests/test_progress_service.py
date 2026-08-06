@@ -59,6 +59,19 @@ def test_weekly_streak():
     assert svc.weekly_streak([], today=date(2026, 8, 5)) == 0
 
 
+def test_longest_streak_weeks():
+    # dos rachas en el histórico: 3 semanas consecutivas (28-30) y, tras un
+    # hueco (31-32 sin entrenar), 2 semanas más (33-34) — el máximo es 3, no
+    # la racha más reciente (esa es cosa de weekly_streak, no de esta función)
+    trained = [
+        date(2026, 7, 6), date(2026, 7, 13), date(2026, 7, 20),   # semanas 28, 29, 30
+        date(2026, 8, 10), date(2026, 8, 17),                     # semanas 33, 34
+    ]
+    assert svc.longest_streak_weeks(trained) == 3
+    assert svc.longest_streak_weeks([]) == 0
+    assert svc.longest_streak_weeks([date(2026, 8, 5)]) == 1
+
+
 def test_annual_heatmap(db_session):
     user, _, _ = seed_user_with_workouts(db_session)
     heatmap = dict(svc.annual_heatmap(db_session, user.id, 2026))
@@ -88,3 +101,117 @@ def test_muscle_distribution(db_session):
         db_session, user.id, start=date(2026, 8, 1), end=date(2026, 8, 31)
     )
     assert only_august == {chest.id: 1}
+
+
+def seed_stats_user(db_session):
+    """Escenario con números conocidos a mano para test_lifetime_stats_seeded_numbers:
+    2 entrenos terminados (fuerza + cardio) y uno ACTIVO (sin ended_at) que
+    prueba que sus series sí cuentan en sets/reps/volumen (ya están registradas)
+    pero no en total_workouts/total_gym_seconds (eso exige entreno terminado)."""
+    user = models.User(username="freya", password_hash="x")
+    bench = models.Exercise(name_es="Press", name_en="Bench", measurement="strength")
+    run = models.Exercise(name_es="Correr", name_en="Run", measurement="cardio")
+    db_session.add_all([user, bench, run])
+    db_session.flush()
+
+    # Workout A (terminado, 1h = 3600s): 1 calentamiento (excluido) + 2 series
+    # efectivas — volumen 5*100 + 5*105 = 1025
+    workout_a = models.Workout(
+        owner_id=user.id,
+        date=date(2026, 7, 27),
+        started_at=datetime(2026, 7, 27, 10, 0, 0),
+        ended_at=datetime(2026, 7, 27, 11, 0, 0),
+    )
+    db_session.add(workout_a)
+    db_session.flush()
+    wex_a = models.WorkoutExercise(workout_id=workout_a.id, exercise_id=bench.id, position=1)
+    db_session.add(wex_a)
+    db_session.flush()
+    db_session.add_all([
+        models.WorkoutSet(
+            workout_exercise_id=wex_a.id, set_number=1, reps=5, weight_kg=90, is_warmup=True
+        ),
+        models.WorkoutSet(workout_exercise_id=wex_a.id, set_number=2, reps=5, weight_kg=100),
+        models.WorkoutSet(workout_exercise_id=wex_a.id, set_number=3, reps=5, weight_kg=105),
+    ])
+
+    # Workout B (terminado, 45min = 2700s): 1 serie de cardio, sin reps/peso
+    workout_b = models.Workout(
+        owner_id=user.id,
+        date=date(2026, 8, 3),
+        started_at=datetime(2026, 8, 3, 9, 0, 0),
+        ended_at=datetime(2026, 8, 3, 9, 45, 0),
+    )
+    db_session.add(workout_b)
+    db_session.flush()
+    wex_b = models.WorkoutExercise(workout_id=workout_b.id, exercise_id=run.id, position=1)
+    db_session.add(wex_b)
+    db_session.flush()
+    db_session.add(
+        models.WorkoutSet(
+            workout_exercise_id=wex_b.id, set_number=1, duration_seconds=1800, distance_m=5000
+        )
+    )
+
+    # Workout C: ACTIVO (ended_at None) — mismo lunes ISO que B (semana 32),
+    # no debe sumar workout ni tiempo de gym
+    workout_c = models.Workout(
+        owner_id=user.id, date=date(2026, 8, 5), started_at=datetime(2026, 8, 5, 8, 0, 0)
+    )
+    db_session.add(workout_c)
+    db_session.flush()
+    wex_c = models.WorkoutExercise(workout_id=workout_c.id, exercise_id=bench.id, position=1)
+    db_session.add(wex_c)
+    db_session.flush()
+    db_session.add(
+        models.WorkoutSet(workout_exercise_id=wex_c.id, set_number=1, reps=5, weight_kg=110)
+    )
+
+    db_session.add_all([
+        models.PersonalRecord(
+            owner_id=user.id, exercise_id=bench.id, kind="max_weight", value=105,
+            achieved_at=datetime(2026, 7, 27, 11, 0, 0),
+        ),
+        models.PersonalRecord(
+            owner_id=user.id, exercise_id=bench.id, kind="est_1rm", value=122.5,
+            achieved_at=datetime(2026, 7, 27, 11, 0, 0),
+        ),
+    ])
+    db_session.commit()
+    return user
+
+
+def test_lifetime_stats_seeded_numbers(db_session):
+    user = seed_stats_user(db_session)
+    stats = svc.lifetime_stats(db_session, user.id)
+    assert stats == {
+        "total_workouts": 2,               # A y B; C sigue activo
+        "total_gym_seconds": 6300,         # 3600 (A) + 2700 (B)
+        "total_cardio_seconds": 1800,      # única serie de cardio (B)
+        "total_distance_m": 5000.0,
+        "total_volume_kg": 1575.0,         # 1025 (A, sin el calentamiento) + 550 (C)
+        "total_sets": 4,                   # 2 (A, efectivas) + 1 (B, cardio) + 1 (C)
+        "total_reps": 15,                  # 5+5 (A) + 5 (C); la de cardio no tiene reps
+        "prs_count": 2,
+        "avg_session_seconds": 3150.0,     # 6300 / 2
+        "longest_streak_weeks": 2,         # semanas 31 (A) y 32 (B y C) consecutivas
+    }
+
+
+def test_lifetime_stats_empty_user(db_session):
+    user = models.User(username="ghost", password_hash="x")
+    db_session.add(user)
+    db_session.commit()
+    stats = svc.lifetime_stats(db_session, user.id)
+    assert stats == {
+        "total_workouts": 0,
+        "total_gym_seconds": 0,
+        "total_cardio_seconds": 0,
+        "total_distance_m": 0.0,
+        "total_volume_kg": 0.0,
+        "total_sets": 0,
+        "total_reps": 0,
+        "prs_count": 0,
+        "avg_session_seconds": 0.0,
+        "longest_streak_weeks": 0,
+    }

@@ -2,14 +2,15 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { DistributionItem, ExerciseOut, MuscleGroupOut, PersonalRecordOut, SeriesPoint } from '@/api/domain'
-import { getDistribution, getRecords, getSeries, listExercises, listMuscleGroups } from '@/api/domain'
+import type { DistributionItem, ExerciseOut, MuscleGroupOut, PersonalRecordOut, SeriesPoint, StatsOut } from '@/api/domain'
+import { getDistribution, getRecords, getSeries, getStats, listExercises, listMuscleGroups } from '@/api/domain'
 import BodySection from '@/components/progress/BodySection.vue'
 import DistributionBars from '@/components/progress/DistributionBars.vue'
 import ExercisePicker from '@/components/progress/ExercisePicker.vue'
 import PrList from '@/components/progress/PrList.vue'
 import type { MetricKey } from '@/components/progress/series'
 import { seriesFor } from '@/components/progress/series'
+import StatsGrid from '@/components/progress/StatsGrid.vue'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import BkCard from '@/lib/BkCard.vue'
 import BkChart from '@/lib/BkChart.vue'
@@ -21,7 +22,7 @@ import { toastApiError } from '@/utils/apiErrors'
 const { t } = useI18n()
 const athlete = useAthleteStore()
 
-const tab = ref<'training' | 'records' | 'body'>('training')
+const tab = ref<'training' | 'records' | 'stats' | 'body'>('training')
 const metric = ref<MetricKey>('top_weight')
 const exerciseId = ref<number | null>(null)
 
@@ -30,15 +31,23 @@ const muscleGroups = ref<MuscleGroupOut[]>([])
 const distribution = ref<DistributionItem[]>([])
 const records = ref<PersonalRecordOut[]>([])
 const series = ref<SeriesPoint[]>([])
+const stats = ref<StatsOut | null>(null)
+// gatea el montaje de StatsGrid a datos ya resueltos (mismo patrón `ready` de
+// TodayView, ver comentario allí): sin esto las cards entrarían primero con
+// ceros y el roll de useAnimatedNumber se dispararía de 0 a 0, sin
+// animación, y luego un segundo repintado saltaría al valor real de golpe
+const statsReady = ref(false)
 
 const units = useDisplayUnits()
 
 // Récords (PrList) y Distribución (DistributionBars) tienen su propia pestaña
 // (item 3b) — "Récords" reutiliza progress.records, ya es exactamente ese
-// texto en los dos idiomas (antes era solo el título de la card)
+// texto en los dos idiomas (antes era solo el título de la card). Estadísticas
+// (round 8) va justo después de Récords, antes de Cuerpo.
 const mainTabs = computed(() => [
   { value: 'training', label: t('progress.tabs.training') },
   { value: 'records', label: t('progress.records') },
+  { value: 'stats', label: t('progress.stats.title') },
   { value: 'body', label: t('progress.tabs.body') },
 ])
 
@@ -86,12 +95,25 @@ async function loadSeries() {
   }
 }
 
+async function loadStats() {
+  try {
+    stats.value = await getStats(athlete.userId)
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    // true también en error (mismo motivo que TodayView): no deja la pestaña
+    // Estadísticas colgada esperando para siempre si el fetch falla
+    statsReady.value = true
+  }
+}
+
 watch(
   () => athlete.userId,
   () => {
     loadCatalogAndDistribution()
     loadRecords()
     loadSeries()
+    loadStats()
   },
   { immediate: true },
 )
@@ -147,6 +169,16 @@ watch(exerciseId, () => {
         <BkCard :title="t('progress.distribution')">
           <DistributionBars :items="distribution" :groups="muscleGroups" />
         </BkCard>
+      </div>
+    </div>
+
+    <!-- Estadísticas (round 8): totales de por vida, gateados a statsReady
+         igual que TodayView — StatsGrid ya lleva su propio flex-1/min-h-0/
+         overflow-y-auto en la raíz (mismo patrón que PrList), así que el
+         wrapper del stagger solo necesita el hueco (flex-1 min-h-0) -->
+    <div v-else-if="tab === 'stats'" class="flex-1 min-h-0 flex flex-col bk-stagger">
+      <div class="flex-1 min-h-0 flex flex-col" :style="{ '--bk-stagger-i': 0 }">
+        <StatsGrid v-if="statsReady" :stats="stats" />
       </div>
     </div>
 

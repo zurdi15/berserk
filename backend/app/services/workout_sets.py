@@ -42,6 +42,18 @@ def estimate_1rm(weight_kg: float, reps: int) -> float:
     return round(weight_kg * (1 + reps / 30), 2)
 
 
+def effective_set_filters() -> tuple:
+    """Condiciones de un set "efectivo" de fuerza: sin calentamientos, con
+    reps y peso registrados. Único sitio que define el criterio — lo comparten
+    session_volume (por sesión) y las stats agregadas de progress.py (por
+    usuario, item de round 8) para no repetir la misma tripleta de where()."""
+    return (
+        WorkoutSet.is_warmup.is_(False),
+        WorkoutSet.reps.is_not(None),
+        WorkoutSet.weight_kg.is_not(None),
+    )
+
+
 def session_volume(db: Session, workout_id: int, exercise_id: int) -> float:
     """Volumen efectivo (reps×kg, sin calentamientos) del ejercicio en la sesión."""
     value = db.scalar(
@@ -50,9 +62,7 @@ def session_volume(db: Session, workout_id: int, exercise_id: int) -> float:
         .where(
             WorkoutExercise.workout_id == workout_id,
             WorkoutExercise.exercise_id == exercise_id,
-            WorkoutSet.is_warmup.is_(False),
-            WorkoutSet.reps.is_not(None),
-            WorkoutSet.weight_kg.is_not(None),
+            *effective_set_filters(),
         )
     )
     return float(value)
