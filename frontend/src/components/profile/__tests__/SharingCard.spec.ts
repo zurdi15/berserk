@@ -61,18 +61,17 @@ describe('SharingCard', () => {
 
     // Find and click the "ver" button for a received user
     const verButtons = wrapper.findAll('[data-testid="view-user-btn"]')
-    if (verButtons.length > 0) {
-      await verButtons[0].trigger('click')
-      await wrapper.vm.$nextTick()
+    expect(verButtons).toHaveLength(1)
+    await verButtons[0].trigger('click')
+    await wrapper.vm.$nextTick()
 
-      // Verify athlete store was updated
-      const athlete = useAthleteStore()
-      expect(athlete.viewing).not.toBeNull()
-      expect(athlete.viewing?.username).toBe('freyr')
+    // Verify athlete store was updated
+    const athlete = useAthleteStore()
+    expect(athlete.viewing).not.toBeNull()
+    expect(athlete.viewing?.username).toBe('freyr')
 
-      // Verify router navigation
-      expect(push).toHaveBeenCalledWith({ name: 'today' })
-    }
+    // Verify router navigation
+    expect(push).toHaveBeenCalledWith({ name: 'today' })
   })
 
   it('renders button text from i18n', async () => {
@@ -93,13 +92,12 @@ describe('SharingCard', () => {
 
     // Trigger revoke on first user
     const revokeButtons = wrapper.findAll('[data-testid="revoke-btn"]')
-    if (revokeButtons.length > 0) {
-      await revokeButtons[0].trigger('click')
-      await wrapper.vm.$nextTick()
+    expect(revokeButtons).toHaveLength(1)
+    await revokeButtons[0].trigger('click')
+    await wrapper.vm.$nextTick()
 
-      // Verify sheet exists
-      const sheet = wrapper.findComponent({ name: 'BkSheet' })
-      expect(sheet.exists()).toBe(true)
-    }
+    // Verify sheet exists
+    const sheet = wrapper.findComponent({ name: 'BkSheet' })
+    expect(sheet.exists()).toBe(true)
   })
 })

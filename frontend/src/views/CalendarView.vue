@@ -99,6 +99,15 @@ watch([year, month], () => {
 watch(year, () => {
   loadHeatmap()
 }, { immediate: true })
+
+// cambiar de atleta (empezar/dejar de ver a alguien) debe refrescar todo lo que
+// depende de athlete.userId aunque year/month no cambien; si no, tras "dejar de
+// ver" el mes y el heatmap seguían mostrando los datos del atleta anterior
+watch(() => athlete.userId, () => {
+  loadMuscleGroups()
+  loadMonth()
+  loadHeatmap()
+})
 </script>
 
 <template>

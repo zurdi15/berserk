@@ -9,13 +9,19 @@ const athlete = useAthleteStore()
   <Transition name="bk-rise">
     <div
       v-if="athlete.isViewing"
+      data-testid="athlete-banner"
       class="flex items-center justify-between gap-2 px-4 py-2 border-b border-aurora bg-stone text-sm"
     >
       <span class="flex items-center gap-2 text-aurora">
         <BkRune name="shoulders" :size="16" />
         {{ $t('athlete.viewing', { name: athlete.viewing!.username }) }}
       </span>
-      <button type="button" class="bk-press text-ink-muted hover:text-ink" @click="athlete.clear()">
+      <button
+        type="button"
+        data-testid="athlete-banner-stop"
+        class="bk-press text-ink-muted hover:text-ink"
+        @click="athlete.clear()"
+      >
         {{ $t('athlete.stop') }}
       </button>
     </div>

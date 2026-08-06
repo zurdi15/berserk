@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
 
 import type { PersonalRecordOut, WorkoutOut, ScheduledOut, ExerciseOut, MuscleGroupOut } from '@/api/domain'
 import { getStreak, getMonth, listWorkouts, getRecords, listExercises, listMuscleGroups } from '@/api/domain'
@@ -57,7 +57,10 @@ async function load() {
   }
 }
 
-onMounted(() => load())
+// recarga en el montaje y cada vez que cambia el atleta observado (empezar/dejar
+// de ver a alguien): sin este watcher los datos de otro atleta quedaban
+// pegados en pantalla tras pulsar "dejar de ver"
+watch(() => athlete.userId, () => load(), { immediate: true })
 </script>
 
 <template>

@@ -9,7 +9,6 @@ export const es = {
       profile: 'Perfil',
       label: 'Navegación principal',
     },
-    placeholder: 'Próximamente',
   },
   auth: {
     loginTitle: 'Entra al clan',

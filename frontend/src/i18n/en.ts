@@ -9,7 +9,6 @@ export const en = {
       profile: 'Profile',
       label: 'Main navigation',
     },
-    placeholder: 'Coming soon',
   },
   auth: {
     loginTitle: 'Enter the clan',
