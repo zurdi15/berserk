@@ -5,6 +5,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import BootstrapView from '@/views/BootstrapView.vue'
 import LoginView from '@/views/LoginView.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
+import TodayView from '@/views/TodayView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import ShellView from '@/views/ShellView.vue'
 
@@ -18,7 +19,7 @@ export const router = createRouter({
       component: ShellView,
       redirect: { name: 'today' },
       children: [
-        { path: 'today', name: 'today', component: PlaceholderView },
+        { path: 'today', name: 'today', component: TodayView },
         { path: 'calendar', name: 'calendar', component: PlaceholderView },
         { path: 'workout', name: 'workout', component: PlaceholderView },
         { path: 'progress', name: 'progress', component: PlaceholderView },

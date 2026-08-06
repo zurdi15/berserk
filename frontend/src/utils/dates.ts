@@ -8,6 +8,15 @@ export function isoDate(d: Date): string {
 
 export const todayIso = () => isoDate(new Date())
 
+export function getMondayOfWeek(date: Date = new Date()): string {
+  // obtener el lunes de la semana actual
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  const monday = new Date(d.setDate(diff))
+  return isoDate(monday)
+}
+
 export function monthLabel(year: number, month: number, locale: string): string {
   return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(
     new Date(year, month - 1, 1),

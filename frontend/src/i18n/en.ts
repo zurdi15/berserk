@@ -122,4 +122,23 @@ export const en = {
     nameRequired: 'Routine name is required',
     confirm: 'Confirm',
   },
+  today: {
+    streakWeeks: 'Streak | Week {n} | {n} Weeks',
+    todaySession: 'Today\'s Session',
+    noSession: 'No sessions scheduled for today',
+    scheduleSession: 'Schedule Session',
+    startWorkout: 'Start Workout',
+    weekSummary: 'This Week',
+    workoutDays: 'Training Days',
+    effectiveSets: 'Effective Sets',
+    muscleGroupsTouched: 'Muscle Groups',
+    recentPrs: 'Recent PRs',
+  },
+  progress: {
+    kinds: {
+      max_weight: 'Max Weight',
+      est_1rm: 'Est. 1RM',
+      max_volume: 'Max Volume',
+    },
+  },
 } as const
