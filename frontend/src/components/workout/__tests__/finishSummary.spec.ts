@@ -59,6 +59,11 @@ describe('FinishSummary', () => {
     expect(wrapper.find('.text-ember').exists()).toBe(true)
   })
 
+  it('renders a max_volume record through formatWeight too, not as a bare number', () => {
+    const wrapper = build([{ id: 2, exercise_id: 5, kind: 'max_volume', value: 1200, achieved_at: 'x' }])
+    expect(wrapper.text()).toContain('1200 kg')
+  })
+
   it('picking a feeling rune calls updateWorkout with the feeling value', async () => {
     const wrapper = build()
     await wrapper.find('[data-testid="feeling-4"]').trigger('click')

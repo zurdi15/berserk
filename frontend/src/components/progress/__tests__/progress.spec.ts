@@ -1,6 +1,7 @@
+import type { VueWrapper } from '@vue/test-utils'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // vi.mock se hoist-ea por encima de los imports: las fixtures que usan las
 // factories deben declararse con vi.hoisted para no chocar con la TDZ
@@ -165,13 +166,13 @@ describe('PrList', () => {
     expect(rows[0].find('[data-testid="pr-value"]').text()).toBe('100 kg')
   })
 
-  it('renders max_volume as a bare number, without a unit suffix', () => {
+  it('renders max_volume through formatWeight too (kg-based, same as max_weight/est_1rm)', () => {
     const wrapper = mount(PrList, {
       props: { records: fixtures.records as never, exercises: fixtures.exercises as never },
       ...withI18n(),
     })
     const rows = wrapper.findAll('[data-testid^="pr-row-"]')
-    expect(rows[1].find('[data-testid="pr-value"]').text()).toBe('1200')
+    expect(rows[1].find('[data-testid="pr-value"]').text()).toBe('1200 kg')
   })
 
   it('shows the empty state when there are no records', () => {
@@ -233,6 +234,16 @@ describe('ExercisePicker', () => {
 })
 
 describe('BodySection', () => {
+  // BkSheet teletransporta a document.body: si un test no desmonta el wrapper,
+  // el siguiente hereda el sheet huérfano y document.querySelector puede
+  // devolver un input de un test anterior en vez del propio (orden del DOM)
+  let wrapper: VueWrapper | null = null
+
+  function build(): VueWrapper {
+    wrapper = mount(BodySection, withI18n())
+    return wrapper
+  }
+
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.mocked(domain.listBody).mockClear().mockResolvedValue(fixtures.bodyEntries as never)
@@ -240,17 +251,22 @@ describe('BodySection', () => {
     vi.mocked(domain.deleteBody).mockClear()
   })
 
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
+  })
+
   it('loads entries with athlete threading on mount', async () => {
-    mount(BodySection, withI18n())
+    build()
     await flushPromises()
     expect(domain.listBody).toHaveBeenCalledWith(undefined)
   })
 
   it('renders entries most-recent-first, with formatted weight and present measures', async () => {
-    const wrapper = mount(BodySection, withI18n())
+    build()
     await flushPromises()
 
-    const rows = wrapper.findAll('[data-testid^="body-entry-"]')
+    const rows = wrapper!.findAll('[data-testid^="body-entry-"]')
     expect(rows).toHaveLength(2)
     expect(rows[0].attributes('data-testid')).toBe('body-entry-2026-07-08')
     expect(rows[1].attributes('data-testid')).toBe('body-entry-2026-07-01')
@@ -259,10 +275,10 @@ describe('BodySection', () => {
   })
 
   it('renders the weight-over-time chart from the weighed entries', async () => {
-    const wrapper = mount(BodySection, withI18n())
+    build()
     await flushPromises()
 
-    const chart = wrapper.findComponent({ name: 'BkChart' })
+    const chart = wrapper!.findComponent({ name: 'BkChart' })
     expect(chart.exists()).toBe(true)
     expect(chart.props('points')).toEqual([
       { date: '2026-07-01', value: 84 },
@@ -271,10 +287,10 @@ describe('BodySection', () => {
   })
 
   it('blocks submission and shows an error when every field is empty (mirrors backend empty_entry)', async () => {
-    const wrapper = mount(BodySection, withI18n())
+    build()
     await flushPromises()
 
-    await wrapper.find('[data-testid="add-body-entry"]').trigger('click')
+    await wrapper!.find('[data-testid="add-body-entry"]').trigger('click')
     await flushPromises()
 
     const saveButton = document.querySelector('[data-testid="save-body-entry"]') as HTMLElement
@@ -287,11 +303,11 @@ describe('BodySection', () => {
     )
   })
 
-  it('submits the weight field converted to kg, nulling the rest', async () => {
-    const wrapper = mount(BodySection, withI18n())
+  it('creates a brand-new entry for a date with no prior data, leaving untouched fields null', async () => {
+    build()
     await flushPromises()
 
-    await wrapper.find('[data-testid="add-body-entry"]').trigger('click')
+    await wrapper!.find('[data-testid="add-body-entry"]').trigger('click')
     await flushPromises()
 
     const weightInput = document.querySelectorAll('input[type="number"]')[0] as HTMLInputElement
@@ -313,26 +329,100 @@ describe('BodySection', () => {
     })
   })
 
-  it('deletes an entry after confirming', async () => {
-    const wrapper = mount(BodySection, withI18n())
+  it("openAdd pre-fills from today's entry when one already exists (upsert-by-date is an edit in disguise)", async () => {
+    const today = todayIso()
+    vi.mocked(domain.listBody).mockResolvedValue([
+      { date: today, weight_kg: 79, waist_cm: null, chest_cm: null, arm_cm: null, thigh_cm: null, hip_cm: null },
+    ] as never)
+
+    build()
     await flushPromises()
 
-    await wrapper.find('[data-testid="delete-body-2026-07-08"]').trigger('click')
-    await wrapper.find('[data-testid="confirm-delete-body-2026-07-08"]').trigger('click')
+    await wrapper!.find('[data-testid="add-body-entry"]').trigger('click')
+    await flushPromises()
+
+    const weightInput = document.querySelectorAll('input[type="number"]')[0] as HTMLInputElement
+    expect(weightInput.value).toBe('79')
+  })
+
+  it('clicking edit on a row pre-fills every field from that entry', async () => {
+    build()
+    await flushPromises()
+
+    await wrapper!.find('[data-testid="edit-body-2026-07-01"]').trigger('click')
+    await flushPromises()
+
+    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
+    const numberInputs = document.querySelectorAll('input[type="number"]')
+    expect(dateInput.value).toBe('2026-07-01')
+    expect((numberInputs[0] as HTMLInputElement).value).toBe('84')
+    expect((numberInputs[1] as HTMLInputElement).value).toBe('90')
+  })
+
+  it('saving after adding a waist value to an existing weight-only entry sends BOTH values (no data loss)', async () => {
+    build()
+    await flushPromises()
+
+    // 2026-07-08 solo tiene weight_kg=83 en la fixture, sin cintura
+    await wrapper!.find('[data-testid="edit-body-2026-07-08"]').trigger('click')
+    await flushPromises()
+
+    const waistInput = document.querySelectorAll('input[type="number"]')[1] as HTMLInputElement
+    waistInput.value = '95'
+    waistInput.dispatchEvent(new Event('input', { bubbles: true }))
+    await flushPromises()
+
+    const saveButton = document.querySelector('[data-testid="save-body-entry"]') as HTMLElement
+    saveButton.click()
+    await flushPromises()
+
+    expect(domain.upsertBody).toHaveBeenCalledWith('2026-07-08', {
+      weight_kg: 83,
+      waist_cm: 95,
+      chest_cm: null,
+      arm_cm: null,
+      thigh_cm: null,
+      hip_cm: null,
+    })
+  })
+
+  it('re-fills the form when the date field is changed to a date that already has an entry', async () => {
+    build()
+    await flushPromises()
+
+    await wrapper!.find('[data-testid="add-body-entry"]').trigger('click')
+    await flushPromises()
+
+    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
+    dateInput.value = '2026-07-01'
+    dateInput.dispatchEvent(new Event('input', { bubbles: true }))
+    await flushPromises()
+
+    const numberInputs = document.querySelectorAll('input[type="number"]')
+    expect((numberInputs[0] as HTMLInputElement).value).toBe('84')
+    expect((numberInputs[1] as HTMLInputElement).value).toBe('90')
+  })
+
+  it('deletes an entry after confirming', async () => {
+    build()
+    await flushPromises()
+
+    await wrapper!.find('[data-testid="delete-body-2026-07-08"]').trigger('click')
+    await wrapper!.find('[data-testid="confirm-delete-body-2026-07-08"]').trigger('click')
     await flushPromises()
 
     expect(domain.deleteBody).toHaveBeenCalledWith('2026-07-08')
   })
 
   it('does not delete when the confirmation is cancelled', async () => {
-    const wrapper = mount(BodySection, withI18n())
+    build()
     await flushPromises()
 
-    await wrapper.find('[data-testid="delete-body-2026-07-08"]').trigger('click')
-    await wrapper.find('[data-testid="cancel-delete-body-2026-07-08"]').trigger('click')
+    await wrapper!.find('[data-testid="delete-body-2026-07-08"]').trigger('click')
+    await wrapper!.find('[data-testid="cancel-delete-body-2026-07-08"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="confirm-delete-body-2026-07-08"]').exists()).toBe(false)
+    expect(wrapper!.find('[data-testid="confirm-delete-body-2026-07-08"]').exists()).toBe(false)
     expect(domain.deleteBody).not.toHaveBeenCalled()
   })
 
@@ -340,13 +430,13 @@ describe('BodySection', () => {
     const athlete = useAthleteStore()
     athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
 
-    const wrapper = mount(BodySection, withI18n())
+    build()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="add-body-entry"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="delete-body-2026-07-08"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="body-entry-2026-07-08"]').exists()).toBe(true)
-    expect(wrapper.findComponent({ name: 'BkChart' }).exists()).toBe(true)
+    expect(wrapper!.find('[data-testid="add-body-entry"]').exists()).toBe(false)
+    expect(wrapper!.find('[data-testid="delete-body-2026-07-08"]').exists()).toBe(false)
+    expect(wrapper!.find('[data-testid="body-entry-2026-07-08"]').exists()).toBe(true)
+    expect(wrapper!.findComponent({ name: 'BkChart' }).exists()).toBe(true)
     expect(domain.listBody).toHaveBeenCalledWith(7)
   })
 })

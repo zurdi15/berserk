@@ -4,10 +4,9 @@ import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut, PersonalRecordOut } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
+import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkRune from '@/lib/BkRune.vue'
-import { useAthleteStore } from '@/stores/athlete'
-import { useAuthStore } from '@/stores/auth'
 import { formatWeight } from '@/utils/units'
 
 const props = withDefaults(
@@ -16,24 +15,18 @@ const props = withDefaults(
 )
 
 const { t, locale } = useI18n()
-const auth = useAuthStore()
-const athlete = useAthleteStore()
-
-const units = computed(() => ((athlete.viewing?.units ?? auth.user?.units ?? 'kg') as 'kg' | 'lb'))
+const units = useDisplayUnits()
 const exerciseMap = computed(() => new Map(props.exercises.map((e) => [e.id, e])))
 
 function getExerciseName(exerciseId: number): string {
   return exerciseName(exerciseMap.value.get(exerciseId), locale.value) || '–'
 }
 
-// max_weight/est_1rm son magnitudes de peso (kg): pasan por formatWeight con
-// la unidad de display; max_volume se muestra como número puro (mismo criterio
-// que RecentPrs/FinishSummary)
+// los 3 kinds de PR (max_weight, est_1rm, max_volume) son magnitudes en kg —
+// mismo criterio que BkCelebration: todos pasan por formatWeight, sin caso
+// especial para max_volume (antes se mostraba como número pelado)
 function formatRecordValue(record: PersonalRecordOut): string {
-  if (record.kind === 'max_weight' || record.kind === 'est_1rm') {
-    return formatWeight(record.value, units.value)
-  }
-  return String(record.value)
+  return formatWeight(record.value, units.value)
 }
 
 function formatAchievedDate(dateStr: string): string {

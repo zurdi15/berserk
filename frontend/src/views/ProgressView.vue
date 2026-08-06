@@ -10,17 +10,16 @@ import ExercisePicker from '@/components/progress/ExercisePicker.vue'
 import PrList from '@/components/progress/PrList.vue'
 import type { MetricKey } from '@/components/progress/series'
 import { seriesFor } from '@/components/progress/series'
+import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import BkCard from '@/lib/BkCard.vue'
 import BkChart from '@/lib/BkChart.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkTabs from '@/lib/BkTabs.vue'
 import { useAthleteStore } from '@/stores/athlete'
-import { useAuthStore } from '@/stores/auth'
 import { toastApiError } from '@/utils/apiErrors'
 
 const { t } = useI18n()
 const athlete = useAthleteStore()
-const auth = useAuthStore()
 
 const tab = ref<'training' | 'body'>('training')
 const metric = ref<MetricKey>('top_weight')
@@ -32,7 +31,7 @@ const distribution = ref<DistributionItem[]>([])
 const records = ref<PersonalRecordOut[]>([])
 const series = ref<SeriesPoint[]>([])
 
-const units = computed(() => ((athlete.viewing?.units ?? auth.user?.units ?? 'kg') as 'kg' | 'lb'))
+const units = useDisplayUnits()
 
 const mainTabs = computed(() => [
   { value: 'training', label: t('progress.tabs.training') },

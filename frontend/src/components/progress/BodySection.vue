@@ -4,11 +4,11 @@ import { useI18n } from 'vue-i18n'
 
 import type { BodyEntryOut, BodyIn } from '@/api/domain'
 import { deleteBody, listBody, upsertBody } from '@/api/domain'
+import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import { toastApiError } from '@/utils/apiErrors'
 import { todayIso } from '@/utils/dates'
 import { displayToKg, formatWeight, kgToDisplay } from '@/utils/units'
 import { useAthleteStore } from '@/stores/athlete'
-import { useAuthStore } from '@/stores/auth'
 import BkButton from '@/lib/BkButton.vue'
 import BkChart from '@/lib/BkChart.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
@@ -17,9 +17,8 @@ import BkSheet from '@/lib/BkSheet.vue'
 
 const { t } = useI18n()
 const athlete = useAthleteStore()
-const auth = useAuthStore()
 
-const units = computed(() => ((athlete.viewing?.units ?? auth.user?.units ?? 'kg') as 'kg' | 'lb'))
+const units = useDisplayUnits()
 // datos de cuerpo son de escritura estrictamente propia (el backend solo
 // resuelve owner_id=CurrentUser en PUT/DELETE): en modo "viendo a X" la sección
 // es de solo lectura
@@ -72,21 +71,48 @@ const thighStr = ref('')
 const hipStr = ref('')
 const formError = ref('')
 
-function openAdd() {
-  date.value = todayIso()
-  weightStr.value = ''
-  waistStr.value = ''
-  chestStr.value = ''
-  armStr.value = ''
-  thighStr.value = ''
-  hipStr.value = ''
+// el backend hace upsert por fecha con reemplazo completo (PUT /body/{date}):
+// abrir el sheet en blanco sobre una fecha que ya tiene entrada borraría sus
+// valores previos en cuanto se guarde. fillForm precarga desde la entrada
+// existente (si la hay) para que guardar sea siempre una edición, no un reset.
+function fillForm(entry: BodyEntryOut | undefined, dateStr: string) {
+  date.value = dateStr
+  weightStr.value = entry?.weight_kg != null ? String(kgToDisplay(entry.weight_kg, units.value)) : ''
+  waistStr.value = entry?.waist_cm != null ? String(entry.waist_cm) : ''
+  chestStr.value = entry?.chest_cm != null ? String(entry.chest_cm) : ''
+  armStr.value = entry?.arm_cm != null ? String(entry.arm_cm) : ''
+  thighStr.value = entry?.thigh_cm != null ? String(entry.thigh_cm) : ''
+  hipStr.value = entry?.hip_cm != null ? String(entry.hip_cm) : ''
   formError.value = ''
+}
+
+function entryFor(dateStr: string): BodyEntryOut | undefined {
+  return entries.value.find((e) => e.date === dateStr)
+}
+
+function openAdd() {
+  const today = todayIso()
+  fillForm(entryFor(today), today)
+  sheetOpen.value = true
+}
+
+function openEdit(entry: BodyEntryOut) {
+  fillForm(entry, entry.date)
   sheetOpen.value = true
 }
 
 function closeSheet() {
   sheetOpen.value = false
 }
+
+// el backend reemplaza por fecha completa: editar sin precargar borra lo
+// previo — por eso, si el usuario cambia la fecha a una que ya tiene entrada,
+// hay que recargar sus valores. Si la fecha no tiene entrada previa, se deja
+// lo ya escrito tal cual (no hay nada que fusionar todavía).
+watch(date, (newDate) => {
+  const existing = entryFor(newDate)
+  if (existing) fillForm(existing, newDate)
+})
 
 function toKgOrNull(value: string): number | null {
   return value.trim() === '' ? null : displayToKg(Number(value), units.value)
@@ -172,6 +198,14 @@ watch(() => athlete.userId, load, { immediate: true })
             {{ entry.weight_kg != null ? formatWeight(entry.weight_kg, units) : '–' }}
           </span>
           <template v-if="isViewingSelf">
+            <button
+              type="button"
+              :data-testid="`edit-body-${entry.date}`"
+              class="text-ink-faint hover:text-aurora text-xs px-2"
+              @click="openEdit(entry)"
+            >
+              {{ t('common.edit') }}
+            </button>
             <button
               v-if="deleteConfirming !== entry.date"
               type="button"

@@ -49,11 +49,10 @@ const totalVolume = computed(() =>
   }, 0),
 )
 
+// los 3 kinds de PR son magnitudes en kg: todos pasan por formatWeight (ver
+// PrList/RecentPrs/BkCelebration — antes max_volume se mostraba sin convertir)
 function formatRecordValue(record: PersonalRecordOut): string {
-  if (record.kind === 'max_weight' || record.kind === 'est_1rm') {
-    return formatWeight(record.value, units.value)
-  }
-  return String(record.value)
+  return formatWeight(record.value, units.value)
 }
 
 async function pickFeeling(value: number) {

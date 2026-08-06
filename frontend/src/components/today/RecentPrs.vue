@@ -4,9 +4,8 @@ import { useI18n } from 'vue-i18n'
 
 import BkCard from '@/lib/BkCard.vue'
 import type { PersonalRecordOut, ExerciseOut } from '@/api/domain'
+import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import { formatWeight } from '@/utils/units'
-import { useAuthStore } from '@/stores/auth'
-import { useAthleteStore } from '@/stores/athlete'
 
 const props = withDefaults(
   defineProps<{
@@ -20,17 +19,11 @@ const props = withDefaults(
 )
 
 const { locale } = useI18n()
-const auth = useAuthStore()
-const athlete = useAthleteStore()
+const units = useDisplayUnits()
 
 const recentRecords = computed(() => props.records.slice(0, 5))
 
 const exerciseMap = computed(() => new Map(props.exercises.map((e) => [e.id, e])))
-
-const units = computed(() => {
-  const unitsStr = athlete.viewing?.units ?? auth.user?.units ?? 'kg'
-  return unitsStr as 'kg' | 'lb'
-})
 
 function getExerciseName(exerciseId: number): string {
   const ex = exerciseMap.value.get(exerciseId)
@@ -38,11 +31,10 @@ function getExerciseName(exerciseId: number): string {
   return locale.value === 'es' ? ex.name_es : ex.name_en
 }
 
+// los 3 kinds de PR son magnitudes en kg: todos pasan por formatWeight (ver
+// PrList/BkCelebration — antes max_volume se mostraba sin convertir)
 function formatRecordValue(record: PersonalRecordOut): string {
-  if (record.kind === 'max_weight' || record.kind === 'est_1rm') {
-    return formatWeight(record.value, units.value)
-  }
-  return String(record.value)
+  return formatWeight(record.value, units.value)
 }
 
 function formatAchievedDate(dateStr: string): string {
