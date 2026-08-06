@@ -37,6 +37,19 @@ describe('BkSelect', () => {
     expect(trigger.attributes('aria-haspopup')).toBe('listbox')
   })
 
+  it('item 1: the trigger carries bk-form-control, so it gets the single-border focus treatment instead of stacking the global ring', () => {
+    wrapper = build()
+    expect(wrapper.get('[role="combobox"]').classes()).toContain('bk-form-control')
+  })
+
+  it('item 1: the filter input ALSO carries bk-form-control (its own focus indicator, not the global ring)', async () => {
+    const manyOptions = Array.from({ length: 20 }, (_, i) => ({ value: String(i), label: `Zone ${i}` }))
+    wrapper = build({ options: manyOptions, modelValue: '0' })
+    await wrapper.get('[role="combobox"]').trigger('click')
+    const filterInput = document.querySelector('input[type="text"]') as HTMLInputElement
+    expect(filterInput.classList.contains('bk-form-control')).toBe(true)
+  })
+
   it('clicking the label focuses the trigger (M10: span+aria-labelledby, not a wrapping <label>)', async () => {
     wrapper = build()
     const label = wrapper.get('span.text-ink-muted')

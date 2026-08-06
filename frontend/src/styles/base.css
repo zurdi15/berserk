@@ -89,6 +89,26 @@ body::before {
   outline-offset: 2px;
 }
 
+/* item 1 (round 9): el anillo global de arriba se apilaba con el borde
+   propio en foco de los controles de formulario (focus:border-aurora, ver
+   BkField.vue y los triggers de BkSelect/BkTimeField/BkDateField),
+   dejando un doble borde grueso. Los controles de formulario llevan la
+   clase .bk-form-control y quedan excluidos aquí — el cambio de color de
+   su propio borde ya es un único indicador de foco suficiente (WCAG
+   2.4.7), sin apilar nada encima. El resto de la app (botones, enlaces,
+   tabs, las opciones/celdas de dentro de los paneles) conserva el anillo
+   global sin cambios: la exclusión es de esta clase, no de :focus-visible
+   en general. */
+.bk-form-control:focus-visible {
+  /* transparente, no "none": en modo alto contraste forzado (Windows), el
+     navegador SÍ pinta un outline visible sobre un outline-style/width
+     reales aunque el color declarado sea transparente — con "none" no
+     quedaría ningún indicador de foco ahí. Mismo ancho/offset que el
+     anillo global para que el hueco reservado no salte al cambiar de modo. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
 ::selection {
   background: var(--bk-accent-aurora-deep);
   color: var(--bk-ink);

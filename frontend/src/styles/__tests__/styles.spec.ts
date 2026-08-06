@@ -79,4 +79,17 @@ describe('base styles', () => {
     expect(css).toContain('--color-aurora: var(--bk-accent-aurora)')
     expect(css).toContain('--font-display: var(--bk-font-display)')
   })
+
+  it('item 1 (round 9): the global focus-visible ring is untouched (still solid aurora) for everything except form controls', () => {
+    const globalRule = css.slice(css.indexOf(':focus-visible {'), css.indexOf(':focus-visible {') + 120)
+    expect(globalRule).toContain('outline: 2px solid var(--bk-accent-aurora)')
+  })
+
+  it('item 1 (round 9): .bk-form-control gets its own focus-visible override instead of stacking the global ring on top of its own border', () => {
+    const overrideRule = css.slice(css.indexOf('.bk-form-control:focus-visible'))
+    expect(overrideRule).toContain('outline: 2px solid transparent')
+    // transparente, no "none": el hueco del outline se conserva para el
+    // modo de alto contraste forzado (ver why-comment en base.css)
+    expect(overrideRule).not.toMatch(/outline:\s*none/)
+  })
 })

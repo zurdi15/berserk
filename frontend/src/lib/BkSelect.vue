@@ -218,7 +218,7 @@ watch(filterQuery, () => {
       :aria-controls="open ? listboxId : undefined"
       :aria-labelledby="labelId"
       :aria-activedescendant="open && !isFilterable && activeValue !== null ? optionId(activeValue) : undefined"
-      class="w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink focus:border-aurora"
+      class="bk-form-control w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink focus:border-aurora"
       @click="onTriggerClick"
       @keydown="onTriggerKeydown"
     >
@@ -255,7 +255,7 @@ watch(filterQuery, () => {
               :aria-controls="listboxId"
               :aria-activedescendant="activeValue !== null ? optionId(activeValue) : undefined"
               :placeholder="t('common.filter')"
-              class="w-full rounded-sm border border-line bg-void px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint focus:border-aurora"
+              class="bk-form-control w-full rounded-sm border border-line bg-void px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint focus:border-aurora"
               @keydown="handleOpenKeydown"
             />
           </div>

@@ -30,6 +30,11 @@ describe('BkDateField', () => {
     expect(text).toMatch(/2026/)
   })
 
+  it('item 1: the trigger carries bk-form-control, so it gets the single-border focus treatment instead of stacking the global ring', () => {
+    wrapper = build({ modelValue: '2026-08-05' })
+    expect(wrapper.get('[role="combobox"]').classes()).toContain('bk-form-control')
+  })
+
   it('zurdi: the panel enters with the softer bk-pop-soft transition (no overshoot), not the punchier bk-pop reserved for celebrations/branding', async () => {
     wrapper = mount(BkDateField, {
       props: { label: 'Fecha', modelValue: '2026-08-05' },

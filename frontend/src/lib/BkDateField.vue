@@ -115,7 +115,7 @@ function onTriggerKeydown(event: KeyboardEvent) {
       :aria-expanded="open ? 'true' : 'false'"
       :aria-controls="open ? gridId : undefined"
       :aria-labelledby="labelId"
-      class="w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink focus:border-aurora"
+      class="bk-form-control w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink focus:border-aurora"
       @click="toggleField"
       @keydown="onTriggerKeydown"
     >

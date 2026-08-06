@@ -30,6 +30,11 @@ describe('BkTimeField', () => {
     expect(wrapper.get('[role="combobox"]').text()).toContain('14:30')
   })
 
+  it('item 1: the trigger carries bk-form-control, so it gets the single-border focus treatment instead of stacking the global ring', () => {
+    wrapper = build({ modelValue: null })
+    expect(wrapper.get('[role="combobox"]').classes()).toContain('bk-form-control')
+  })
+
   it('zurdi: the panel enters with the softer bk-pop-soft transition (no overshoot), not the punchier bk-pop reserved for celebrations/branding', async () => {
     wrapper = mount(BkTimeField, {
       props: { label: 'Hora', modelValue: null },
