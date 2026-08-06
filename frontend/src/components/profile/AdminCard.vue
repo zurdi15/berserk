@@ -258,7 +258,7 @@ function redeemUrl(token: string): string {
                   </span>
                 </td>
                 <td class="py-2 px-2">
-                  <div class="flex gap-2">
+                  <div class="flex justify-end gap-2">
                     <BkButton
                       v-if="!isOwnUser(user.id)"
                       variant="ghost"
@@ -267,7 +267,12 @@ function redeemUrl(token: string): string {
                       data-testid="reset-password-btn"
                       @click="handleResetPassword(user.id)"
                     >
-                      <span aria-hidden="true">⟳</span>
+                      <!-- icono de llave: arco circular + eje dentado, geométrico
+                           como el resto de iconografía de la app (nada de emoji) -->
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4" aria-hidden="true">
+                        <circle cx="6" cy="12" r="3.5" />
+                        <path d="M9.5 12 L20 12 M15 12 L15 15 M19 12 L19 16" />
+                      </svg>
                       <span class="hidden sm:inline">{{ $t('admin.resetPassword') }}</span>
                     </BkButton>
                     <BkButton

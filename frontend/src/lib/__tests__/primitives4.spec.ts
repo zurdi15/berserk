@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
 import BkChart from '../BkChart.vue'
@@ -31,6 +31,47 @@ describe('BkTabs', () => {
   it('marks aria-selected', () => {
     const wrapper = mount(BkTabs, { props: { modelValue: 'b', tabs } })
     expect(wrapper.findAll('[role="tab"]')[1].attributes('aria-selected')).toBe('true')
+  })
+
+  // item 3c: jsdom/happy-dom no hace layout real, así que scrollIntoView no
+  // mueve nada de verdad — se espía el prototipo y se comprueba que SE LLAMA
+  // con los argumentos correctos, incondicional (sin guardas)
+  describe('auto-scroll on tab activation (item 3c)', () => {
+    let scrollSpy: ReturnType<typeof vi.spyOn>
+
+    beforeEach(() => {
+      scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+      vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as MediaQueryList)
+    })
+
+    afterEach(() => vi.restoreAllMocks())
+
+    it('click: scrolls the clicked tab into view smoothly', async () => {
+      const wrapper = mount(BkTabs, { props: { modelValue: 'a', tabs } })
+      const tabButtons = wrapper.findAll('[role="tab"]')
+      await tabButtons[1].trigger('click')
+
+      expect(scrollSpy).toHaveBeenCalledWith({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
+      expect(scrollSpy.mock.instances[0]).toBe(tabButtons[1].element)
+    })
+
+    it('keyboard move: scrolls the newly-active tab into view smoothly', async () => {
+      const wrapper = mount(BkTabs, { props: { modelValue: 'a', tabs } })
+      const tabButtons = wrapper.findAll('[role="tab"]')
+      await wrapper.find('[role="tablist"]').trigger('keydown', { key: 'ArrowRight' })
+      await wrapper.vm.$nextTick()
+
+      expect(scrollSpy).toHaveBeenCalledWith({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
+      expect(scrollSpy.mock.instances[0]).toBe(tabButtons[1].element)
+    })
+
+    it('respects reduced-motion: uses behavior "auto" instead of "smooth" when matchMedia matches', async () => {
+      vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+      const wrapper = mount(BkTabs, { props: { modelValue: 'a', tabs } })
+      await wrapper.findAll('[role="tab"]')[1].trigger('click')
+
+      expect(scrollSpy).toHaveBeenCalledWith({ inline: 'nearest', block: 'nearest', behavior: 'auto' })
+    })
   })
 })
 

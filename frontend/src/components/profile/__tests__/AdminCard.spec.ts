@@ -154,6 +154,23 @@ describe('AdminCard', () => {
     expect(badgeInNonAdminRow.exists()).toBe(false)
   })
 
+  it('item 3a/3b: action buttons are right-aligned and reset-password shows a key SVG icon, not a glyph', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    // 3a: la celda de acciones alinea su contenido a la derecha
+    const actionsCell = wrapper.find('[data-testid="reset-password-btn"]').element.closest('td')!
+    const actionsWrapper = actionsCell.querySelector('div')!
+    expect(actionsWrapper.className).toContain('justify-end')
+
+    // 3b: icono SVG (llave), no el glifo de texto anterior
+    const resetBtn = wrapper.find('[data-testid="reset-password-btn"]')
+    expect(resetBtn.find('svg').exists()).toBe(true)
+    expect(resetBtn.text()).not.toContain('⟳')
+    expect(resetBtn.attributes('aria-label')).toBe('Restablecer contraseña')
+  })
+
   it('hides delete and reset buttons on own row (id=1)', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
