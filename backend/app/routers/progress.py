@@ -10,6 +10,7 @@ from ..models import PersonalRecord, Workout
 from ..permissions import TargetUser
 from ..schemas.progress import (
     DistributionItem,
+    ExerciseHistoryOut,
     HeatmapDay,
     SeriesOut,
     StatsOut,
@@ -20,6 +21,7 @@ from ..schemas.workouts import PersonalRecordOut
 from ..services.progress import (
     annual_heatmap,
     exercise_series,
+    latest_exercise_session,
     lifetime_stats,
     muscle_distribution,
     trained_exercise_ids,
@@ -35,6 +37,19 @@ def series(exercise_id: int, target: TargetUser, db: Session = Depends(get_db)):
     if get_visible_exercise(db, target.id, exercise_id) is None:
         raise HTTPException(status_code=404, detail="not_found")
     return SeriesOut(series=exercise_series(db, target.id, exercise_id))
+
+
+@router.get("/exercise-history/{exercise_id}", response_model=ExerciseHistoryOut | None)
+def exercise_history(
+    exercise_id: int,
+    target: TargetUser,
+    db: Session = Depends(get_db),
+    exclude_workout_id: int | None = Query(default=None),
+):
+    if get_visible_exercise(db, target.id, exercise_id) is None:
+        raise HTTPException(status_code=404, detail="not_found")
+    result = latest_exercise_session(db, target.id, exercise_id, exclude_workout_id)
+    return ExerciseHistoryOut(**result) if result is not None else None
 
 
 @router.get("/records", response_model=list[PersonalRecordOut])

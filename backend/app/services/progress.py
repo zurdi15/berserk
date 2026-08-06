@@ -74,6 +74,51 @@ def exercise_series(db: Session, owner_id: int, exercise_id: int) -> list[dict]:
     return list(by_workout.values())
 
 
+def latest_exercise_session(
+    db: Session,
+    owner_id: int,
+    exercise_id: int,
+    exclude_workout_id: int | None = None,
+) -> dict | None:
+    """Sesión TERMINADA más reciente (día + series) en la que se hizo este
+    ejercicio, excluyendo opcionalmente un workout (el que se está editando/
+    viviendo ahora mismo — un entreno retroactivo ya cerrado, si no se
+    excluye, se encontraría a sí mismo como "la última vez"). None si nunca
+    se ha entrenado (terminado) este ejercicio.
+
+    Si el ejercicio aparece más de una vez en la misma sesión (dos
+    WorkoutExercise del mismo exercise_id — el alta no lo impide), se
+    devuelven las series de TODAS esas entradas juntas, ordenadas por
+    completed_at: "todas las series de la última vez que hice el ejercicio",
+    no solo las de una de las entradas.
+    """
+    query = (
+        select(Workout.id, Workout.date)
+        .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
+        .where(
+            Workout.owner_id == owner_id,
+            Workout.ended_at.is_not(None),
+            WorkoutExercise.exercise_id == exercise_id,
+        )
+    )
+    if exclude_workout_id is not None:
+        query = query.where(Workout.id != exclude_workout_id)
+    row = db.execute(query.order_by(Workout.date.desc(), Workout.id.desc()).limit(1)).first()
+    if row is None:
+        return None
+    workout_id, workout_date = row
+    sets = db.scalars(
+        select(WorkoutSet)
+        .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .where(
+            WorkoutExercise.workout_id == workout_id,
+            WorkoutExercise.exercise_id == exercise_id,
+        )
+        .order_by(WorkoutSet.completed_at, WorkoutSet.id)
+    ).all()
+    return {"workout_id": workout_id, "date": workout_date, "sets": sets}
+
+
 def _prev_week(week: tuple[int, int]) -> tuple[int, int]:
     """Calcula la semana ISO anterior."""
     year, number = week
