@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
+import { core } from '@/tokens'
 import BkChart from '../BkChart.vue'
 import BkHeatmap from '../BkHeatmap.vue'
 import BkSelect from '../BkSelect.vue'
@@ -239,9 +240,18 @@ describe('BkChart', () => {
     // Get the mocked uPlot module and set up instance mock
     const uplotModule = await import('uplot')
     mockUPlot = uplotModule.default
-    mockInstance = { destroy: vi.fn(), setSize: vi.fn() } as any
+    mockInstance = { destroy: vi.fn(), setSize: vi.fn(), setData: vi.fn() } as any
     mockUPlot.mockImplementation(() => mockInstance)
     mockUPlot.mockClear()
+    // item 2: estos tests (previos al revelado progresivo) no verifican la
+    // animación en sí — reduced-motion forzado hace que build() tome la rama
+    // instantánea y evita depender del rAF real de happy-dom
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('mounts and creates chart with UTC tzDate anchor', async () => {
@@ -308,5 +318,117 @@ describe('BkChart', () => {
     wrapper.unmount()
     // Hard assertion: destroy was called exactly once on unmount
     expect(mockInstance.destroy).toHaveBeenCalledTimes(1)
+  })
+
+  describe('progressive reveal (item 2)', () => {
+    // mismo fake-rAF que useAnimatedNumber.spec.ts: callbacks capturados a
+    // mano, se disparan con pump(ms) para controlar el tween determinísticamente
+    let callbacks: FrameRequestCallback[]
+    let now: number
+
+    function pump(ms: number) {
+      now += ms
+      const batch = callbacks
+      callbacks = []
+      for (const cb of batch) cb(now)
+    }
+
+    beforeEach(() => {
+      callbacks = []
+      now = 0
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        callbacks.push(cb)
+        return callbacks.length
+      })
+      vi.stubGlobal('cancelAnimationFrame', () => undefined)
+      vi.stubGlobal('performance', { now: () => now })
+      // estos tests SÍ quieren ver el tween, no el salto directo del guard
+      // de reduced-motion (ese va aparte, más abajo)
+      vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as MediaQueryList)
+    })
+
+    it('tweens setData with growing prefixes of the full series, ending on the exact full arrays', () => {
+      const points = Array.from({ length: 10 }, (_, i) => ({
+        date: `2026-08-${String(i + 1).padStart(2, '0')}`,
+        value: (i + 1) * 10,
+      }))
+
+      mount(BkChart, { props: { points, color: 'aurora' }, global: { stubs: { teleport: true } } })
+
+      // el chart se crea vacío en el frame 0 — la estructura (ejes/grid) ya
+      // está completa porque el rango de escala viene fijado en opts, no de data
+      expect(mockUPlot).toHaveBeenCalledTimes(1)
+      expect(mockUPlot.mock.calls[0][1]).toEqual([[], []])
+      expect(mockInstance.setData).not.toHaveBeenCalled()
+
+      const duration = parseInt(core.dur[5], 10)
+
+      pump(0) // primer frame: al menos 1 punto, nunca los 10
+      const firstSlice = mockInstance.setData.mock.calls[0][0]
+      expect(firstSlice[0].length).toBeGreaterThan(0)
+      expect(firstSlice[0].length).toBeLessThan(points.length)
+
+      pump(duration * 0.4) // frame intermedio: más puntos que el primero, aún no todos
+      const midSlice = mockInstance.setData.mock.calls.at(-1)![0]
+      expect(midSlice[0].length).toBeGreaterThan(firstSlice[0].length)
+      expect(midSlice[0].length).toBeLessThan(points.length)
+
+      pump(duration) // tween completo: último setData con los arrays EXACTOS
+      const lastCall = mockInstance.setData.mock.calls.at(-1)![0]
+      expect(lastCall).toEqual([
+        points.map((p) => new Date(p.date).getTime() / 1000),
+        points.map((p) => p.value),
+      ])
+      expect(callbacks.length).toBe(0) // no queda ningún frame agendado
+    })
+
+    it('pins scales.{x,y}.range to the FULL data extent from the very first build, so axes/grid never jump mid-tween', () => {
+      const points = [
+        { date: '2026-08-01', value: 10 },
+        { date: '2026-08-04', value: 40 },
+      ]
+      mount(BkChart, { props: { points, color: 'aurora' }, global: { stubs: { teleport: true } } })
+
+      const options = mockUPlot.mock.calls[0][0]
+      const fullXs = points.map((p) => new Date(p.date).getTime() / 1000)
+      expect(options.scales.x.range).toEqual([Math.min(...fullXs), Math.max(...fullXs)])
+      expect(options.scales.y.range).toEqual([10, 40])
+    })
+  })
+
+  it('reduced-motion: sets the full data immediately via the constructor, never calls setData', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+    const points = [
+      { date: '2026-08-01', value: 10 },
+      { date: '2026-08-02', value: 20 },
+    ]
+    mount(BkChart, { props: { points }, global: { stubs: { teleport: true } } })
+
+    expect(mockUPlot).toHaveBeenCalledTimes(1)
+    expect(mockUPlot.mock.calls[0][1]).toEqual([
+      points.map((p) => new Date(p.date).getTime() / 1000),
+      points.map((p) => p.value),
+    ])
+    expect(mockInstance.setData).not.toHaveBeenCalled()
+  })
+
+  it('no requestAnimationFrame in the runtime (SSR/node): sets the full data immediately, same guard as useAnimatedNumber', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as MediaQueryList)
+    // happy-dom sí trae rAF nativo: para simular su ausencia real hay que
+    // pisarlo explícitamente a undefined, no solo quitar el stub
+    vi.stubGlobal('requestAnimationFrame', undefined)
+    vi.stubGlobal('cancelAnimationFrame', undefined)
+    const points = [
+      { date: '2026-08-01', value: 10 },
+      { date: '2026-08-02', value: 20 },
+    ]
+    mount(BkChart, { props: { points }, global: { stubs: { teleport: true } } })
+
+    expect(mockUPlot).toHaveBeenCalledTimes(1)
+    expect(mockUPlot.mock.calls[0][1]).toEqual([
+      points.map((p) => new Date(p.date).getTime() / 1000),
+      points.map((p) => p.value),
+    ])
+    expect(mockInstance.setData).not.toHaveBeenCalled()
   })
 })

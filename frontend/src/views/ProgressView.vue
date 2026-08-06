@@ -123,22 +123,26 @@ watch(exerciseId, () => {
       <div v-if="exerciseId !== null" class="shrink-0 space-y-3" :style="{ '--bk-stagger-i': 1 }">
         <BkTabs v-model="metric" :tabs="metricTabs" />
         <!-- :key="exerciseId" (item 2): remonta el chart al cambiar de
-             ejercicio para repetir el barrido bk-reveal — el metric NO va en
-             la key, así que cambiar peso/volumen/1RM solo actualiza :points
-             sin remontar (progress.spec.ts:563 fija justo eso) -->
+             ejercicio para repetir el revelado progresivo de la serie — el
+             metric NO va en la key, así que cambiar peso/volumen/1RM solo
+             actualiza :points sin remontar (progress.spec.ts:563 fija justo eso) -->
         <BkChart v-if="chartPoints.length" :key="exerciseId" :points="chartPoints" color="aurora" :suffix="` ${units}`" />
         <BkEmpty v-else :message="t('progress.noSeries')" />
       </div>
     </div>
 
-    <!-- Récords: PrList + DistributionBars, movidos aquí desde Entrenos (item 3b) -->
-    <div v-else-if="tab === 'records'" class="flex-1 min-h-0 overflow-y-auto space-y-6 bk-stagger">
-      <div :style="{ '--bk-stagger-i': 0 }">
-        <BkCard :title="t('progress.records')">
+    <!-- Récords: PrList + DistributionBars, movidos aquí desde Entrenos (item 3b).
+         item 8: mismo patrón flex que la pestaña Entrenos de arriba —
+         Distribución se queda anclada abajo con su alto natural (shrink-0) y
+         Récords se lleva TODO el resto del alto (flex-1 min-h-0, scroll
+         interno vía PrList — ver PrList.vue, ya sin su tope max-h-72) -->
+    <div v-else-if="tab === 'records'" class="flex-1 min-h-0 flex flex-col gap-4 bk-stagger">
+      <div class="flex-1 min-h-0" :style="{ '--bk-stagger-i': 0 }">
+        <BkCard :title="t('progress.records')" class="h-full flex flex-col">
           <PrList :records="records" :exercises="exercises" />
         </BkCard>
       </div>
-      <div :style="{ '--bk-stagger-i': 1 }">
+      <div class="shrink-0" :style="{ '--bk-stagger-i': 1 }">
         <BkCard :title="t('progress.distribution')">
           <DistributionBars :items="distribution" :groups="muscleGroups" />
         </BkCard>

@@ -42,7 +42,13 @@ function formatAchievedDate(dateStr: string): string {
 
 <template>
   <BkEmpty v-if="!records.length" :message="t('progress.noRecords')" />
-  <div v-else class="space-y-2 max-h-72 overflow-y-auto">
+  <div v-else class="space-y-2 flex-1 min-h-0 overflow-y-auto">
+    <!-- item 8: sin tope propio (max-h-72) — el padre (ProgressView, pestaña
+         Récords) le da el hueco vía flex-1 min-h-0, mismo patrón que la lista
+         de ExercisePicker en la pestaña Entrenos (item 3c). (comentario
+         DENTRO de la raíz condicional: como hermano de nivel superior sería
+         un nodo extra en el fragmento y rompería la resolución de root del
+         componente, ver el comentario equivalente en ProgressView.vue) -->
     <div
       v-for="record in records"
       :key="record.id"
