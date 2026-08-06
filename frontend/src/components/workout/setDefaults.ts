@@ -26,7 +26,14 @@ export function resolveNewSetDefaults(
   routines: RoutineOut[],
   exerciseId: number,
 ): SetDefaults | null {
-  const lastInWorkout = workoutSets.at(-1)
+  // fix de revisión (I1): la ÚLTIMA serie sin más, is_warmup incluido, hacía
+  // que un calentamiento colado al final (p.ej. registrado después del
+  // trabajo real, o una tanda de calentamientos antes de la primera serie
+  // de trabajo) tapase el peso real con uno de calentamiento — se prioriza
+  // la última serie EFECTIVA (no-calentamiento); el `?? workoutSets.at(-1)`
+  // es el mismo criterio que el resto del módulo (setHistoryFormat.ts):
+  // si TODA la sesión de hoy fue calentamiento, mejor mostrar ESO que nada
+  const lastInWorkout = workoutSets.filter((s) => !s.is_warmup).at(-1) ?? workoutSets.at(-1)
   if (lastInWorkout) {
     return {
       reps: lastInWorkout.reps,
@@ -36,7 +43,11 @@ export function resolveNewSetDefaults(
     }
   }
 
-  const lastInHistory = historySets?.at(-1)
+  // mismo criterio que arriba, sobre la sesión ANTERIOR: si esa sesión
+  // terminó en un calentamiento/enfriamiento tras el trabajo real (o el
+  // entreno de hoy no tiene datos y hay que mirar la anterior desde cero),
+  // la última serie EFECTIVA de esa sesión es la que de verdad importa
+  const lastInHistory = historySets?.filter((s) => !s.is_warmup).at(-1) ?? historySets?.at(-1)
   if (lastInHistory) {
     return {
       reps: lastInHistory.reps,

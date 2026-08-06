@@ -165,7 +165,23 @@ describe('WorkoutExerciseCard', () => {
     expect(rune.props('name')).toBe('chest')
     expect(rune.props('size')).toBe(14)
     expect(wrapper.text()).toContain('100 kg')
-    expect(wrapper.find('[data-testid="set-count-20"]').text()).toContain('2')
+  })
+
+  // fix M10a (revisión): "· N" es el nº de series EFECTIVAS, como en el
+  // resto de la app — pushExercise trae 1 de trabajo + 1 de calentamiento
+  it('fix M10a: the compact set count excludes warmups (1 effective + 1 warmup shows "1", not "2")', () => {
+    const wrapper = mountCard()
+    expect(wrapper.get('[data-testid="set-count-20"]').text()).toContain('1')
+    expect(wrapper.get('[data-testid="set-count-20"]').text()).not.toContain('2')
+  })
+
+  it('fix M10a: hides the set-count badge entirely when every logged set is a warmup', () => {
+    const warmupOnly = {
+      ...pushExercise,
+      sets: [{ id: 1, set_number: 1, reps: 10, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: true, rpe: null, completed_at: 'x' }],
+    }
+    const wrapper = mountCard({ workoutExercise: warmupOnly })
+    expect(wrapper.find('[data-testid="set-count-20"]').exists()).toBe(false)
   })
 
   it('marks warmup sets as ink-faint', () => {
@@ -240,6 +256,38 @@ describe('WorkoutExerciseCard', () => {
       expect(document.body.querySelector('[role="dialog"]')).toBeNull()
     })
 
+    // fix I2 (revisión): la prueba de arriba envía el payload SIN tocar nada,
+    // así que pasaría igual con un formulario "muerto" (que no leyera de
+    // verdad el valor tecleado). Esta es la versión discriminante: toca UN
+    // campo (peso) y comprueba que el payload COMPLETO — con reps intacto —
+    // refleja el cambio; es el footgun real del PATCH full-replace del
+    // backend (ver backend/app/routers/workouts.py::update_set)
+    it('edits a set via actions.updateSet with the full SetIn payload after a real click-through tweak (I5 full-replace footgun)', async () => {
+      const actions = makeActions()
+      mountCard({ actions })
+
+      await byTestId('edit-set-1').trigger('click')
+      await flushPromises()
+
+      // set 1 del fixture: reps 5, weight_kg 100, is_warmup false, sin rpe —
+      // el primer "Aumentar" del drawer es el del peso (stepper de peso
+      // antes que el de reps en la rama strength de SetForm)
+      const weightPlus = new DOMWrapper(
+        document.body.querySelectorAll('[aria-label="Aumentar"]')[0] as HTMLElement,
+      )
+      await weightPlus.trigger('click', { detail: 0 })
+      await drawerForm().trigger('submit')
+      await flushPromises()
+
+      // payload COMPLETO: reps e is_warmup viajan intactos aunque solo se
+      // haya tocado el peso
+      expect(actions.updateSet).toHaveBeenCalledWith(20, 1, {
+        is_warmup: false,
+        reps: 5,
+        weight_kg: 102.5,
+      })
+    })
+
     it('editing never shows "Registrar y otra" (only makes sense for a fresh set)', async () => {
       mountCard()
       await byTestId('edit-set-1').trigger('click')
@@ -280,13 +328,15 @@ describe('WorkoutExerciseCard', () => {
   })
 
   describe('item 2: prefill defaults for a NEW set', () => {
-    it('defaults from the last set of THIS exercise in THIS workout when one exists', async () => {
+    it('defaults from the last EFFECTIVE (non-warmup) set of THIS exercise in THIS workout when one exists', async () => {
       mountCard()
       await openDrawer(20)
-      // último set del fixture: reps 5, weight_kg 40 (el de calentamiento, el
-      // ÚLTIMO logueado en la sesión, sin importar is_warmup — ver setDefaults.ts)
+      // fix I1 (revisión): el fixture trae reps 5/100kg (set 1, trabajo) y
+      // LUEGO reps 5/40kg (set 2, calentamiento) — el último set SIN MÁS es
+      // el calentamiento, pero el prefill debe ignorarlo y usar el 100kg de
+      // la serie de trabajo (ver setDefaults.ts::resolveNewSetDefaults)
       const weightDisplay = document.body.querySelector('.bk-metric.text-2xl')
-      expect(weightDisplay?.textContent).toContain('40')
+      expect(weightDisplay?.textContent).toContain('100')
     })
 
     it('falls back to the routine target when this workout has no sets yet for the exercise', async () => {

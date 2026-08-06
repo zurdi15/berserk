@@ -91,6 +91,13 @@ const isLast = computed(() => index.value === -1 || index.value === props.exerci
 // numerar, con acento de borde) en vez de series numeradas de fuerza
 const isCardio = computed(() => props.exercise?.measurement === 'cardio')
 
+// fix M10a (revisión): el contador del header debe ser el nº de series
+// EFECTIVAS (sin calentamiento), como en el resto de la app (FinishSummary,
+// saveAsRoutine.ts...) — antes contaba workoutExercise.sets.length a secas
+const effectiveSetCount = computed(
+  () => props.workoutExercise.sets.filter((s) => !s.is_warmup).length,
+)
+
 // item 11: descanso efectivo (override del entreno > target de rutina > default)
 const effectiveRestSeconds = computed(() =>
   restFor(props.workoutExercise.rest_seconds, props.routineId, props.routines, props.workoutExercise.exercise_id),
@@ -268,11 +275,11 @@ async function moveDown() {
         <BkRune v-if="primaryRune" :name="primaryRune" :size="14" />
         <h3 class="font-display font-semibold text-ink truncate">{{ name }}</h3>
         <span
-          v-if="workoutExercise.sets.length"
+          v-if="effectiveSetCount"
           class="bk-metric text-xs text-ink-faint shrink-0"
           :data-testid="`set-count-${workoutExercise.id}`"
         >
-          · {{ workoutExercise.sets.length }}
+          · {{ effectiveSetCount }}
         </span>
       </div>
       <div class="flex items-center gap-1 shrink-0">
