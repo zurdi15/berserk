@@ -904,6 +904,32 @@ describe('ScheduleSheet', () => {
       expect(wrapper.get('[data-testid="workout-card-volume"]').text()).toContain('1280')
     })
 
+    it('shows the stretched indicator when the workout was marked as stretched', async () => {
+      vi.mocked(domain.listWorkouts).mockResolvedValueOnce([
+        {
+          id: 43,
+          date: '2026-08-01',
+          started_at: '2026-08-01T18:00:00',
+          ended_at: '2026-08-01T18:40:00',
+          routine_id: null,
+          note: null,
+          feeling: null,
+          stretched: true,
+          exercises: [],
+          muscle_tag_ids: [],
+        },
+      ] as never)
+      vi.mocked(domain.listExercises).mockResolvedValueOnce([] as never)
+
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-01', scheduled: [] },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="day-info-stretched"]').text()).toContain('He estirado')
+    })
+
     it('shows "Entreno libre" when the workout has no routine_id', async () => {
       vi.mocked(domain.listWorkouts).mockResolvedValueOnce([
         { id: 43, date: '2026-08-01', started_at: null, ended_at: null, routine_id: null, note: null, feeling: null, exercises: [], muscle_tag_ids: [] },

@@ -17,6 +17,7 @@ const workouts: WorkoutOut[] = [
     routine_id: null,
     note: null,
     feeling: null,
+    stretched: false,
     exercises: [],
     muscle_tag_ids: [1, 2],
   },

@@ -197,16 +197,8 @@ async function onDrawerSubmit(value: SetIn, keepOpen: boolean) {
     }
     const result = await props.actions.logSet(props.workoutExercise.id, value)
     if (props.restEnabled) {
-      // ver addendum del coordinador (lane del timer, rama aún no mergeada
-      // en este worktree): restTimer.start ganó un 2º parámetro opcional
-      // (nombre del ejercicio, para la notificación de descanso). Cast
-      // tolerante para no romper vue-tsc antes de ese merge — en runtime JS
-      // ignora un argumento de más si el store en este worktree sigue
-      // siendo la firma vieja de un solo parámetro.
-      ;(restTimer.start as (seconds: number, exerciseName?: string) => void)(
-        effectiveRestSeconds.value,
-        name.value,
-      )
+      // nombre del ejercicio → cuerpo de la notificación de fin de descanso
+      restTimer.start(effectiveRestSeconds.value, name.value)
     }
     if (result.new_records.length) emit('recorded', result.new_records)
     emit('logged', result.new_records.length > 0)

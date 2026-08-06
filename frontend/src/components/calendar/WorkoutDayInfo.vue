@@ -124,6 +124,9 @@ const totalVolume = computed(() =>
       </div>
     </div>
 
+    <p v-if="workout.stretched" data-testid="day-info-stretched" class="text-sm text-aurora">
+      ✓ {{ t('workout.stretched') }}
+    </p>
     <p v-if="workout.note" class="text-sm text-ink-muted italic">{{ workout.note }}</p>
   </div>
 </template>
