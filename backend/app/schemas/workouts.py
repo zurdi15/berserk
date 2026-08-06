@@ -9,6 +9,9 @@ class WorkoutStartIn(BaseModel):
     routine_id: int | None = None
     scheduled_session_id: int | None = None
     started_at: datetime | None = None
+    # entreno retroactivo: ya terminado al crearlo (ver start_workout), así que
+    # no compite por el hueco "activo" y exige date (no hay "hoy" implícito)
+    finished: bool = False
 
 
 class WorkoutPatchIn(BaseModel):

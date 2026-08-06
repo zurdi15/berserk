@@ -133,6 +133,37 @@ def test_patch_exercise_note_is_noop_on_empty_body(client: TestClient):
     assert resp.status_code == 200 and resp.json()["note"] is None
 
 
+def test_retro_workout_requires_date(client: TestClient):
+    resp = client.post("/api/v1/workouts", json={"finished": True})
+    assert resp.status_code == 422 and resp.json()["detail"] == "date_required"
+
+
+def test_retro_workout_creates_finished_with_synthetic_timestamps(client: TestClient):
+    resp = client.post(
+        "/api/v1/workouts", json={"date": "2026-07-20", "finished": True}
+    )
+    assert resp.status_code == 201
+    workout = resp.json()
+    assert workout["date"] == "2026-07-20"
+    # started==ended (duración desconocida): las stats no inflan tiempo de gym
+    assert workout["started_at"] == workout["ended_at"] == "2026-07-20T12:00:00"
+
+
+def test_retro_workout_works_while_another_workout_is_active(client: TestClient):
+    active = client.post("/api/v1/workouts", json={}).json()
+
+    resp = client.post(
+        "/api/v1/workouts", json={"date": "2026-07-20", "finished": True}
+    )
+    assert resp.status_code == 201
+    retro = resp.json()
+    assert retro["id"] != active["id"]
+    assert retro["ended_at"] is not None
+
+    # el activo original sigue siéndolo: el retroactivo no lo pisó
+    assert client.get("/api/v1/workouts/active").json()["id"] == active["id"]
+
+
 def test_list_with_date_filters(client: TestClient):
     for day in ("2026-07-01", "2026-07-15", "2026-08-01"):
         wid = client.post("/api/v1/workouts", json={"date": day}).json()["id"]

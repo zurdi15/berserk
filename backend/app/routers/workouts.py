@@ -1,4 +1,5 @@
 from datetime import date as date_type
+from datetime import datetime, time
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, select
@@ -66,11 +67,19 @@ def _own_workout(db: Session, user_id: int, workout_id: int) -> Workout:
 
 @router.post("", response_model=WorkoutOut, status_code=201)
 def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depends(get_db)):
-    active = db.scalar(
-        select(Workout).where(Workout.owner_id == user.id, Workout.ended_at.is_(None))
-    )
-    if active:
-        raise HTTPException(status_code=409, detail="workout_already_active")
+    if payload.finished and payload.date is None:
+        raise HTTPException(status_code=422, detail="date_required")
+
+    # un entreno retroactivo llega ya cerrado (ended_at != None): no compite
+    # por el hueco "activo" (el índice único parcial solo mira ended_at IS
+    # NULL), así que el chequeo de abajo directamente no le aplica — se puede
+    # registrar un entreno pasado mientras hay uno en curso ahora mismo
+    if not payload.finished:
+        active = db.scalar(
+            select(Workout).where(Workout.owner_id == user.id, Workout.ended_at.is_(None))
+        )
+        if active:
+            raise HTTPException(status_code=409, detail="workout_already_active")
 
     session = None
     routine_id = payload.routine_id
@@ -88,10 +97,22 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
         if routine is None or routine.owner_id != user.id:
             raise HTTPException(status_code=422, detail="routine_invalid")
 
+    if payload.finished:
+        # duración real desconocida en un registro retroactivo: started==ended
+        # mantiene las stats honestas (total_gym_seconds += 0) en vez de
+        # inventar una duración que nunca se midió. Mediodía naive-UTC es un
+        # placeholder estable (no un intento de acertar la hora real del día)
+        started_at = datetime.combine(payload.date, time(12, 0))
+        ended_at = started_at
+    else:
+        started_at = payload.started_at or utcnow()
+        ended_at = None
+
     workout = Workout(
         owner_id=user.id,
         date=payload.date or date_type.today(),
-        started_at=payload.started_at or utcnow(),
+        started_at=started_at,
+        ended_at=ended_at,
         routine_id=routine_id,
     )
     db.add(workout)
@@ -326,7 +347,11 @@ def log_set(
     db.add(wset)
     db.flush()
     volume = session_volume(db, workout.id, exercise.id)
-    new_records = detect_prs(db, user.id, exercise, wset, volume)
+    # entreno ya cerrado (terminado en vivo o retroactivo, da igual el
+    # origen): el PR se fecha al día del entreno, no al instante en que se
+    # registra la serie — uno en curso (ended_at None) sigue fechando a "ahora"
+    achieved_at = workout.started_at if workout.ended_at is not None else None
+    new_records = detect_prs(db, user.id, exercise, wset, volume, achieved_at=achieved_at)
     db.commit()
     return SetLogOut(set=wset, new_records=new_records)
 
@@ -364,7 +389,10 @@ def update_set(
     # fantasma: se barren los PRs de la serie y se re-detectan en silencio
     db.execute(delete(PersonalRecord).where(PersonalRecord.set_id == wset.id))
     volume = session_volume(db, workout_id, exercise.id)
-    detect_prs(db, user.id, exercise, wset, volume)
+    # mismo criterio que log_set: si el entreno ya está cerrado, el PR
+    # re-detectado se fecha al día del entreno, no al instante de la edición
+    achieved_at = workout.started_at if workout.ended_at is not None else None
+    detect_prs(db, user.id, exercise, wset, volume, achieved_at=achieved_at)
     db.commit()
     return wset
 

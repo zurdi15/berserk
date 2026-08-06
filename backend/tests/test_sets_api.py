@@ -16,6 +16,19 @@ def start_with_exercise(client, name_en="Bench press"):
     return workout, wex
 
 
+def start_finished_with_exercise(client, date_str, name_en="Bench press"):
+    """Entreno retroactivo (ya cerrado) con un ejercicio añadido: mismo
+    helper que start_with_exercise pero para los tests de PRs retroactivos."""
+    workout = client.post(
+        "/api/v1/workouts", json={"date": date_str, "finished": True}
+    ).json()
+    wex = client.post(
+        f"/api/v1/workouts/{workout['id']}/exercises",
+        json={"exercise_id": exercise_id(client, name_en)},
+    ).json()
+    return workout, wex
+
+
 def test_log_sets_and_pr_flow(client: TestClient):
     workout, wex = start_with_exercise(client)
     resp = client.post(
@@ -131,6 +144,66 @@ def test_delete_workout_exercise_removes_its_prs(client: TestClient, db_session)
     assert client.delete(
         f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}"
     ).status_code == 204
+    db_session.expire_all()
+    assert db_session.scalars(select(models.PersonalRecord)).all() == []
+
+
+def test_retro_set_logging_dates_prs_to_the_workout_day(client: TestClient, db_session):
+    from sqlalchemy import select
+
+    from app import models
+
+    workout, wex = start_finished_with_exercise(client, "2026-07-20")
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+    resp = client.post(url, json={"reps": 5, "weight_kg": 100})
+    assert resp.status_code == 201
+    assert resp.json()["new_records"] != []
+
+    db_session.expire_all()
+    records = db_session.scalars(select(models.PersonalRecord)).all()
+    assert records != []
+    # fechados al día del entreno (mediodía naive-UTC), no al instante del test
+    for record in records:
+        assert record.achieved_at.isoformat() == "2026-07-20T12:00:00"
+
+
+def test_update_set_on_finished_workout_redates_its_prs_to_the_workout_day(
+    client: TestClient, db_session
+):
+    from sqlalchemy import select
+
+    from app import models
+
+    workout, wex = start_finished_with_exercise(client, "2026-07-15")
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+    sid = client.post(url, json={"reps": 5, "weight_kg": 1000}).json()["set"]["id"]
+
+    # fat-finger corregido en un entreno ya cerrado: sigue barriendo y
+    # re-detectando en silencio (cobertura ya existente para entrenos activos,
+    # extendida aquí a uno finished), pero el PR recalculado se fecha al día
+    # del entreno, no a "ahora"
+    resp = client.patch(f"{url}/{sid}", json={"reps": 5, "weight_kg": 100})
+    assert resp.status_code == 200
+
+    db_session.expire_all()
+    records = db_session.scalars(select(models.PersonalRecord)).all()
+    assert records != []
+    assert all(r.value < 1000 for r in records)
+    for record in records:
+        assert record.achieved_at.isoformat() == "2026-07-15T12:00:00"
+
+
+def test_delete_set_on_finished_workout_still_sweeps_its_prs(client: TestClient, db_session):
+    from sqlalchemy import select
+
+    from app import models
+
+    workout, wex = start_finished_with_exercise(client, "2026-07-15")
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+    sid = client.post(url, json={"reps": 5, "weight_kg": 100}).json()["set"]["id"]
+    assert db_session.scalars(select(models.PersonalRecord)).all() != []
+
+    assert client.delete(f"{url}/{sid}").status_code == 204
     db_session.expire_all()
     assert db_session.scalars(select(models.PersonalRecord)).all() == []
 
