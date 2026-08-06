@@ -214,6 +214,36 @@ describe('MonthGrid', () => {
     expect(runes[1].props('name')).toBe('legs')
   })
 
+  it('gives a day cell with runes the same sizing classes as an empty day cell (uniform squares)', async () => {
+    // reloj pineado a un día distinto de los dos comparados: si "hoy" cayera
+    // en 2026-08-01 o 2026-08-10, el borde especial de "hoy" rompería la
+    // comparación de clases entre ambas celdas
+    vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
+    const wrapper = mount(MonthGrid, {
+      props: {
+        month: {
+          scheduled: [],
+          workouts: [
+            { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [1, 3] },
+          ],
+        },
+        year: 2026,
+        monthNum: 8,
+        groupMap: createGroupMap(),
+      },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const cellWithRunes = wrapper.get('[data-testid="day-cell-2026-08-01"]')
+    const emptyCell = wrapper.get('[data-testid="day-cell-2026-08-10"]')
+
+    expect(cellWithRunes.classes()).toContain('aspect-square')
+    expect(cellWithRunes.classes().sort()).toEqual(emptyCell.classes().sort())
+
+    vi.useRealTimers()
+  })
+
   it('emits select event when day is clicked', async () => {
     const wrapper = mount(MonthGrid, {
       props: {
@@ -505,6 +535,19 @@ describe('CalendarView heatmap empty state', () => {
 
     expect(wrapper.text()).toContain('Actividad del año')
     expect(wrapper.findComponent({ name: 'BkHeatmap' }).exists()).toBe(true)
+  })
+
+  it('item 3: centers the "Actividad del año" heading', async () => {
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    // único h3 de la vista: si dejara de serlo, .get() falla ruidosamente
+    // en vez de colar un undefined silencioso
+    const heading = wrapper.get('h3')
+    expect(heading.text()).toBe('Actividad del año')
+    expect(heading.classes()).toContain('text-center')
   })
 })
 
