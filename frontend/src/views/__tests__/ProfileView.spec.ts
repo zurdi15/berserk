@@ -179,10 +179,14 @@ describe('ProfileView', () => {
       const wrapper = build({ SettingsCard: false })
       await flushPromises()
 
-      const localeSelect = wrapper.find('[data-testid="locale-select"] select')
-      expect(localeSelect.exists()).toBe(true)
-      expect(localeSelect.text()).toContain('Español')
-      expect(localeSelect.text()).toContain('English')
+      // BkSelect v2 (round 7): ya no es un <select> nativo, sino un botón
+      // role=combobox que abre un listbox propio — mismo test-id en la raíz
+      const localeTrigger = wrapper.find('[data-testid="locale-select"] [role="combobox"]')
+      expect(localeTrigger.exists()).toBe(true)
+      await localeTrigger.trigger('click')
+      const options = document.querySelectorAll('[role="option"]')
+      expect(Array.from(options).some((o) => o.textContent?.includes('Español'))).toBe(true)
+      expect(Array.from(options).some((o) => o.textContent?.includes('English'))).toBe(true)
     })
 
     it('routines tab renders the real RoutineList with its create-routine control', async () => {

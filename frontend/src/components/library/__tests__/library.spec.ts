@@ -125,7 +125,15 @@ describe('ExerciseManager', () => {
 
     await byTestId('exercise-name-es-field').find('input').setValue('Press Arnold')
     await byTestId('exercise-name-en-field').find('input').setValue('Arnold press')
-    await byTestId('exercise-measurement-select').find('select').setValue('strength')
+
+    // BkSelect v2 (round 7): listbox propio, no <select> nativo
+    await byTestId('exercise-measurement-select').find('[role="combobox"]').trigger('click')
+    const strengthOption = Array.from(document.querySelectorAll('[role="option"]'))
+      .find((o) => o.textContent?.trim() === 'Fuerza') as HTMLElement
+    expect(strengthOption).not.toBeUndefined()
+    strengthOption.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+
     await byTestId('muscle-group-checkbox-1').setValue(true)
     await byTestId('muscle-group-primary-1').setValue(true)
 

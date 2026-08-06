@@ -4,11 +4,11 @@
 // independientemente navegables, mismo mecanismo de posicionamiento/Escape/
 // click-fuera que BkSelect (useFloatingPanel, ver ese archivo para el porqué
 // de la pila de capas compartida con BkSheet).
-import { computed, nextTick, ref, useId, watch } from 'vue'
+import { nextTick, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFloatingPanel } from '@/composables/useFloatingPanel'
 
-const props = defineProps<{ label: string; modelValue: string | null }>()
+const props = defineProps<{ label: string; modelValue: string | null; hint?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>()
 
 const { t } = useI18n()
@@ -139,6 +139,7 @@ watch(() => props.modelValue, (value) => {
         <path d="M12 7v5l3 3" />
       </svg>
     </button>
+    <span v-if="hint" class="block mt-1 text-sm text-ink-faint">{{ hint }}</span>
 
     <Teleport to="body">
       <Transition name="bk-pop">

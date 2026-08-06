@@ -4,6 +4,8 @@ import { computed, ref } from 'vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkField from '@/lib/BkField.vue'
+import BkTimeField from '@/lib/BkTimeField.vue'
+import BkDateField from '@/lib/BkDateField.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import { statusClasses } from './statusClasses'
 import type { ScheduledOut, RoutineOut } from '@/api/domain'
@@ -29,14 +31,16 @@ const routines = ref<RoutineOut[]>([])
 const loading = ref(false)
 
 // Form state for creating new session
-const newTime = ref('')
+// null (no ''): BkTimeField emite null al limpiar/nunca elegir hora — el ''
+// del campo de hora nativo que sustituye ya no aplica
+const newTime = ref<string | null>(null)
 const newRoutineId = ref<string>('')
 const newNote = ref('')
 
 // Replan state
 const editingId = ref<number | null>(null)
 const editDate = ref('')
-const editTime = ref('')
+const editTime = ref<string | null>(null)
 
 // Confirm dialog state
 const confirmAction = ref<{ type: 'skip' | 'delete'; id: number } | null>(null)
@@ -76,7 +80,7 @@ async function deleteSession(id: number) {
 function startReplan(session: ScheduledOut) {
   editingId.value = session.id
   editDate.value = session.date
-  editTime.value = session.time || ''
+  editTime.value = session.time
 }
 
 async function saveReplan() {
@@ -85,11 +89,11 @@ async function saveReplan() {
     loading.value = true
     await updateSchedule(editingId.value, {
       date: editDate.value,
-      time: editTime.value || null,
+      time: editTime.value,
     })
     editingId.value = null
     editDate.value = ''
-    editTime.value = ''
+    editTime.value = null
     emit('updated')
   } catch (error) {
     toastApiError(error)
@@ -101,7 +105,7 @@ async function saveReplan() {
 function cancelReplan() {
   editingId.value = null
   editDate.value = ''
-  editTime.value = ''
+  editTime.value = null
 }
 
 async function confirmDelete() {
@@ -207,9 +211,8 @@ loadRoutines()
     <div v-if="isViewingSelf" class="border border-line rounded-sm p-3 space-y-3">
       <h4 class="font-medium text-ink">{{ $t('calendar.newSession') }}</h4>
       <div class="space-y-2">
-        <BkField
+        <BkTimeField
           v-model="newTime"
-          type="time"
           :label="$t('calendar.time')"
           :hint="$t('calendar.optional')"
         />
@@ -238,14 +241,12 @@ loadRoutines()
     <!-- Replan sheet -->
     <BkSheet :open="editingId !== null" :title="$t('calendar.replan')" @close="cancelReplan">
       <div v-if="editingId !== null" class="space-y-3">
-        <BkField
+        <BkDateField
           v-model="editDate"
-          type="date"
           :label="$t('calendar.date')"
         />
-        <BkField
+        <BkTimeField
           v-model="editTime"
-          type="time"
           :label="$t('calendar.time')"
           :hint="$t('calendar.optional')"
         />

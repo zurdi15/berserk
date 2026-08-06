@@ -80,7 +80,7 @@ import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
 import { useAuthStore } from '@/stores/auth'
 import { core } from '@/tokens'
-import { todayIso } from '@/utils/dates'
+import { formatDateShort, todayIso } from '@/utils/dates'
 import { kgToDisplay } from '@/utils/units'
 import ProgressView from '@/views/ProgressView.vue'
 
@@ -463,9 +463,11 @@ describe('BodySection', () => {
     await wrapper!.find('[data-testid="edit-body-2026-07-01"]').trigger('click')
     await flushPromises()
 
-    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
+    // BkDateField (round 7): ya no es un <input type="date">, sino un
+    // trigger que muestra la fecha corta localizada
+    const dateTrigger = document.querySelector('[role="combobox"]') as HTMLElement
+    expect(dateTrigger.textContent).toContain(formatDateShort('2026-07-01', 'es'))
     const numberInputs = document.querySelectorAll('input[type="number"]')
-    expect(dateInput.value).toBe('2026-07-01')
     expect((numberInputs[0] as HTMLInputElement).value).toBe('84')
     expect((numberInputs[1] as HTMLInputElement).value).toBe('90')
   })
@@ -498,20 +500,32 @@ describe('BodySection', () => {
   })
 
   it('re-fills the form when the date field is changed to a date that already has an entry', async () => {
+    // reloj pineado dentro de julio 2026 (mismo mes que la fixture que se va
+    // a elegir): así el panel de BkDateField abre YA en el mes correcto y el
+    // día 1 se puede clicar directamente, sin depender de a qué mes real
+    // caiga "hoy" cuando corran los tests
+    vi.useFakeTimers({ now: new Date(2026, 6, 15, 12), toFake: ['Date'] })
     build()
     await flushPromises()
 
     await wrapper!.find('[data-testid="add-body-entry"]').trigger('click')
     await flushPromises()
 
-    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-    dateInput.value = '2026-07-01'
-    dateInput.dispatchEvent(new Event('input', { bubbles: true }))
+    const dateTrigger = document.querySelector('[role="combobox"]') as HTMLElement
+    dateTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+
+    const day1 = Array.from(document.querySelectorAll('[role="gridcell"]'))
+      .find((c) => c.id.endsWith('2026-07-01')) as HTMLElement
+    expect(day1).not.toBeUndefined()
+    day1.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await flushPromises()
 
     const numberInputs = document.querySelectorAll('input[type="number"]')
     expect((numberInputs[0] as HTMLInputElement).value).toBe('84')
     expect((numberInputs[1] as HTMLInputElement).value).toBe('90')
+
+    vi.useRealTimers()
   })
 
   it('deletes an entry after confirming', async () => {

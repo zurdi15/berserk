@@ -437,17 +437,31 @@ describe('ScheduleSheet', () => {
     await replanButton.trigger('click')
     await flushPromises()
 
-    // Find and fill date and time fields in the teleported replan sheet
-    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-    expect(dateInput).not.toBeNull()
-    dateInput.value = '2026-08-25'
-    dateInput.dispatchEvent(new Event('input', { bubbles: true }))
+    // BkDateField/BkTimeField (round 7): ya no son <input type="date|time">
+    // nativos. El sheet de replan monta BkDateField (fecha) antes que
+    // BkTimeField (hora) — mismo orden que en el template.
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement
+    const [dateTrigger, timeTrigger] = dialog.querySelectorAll('[role="combobox"]')
 
-    const timeInputs = Array.from(document.querySelectorAll('input[type="time"]')) as HTMLInputElement[]
-    expect(timeInputs.length).toBeGreaterThan(0)
-    const timeInput = timeInputs[timeInputs.length - 1]
-    timeInput.value = '19:30'
-    timeInput.dispatchEvent(new Event('input', { bubbles: true }))
+    // sesión original del 2026-08-20: el panel de fecha abre ya en agosto,
+    // así que el día 25 se puede clicar directamente sin navegar de mes
+    dateTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    const day25 = Array.from(document.querySelectorAll('[role="gridcell"]'))
+      .find((c) => c.id.endsWith('2026-08-25')) as HTMLElement
+    expect(day25).not.toBeUndefined()
+    day25.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+
+    timeTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    const [hourList, minuteList] = document.querySelectorAll('[role="listbox"]')
+    const hour19 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '19')!
+    const minute30 = Array.from(minuteList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '30')!
+    hour19.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    minute30.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    const applyBtn = document.querySelector('[data-testid="time-field-apply"]') as HTMLElement
+    applyBtn.click()
     await flushPromises()
 
     // Find and click the Save button in the teleported replan sheet

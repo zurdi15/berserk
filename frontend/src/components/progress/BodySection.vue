@@ -12,6 +12,7 @@ import { useAthleteStore } from '@/stores/athlete'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkChart from '@/lib/BkChart.vue'
+import BkDateField from '@/lib/BkDateField.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkField from '@/lib/BkField.vue'
 import BkSheet from '@/lib/BkSheet.vue'
@@ -282,7 +283,7 @@ watch(() => athlete.userId, load, { immediate: true })
 
     <BkSheet :open="sheetOpen" :title="t('body.newEntry')" @close="closeSheet">
       <div class="space-y-3">
-        <BkField v-model="date" type="date" :label="t('body.date')" />
+        <BkDateField v-model="date" :label="t('body.date')" />
         <BkField v-model="weightStr" type="number" mono :label="`${t('body.weight')} (${units})`" />
         <BkField v-model="waistStr" type="number" mono :label="`${t('body.waist')} (cm)`" />
         <BkField v-model="chestStr" type="number" mono :label="`${t('body.chest')} (cm)`" />

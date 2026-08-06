@@ -96,8 +96,16 @@ describe('SetForm', () => {
   })
 
   it('rpe select includes the chosen value in the payload', async () => {
+    // BkSelect v2 (round 7): listbox propio, no <select> nativo — abrir y
+    // hacer click real sobre la opción "8"
     const wrapper = build('strength')
-    await wrapper.find('select').setValue('8')
+    await wrapper.find('[role="combobox"]').trigger('click')
+    const option8 = Array.from(document.querySelectorAll('[role="option"]'))
+      .find((o) => o.textContent?.trim() === '8') as HTMLElement
+    expect(option8).not.toBeUndefined()
+    option8.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await wrapper.vm.$nextTick()
+
     await wrapper.find('form').trigger('submit')
     const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
     expect(payload.rpe).toBe(8)
