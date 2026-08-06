@@ -12,9 +12,12 @@ import BkCard from '@/lib/BkCard.vue'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
+import BkRune from '@/lib/BkRune.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
+import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
+import type { RuneName } from '@/lib/runes'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -37,6 +40,13 @@ const measurementOptions = computed(() =>
 
 function groupLabel(group: MuscleGroupOut): string {
   return auth.user?.locale === 'en' ? group.name_en : group.name_es
+}
+
+// item 6: tag runa+nombre del grupo muscular primario, en cada fila de
+// ejercicio (propio o del catálogo) — mismo resolver que AddExerciseSheet/
+// ExercisePicker, un único punto de verdad para "qué grupo es el primario"
+function primaryGroup(exercise: ExerciseOut): MuscleGroupOut | undefined {
+  return primaryMuscleGroup(exercise, muscleGroups.value)
 }
 
 const formOpen = ref(false)
@@ -169,7 +179,22 @@ async function confirmDelete() {
             :data-testid="`exercise-row-${exercise.id}`"
             class="flex items-center justify-between gap-2 p-2 rounded border border-line text-sm"
           >
-            <span>{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
+              <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
+              <span
+                v-if="primaryGroup(exercise)"
+                class="inline-flex items-center gap-1 text-ink-faint shrink-0"
+                :data-testid="`exercise-group-tag-${exercise.id}`"
+              >
+                <BkRune
+                  v-if="isValidRuneName(primaryGroup(exercise)!.slug)"
+                  :name="(primaryGroup(exercise)!.slug as RuneName)"
+                  :size="14"
+                />
+                <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
+              </span>
+            </span>
             <!-- item 1: icon-only, como en RoutineList/AdminCard -->
             <div class="flex items-center gap-2 shrink-0">
               <BkActionBtn
@@ -229,7 +254,22 @@ async function confirmDelete() {
               :data-testid="`catalog-exercise-row-${exercise.id}`"
               class="flex items-center justify-between gap-2 p-2 rounded border border-line text-sm"
             >
-              <span>{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
+              <span class="flex items-center gap-2 min-w-0">
+                <span class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
+                <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
+                <span
+                  v-if="primaryGroup(exercise)"
+                  class="inline-flex items-center gap-1 text-ink-faint shrink-0"
+                  :data-testid="`exercise-group-tag-${exercise.id}`"
+                >
+                  <BkRune
+                    v-if="isValidRuneName(primaryGroup(exercise)!.slug)"
+                    :name="(primaryGroup(exercise)!.slug as RuneName)"
+                    :size="14"
+                  />
+                  <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
+                </span>
+              </span>
               <!-- item 5: un admin puede editar/borrar filas predefinidas —
                    reutiliza el mismo sheet/flow que los ejercicios propios,
                    el backend ya lo permite sobre owner_id null -->

@@ -4,7 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/api/domain', () => ({
   listExercises: vi.fn(async () => [
-    { id: 5, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [] },
+    { id: 5, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [{ muscle_group_id: 1, is_primary: true }] },
+  ]),
+  listMuscleGroups: vi.fn(async () => [
+    { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
   ]),
 }))
 
@@ -63,5 +66,20 @@ describe('AddExerciseSheet', () => {
 
     expect(addSpy).toHaveBeenCalledWith(5)
     expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('item 6: shows a rune+name tag for the primary muscle group of each search result', async () => {
+    mount(AddExerciseSheet, {
+      props: { open: true, actions: { addExercise: vi.fn() } },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    await typeQuery('banca')
+
+    const tag = document.querySelector('[data-testid="exercise-group-tag-5"]') as HTMLElement
+    expect(tag).not.toBeNull()
+    expect(tag.textContent).toContain('Pecho')
+    expect(tag.querySelector('svg')).not.toBeNull()
   })
 })

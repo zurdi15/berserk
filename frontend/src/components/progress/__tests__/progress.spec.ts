@@ -349,6 +349,19 @@ describe('ExercisePicker', () => {
     expect(untrainedOption.find('[data-testid="trained-dot"]').exists()).toBe(false)
   })
 
+  it('item 6: shows a rune+name tag for the primary muscle group of each option', async () => {
+    const wrapper = mount(ExercisePicker, { props: { modelValue: null }, ...withI18n() })
+    await flushPromises()
+
+    const chestOption = wrapper.get('[data-testid="exercise-option-1"]') // Press banca -> chest
+    const tag = chestOption.get('[data-testid="exercise-group-tag-1"]')
+    expect(tag.text()).toContain('Pecho')
+    expect(tag.findComponent({ name: 'BkRune' }).props('name')).toBe('chest')
+
+    const legsOption = wrapper.get('[data-testid="exercise-option-2"]') // Sentadilla -> legs
+    expect(legsOption.get('[data-testid="exercise-group-tag-2"]').text()).toContain('Piernas')
+  })
+
   it("threads the viewed athlete's id into the catalog request", async () => {
     const athlete = useAthleteStore()
     athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })

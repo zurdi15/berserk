@@ -85,6 +85,45 @@ describe('ExerciseManager', () => {
     expect(wrapper.text()).not.toContain('Press banca')
   })
 
+  it('item 6: shows a rune+name tag for the primary muscle group on own AND catalog rows', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [{ muscle_group_id: 1, is_primary: true }] },
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [{ muscle_group_id: 2, is_primary: true }] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+      { id: 2, slug: 'shoulders', name_es: 'Hombros', name_en: 'Shoulders', owner_id: null },
+    ] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    const ownTag = wrapper.get('[data-testid="exercise-group-tag-12"]')
+    expect(ownTag.text()).toContain('Hombros')
+    expect(ownTag.findComponent({ name: 'BkRune' }).props('name')).toBe('shoulders')
+
+    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
+    await flushPromises()
+
+    const catalogTag = wrapper.get('[data-testid="exercise-group-tag-1"]')
+    expect(catalogTag.text()).toContain('Pecho')
+    expect(catalogTag.findComponent({ name: 'BkRune' }).props('name')).toBe('chest')
+  })
+
+  it('item 6: renders no tag (and no crash) for an exercise without a primary muscle group', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="exercise-group-tag-12"]').exists()).toBe(false)
+  })
+
   it('gates the list on readiness: neither rows nor the empty state show while pending, the loaded rows appear once resolved', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     let resolveExercises: (value: never) => void = () => {}
