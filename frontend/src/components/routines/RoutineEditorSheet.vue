@@ -340,27 +340,33 @@ watch(
               @update:model-value="exercise.rest_seconds = $event"
             />
 
-            <!-- Action buttons -->
-            <div class="flex gap-2">
-              <BkButton
+            <!-- Action buttons — item 6 (ola de pulido v0.3.0): flechas
+                 icon-only en vez de los botones "Arriba"/"Abajo" de texto,
+                 mismo affordance compacto que WorkoutExerciseCard.vue (↑/↓,
+                 aria-label conservado en vez del texto visible) -->
+            <div class="flex items-center gap-1">
+              <button
                 v-if="index > 0"
-                variant="ghost"
-                size="sm"
+                type="button"
+                class="bk-press w-8 h-8 text-ink-muted hover:text-ink"
+                :aria-label="$t('routines.moveUp')"
                 @click="moveExerciseUp(index)"
               >
-                {{ $t('routines.moveUp') }}
-              </BkButton>
-              <BkButton
+                ↑
+              </button>
+              <button
                 v-if="index < exercises.length - 1"
-                variant="ghost"
-                size="sm"
+                type="button"
+                class="bk-press w-8 h-8 text-ink-muted hover:text-ink"
+                :aria-label="$t('routines.moveDown')"
                 @click="moveExerciseDown(index)"
               >
-                {{ $t('routines.moveDown') }}
-              </BkButton>
+                ↓
+              </button>
               <BkButton
                 variant="danger"
                 size="sm"
+                class="ml-auto"
                 @click="removeExercise(exercise.id)"
               >
                 {{ $t('routines.remove') }}

@@ -168,9 +168,13 @@ describe('RoutineEditorSheet', () => {
     const dialogs = document.querySelectorAll('[role="dialog"]')
     const dialog = dialogs[dialogs.length - 1] as HTMLElement
 
-    // Sube el segundo ejercicio vía el botón "Arriba" real (solo la fila con
+    // Sube el segundo ejercicio vía el botón "↑" real (solo la fila con
     // index > 0 lo muestra, así que es único en este montaje de 2 ejercicios)
-    const moveUpButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Arriba')
+    // — item 6: ahora es icon-only, se busca por aria-label (que SÍ se
+    // conserva) en vez del texto visible
+    const moveUpButton = Array.from(dialog.querySelectorAll('button')).find(
+      (b) => b.getAttribute('aria-label') === 'Arriba',
+    )
     expect(moveUpButton).not.toBeUndefined()
     moveUpButton!.click()
     await wrapper.vm.$nextTick()
