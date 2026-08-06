@@ -14,6 +14,7 @@ vi.mock('@/api/domain', () => ({
   deleteExercise: vi.fn(),
   listMuscleGroups: vi.fn(),
   createMuscleGroup: vi.fn(),
+  updateMuscleGroup: vi.fn(),
   deleteMuscleGroup: vi.fn(),
 }))
 
@@ -288,6 +289,33 @@ describe('ExerciseManager', () => {
     expect(wrapper.find('[data-testid="catalog-exercise-row-12"]').exists()).toBe(false)
   })
 
+  it('item 5: an admin sees edit/delete controls on catalog (predefined) rows too, and can edit one through the same sheet', async () => {
+    const { listExercises, listMuscleGroups, updateExercise } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    vi.mocked(updateExercise).mockResolvedValue({
+      id: 1, name_es: 'Press banca v2', name_en: 'Bench press v2', measurement: 'strength', owner_id: null, muscle_groups: [],
+    } as never)
+    setUser({ is_admin: true })
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="catalog-exercise-row-1"]')
+    await row.get('[data-testid="edit-exercise-1"]').trigger('click')
+    await flushPromises()
+
+    await byTestId('exercise-name-en-field').find('input').setValue('Bench press v2')
+    await byTestId('save-exercise-btn').trigger('click')
+    await flushPromises()
+
+    expect(updateExercise).toHaveBeenCalledWith(1, expect.objectContaining({ name_en: 'Bench press v2' }))
+  })
+
   it('item 4: shows the empty state once loaded if the catalog has no predefined rows', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([] as never)
@@ -327,6 +355,75 @@ describe('MuscleGroupManager', () => {
     const ownRow = wrapper.find('[data-testid="muscle-group-row-2"]')
     expect(ownRow.find('[data-testid="delete-muscle-group-btn"]').exists()).toBe(true)
     expect(ownRow.find('[data-testid="global-group-badge"]').exists()).toBe(false)
+  })
+
+  it('item 5: an admin sees edit AND delete on a global row too (a regular user still sees neither)', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+    ] as never)
+    setUser({ is_admin: true })
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    const globalRow = wrapper.get('[data-testid="muscle-group-row-1"]')
+    expect(globalRow.find('[data-testid="edit-muscle-group-btn"]').exists()).toBe(true)
+    expect(globalRow.find('[data-testid="delete-muscle-group-btn"]').exists()).toBe(true)
+  })
+
+  it('item 5: a non-admin sees neither edit nor delete on a global row', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+    ] as never)
+    setUser({ is_admin: false })
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    const globalRow = wrapper.get('[data-testid="muscle-group-row-1"]')
+    expect(globalRow.find('[data-testid="edit-muscle-group-btn"]').exists()).toBe(false)
+    expect(globalRow.find('[data-testid="delete-muscle-group-btn"]').exists()).toBe(false)
+  })
+
+  it('item 5: admin edits a global group\'s name and rune (slug) through the edit sheet, pre-filled from the row and highlighting the active rune', async () => {
+    const { listMuscleGroups, updateMuscleGroup } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+    ] as never)
+    vi.mocked(updateMuscleGroup).mockResolvedValue({
+      id: 1, slug: 'shoulders', name_es: 'Pecho y hombro', name_en: 'Chest and shoulder', owner_id: null,
+    } as never)
+    setUser({ is_admin: true })
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-muscle-group-btn"]').trigger('click')
+    await flushPromises()
+
+    // pre-rellenado desde la fila, y la runa actual (chest) resaltada
+    expect(byTestId('edit-group-name-es-field').find('input').element).toHaveProperty('value', 'Pecho')
+    expect(byTestId('edit-group-rune-chest').attributes('aria-pressed')).toBe('true')
+    expect(byTestId('edit-group-rune-shoulders').attributes('aria-pressed')).toBe('false')
+
+    await byTestId('edit-group-name-es-field').find('input').setValue('Pecho y hombro')
+    await byTestId('edit-group-name-en-field').find('input').setValue('Chest and shoulder')
+    await byTestId('edit-group-rune-shoulders').trigger('click')
+    await flushPromises()
+
+    expect(byTestId('edit-group-rune-shoulders').attributes('aria-pressed')).toBe('true')
+    expect(byTestId('edit-group-rune-chest').attributes('aria-pressed')).toBe('false')
+
+    await byTestId('save-group-btn').trigger('click')
+    await flushPromises()
+
+    expect(updateMuscleGroup).toHaveBeenCalledWith(1, {
+      name_es: 'Pecho y hombro',
+      name_en: 'Chest and shoulder',
+      slug: 'shoulders',
+    })
   })
 
   it('gates the list on readiness: neither rows nor the empty state show while pending, rows appear once resolved', async () => {

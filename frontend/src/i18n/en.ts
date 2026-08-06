@@ -183,6 +183,7 @@ export const en = {
     noGroups: 'No custom muscle groups yet',
     catalog: 'Predefined catalog',
     noCatalog: 'No exercises in the catalog',
+    rune: 'Rune',
     confirmDeleteExercise: 'Delete exercise',
     confirmDeleteExerciseMessage: 'Are you sure you want to delete this exercise?',
     confirmDeleteGroup: 'Delete muscle group',

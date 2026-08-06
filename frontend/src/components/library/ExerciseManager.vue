@@ -230,6 +230,23 @@ async function confirmDelete() {
               class="flex items-center justify-between gap-2 p-2 rounded border border-line text-sm"
             >
               <span>{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
+              <!-- item 5: un admin puede editar/borrar filas predefinidas —
+                   reutiliza el mismo sheet/flow que los ejercicios propios,
+                   el backend ya lo permite sobre owner_id null -->
+              <div v-if="auth.user?.is_admin" class="flex items-center gap-2 shrink-0">
+                <BkActionBtn
+                  icon="edit"
+                  :data-testid="`edit-exercise-${exercise.id}`"
+                  :aria-label="$t('common.edit')"
+                  @click="openEdit(exercise)"
+                />
+                <BkActionBtn
+                  icon="delete"
+                  :data-testid="`delete-exercise-${exercise.id}`"
+                  :aria-label="$t('common.delete')"
+                  @click="askDelete(exercise.id)"
+                />
+              </div>
             </div>
           </div>
 

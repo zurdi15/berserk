@@ -223,6 +223,15 @@ export const createMuscleGroup = (body: {
 }) =>
   api<MuscleGroupOut>('/muscle-groups', { method: 'POST', body })
 
+// item 5: no existía PATCH para grupos musculares — un admin lo usa para
+// editar nombre y "runa" (slug, ver runeResolve.ts) de una fila predefinida
+export const updateMuscleGroup = (id: number, body: {
+  slug?: string
+  name_es?: string
+  name_en?: string
+}) =>
+  api<MuscleGroupOut>(`/muscle-groups/${id}`, { method: 'PATCH', body })
+
 export const deleteMuscleGroup = (id: number) =>
   api<void>(`/muscle-groups/${id}`, { method: 'DELETE' })
 
