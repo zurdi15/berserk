@@ -1,6 +1,6 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
 import { useRestTimerStore } from '@/stores/restTimer'
@@ -13,10 +13,20 @@ const pushExercise = {
   exercise_id: 5,
   position: 0,
   note: null,
+  rest_seconds: null,
   sets: [
     { id: 1, set_number: 1, reps: 5, weight_kg: 100, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
     { id: 2, set_number: 2, reps: 5, weight_kg: 40, duration_seconds: null, distance_m: null, is_warmup: true, rpe: null, completed_at: 'x' },
   ],
+}
+
+const cardioWorkoutExercise = {
+  id: 30,
+  exercise_id: 6,
+  position: 1,
+  note: null,
+  rest_seconds: null,
+  sets: [],
 }
 
 const routines = [
@@ -41,24 +51,41 @@ const exercise = {
   muscle_groups: [{ muscle_group_id: 1, is_primary: true }],
 }
 
+const cardioExercise = {
+  id: 6,
+  name_es: 'Cinta',
+  name_en: 'Treadmill',
+  measurement: 'cardio' as const,
+  owner_id: null,
+  muscle_groups: [],
+}
+
 const muscleGroups = [{ id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null }]
 
-describe('restFor', () => {
-  it('picks the routine rest_seconds for the exercise when the workout came from that routine', () => {
-    expect(restFor(1, routines as never, 5)).toBe(120)
+describe('restFor (item 11: workout-exercise override > routine target > default)', () => {
+  it('picks the workout exercise override first, even over a routine target', () => {
+    expect(restFor(200, 1, routines as never, 5)).toBe(200)
   })
 
-  it('falls back to 90 when the workout is free (no routine)', () => {
-    expect(restFor(null, routines as never, 5)).toBe(90)
+  it('falls back to the routine rest_seconds when there is no override', () => {
+    expect(restFor(null, 1, routines as never, 5)).toBe(120)
+  })
+
+  it('falls back to 90 when the workout is free (no routine) and no override', () => {
+    expect(restFor(null, null, routines as never, 5)).toBe(90)
   })
 
   it('falls back to 90 when the exercise is not part of the matched routine', () => {
-    expect(restFor(1, routines as never, 999)).toBe(90)
+    expect(restFor(null, 1, routines as never, 999)).toBe(90)
+  })
+
+  it('an override of 0 is still respected (falsy but not nullish)', () => {
+    expect(restFor(0, 1, routines as never, 5)).toBe(0)
   })
 })
 
 // round 8: WorkoutExerciseCard dejó de leer un store propio (ver
-// workoutActions.ts) — las 6 acciones de escritura llegan como prop
+// workoutActions.ts) — las acciones de escritura llegan como prop
 // `actions`, así que los mocks van directos ahí, sin pasar por '@/api/domain'
 function makeActions(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -81,6 +108,8 @@ function makeActions(overrides: Partial<Record<string, unknown>> = {}) {
     removeExercise: vi.fn(async () => {}),
     reorder: vi.fn(async () => {}),
     addExercise: vi.fn(async () => {}),
+    exerciseHistory: vi.fn(async () => null),
+    setExerciseRest: vi.fn(async () => {}),
     ...overrides,
   }
 }
@@ -101,7 +130,23 @@ function mountCard(overrides: Partial<Record<string, unknown>> = {}) {
       actions,
     },
     global: { plugins: [createI18nInstance()] },
+    attachTo: document.body,
   })
+}
+
+// BkSheet teletransporta el drawer a document.body — patrón obligatorio
+// (HARD TEST RULES) para cualquier interacción con SetForm dentro del cajón
+function byTestId(id: string): DOMWrapper<Element> {
+  return new DOMWrapper(document.body.querySelector(`[data-testid="${id}"]`) as Element | null)
+}
+
+async function openDrawer(weid: number) {
+  await byTestId(`add-set-${weid}`).trigger('click')
+  await flushPromises()
+}
+
+function drawerForm(): DOMWrapper<HTMLFormElement> {
+  return new DOMWrapper(document.body.querySelector('form') as HTMLFormElement)
 }
 
 describe('WorkoutExerciseCard', () => {
@@ -109,11 +154,18 @@ describe('WorkoutExerciseCard', () => {
     setActivePinia(createPinia())
   })
 
-  it('renders the exercise name, its primary-group rune and the formatted sets', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('renders the exercise name, its primary-group rune (size 14) and the formatted sets as dense rows', () => {
     const wrapper = mountCard()
     expect(wrapper.text()).toContain('Press banca')
-    expect(wrapper.findComponent({ name: 'BkRune' }).props('name')).toBe('chest')
+    const rune = wrapper.findComponent({ name: 'BkRune' })
+    expect(rune.props('name')).toBe('chest')
+    expect(rune.props('size')).toBe(14)
     expect(wrapper.text()).toContain('100 kg')
+    expect(wrapper.find('[data-testid="set-count-20"]').text()).toContain('2')
   })
 
   it('marks warmup sets as ink-faint', () => {
@@ -123,20 +175,341 @@ describe('WorkoutExerciseCard', () => {
     expect(rows[1].classes()).toContain('text-ink-faint')
   })
 
-  it('logs a set through actions.logSet and starts the rest timer with the default 90s for a free workout', async () => {
+  it('there is no permanent inline form: no <form> exists until the drawer is opened', () => {
+    const wrapper = mountCard()
+    expect(wrapper.find('form').exists()).toBe(false)
+    expect(document.body.querySelector('form')).toBeNull()
+  })
+
+  describe('item 1: drawer logging', () => {
+    it('"+ Serie" opens a real dialog with SetForm inside, teleported to body', async () => {
+      mountCard()
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+
+      await openDrawer(20)
+
+      expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
+      expect(drawerForm()).not.toBeNull()
+    })
+
+    it('"Registrar serie" (primary submit) logs through actions.logSet and CLOSES the drawer', async () => {
+      const actions = makeActions()
+      mountCard({ actions })
+      await openDrawer(20)
+
+      await drawerForm().trigger('submit')
+      await flushPromises()
+
+      expect(actions.logSet).toHaveBeenCalledWith(
+        20,
+        expect.objectContaining({ is_warmup: false, reps: expect.any(Number), weight_kg: expect.any(Number) }),
+      )
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+    })
+
+    it('"Registrar y otra" logs through actions.logSet and KEEPS the drawer open with values kept', async () => {
+      const actions = makeActions()
+      mountCard({ actions })
+      await openDrawer(20)
+
+      await byTestId('log-set-and-another').trigger('click')
+      await flushPromises()
+
+      expect(actions.logSet).toHaveBeenCalledTimes(1)
+      expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
+      // el form sigue montado (misma instancia): un segundo envío reutiliza los valores
+      await drawerForm().trigger('submit')
+      await flushPromises()
+      expect(actions.logSet).toHaveBeenCalledTimes(2)
+    })
+
+    it('editing a set opens the drawer prefilled with its EXACT values (not the item-2 defaults chain)', async () => {
+      const actions = makeActions()
+      mountCard({ actions })
+
+      await byTestId('edit-set-1').trigger('click')
+      await flushPromises()
+
+      const weightDisplay = document.body.querySelector('.bk-metric.text-2xl')
+      expect(weightDisplay?.textContent).toContain('100')
+
+      await drawerForm().trigger('submit')
+      await flushPromises()
+
+      expect(actions.updateSet).toHaveBeenCalledWith(20, 1, { is_warmup: false, reps: 5, weight_kg: 100 })
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+    })
+
+    it('editing never shows "Registrar y otra" (only makes sense for a fresh set)', async () => {
+      mountCard()
+      await byTestId('edit-set-1').trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('[data-testid="log-set-and-another"]')).toBeNull()
+    })
+
+    it('closing the drawer via Escape without submitting never calls logSet/updateSet', async () => {
+      const actions = makeActions()
+      mountCard({ actions })
+      await openDrawer(20)
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
+
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+      expect(actions.logSet).not.toHaveBeenCalled()
+      expect(actions.updateSet).not.toHaveBeenCalled()
+    })
+
+    it('a rejected logSet surfaces a toast and leaves the drawer open and usable', async () => {
+      const toast = useToastStore()
+      const actions = makeActions({ logSet: vi.fn().mockRejectedValueOnce(new Error('network down')) })
+      mountCard({ actions })
+      await openDrawer(20)
+
+      await drawerForm().trigger('submit')
+      await flushPromises()
+
+      expect(toast.toasts.length).toBeGreaterThan(0)
+      expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
+
+      actions.logSet = vi.fn(async () => ({ set: pushExercise.sets[0], new_records: [] }))
+      await drawerForm().trigger('submit')
+      await flushPromises()
+      expect(actions.logSet).toHaveBeenCalled()
+    })
+  })
+
+  describe('item 2: prefill defaults for a NEW set', () => {
+    it('defaults from the last set of THIS exercise in THIS workout when one exists', async () => {
+      mountCard()
+      await openDrawer(20)
+      // último set del fixture: reps 5, weight_kg 40 (el de calentamiento, el
+      // ÚLTIMO logueado en la sesión, sin importar is_warmup — ver setDefaults.ts)
+      const weightDisplay = document.body.querySelector('.bk-metric.text-2xl')
+      expect(weightDisplay?.textContent).toContain('40')
+    })
+
+    it('falls back to the routine target when this workout has no sets yet for the exercise', async () => {
+      const emptyExercise = { ...pushExercise, sets: [] }
+      mountCard({ workoutExercise: emptyExercise, routines, routineId: 1 })
+      await openDrawer(20)
+
+      const weightDisplay = document.body.querySelector('.bk-metric.text-2xl')
+      const repsDisplay = document.body.querySelectorAll('.bk-metric.text-2xl')[1]
+      // target_weight_kg es null en el fixture de rutina, así que cae al
+      // default de medición (20kg); target_reps sí está fijado (8)
+      expect(weightDisplay?.textContent).toContain('20')
+      expect(repsDisplay?.textContent).toContain('8')
+    })
+
+    it('falls back to the previous-session history when there is no workout data and no routine target', async () => {
+      const emptyExercise = { ...pushExercise, sets: [] }
+      const actions = makeActions({
+        exerciseHistory: vi.fn(async () => ({
+          workout_id: 9,
+          date: '2026-07-20',
+          sets: [{ reps: 6, weight_kg: 82.5, duration_seconds: null, distance_m: null, is_warmup: false }],
+        })),
+      })
+      mountCard({ workoutExercise: emptyExercise, actions })
+      await openDrawer(20)
+
+      const weightDisplay = document.body.querySelector('.bk-metric.text-2xl')
+      expect(weightDisplay?.textContent).toContain('82.5')
+    })
+  })
+
+  describe('item 3: previous-session history', () => {
+    it('shows a one-line hint on the compact card when the exercise has no sets yet', async () => {
+      const emptyExercise = { ...pushExercise, sets: [] }
+      const actions = makeActions({
+        exerciseHistory: vi.fn(async () => ({
+          workout_id: 9,
+          date: '2026-07-20',
+          sets: [
+            { reps: 8, weight_kg: 80, duration_seconds: null, distance_m: null, is_warmup: false },
+            { reps: 8, weight_kg: 80, duration_seconds: null, distance_m: null, is_warmup: false },
+          ],
+        })),
+      })
+      const wrapper = mountCard({ workoutExercise: emptyExercise, actions })
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="card-history-hint"]').text()).toContain('2×8·80 kg')
+    })
+
+    it('does not show the card hint once the exercise already has sets logged', async () => {
+      const actions = makeActions({
+        exerciseHistory: vi.fn(async () => ({ workout_id: 9, date: '2026-07-20', sets: [{ reps: 8, weight_kg: 80, duration_seconds: null, distance_m: null, is_warmup: false }] })),
+      })
+      const wrapper = mountCard({ actions })
+      await flushPromises()
+      expect(wrapper.find('[data-testid="card-history-hint"]').exists()).toBe(false)
+    })
+
+    it('shows the dense "Última vez" line inside the drawer, under the form', async () => {
+      const actions = makeActions({
+        exerciseHistory: vi.fn(async () => ({
+          workout_id: 9,
+          date: '2026-07-20',
+          sets: [{ reps: 8, weight_kg: 80, duration_seconds: null, distance_m: null, is_warmup: false }],
+        })),
+      })
+      mountCard({ actions })
+      await flushPromises()
+      await openDrawer(20)
+
+      const hint = byTestId('drawer-history-hint')
+      expect(hint.text()).toContain('8·80 kg')
+    })
+
+    it('fetches history once per exercise id (cache lives in the store, not refetched per drawer open)', async () => {
+      const actions = makeActions()
+      mountCard({ actions })
+      await flushPromises()
+
+      await openDrawer(20)
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
+      await openDrawer(20)
+
+      // se pide UNA vez al montar (para el hint de la tarjeta), no de nuevo
+      // en cada apertura del cajón — el cacheo es responsabilidad del store,
+      // pero la tarjeta tampoco debe volver a llamar a exerciseHistory ella sola
+      expect(actions.exerciseHistory).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('item 6: cardio block', () => {
+    function mountCardio(overrides: Partial<Record<string, unknown>> = {}) {
+      return mountCard({
+        workoutExercise: cardioWorkoutExercise,
+        exercise: cardioExercise,
+        exerciseIds: [30],
+        ...overrides,
+      })
+    }
+
+    it('renders with a left border accent instead of the plain slab', () => {
+      const wrapper = mountCardio()
+      expect(wrapper.classes()).toEqual(expect.arrayContaining(['border-l-2', 'border-aurora/50']))
+    })
+
+    it('the add-set button reads "+ Cardio" instead of "+ Serie"', () => {
+      const wrapper = mountCardio()
+      expect(wrapper.get('[data-testid="add-set-30"]').text()).toBe('Añadir cardio')
+    })
+
+    it('cardio rows are not numbered (no "N." prefix)', () => {
+      const withSet = {
+        ...cardioWorkoutExercise,
+        sets: [{ id: 1, set_number: 1, reps: null, weight_kg: null, duration_seconds: 1800, distance_m: 5000, is_warmup: false, rpe: null, completed_at: 'x' }],
+      }
+      const wrapper = mountCardio({ workoutExercise: withSet })
+      const row = wrapper.get('[data-testid="set-row-1"]')
+      expect(row.text()).not.toMatch(/^1\./)
+      expect(row.text()).toContain('5000 m')
+    })
+  })
+
+  describe('item 7: cardio countdown', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.stubGlobal('navigator', { vibrate: vi.fn() })
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    })
+
+    function mountCardio(overrides: Partial<Record<string, unknown>> = {}) {
+      return mountCard({
+        workoutExercise: cardioWorkoutExercise,
+        exercise: cardioExercise,
+        exerciseIds: [30],
+        ...overrides,
+      })
+    }
+
+    it('shows "Empezar" for a live cardio drawer (not editing)', async () => {
+      const actions = makeActions()
+      mountCardio({ actions })
+      await openDrawer(30)
+      expect(document.body.querySelector('[data-testid="cardio-start-countdown"]')).not.toBeNull()
+    })
+
+    it('hides "Empezar" when restEnabled is false (retro editor)', async () => {
+      mountCardio({ restEnabled: false })
+      await openDrawer(30)
+      expect(document.body.querySelector('[data-testid="cardio-start-countdown"]')).toBeNull()
+    })
+
+    it('starting the countdown and letting it reach zero auto-logs the set and closes the drawer', async () => {
+      const actions = makeActions({
+        logSet: vi.fn(async () => ({
+          set: { id: 1, set_number: 1, reps: null, weight_kg: null, duration_seconds: 60, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+          new_records: [],
+        })),
+      })
+      mountCardio({ actions })
+      await openDrawer(30)
+
+      await byTestId('cardio-start-countdown').trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('[data-testid="cardio-countdown"]')).not.toBeNull()
+
+      vi.advanceTimersByTime(60_000)
+      await flushPromises()
+
+      expect(actions.logSet).toHaveBeenCalledWith(30, expect.objectContaining({ duration_seconds: 60, is_warmup: false }))
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+    })
+  })
+
+  describe('item 11: rest control', () => {
+    it('shows the effective rest (workout override > routine target > default) and toggles a preset picker', async () => {
+      const wrapper = mountCard({ routines, routineId: 1 })
+      expect(wrapper.get('[data-testid="rest-toggle-20"]').text()).toContain('120')
+
+      expect(wrapper.find('[data-testid="rest-picker-20"]').exists()).toBe(false)
+      await wrapper.get('[data-testid="rest-toggle-20"]').trigger('click')
+      expect(wrapper.find('[data-testid="rest-picker-20"]').exists()).toBe(true)
+    })
+
+    it('picking a preset calls actions.setExerciseRest with that value', async () => {
+      const actions = makeActions()
+      const wrapper = mountCard({ actions })
+      await wrapper.get('[data-testid="rest-toggle-20"]').trigger('click')
+
+      await wrapper.get('[data-testid="rest-preset-20-120"]').trigger('click')
+      await flushPromises()
+
+      expect(actions.setExerciseRest).toHaveBeenCalledWith(20, 120)
+    })
+
+    it('reflects the workout exercise override over the routine target', () => {
+      const overridden = { ...pushExercise, rest_seconds: 60 }
+      const wrapper = mountCard({ workoutExercise: overridden, routines, routineId: 1 })
+      expect(wrapper.get('[data-testid="rest-toggle-20"]').text()).toContain('60')
+    })
+
+    it('is hidden entirely when restEnabled is false (retro editor)', () => {
+      const wrapper = mountCard({ restEnabled: false })
+      expect(wrapper.find('[data-testid="rest-toggle-20"]').exists()).toBe(false)
+    })
+  })
+
+  it('logs a set and starts the rest timer with the default 90s AND the exercise name for a free workout', async () => {
     const actions = makeActions()
     const restTimer = useRestTimerStore()
     const startSpy = vi.spyOn(restTimer, 'start')
 
-    const wrapper = mountCard({ actions, routines: [], routineId: null })
-    await wrapper.find('form').trigger('submit')
+    mountCard({ actions, routines: [], routineId: null })
+    await openDrawer(20)
+    await drawerForm().trigger('submit')
     await flushPromises()
 
-    expect(actions.logSet).toHaveBeenCalledWith(
-      20,
-      expect.objectContaining({ is_warmup: false, reps: expect.any(Number), weight_kg: expect.any(Number) }),
-    )
-    expect(startSpy).toHaveBeenCalledWith(90)
+    expect(startSpy).toHaveBeenCalledWith(90, 'Press banca')
   })
 
   it('starts the rest timer with the routine rest_seconds when the workout came from a routine', async () => {
@@ -144,11 +517,12 @@ describe('WorkoutExerciseCard', () => {
     const restTimer = useRestTimerStore()
     const startSpy = vi.spyOn(restTimer, 'start')
 
-    const wrapper = mountCard({ actions, routines, routineId: 1 })
-    await wrapper.find('form').trigger('submit')
+    mountCard({ actions, routines, routineId: 1 })
+    await openDrawer(20)
+    await drawerForm().trigger('submit')
     await flushPromises()
 
-    expect(startSpy).toHaveBeenCalledWith(120)
+    expect(startSpy).toHaveBeenCalledWith(120, 'Press banca')
   })
 
   it('does not start the rest timer when restEnabled is false (retro editor)', async () => {
@@ -156,15 +530,16 @@ describe('WorkoutExerciseCard', () => {
     const restTimer = useRestTimerStore()
     const startSpy = vi.spyOn(restTimer, 'start')
 
-    const wrapper = mountCard({ actions, restEnabled: false })
-    await wrapper.find('form').trigger('submit')
+    mountCard({ actions, restEnabled: false })
+    await openDrawer(20)
+    await drawerForm().trigger('submit')
     await flushPromises()
 
     expect(actions.logSet).toHaveBeenCalled()
     expect(startSpy).not.toHaveBeenCalled()
   })
 
-  it('emits recorded with the new records so the retro editor can toast their count instead of celebrating', async () => {
+  it('emits recorded AND logged(true) so the retro editor can toast instead of celebrating, and the live view can skip the neon pulse', async () => {
     const actions = makeActions({
       logSet: vi.fn(async () => ({
         set: { id: 101, set_number: 1, reps: 8, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
@@ -173,13 +548,26 @@ describe('WorkoutExerciseCard', () => {
     })
     const wrapper = mountCard({ actions, restEnabled: false })
 
-    await wrapper.find('form').trigger('submit')
+    await openDrawer(20)
+    await drawerForm().trigger('submit')
     await flushPromises()
 
     expect(wrapper.emitted('recorded')).toBeTruthy()
     expect(wrapper.emitted('recorded')![0][0]).toEqual([
       { id: 9, exercise_id: 5, kind: 'max_weight', value: 100, achieved_at: 'x' },
     ])
+    expect(wrapper.emitted('logged')![0]).toEqual([true])
+  })
+
+  it('emits logged(false) for an ordinary set with no new records', async () => {
+    const actions = makeActions()
+    const wrapper = mountCard({ actions, restEnabled: false })
+
+    await openDrawer(20)
+    await drawerForm().trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.emitted('logged')![0]).toEqual([false])
   })
 
   it('deletes a set via actions.deleteSet after confirming with a real click', async () => {
@@ -211,43 +599,6 @@ describe('WorkoutExerciseCard', () => {
     expect(wrapper.find('[data-testid="delete-set-1"]').exists()).toBe(true)
   })
 
-  it('edits a set via actions.updateSet with the full SetIn payload after a real click-through (I5)', async () => {
-    const actions = makeActions()
-    const wrapper = mountCard({ actions })
-
-    await wrapper.find('[data-testid="edit-set-1"]').trigger('click')
-    await flushPromises()
-
-    // el set 1 del fixture: reps 5, weight_kg 100, is_warmup false, sin rpe
-    const setRow = wrapper.find('[data-testid="set-row-1"]')
-    const weightPlus = setRow.findAll('button[aria-label="Aumentar"]')[0]
-    await weightPlus.trigger('click', { detail: 0 })
-    await setRow.find('form').trigger('submit')
-    await flushPromises()
-
-    // payload COMPLETO (footgun del full-replace del backend): reps y
-    // is_warmup viajan aunque solo se haya tocado el peso
-    expect(actions.updateSet).toHaveBeenCalledWith(20, 1, {
-      is_warmup: false,
-      reps: 5,
-      weight_kg: 102.5,
-    })
-  })
-
-  it('cancelling a set edit never calls actions.updateSet and restores the static row', async () => {
-    const actions = makeActions()
-    const wrapper = mountCard({ actions })
-
-    await wrapper.find('[data-testid="edit-set-1"]').trigger('click')
-    await flushPromises()
-
-    await wrapper.find('[data-testid="cancel-edit-set-1"]').trigger('click')
-    await flushPromises()
-
-    expect(actions.updateSet).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="edit-set-1"]').exists()).toBe(true)
-  })
-
   it('removes the exercise via actions.removeExercise after confirming with a real click', async () => {
     const actions = makeActions()
     const wrapper = mountCard({ actions })
@@ -276,23 +627,6 @@ describe('WorkoutExerciseCard', () => {
     const wrapper = mountCard({ exerciseIds: [20, 30] })
     expect(wrapper.find('[data-testid="move-up-20"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="move-down-20"]').exists()).toBe(true)
-  })
-
-  it('a rejected logSet surfaces a toast and leaves the form usable', async () => {
-    const toast = useToastStore()
-    const actions = makeActions({ logSet: vi.fn().mockRejectedValueOnce(new Error('network down')) })
-
-    const wrapper = mountCard({ actions })
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-
-    expect(toast.toasts.length).toBeGreaterThan(0)
-    // no wedge: el formulario sigue montado y se puede reintentar el envío
-    expect(wrapper.find('form').exists()).toBe(true)
-    actions.logSet = vi.fn(async () => ({ set: pushExercise.sets[0], new_records: [] }))
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-    expect(actions.logSet).toHaveBeenCalled()
   })
 
   it('a rejected reorder (move-down) surfaces a toast instead of failing silently', async () => {
