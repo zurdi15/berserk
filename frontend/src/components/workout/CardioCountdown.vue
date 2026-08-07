@@ -7,7 +7,13 @@ import BkButton from '@/lib/BkButton.vue'
 // item 7: "botón empezar → countdown de la duración objetivo; al acabar, la
 // serie se registra sola con ese tiempo". Toma el revelo completo del cajón
 // (lo monta SetForm en vez de sus campos, ver SetForm.vue) mientras corre.
-const props = defineProps<{ targetSeconds: number }>()
+// v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: `endsAt` opcional deja SEMBRAR el
+// timestamp real de fin en vez de recalcularlo desde targetSeconds — así un
+// countdown RESUMIDO (la pestaña volvió con el countdown todavía corriendo,
+// ver uiPrefs.ts::PersistedCardioCountdown y WorkoutExerciseCard.vue) arranca
+// en el remaining correcto en vez de en targetSeconds completo otra vez. Sin
+// endsAt, el comportamiento es el de siempre (arranque fresco desde ahora).
+const props = defineProps<{ targetSeconds: number; endsAt?: number }>()
 const emit = defineEmits<{ done: []; cancel: [] }>()
 
 const { t } = useI18n()
@@ -16,7 +22,7 @@ const { t } = useI18n()
 // stores/restTimer.ts — si la pestaña se congela en segundo plano, el
 // próximo tick calcula lo que de verdad queda en vez de arrastrar un
 // contador que se quedó parado
-const endsAt = Date.now() + Math.max(0, props.targetSeconds) * 1000
+const endsAt = props.endsAt ?? Date.now() + Math.max(0, props.targetSeconds) * 1000
 const now = ref(Date.now())
 let ticker: ReturnType<typeof setInterval> | null = null
 let finished = false

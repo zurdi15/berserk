@@ -346,5 +346,8 @@ export const es = {
     routineNameDefault: 'Entreno {date}',
     savedAsRoutine: 'Rutina guardada',
     restLabel: 'Descanso: {seconds}s',
+    cardio: {
+      loggedWhileAway: 'Cardio registrado: {duration}',
+    },
   },
 } as const

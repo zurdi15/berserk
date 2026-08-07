@@ -30,7 +30,20 @@ const props = withDefaults(
 // keepOpen (item 1): false = "Registrar serie" (cierra el cajón), true =
 // "Registrar y otra" (se queda abierto, valores conservados para la
 // siguiente serie — ver WorkoutExerciseCard.vue)
-const emit = defineEmits<{ submit: [value: SetIn, keepOpen: boolean] }>()
+//
+// v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: countdownStart/countdownCancel son la
+// señal mínima hacia WorkoutExerciseCard — SetForm es quien conoce
+// duration_seconds/distance_m en el instante justo de arrancar/cancelar el
+// countdown, pero es WorkoutExerciseCard quien conoce workoutId/
+// workoutExerciseId para persistirlo en localStorage (ver uiPrefs.ts). El
+// 'done' normal (countdown llega a 0 solo) NO necesita una señal aparte: ya
+// dispara 'submit' más abajo, que es donde WorkoutExerciseCard limpia
+// cualquier countdown persistido de este ejercicio tras loguear la serie.
+const emit = defineEmits<{
+  submit: [value: SetIn, keepOpen: boolean]
+  countdownStart: [payload: { targetSeconds: number; distanceM?: number }]
+  countdownCancel: []
+}>()
 
 const { t } = useI18n()
 
@@ -116,6 +129,19 @@ function onCountdownDone() {
   countdownActive.value = false
   submit(false)
 }
+
+function startCountdown() {
+  countdownActive.value = true
+  emit('countdownStart', {
+    targetSeconds: durationSeconds.value,
+    distanceM: distanceM.value > 0 ? distanceM.value : undefined,
+  })
+}
+
+function onCountdownCancel() {
+  countdownActive.value = false
+  emit('countdownCancel')
+}
 </script>
 
 <template>
@@ -123,7 +149,7 @@ function onCountdownDone() {
     v-if="countdownActive"
     :target-seconds="durationSeconds"
     @done="onCountdownDone"
-    @cancel="countdownActive = false"
+    @cancel="onCountdownCancel"
   />
 
   <form v-else class="space-y-3 flex flex-col items-center" @submit.prevent="submit(false)">
@@ -179,7 +205,7 @@ function onCountdownDone() {
         type="button"
         variant="ghost"
         data-testid="cardio-start-countdown"
-        @click="countdownActive = true"
+        @click="startCountdown"
       >
         {{ t('workout.startCountdown') }}
       </BkButton>

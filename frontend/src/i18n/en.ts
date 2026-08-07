@@ -339,5 +339,8 @@ export const en = {
     routineNameDefault: 'Workout {date}',
     savedAsRoutine: 'Routine saved',
     restLabel: 'Rest: {seconds}s',
+    cardio: {
+      loggedWhileAway: 'Cardio logged: {duration}',
+    },
   },
 } as const
