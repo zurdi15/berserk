@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.5.0 - 2026-08-07
+
+- Supersets: link exercises into A/B groups in the routine editor; grouped cards show joined in the workout with a "next up" hint, and the automatic rest fires only when the group's round closes — solo exercises rest as always.
+- One scroll to rule the app: sections scroll as a normal page again (also on mobile), while tab strips, the calendar month bar and the workout chrono stay pinned on top as you scroll; the desktop scrollbar returns to the window edge.
+- Mobile scrollbars are native again (appear while scrolling, fade out); the thin aurora bar stays on desktop pointers only.
+
 ## 0.4.4 - 2026-08-07
 
 - Fixed a mobile regression from 0.4.3: every section's content box ended ~128px above the bottom bar (a leftover flow spacer double-counted the navbar reserve once all views got their own internal scroll). All sections now end with a uniform clean margin above the bar.
