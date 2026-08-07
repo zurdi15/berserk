@@ -13,6 +13,8 @@ import BkSheet from '@/lib/BkSheet.vue'
 import BkRune from '@/lib/BkRune.vue'
 import WorkoutDayInfo from './WorkoutDayInfo.vue'
 import { statusClasses } from './statusClasses'
+import { isValidRuneName } from '@/lib/runeResolve'
+import type { RuneName } from '@/lib/runes'
 import type { ExerciseOut, PersonalRecordOut, RoutineOut, ScheduledOut, WorkoutOut } from '@/api/domain'
 import {
   deleteSchedule,
@@ -59,6 +61,9 @@ const isPastOrToday = computed(() => props.date <= todayIso())
 const isTodayOrFuture = computed(() => props.date >= todayIso())
 const isToday = computed(() => props.date === todayIso())
 const loggingPastWorkout = ref(false)
+// item 3 (v0.4.0): "Registrar entreno" ya no crea directamente un entreno
+// libre — abre este picker primero (Entreno libre + rutinas propias)
+const pastWorkoutPickerOpen = ref(false)
 
 const routines = ref<RoutineOut[]>([])
 const loading = ref(false)
@@ -250,16 +255,28 @@ function editWorkout(id: number) {
   router.push({ name: 'workout-edit', params: { id } })
 }
 
-async function logPastWorkout() {
+// item 3 (v0.4.0): routineId ausente = "Entreno libre" (sin rutina, como
+// antes); con routineId, start_workout ya compone la rutina (exercises
+// precargados + rest_seconds + grupos derivados) para el camino finished
+// exactamente igual que para el en vivo — no está condicionado a `finished`
+// en el backend (ver routers/workouts.py::start_workout)
+async function logPastWorkout(routineId?: number) {
+  pastWorkoutPickerOpen.value = false
   try {
     loggingPastWorkout.value = true
-    const workout = await startWorkout({ date: props.date, finished: true })
+    const workout = await startWorkout({ date: props.date, finished: true, routine_id: routineId })
     router.push({ name: 'workout-edit', params: { id: workout.id } })
   } catch (error) {
     toastApiError(error)
   } finally {
     loggingPastWorkout.value = false
   }
+}
+
+// mismo helper que WorkoutView.vue: la runa de la rutina, si es una runa
+// futhark válida (columna dedicada, con fallback a slug — ver runeResolve)
+function routineRune(routine: RoutineOut): RuneName | null {
+  return routine.rune && isValidRuneName(routine.rune) ? (routine.rune as RuneName) : null
 }
 
 async function createSession() {
@@ -377,18 +394,60 @@ loadDayInfo()
     </div>
 
     <!-- Registrar un entreno pasado: solo hoy/pasado (ver isPastOrToday).
-         amendment B: variant primary, como toda acción de "añadir algo" -->
+         amendment B: variant primary, como toda acción de "añadir algo".
+         item 3 (v0.4.0): ya no registra directo — abre el picker de abajo -->
     <div v-if="isViewingSelf && isPastOrToday" class="border border-line rounded-sm p-3">
       <BkButton
         variant="primary"
         block
         data-testid="log-past-workout"
         :disabled="loggingPastWorkout"
-        @click="logPastWorkout"
+        @click="pastWorkoutPickerOpen = true"
       >
         {{ $t('calendar.logPastWorkout') }}
       </BkButton>
     </div>
+
+    <!-- item 3 (v0.4.0): picker de "Registrar entreno" — Entreno libre +
+         rutinas propias (rune + nombre), mismo idiom que el idle de
+         WorkoutView.vue. El título dobla como el del botón que lo abre. -->
+    <BkSheet
+      :open="pastWorkoutPickerOpen"
+      :title="$t('calendar.logPastWorkout')"
+      @close="pastWorkoutPickerOpen = false"
+    >
+      <div class="space-y-3 p-4">
+        <BkButton
+          variant="primary"
+          block
+          data-testid="log-past-workout-free"
+          :disabled="loggingPastWorkout"
+          @click="logPastWorkout()"
+        >
+          {{ $t('calendar.logPastWorkoutFree') }}
+        </BkButton>
+
+        <div v-if="routines.length" class="space-y-2">
+          <div class="flex items-center gap-3" aria-hidden="true">
+            <span class="h-px flex-1 bg-line" />
+            <span class="text-ink-faint text-sm">{{ $t('calendar.logPastWorkoutOr') }}</span>
+            <span class="h-px flex-1 bg-line" />
+          </div>
+          <BkButton
+            v-for="routine in routines"
+            :key="routine.id"
+            variant="ghost"
+            block
+            :data-testid="`log-past-workout-routine-${routine.id}`"
+            :disabled="loggingPastWorkout"
+            @click="logPastWorkout(routine.id)"
+          >
+            <BkRune v-if="routineRune(routine)" :name="routineRune(routine) as RuneName" :size="16" />
+            <span>{{ routine.name }}</span>
+          </BkButton>
+        </div>
+      </div>
+    </BkSheet>
 
     <!-- Create new session form: solo hoy/futuro (item 1) -->
     <div v-if="isViewingSelf && isTodayOrFuture" class="border border-line rounded-sm p-3 space-y-3">

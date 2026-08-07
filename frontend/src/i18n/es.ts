@@ -251,6 +251,11 @@ export const es = {
     confirmDeleteMessage: '¿Estás seguro de que quieres borrar esta sesión?',
     runeLegend: 'Leyenda de runas',
     logPastWorkout: 'Registrar entreno',
+    // item 3 (v0.4.0): picker de "Registrar entreno" — "Entreno libre" +
+    // rutinas del usuario (rune + nombre, mismo idiom que el idle de
+    // WorkoutView). logPastWorkout de arriba dobla como título del sheet.
+    logPastWorkoutFree: 'Entreno libre',
+    logPastWorkoutOr: 'o',
     prsOfDay: 'Récords del día',
     plannedEyebrow: 'Planificado',
   },

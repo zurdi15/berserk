@@ -783,7 +783,29 @@ describe('ScheduleSheet', () => {
       expect(push).toHaveBeenCalledWith({ name: 'workout-edit', params: { id: 42 } })
     })
 
-    it('"Registrar entreno" on a past day creates a finished workout via startWorkout({date, finished:true}) and navigates to its editor', async () => {
+    it('"Registrar entreno" opens a picker (free workout + own routines) instead of logging directly', async () => {
+      vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-01', scheduled: [] },
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await flushPromises()
+
+      expect(document.querySelector('[data-testid="log-past-workout-free"]')).toBeNull()
+      await wrapper.find('[data-testid="log-past-workout"]').trigger('click')
+      await flushPromises()
+
+      expect(domain.startWorkout).not.toHaveBeenCalled()
+      expect(document.querySelector('[data-testid="log-past-workout-free"]')).not.toBeNull()
+      // item 3: mock module-level de listRoutines trae 'Push' (id 1) y 'Pull' (id 2)
+      expect(document.querySelector('[data-testid="log-past-workout-routine-1"]')).not.toBeNull()
+      expect(document.querySelector('[data-testid="log-past-workout-routine-2"]')).not.toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('picking "Entreno libre" in the picker calls startWorkout({date, finished:true}) without routine_id and navigates to the editor', async () => {
       vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
       vi.mocked(domain.startWorkout).mockResolvedValueOnce({
         id: 88, date: '2026-08-01', started_at: '2026-08-01T12:00:00', ended_at: '2026-08-01T12:00:00',
@@ -793,16 +815,52 @@ describe('ScheduleSheet', () => {
       const wrapper = mount(ScheduleSheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
       })
       await flushPromises()
-
-      const button = wrapper.find('[data-testid="log-past-workout"]')
-      expect(button.exists()).toBe(true)
-      await button.trigger('click')
+      await wrapper.find('[data-testid="log-past-workout"]').trigger('click')
       await flushPromises()
 
-      expect(domain.startWorkout).toHaveBeenCalledWith({ date: '2026-08-01', finished: true })
+      const freeBtn = document.querySelector<HTMLElement>('[data-testid="log-past-workout-free"]')!
+      freeBtn.click()
+      await flushPromises()
+
+      expect(domain.startWorkout).toHaveBeenCalledWith({ date: '2026-08-01', finished: true, routine_id: undefined })
       expect(push).toHaveBeenCalledWith({ name: 'workout-edit', params: { id: 88 } })
+      // el picker se cierra tras elegir
+      expect(document.querySelector('[data-testid="log-past-workout-free"]')).toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('picking a routine in the picker calls startWorkout with its routine_id, showing its rune when it has one', async () => {
+      vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
+      vi.mocked(domain.listRoutines).mockResolvedValueOnce([
+        { id: 1, name: 'Push', description: null, rune: 'core', color: null, exercises: [] },
+      ] as never)
+      vi.mocked(domain.startWorkout).mockResolvedValueOnce({
+        id: 89, date: '2026-08-01', started_at: '2026-08-01T12:00:00', ended_at: '2026-08-01T12:00:00',
+        routine_id: 1, note: null, feeling: null, exercises: [], muscle_tag_ids: [],
+      } as never)
+
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-01', scheduled: [] },
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await flushPromises()
+      await wrapper.find('[data-testid="log-past-workout"]').trigger('click')
+      await flushPromises()
+
+      const routineBtn = document.querySelector<HTMLElement>('[data-testid="log-past-workout-routine-1"]')!
+      expect(routineBtn.querySelector('svg')).not.toBeNull() // BkRune de 'core'
+      routineBtn.click()
+      await flushPromises()
+
+      expect(domain.startWorkout).toHaveBeenCalledWith({ date: '2026-08-01', finished: true, routine_id: 1 })
+      expect(push).toHaveBeenCalledWith({ name: 'workout-edit', params: { id: 89 } })
+
+      wrapper.unmount()
     })
 
     it('"Registrar entreno" is present for today', async () => {
@@ -825,6 +883,21 @@ describe('ScheduleSheet', () => {
       await flushPromises()
 
       expect(wrapper.find('[data-testid="log-past-workout"]').exists()).toBe(false)
+    })
+
+    it('athlete mode: "Registrar entreno" (and its picker) stays hidden — unchanged by item 3', async () => {
+      vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
+      const athlete = useAthleteStore()
+      athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
+
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-01', scheduled: [] },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="log-past-workout"]').exists()).toBe(false)
+      expect(document.querySelector('[data-testid="log-past-workout-free"]')).toBeNull()
     })
   })
 
