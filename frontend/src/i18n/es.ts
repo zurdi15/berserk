@@ -323,7 +323,6 @@ export const es = {
       est1rm: 'Est. 1RM',
     },
     searchExercise: 'Buscar ejercicio',
-    allExercises: 'Todos los ejercicios',
     hasData: 'Con datos',
     noSeries: 'Aún no hay datos de este ejercicio',
     records: 'Récords',

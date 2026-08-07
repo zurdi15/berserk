@@ -321,7 +321,6 @@ export const en = {
       est1rm: 'Est. 1RM',
     },
     searchExercise: 'Search exercise',
-    allExercises: 'All exercises',
     hasData: 'Has data',
     noSeries: 'No data for this exercise yet',
     records: 'Records',

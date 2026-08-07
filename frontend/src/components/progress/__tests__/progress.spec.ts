@@ -435,13 +435,19 @@ describe('ExercisePicker', () => {
     expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([1])
   })
 
-  it('emits null when "all exercises" is clicked', async () => {
-    const wrapper = mount(ExercisePicker, { props: { modelValue: 1 }, ...withI18n() })
+  // v0.8.1 (zurdi): "Todos los ejercicios" murió — seleccionaba null y con
+  // null ni siquiera se pintaba chart. La lista además crece hasta el fondo
+  // sin selección (70dvh) y se encoge al elegir (40dvh) con transición.
+  it('v0.8.1: no "all exercises" option; the list height is tall when nothing is picked and shrinks on selection', async () => {
+    const unpicked = mount(ExercisePicker, { props: { modelValue: null }, ...withI18n() })
     await flushPromises()
+    expect(unpicked.find('[data-testid="exercise-option-all"]').exists()).toBe(false)
+    expect(unpicked.get('[data-testid="exercise-picker-list"]').classes()).toContain('max-h-[70dvh]')
+    unpicked.unmount()
 
-    await wrapper.find('[data-testid="exercise-option-all"]').trigger('click')
-
-    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([null])
+    const picked = mount(ExercisePicker, { props: { modelValue: 1 }, ...withI18n() })
+    await flushPromises()
+    expect(picked.get('[data-testid="exercise-picker-list"]').classes()).toContain('max-h-[40dvh]')
   })
 
   it('item 3a: shows shimmer skeleton rows (not the real list) while listExercises is pending, swaps to the real list once resolved', async () => {
@@ -460,7 +466,7 @@ describe('ExercisePicker', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="exercise-list-skeleton"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="exercise-option-all"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="exercise-picker-list"]').exists()).toBe(true)
   })
 })
 
@@ -1049,7 +1055,8 @@ describe('ProgressView', () => {
     expect(trainingPanel.classes()).not.toContain('overflow-y-auto')
 
     const pickerList = wrapper.find('[data-testid="exercise-picker-list"]')
-    expect(pickerList.classes()).toContain('max-h-[50dvh]')
+    // v0.8.1: sin selección la lista llega hasta el fondo (70dvh)
+    expect(pickerList.classes()).toContain('max-h-[70dvh]')
     expect(pickerList.classes()).toContain('overflow-y-auto')
   })
 

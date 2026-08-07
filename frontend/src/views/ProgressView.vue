@@ -162,7 +162,12 @@ watch(exerciseId, () => {
         <ExercisePicker v-model="exerciseId" />
       </div>
 
-      <div v-if="exerciseId !== null" class="space-y-3" :style="{ '--bk-stagger-i': 1 }">
+      <!-- v0.8.1 (zurdi): el bloque del chart ENTRA con animación al elegir
+           ejercicio (bk-rise) mientras la lista del picker se encoge con su
+           transición de max-height (ver ExercisePicker) — el hueco vacío
+           reservado bajo la lista murió con la opción "Todos los ejercicios" -->
+      <Transition name="bk-rise">
+        <div v-if="exerciseId !== null" class="space-y-3" :style="{ '--bk-stagger-i': 1 }">
         <BkTabs v-model="metric" :tabs="metricTabs" />
         <!-- :key="exerciseId" (item 2): remonta el chart al cambiar de
              ejercicio para repetir el revelado progresivo de la serie — el
@@ -170,7 +175,8 @@ watch(exerciseId, () => {
              actualiza :points sin remontar (progress.spec.ts:563 fija justo eso) -->
         <BkChart v-if="chartPoints.length" :key="exerciseId" :points="chartPoints" color="aurora" :suffix="` ${units}`" />
         <BkEmpty v-else :message="t('progress.noSeries')" />
-      </div>
+        </div>
+      </Transition>
     </div>
 
     <!-- Récords: solo PrList (item 4, v0.4.2 — antes también DistributionBars,

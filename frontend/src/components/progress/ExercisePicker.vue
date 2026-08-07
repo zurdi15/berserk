@@ -77,29 +77,33 @@ watch(() => athlete.userId, load)
   <div class="flex flex-col gap-2">
     <!-- v0.5.0 (modelo de scroll único): este picker es una de las pocas
          cajas HOJA con scroll interno que sobreviven — la lista lleva su
-         propia altura tope (max-h-[50dvh]: media pantalla, deja sitio al
-         chart que la sigue en flujo en ProgressView) en vez de recibir el
-         hueco por cadena flex del padre. dvh y no vh: en móvil el viewport
-         dinámico descuenta la UI del navegador. (comentario dentro de la
-         raíz para no crear un fragmento de dos raíces que rompa el
-         fall-through de atributos) -->
+         propia altura tope en vez de recibir el hueco por cadena flex del
+         padre; dvh y no vh: en móvil el viewport dinámico descuenta la UI
+         del navegador.
+         v0.8.1 (zurdi: "antes de hacer click el espacio de la gráfica está
+         vacío — que la lista llegue hasta el fondo y la gráfica salga con
+         animación"): la altura tope es DINÁMICA — sin selección la lista se
+         estira hasta el fondo (70dvh) porque no hay chart que dejar sitio;
+         al elegir, se encoge a 40dvh con transición de max-height (dos
+         valores explícitos, animables) mientras el chart entra debajo (ver
+         ProgressView). La opción "Todos los ejercicios" murió aquí también:
+         seleccionaba null, y con null ni siquiera se pintaba chart — era un
+         botón a ninguna parte. (comentario dentro de la raíz para no crear
+         un fragmento de dos raíces que rompa el fall-through de atributos) -->
     <BkField v-model="query" :label="t('progress.searchExercise')" class="shrink-0" />
 
-    <!-- esqueleto mientras carga: mismo hueco que la lista real -->
-    <div v-if="!ready" class="max-h-[50dvh] overflow-y-auto space-y-1" data-testid="exercise-list-skeleton">
+    <!-- esqueleto mientras carga: mismo hueco que la lista real inicial -->
+    <div v-if="!ready" class="max-h-[70dvh] overflow-y-auto space-y-1" data-testid="exercise-list-skeleton">
       <div v-for="n in 6" :key="n" class="h-9 rounded-sm bg-stone bk-shimmer" aria-hidden="true" />
     </div>
 
-    <div v-else class="max-h-[50dvh] overflow-y-auto space-y-1" data-testid="exercise-picker-list">
-      <button
-        type="button"
-        data-testid="exercise-option-all"
-        class="w-full text-left p-2 rounded-sm hover:bg-stone transition-colors text-sm border border-transparent hover:border-line"
-        :class="modelValue === null ? 'text-aurora' : 'text-ink'"
-        @click="select(null)"
-      >
-        {{ t('progress.allExercises') }}
-      </button>
+    <div
+      v-else
+      class="overflow-y-auto space-y-1"
+      :class="modelValue === null ? 'max-h-[70dvh]' : 'max-h-[40dvh]'"
+      :style="{ transition: 'max-height var(--bk-dur-4) var(--bk-ease-out)' }"
+      data-testid="exercise-picker-list"
+    >
       <button
         v-for="exercise in filtered"
         :key="exercise.id"
