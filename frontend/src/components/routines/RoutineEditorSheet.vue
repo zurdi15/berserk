@@ -32,6 +32,11 @@ const units = computed(() => (auth.user?.units as 'kg' | 'lb') || 'kg')
 const name = ref('')
 const description = ref('')
 const selectedRune = ref<string | null>(null)
+// ROUTINES-OPEN: check "Global" (renombrado desde is_public), ahora vive en
+// el editor — disponible a CUALQUIER usuario sobre su propia rutina, ya
+// marcable al crear (a diferencia del viejo flujo globalize, admin-only y
+// que cedía la propiedad)
+const isGlobal = ref(false)
 const exercises = ref<Array<{
   id: string
   exercise_id: number
@@ -119,6 +124,7 @@ async function initializeForm() {
     name.value = props.routine.name
     description.value = props.routine.description || ''
     selectedRune.value = props.routine.rune || null
+    isGlobal.value = props.routine.is_global ?? false
     exercises.value = props.routine.exercises.map(e => ({
       id: String(e.id),
       exercise_id: e.exercise_id,
@@ -131,6 +137,7 @@ async function initializeForm() {
     name.value = ''
     description.value = ''
     selectedRune.value = null
+    isGlobal.value = false
     exercises.value = []
   }
 
@@ -186,12 +193,14 @@ async function saveRoutine() {
         name: name.value,
         description: description.value || null,
         rune: selectedRune.value,
+        is_global: isGlobal.value,
       })
     } else {
       routine = await createRoutine({
         name: name.value,
         description: description.value || null,
         rune: selectedRune.value,
+        is_global: isGlobal.value,
       })
     }
 
@@ -279,6 +288,25 @@ watch(
             <BkRune name="berserk" :size="24" />
           </button>
         </div>
+      </div>
+
+      <!-- ROUTINES-OPEN (course correction): check "Global" — disponible a
+           CUALQUIER usuario sobre su propia rutina, ya marcable al crear.
+           Sustituye al viejo toggle "Compartir como plantilla" de la
+           tarjeta y a la conversión admin-only "Convertir en global" (que
+           cedía la propiedad) — mismo patrón visual que el checkbox
+           isPublic de ExerciseManager. -->
+      <div class="space-y-1">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            v-model="isGlobal"
+            type="checkbox"
+            class="rounded border border-line"
+            data-testid="routine-is-global-checkbox"
+          />
+          <span class="text-sm text-ink-muted">{{ $t('routines.isGlobal') }}</span>
+        </label>
+        <p class="text-xs text-ink-faint pl-6">{{ $t('routines.isGlobalHint') }}</p>
       </div>
 
       <!-- Exercises Section -->

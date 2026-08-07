@@ -17,6 +17,7 @@ vi.mock('@/api/domain', () => ({
     description: body.description || null,
     rune: body.rune || null,
     color: body.color || null,
+    is_global: body.is_global ?? false,
     exercises: [],
   })),
   updateRoutine: vi.fn((id, body) => Promise.resolve({
@@ -25,6 +26,7 @@ vi.mock('@/api/domain', () => ({
     description: body.description || null,
     rune: body.rune || null,
     color: body.color || null,
+    is_global: body.is_global ?? false,
     exercises: [],
   })),
   replaceRoutineExercises: vi.fn((id: number, items: any[]) => Promise.resolve({
@@ -472,5 +474,109 @@ describe('RoutineEditorSheet', () => {
     // Verify allExercises unchanged (row names still render)
     expect(vm.allExercises).toHaveLength(allExercisesBefore)
     expect(vm.exercises).toHaveLength(2)
+  })
+
+  // ROUTINES-OPEN (course correction, v0.4.2): el check "Global" vive en el
+  // editor, disponible a CUALQUIER usuario sobre su propia rutina (nunca
+  // admin-only, sin confirm — a diferencia del extinto flujo globalize).
+  describe('ROUTINES-OPEN: "Global" checkbox', () => {
+    it('is unchecked by default when creating a new routine, even for a non-admin user', async () => {
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const dialog = dialogs[dialogs.length - 1] as HTMLElement
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
+      expect(checkbox.checked).toBe(false)
+    })
+
+    it('reflects the routine\'s is_global when editing an existing one', async () => {
+      const routine = {
+        id: 5, name: 'Global routine', description: null, rune: null, color: null,
+        is_global: true, exercises: [],
+      }
+
+      const wrapper = build(routine as RoutineOut)
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 100))
+      await wrapper.vm.$nextTick()
+
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const dialog = dialogs[dialogs.length - 1] as HTMLElement
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
+      expect(checkbox.checked).toBe(true)
+    })
+
+    it('checking it and saving a NEW routine sends is_global: true to createRoutine', async () => {
+      const { createRoutine } = await import('@/api/domain')
+      vi.mocked(createRoutine).mockClear()
+
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+
+      const vm = wrapper.vm as any
+      vm.name = 'Full body'
+
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const dialog = dialogs[dialogs.length - 1] as HTMLElement
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
+      checkbox.checked = true
+      checkbox.dispatchEvent(new Event('change'))
+      await wrapper.vm.$nextTick()
+
+      const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+      saveButton!.click()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(createRoutine).toHaveBeenCalledWith(expect.objectContaining({ is_global: true }))
+    })
+
+    it('unchecking it and saving an existing GLOBAL routine sends is_global: false to updateRoutine (round trip)', async () => {
+      const { updateRoutine } = await import('@/api/domain')
+      vi.mocked(updateRoutine).mockClear()
+
+      const routine = {
+        id: 5, name: 'Global routine', description: null, rune: null, color: null,
+        is_global: true, exercises: [],
+      }
+
+      const wrapper = build(routine as RoutineOut)
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 100))
+      await wrapper.vm.$nextTick()
+
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const dialog = dialogs[dialogs.length - 1] as HTMLElement
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
+      expect(checkbox.checked).toBe(true)
+      checkbox.checked = false
+      checkbox.dispatchEvent(new Event('change'))
+      await wrapper.vm.$nextTick()
+
+      const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+      saveButton!.click()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(updateRoutine).toHaveBeenCalledWith(5, expect.objectContaining({ is_global: false }))
+    })
+
+    it('is never admin-only: a non-admin user\'s form renders it unconditionally, with no confirm step nested inside', async () => {
+      const auth = useAuthStore()
+      expect(auth.user?.is_admin).toBe(false)
+
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+
+      // renderiza directo, checkeable de inmediato — sin un botón previo que
+      // abra un sheet de confirmación anidado (a diferencia del extinto
+      // flujo globalize)
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const dialog = dialogs[dialogs.length - 1] as HTMLElement
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
+      expect(checkbox.type).toBe('checkbox')
+      expect(checkbox.disabled).toBe(false)
+    })
   })
 })

@@ -183,24 +183,22 @@ export const en = {
     noExercisesInRoutine: 'No exercises in this routine yet',
     nameRequired: 'Routine name is required',
     confirm: 'Confirm',
-    // UNIFIED-LISTINGS: mine + global + others' public all live in ONE
-    // list (RoutineList) — the attribution chip for anything not mine
+    // UNIFIED-LISTINGS: mine + legacy owner_id NULL + others' global all
+    // live in ONE list (RoutineList) — the attribution chip for anything
+    // not mine
     globalTemplate: 'Global',
-    // toggle on the card itself (the editor is out of this lane).
-    // item 1 (v0.4.0): "Visible to everyone" didn't say WHAT turning it on
-    // does — reworded to the actual action: it becomes a template
-    isPublic: 'Share as template',
-    copy: 'Copy',
-    copied: 'Routine copied to your list',
-    // item 2 (v0.4.0): fallback when a template's exercise isn't visible to
-    // whoever's looking (its owner made the ROUTINE public but not THAT
-    // exercise) — used to render as a blank name, with no explanation
+    // ROUTINES-OPEN (course correction): check in the EDITOR
+    // (RoutineEditorSheet), available to any user on their own routine —
+    // replaces the old "Share as template" card toggle and the admin-only
+    // "Make global" conversion (which used to give away ownership)
+    isGlobal: 'Global',
+    isGlobalHint: 'Visible and usable by every user',
+    duplicate: 'Duplicate',
+    duplicated: 'Routine duplicated to your list',
+    // item 2 (v0.4.0): fallback when a global routine's exercise isn't
+    // visible to whoever's looking (its owner made the ROUTINE global but
+    // not THAT exercise) — used to render as a blank name, with no explanation
     privateExercise: 'Private exercise',
-    // second control, admin-only, on an OWN routine — turns it into a
-    // global template (owner_id -> NULL, leaves the personal list)
-    globalize: 'Make global',
-    confirmGlobalize: 'Make global template',
-    confirmGlobalizeMessage: 'This routine will leave your personal list and become a read-only global template, visible to every user. Continue?',
   },
   library: {
     exercises: 'Exercises',

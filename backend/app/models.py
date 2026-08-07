@@ -157,11 +157,11 @@ class Routine(Base):
     __tablename__ = "routines"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # W2 feature 2: nullable ahora — NULL es una plantilla GLOBAL creada por
-    # un admin (mirror de Exercise.owner_id/MuscleGroup.owner_id: catálogo
-    # sin dueño, visible a todos). Un admin llega ahí "globalizando" una
-    # rutina propia existente (POST .../globalize), no creándola ya global
-    # (la UI del editor no expone ese checkbox, ver v0.3.2 report)
+    # ROUTINES-OPEN: nullable desde cca94a818289 — NULL es una plantilla
+    # global LEGACY (creada vía el extinto POST .../globalize, que perdía la
+    # propiedad). Ya no hay forma de producir owner_id NULL desde la API,
+    # pero las filas existentes se mantienen visibles bajo la misma regla que
+    # is_global (ver _visible_template/list_templates en routers/routines.py)
     owner_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), default=None, index=True
     )
@@ -169,10 +169,13 @@ class Routine(Base):
     description: Mapped[str | None] = mapped_column(String(300), default=None)
     rune: Mapped[str | None] = mapped_column(String(20), default=None)
     color: Mapped[str | None] = mapped_column(String(30), default=None)
-    # W2 feature 2: rutina propia compartida como plantilla de solo lectura
-    # con el resto de usuarios (consumo = copia, nunca referencia viva, ver
-    # POST .../copy) — independiente de owner_id NULL (plantilla global)
-    is_public: Mapped[bool] = mapped_column(default=False)
+    # ROUTINES-OPEN (renombrada desde is_public, migración
+    # fbf6cb158a4e_rename_routine_is_public_to_is_global): un check por
+    # rutina, editable por CUALQUIER usuario sobre la suya desde el editor —
+    # is_global=True la hace visible/usable/duplicable por todo el mundo sin
+    # perder la propiedad (a diferencia del viejo flujo globalize). Consumo
+    # siempre vía POST .../copy (snapshot, nunca referencia viva).
+    is_global: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     exercises: Mapped[list["RoutineExercise"]] = relationship(

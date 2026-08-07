@@ -10,7 +10,9 @@
 withDefaults(
   defineProps<{
     user: { username: string; color?: string | null }
-    size?: 'sm' | 'md'
+    // ROUTINES-OPEN: 'xs' añadido para la fila de atribución compacta de
+    // RoutineList (text-2xs) — additive, sm/md sin cambios
+    size?: 'xs' | 'sm' | 'md'
   }>(),
   { size: 'md' },
 )
@@ -20,11 +22,11 @@ withDefaults(
   <span class="inline-flex items-center gap-2 min-w-0" data-testid="bk-user">
     <span
       class="rounded-full shrink-0"
-      :class="size === 'sm' ? 'w-2 h-2' : 'w-2.5 h-2.5'"
+      :class="size === 'xs' ? 'w-1.5 h-1.5' : size === 'sm' ? 'w-2 h-2' : 'w-2.5 h-2.5'"
       :style="{ backgroundColor: user.color || 'var(--bk-accent-aurora)' }"
       data-testid="bk-user-dot"
       aria-hidden="true"
     />
-    <span class="truncate" :class="size === 'sm' ? 'text-xs' : 'text-sm'">{{ user.username }}</span>
+    <span class="truncate" :class="size === 'xs' ? 'text-2xs' : size === 'sm' ? 'text-xs' : 'text-sm'">{{ user.username }}</span>
   </span>
 </template>

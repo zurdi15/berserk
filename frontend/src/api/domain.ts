@@ -146,16 +146,17 @@ export interface RoutineOut {
   description: string | null
   rune: string | null
   color: string | null
-  // W2 feature 2: los tres siguientes son opcionales en el tipo aunque el
+  // ROUTINES-OPEN: los tres siguientes son opcionales en el tipo aunque el
   // backend siempre los manda (mismo criterio que ExerciseOut.is_public /
   // MuscleGroupOut.rune) — evita tener que tocar fixtures de RoutineOut de
-  // otros carriles (RoutineEditorSheet está fuera de este carril) por un
-  // campo que no usan. Resolución efectiva siempre vía `?? false` / `?? null`.
-  // owner_id: null = plantilla GLOBAL (creada por un admin, ver globalizeRoutine)
+  // otros carriles por un campo que no usan. Resolución efectiva siempre vía
+  // `?? false` / `?? null`.
+  // owner_id: null = plantilla GLOBAL legacy (viejo flujo globalize, retirado)
   owner_id?: number | null
-  // rutina propia compartida como plantilla de solo lectura con el resto
-  is_public?: boolean
-  // atribución en la sección Plantillas; null para una plantilla GLOBAL
+  // check "Global" del editor (renombrado desde is_public, misma columna) —
+  // el resto del mundo ve/usa/duplica la rutina sin que su dueño la pierda
+  is_global?: boolean
+  // atribución en la lista unificada; null para una plantilla GLOBAL legacy
   owner_username?: string | null
   exercises: RoutineExerciseOut[]
 }
@@ -361,6 +362,8 @@ export const createRoutine = (body: {
   description?: string | null
   rune?: string | null
   color?: string | null
+  // ROUTINES-OPEN: check "Global" del editor, marcable ya al crear
+  is_global?: boolean
 }) =>
   api<RoutineOut>('/routines', { method: 'POST', body })
 
@@ -369,8 +372,8 @@ export const updateRoutine = (id: number, body: {
   description?: string | null
   rune?: string | null
   color?: string | null
-  // W2 feature 2: toggle "Visible para todos" en la tarjeta de RoutineList
-  is_public?: boolean
+  // ROUTINES-OPEN: check "Global" del editor (renombrado desde is_public)
+  is_global?: boolean
 }) =>
   api<RoutineOut>(`/routines/${id}`, { method: 'PATCH', body })
 
@@ -380,15 +383,11 @@ export const deleteRoutine = (id: number) =>
 export const replaceRoutineExercises = (id: number, items: RoutineExerciseIn[]) =>
   api<RoutineOut>(`/routines/${id}/exercises`, { method: 'PUT', body: items })
 
-// W2 feature 2: copia una plantilla visible (global o pública) a MIS
-// rutinas — nunca una referencia viva, ver backend routers/routines.py
+// ROUTINES-OPEN: "Duplicar" una rutina visible (global, legacy owner_id
+// NULL, o la propia) a MIS rutinas — nunca una referencia viva, ver backend
+// routers/routines.py
 export const copyRoutine = (id: number) =>
   api<RoutineOut>(`/routines/${id}/copy`, { method: 'POST' })
-
-// W2 feature 2: admin-only — convierte una rutina PROPIA en plantilla
-// global (owner_id -> NULL); deja la lista personal del admin
-export const globalizeRoutine = (id: number) =>
-  api<RoutineOut>(`/routines/${id}/globalize`, { method: 'POST' })
 
 // Workout endpoints
 export const startWorkout = (body: {

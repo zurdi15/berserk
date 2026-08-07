@@ -1,6 +1,6 @@
-import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -15,7 +15,7 @@ vi.mock('@/api/domain', () => ({
       description: 'Upper body push',
       rune: 'chest',
       color: null,
-      is_public: false,
+      is_global: false,
       owner_username: null,
       exercises: [
         { id: 1, exercise_id: 1, position: 0, target_sets: 4, target_reps: 8, target_weight_kg: 80, rest_seconds: 120 },
@@ -29,7 +29,7 @@ vi.mock('@/api/domain', () => ({
       description: 'Upper body pull',
       rune: 'back',
       color: null,
-      is_public: false,
+      is_global: false,
       owner_username: null,
       exercises: [
         { id: 3, exercise_id: 3, position: 0, target_sets: 4, target_reps: 6, target_weight_kg: 100, rest_seconds: 120 },
@@ -37,12 +37,10 @@ vi.mock('@/api/domain', () => ({
     },
   ])),
   deleteRoutine: vi.fn((id: number) => Promise.resolve(void 0)),
-  // W2 feature 2: nuevos endpoints — resueltos en vacío/no-op por defecto,
-  // los tests que los ejercitan los sobreescriben con mockResolvedValueOnce
+  // ROUTINES-OPEN: resuelto en vacío por defecto, los tests que lo ejercitan
+  // lo sobreescriben con mockResolvedValueOnce
   listRoutineTemplates: vi.fn(() => Promise.resolve([])),
-  updateRoutine: vi.fn((id: number, body: unknown) => Promise.resolve({ id, ...(body as object) })),
   copyRoutine: vi.fn((id: number) => Promise.resolve({ id: 99 })),
-  globalizeRoutine: vi.fn((id: number) => Promise.resolve({ id, owner_id: null })),
   listExercises: vi.fn(() => Promise.resolve([
     { id: 1, name_es: 'Press de banca', name_en: 'Bench Press', measurement: 'strength', owner_id: null, muscle_groups: [] },
     { id: 2, name_es: 'Aperturas', name_en: 'Flyes', measurement: 'strength', owner_id: null, muscle_groups: [] },
@@ -75,36 +73,6 @@ describe('RoutineList', () => {
       },
     })
   }
-
-  // W2 feature 2: el sheet de confirmación de "globalizar" usa BkSheet de
-  // verdad (no stubeado, a diferencia de RoutineEditorSheet) — su contenido
-  // viaja a <Teleport to="body">, así que hace falta montar sobre
-  // document.body y consultar ahí (mismo patrón que library.spec.ts)
-  let mountedWrappers: VueWrapper[] = []
-
-  function buildAttached() {
-    const wrapper = mount(RoutineList, {
-      global: {
-        plugins: [createI18nInstance()],
-        stubs: {
-          BkRune: true,
-          RoutineEditorSheet: true,
-        },
-      },
-      attachTo: document.body,
-    })
-    mountedWrappers.push(wrapper)
-    return wrapper
-  }
-
-  function byTestId(id: string): DOMWrapper<Element> {
-    return new DOMWrapper(document.body.querySelector(`[data-testid="${id}"]`) as Element | null)
-  }
-
-  afterEach(() => {
-    mountedWrappers.forEach((wrapper) => wrapper.unmount())
-    mountedWrappers = []
-  })
 
   it('item 7: has no "Rutinas" heading, and the new-routine button sits alone at the left edge of its row, opening the editor in create mode', async () => {
     const wrapper = build()
@@ -442,20 +410,21 @@ describe('RoutineList', () => {
     }
 
     // item 2 (v0.4.0 — ROOT CAUSE del bug de visibilidad "ni tampoco
-    // ejercicios"): una plantilla pública puede referenciar un ejercicio que
-    // su dueño nunca marcó is_public por separado — la rutina SÍ es visible
-    // (list_templates solo mira Routine.is_public), pero ese ejercicio no
-    // está en el catálogo visible de quien mira (no es suyo, no es global, no
-    // es público). Antes exerciseName() devolvía '' para un ExerciseOut
+    // ejercicios"): una rutina global puede referenciar un ejercicio que su
+    // dueño nunca marcó is_public por separado (el campo del EJERCICIO, no
+    // el is_global de la rutina) — la rutina SÍ es visible (list_templates
+    // solo mira Routine.is_global), pero ese ejercicio no está en el
+    // catálogo visible de quien mira (no es suyo, no es global, no es
+    // público). Antes exerciseName() devolvía '' para un ExerciseOut
     // undefined y la fila salía completamente en blanco, indistinguible de
     // un fallo real. Ahora se explicita con un placeholder — sin filtrar el
     // nombre real, que sería la fuga de privacidad que el backend evita.
-    it('item 2: an exercise not visible to the viewer (owner made the routine public but not that exercise) shows a "private exercise" placeholder instead of a blank name', async () => {
+    it('item 2: an exercise not visible to the viewer (owner made the routine global but not that exercise) shows a "private exercise" placeholder instead of a blank name', async () => {
       const { listRoutineTemplates } = await import('@/api/domain')
       vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
         {
           id: 10, owner_id: 9, name: 'Empuje de Freyja', description: null, rune: null, color: null,
-          is_public: true, owner_username: 'freyja',
+          is_global: true, owner_username: 'freyja',
           exercises: [
             // exercise_id 999: NO está en el mock de listExercises (solo 1,2,3) —
             // simula el ejercicio privado de freyja que nunca hizo público
@@ -479,11 +448,11 @@ describe('RoutineList', () => {
       vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
         {
           id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
-          is_public: false, owner_username: null, exercises: [],
+          is_global: false, owner_username: null, exercises: [],
         },
         {
           id: 11, owner_id: 9, name: 'Rutina de Freyja', description: null, rune: null, color: null,
-          is_public: true, owner_username: 'freyja', exercises: [],
+          is_global: true, owner_username: 'freyja', exercises: [],
         },
       ] as never)
 
@@ -506,16 +475,16 @@ describe('RoutineList', () => {
       expect(wrapper.find('[data-testid="template-attribution-2"]').exists()).toBe(false)
     })
 
-    it('UNIFIED-LISTINGS: global and others\' public templates expose only the copy action (no edit, delete, visibility toggle or globalize control)', async () => {
+    it('UNIFIED-LISTINGS: global and others\' templates expose only the duplicate action (no edit or delete)', async () => {
       const { listRoutineTemplates } = await import('@/api/domain')
       vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
         {
           id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
-          is_public: false, owner_username: null, exercises: [],
+          is_global: false, owner_username: null, exercises: [],
         },
         {
           id: 11, owner_id: 9, name: 'Rutina de Freyja', description: null, rune: null, color: null,
-          is_public: true, owner_username: 'freyja', exercises: [],
+          is_global: true, owner_username: 'freyja', exercises: [],
         },
       ] as never)
 
@@ -524,10 +493,33 @@ describe('RoutineList', () => {
       for (const id of [10, 11]) {
         expect(wrapper.find(`[data-testid="edit-routine-${id}"]`).exists()).toBe(false)
         expect(wrapper.find(`[data-testid="delete-routine-${id}"]`).exists()).toBe(false)
-        expect(wrapper.find(`[data-testid="toggle-public-routine-${id}"]`).exists()).toBe(false)
-        expect(wrapper.find(`[data-testid="globalize-routine-${id}"]`).exists()).toBe(false)
-        expect(wrapper.find(`[data-testid="copy-template-${id}"]`).exists()).toBe(true)
+        expect(wrapper.find(`[data-testid="duplicate-routine-${id}"]`).exists()).toBe(true)
       }
+    })
+
+    // ROUTINES-OPEN: "Duplicar" ya no es exclusivo de lo ajeno — una rutina
+    // PROPIA también expone la acción, junto a editar/borrar
+    it('ROUTINES-OPEN: own routines ALSO expose the duplicate action alongside edit/delete', async () => {
+      const wrapper = await buildReady()
+
+      expect(wrapper.find('[data-testid="edit-routine-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="delete-routine-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="duplicate-routine-1"]').exists()).toBe(true)
+    })
+
+    it('ROUTINES-OPEN: clicking duplicate on an OWN routine calls copyRoutine and reloads', async () => {
+      const { copyRoutine, listRoutines } = await import('@/api/domain')
+      vi.mocked(copyRoutine).mockClear()
+      vi.mocked(listRoutines).mockClear()
+
+      const wrapper = await buildReady()
+      const callsBefore = vi.mocked(listRoutines).mock.calls.length
+
+      await wrapper.get('[data-testid="duplicate-routine-1"]').trigger('click')
+      await flushPromises()
+
+      expect(copyRoutine).toHaveBeenCalledWith(1)
+      expect(vi.mocked(listRoutines).mock.calls.length).toBeGreaterThan(callsBefore)
     })
 
     it('UNIFIED-LISTINGS: sorts the merged list mine first, then global templates, then others\' public templates', async () => {
@@ -535,11 +527,11 @@ describe('RoutineList', () => {
       vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
         {
           id: 11, owner_id: 9, name: 'Rutina de Freyja', description: null, rune: null, color: null,
-          is_public: true, owner_username: 'freyja', exercises: [],
+          is_global: true, owner_username: 'freyja', exercises: [],
         },
         {
           id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
-          is_public: false, owner_username: null, exercises: [],
+          is_global: false, owner_username: null, exercises: [],
         },
       ] as never)
 
@@ -550,12 +542,12 @@ describe('RoutineList', () => {
       expect(names).toEqual(['Push Day', 'Pull Day', 'Plantilla admin', 'Rutina de Freyja'])
     })
 
-    it('clicking the copy button copies the template and reloads the lists', async () => {
+    it('clicking the duplicate button duplicates the routine and reloads the lists', async () => {
       const { listRoutineTemplates, copyRoutine, listRoutines } = await import('@/api/domain')
       vi.mocked(listRoutineTemplates).mockResolvedValue([
         {
           id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
-          is_public: false, owner_username: null, exercises: [],
+          is_global: false, owner_username: null, exercises: [],
         },
       ] as never)
       vi.mocked(copyRoutine).mockClear()
@@ -564,28 +556,28 @@ describe('RoutineList', () => {
       const wrapper = await buildReady()
       const callsBeforeCopy = vi.mocked(listRoutines).mock.calls.length
 
-      await wrapper.get('[data-testid="copy-template-10"]').trigger('click')
+      await wrapper.get('[data-testid="duplicate-routine-10"]').trigger('click')
       await flushPromises()
 
       expect(copyRoutine).toHaveBeenCalledWith(10)
-      // recarga tras copiar: mis rutinas se vuelven a pedir para reflejar la copia
+      // recarga tras duplicar: mis rutinas se vuelven a pedir para reflejar la copia
       expect(vi.mocked(listRoutines).mock.calls.length).toBeGreaterThan(callsBeforeCopy)
     })
 
-    it('the copy action renders an icon-only BkActionBtn with icon="copy"', async () => {
+    it('the duplicate action renders an icon-only BkActionBtn with icon="copy", labelled "Duplicar"', async () => {
       const { listRoutineTemplates } = await import('@/api/domain')
       vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
         {
           id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
-          is_public: false, owner_username: null, exercises: [],
+          is_global: false, owner_username: null, exercises: [],
         },
       ] as never)
 
       const wrapper = await buildReady()
 
-      const copyBtn = wrapper.get('[data-testid="copy-template-10"]')
-      expect(copyBtn.attributes('aria-label')).toBe('Copiar')
-      expect(copyBtn.find('svg').findAll('rect')).toHaveLength(2)
+      const duplicateBtn = wrapper.get('[data-testid="duplicate-routine-10"]')
+      expect(duplicateBtn.attributes('aria-label')).toBe('Duplicar')
+      expect(duplicateBtn.find('svg').findAll('rect')).toHaveLength(2)
     })
 
     it('a template card expands to reveal its exercises, same as an own routine card', async () => {
@@ -593,7 +585,7 @@ describe('RoutineList', () => {
       vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
         {
           id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
-          is_public: false, owner_username: null,
+          is_global: false, owner_username: null,
           exercises: [
             { id: 1, exercise_id: 1, position: 0, target_sets: 4, target_reps: 8, target_weight_kg: 80, rest_seconds: 120 },
           ],
@@ -617,7 +609,7 @@ describe('RoutineList', () => {
       vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
         {
           id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
-          is_public: false, owner_username: null, exercises: [],
+          is_global: false, owner_username: null, exercises: [],
         },
       ] as never)
 
@@ -638,7 +630,43 @@ describe('RoutineList', () => {
     })
   })
 
-  describe('item 1 (v0.4.0, relabel of W2 feature 2): "Compartir como plantilla" toggle on own routine card', () => {
+  // ROUTINES-OPEN (course correction, v0.4.2): el toggle "Compartir como
+  // plantilla" de la tarjeta y el control admin-only "Convertir en global"
+  // (con su confirm sheet) MUEREN los dos — el check "Global" vive ahora en
+  // RoutineEditorSheet (ver routineEditor.spec.ts), disponible a CUALQUIER
+  // usuario sobre su propia rutina, sin ceder la propiedad. Este test barre
+  // que ninguno de los dos afordances viejos sobrevive en la card, ni para
+  // un usuario normal ni para un admin.
+  describe('ROUTINES-OPEN: no card-level visibility controls survive the pivot', () => {
+    it('no toggle-public or globalize control renders anywhere, for a regular user', async () => {
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="toggle-public-routine-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="globalize-routine-1"]').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('Compartir como plantilla')
+      expect(wrapper.text()).not.toContain('Convertir en global')
+    })
+
+    it('no toggle-public or globalize control renders anywhere, for an admin either', async () => {
+      const auth = useAuthStore()
+      auth.user = { id: 1, username: 'admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' }
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="toggle-public-routine-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="globalize-routine-1"]').exists()).toBe(false)
+    })
+  })
+
+  // brief: "Ownership chip on its own row, smaller" — text-2xs scale, y la
+  // atribución de otro usuario vía BkUser en size="xs" (más pequeño que el
+  // "sm" que usaba UNIFIED-LISTINGS antes de esta pivot)
+  describe('ROUTINES-OPEN: compact attribution row', () => {
     async function buildReady() {
       const wrapper = build()
       await wrapper.vm.$nextTick()
@@ -647,87 +675,34 @@ describe('RoutineList', () => {
       return wrapper
     }
 
-    it('reflects the routine\'s is_public via aria-pressed, off by default (fixture is_public: false)', async () => {
-      const wrapper = await buildReady()
-
-      const toggle = wrapper.get('[data-testid="toggle-public-routine-1"]')
-      expect(toggle.attributes('aria-pressed')).toBe('false')
-      // item 1: relabel de "Visible para todos" — se lee como la acción real
-      expect(toggle.attributes('aria-label')).toBe('Compartir como plantilla')
-      expect(toggle.text()).toBe('Compartir como plantilla')
-    })
-
-    it('clicking it PATCHes is_public to true and reloads', async () => {
-      const { updateRoutine, listRoutines } = await import('@/api/domain')
-      vi.mocked(updateRoutine).mockClear()
-      vi.mocked(listRoutines).mockClear()
+    it('renders the "Global" chip at text-2xs scale for a legacy owner_id NULL routine', async () => {
+      const { listRoutineTemplates } = await import('@/api/domain')
+      vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
+        {
+          id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
+          is_global: false, owner_username: null, exercises: [],
+        },
+      ] as never)
 
       const wrapper = await buildReady()
-      const callsBefore = vi.mocked(listRoutines).mock.calls.length
 
-      await wrapper.get('[data-testid="toggle-public-routine-1"]').trigger('click')
-      await flushPromises()
-
-      expect(updateRoutine).toHaveBeenCalledWith(1, { is_public: true })
-      expect(vi.mocked(listRoutines).mock.calls.length).toBeGreaterThan(callsBefore)
-    })
-  })
-
-  describe('W2 feature 2: admin-only "globalize" control', () => {
-    async function buildReadyAsAdmin() {
-      const auth = useAuthStore()
-      auth.user = { id: 1, username: 'admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' }
-      const wrapper = buildAttached()
-      await wrapper.vm.$nextTick()
-      await new Promise(resolve => setTimeout(resolve, 50))
-      await wrapper.vm.$nextTick()
-      return wrapper
-    }
-
-    it('is hidden for a non-admin user', async () => {
-      const wrapper = build()
-      await wrapper.vm.$nextTick()
-      await new Promise(resolve => setTimeout(resolve, 50))
-      await wrapper.vm.$nextTick()
-
-      expect(wrapper.find('[data-testid="globalize-routine-1"]').exists()).toBe(false)
+      const attribution = wrapper.get('[data-testid="template-attribution-10"]')
+      expect(attribution.find('span').classes()).toContain('text-2xs')
     })
 
-    it('opens a confirm sheet for an admin, and confirming calls globalizeRoutine then reloads', async () => {
-      const { globalizeRoutine, listRoutines } = await import('@/api/domain')
-      vi.mocked(globalizeRoutine).mockClear()
-      vi.mocked(listRoutines).mockClear()
+    it('renders a global routine\'s owner via BkUser at size="xs"', async () => {
+      const { listRoutineTemplates } = await import('@/api/domain')
+      vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
+        {
+          id: 11, owner_id: 9, name: 'Rutina de Freyja', description: null, rune: null, color: null,
+          is_global: true, owner_username: 'freyja', exercises: [],
+        },
+      ] as never)
 
-      const wrapper = await buildReadyAsAdmin()
-      const callsBefore = vi.mocked(listRoutines).mock.calls.length
+      const wrapper = await buildReady()
 
-      const control = wrapper.get('[data-testid="globalize-routine-1"]')
-      expect(control.attributes('aria-label')).toBe('Convertir en global')
-      await control.trigger('click')
-      await wrapper.vm.$nextTick()
-
-      expect(byTestId('globalize-confirm-sheet').exists()).toBe(true)
-
-      await byTestId('globalize-confirm-btn').trigger('click')
-      await flushPromises()
-
-      expect(globalizeRoutine).toHaveBeenCalledWith(1)
-      expect(vi.mocked(listRoutines).mock.calls.length).toBeGreaterThan(callsBefore)
-    })
-
-    it('cancelling the confirm sheet does not call globalizeRoutine', async () => {
-      const { globalizeRoutine } = await import('@/api/domain')
-      vi.mocked(globalizeRoutine).mockClear()
-
-      const wrapper = await buildReadyAsAdmin()
-
-      await wrapper.get('[data-testid="globalize-routine-1"]').trigger('click')
-      await wrapper.vm.$nextTick()
-      await byTestId('globalize-cancel-btn').trigger('click')
-      await wrapper.vm.$nextTick()
-
-      expect(byTestId('globalize-confirm-sheet').exists()).toBe(false)
-      expect(globalizeRoutine).not.toHaveBeenCalled()
+      const bkUser = wrapper.get('[data-testid="template-attribution-11"]').findComponent({ name: 'BkUser' })
+      expect(bkUser.props('size')).toBe('xs')
     })
   })
 })

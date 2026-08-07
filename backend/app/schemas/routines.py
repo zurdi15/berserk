@@ -6,6 +6,9 @@ class RoutineIn(BaseModel):
     description: str | None = Field(None, max_length=300)
     rune: str | None = Field(None, max_length=20)
     color: str | None = Field(None, max_length=30)
+    # ROUTINES-OPEN: el check "Global" del editor se puede marcar ya al
+    # crear, no solo al editar (a diferencia del viejo flujo globalize)
+    is_global: bool = False
 
 
 class RoutinePatchIn(BaseModel):
@@ -13,10 +16,11 @@ class RoutinePatchIn(BaseModel):
     description: str | None = Field(None, max_length=300)
     rune: str | None = Field(None, max_length=20)
     color: str | None = Field(None, max_length=30)
-    # W2 feature 2: toggle "Visible para todos" en la tarjeta de RoutineList
-    # (el editor está fuera de mi carril) — None = no lo toques, igual que
+    # ROUTINES-OPEN: check "Global" del editor de rutinas, disponible para
+    # CUALQUIER usuario sobre su propia rutina (renombrado desde is_public,
+    # mismo comportamiento) — None = no lo toques, igual que
     # ExercisePatchIn.is_public
-    is_public: bool | None = None
+    is_global: bool | None = None
 
 
 class RoutineExerciseIn(BaseModel):
@@ -46,11 +50,11 @@ class RoutineOut(BaseModel):
     description: str | None
     rune: str | None
     color: str | None
-    # W2 feature 2: is_public alimenta el toggle de la propia tarjeta;
-    # owner_username la atribución de la sección Plantillas (None para una
-    # plantilla GLOBAL, owner_id NULL — esas se atribuyen como "global" en
+    # ROUTINES-OPEN: is_global alimenta el check "Global" del editor;
+    # owner_username la atribución en la lista unificada (None para una
+    # plantilla legacy owner_id NULL — esas se atribuyen como "global" en
     # el frontend, no a un usuario)
-    is_public: bool
+    is_global: bool
     owner_username: str | None
     exercises: list[RoutineExerciseOut]
 
