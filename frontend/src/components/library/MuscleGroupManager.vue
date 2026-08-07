@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { MuscleGroupOut } from '@/api/domain'
@@ -23,6 +23,19 @@ const auth = useAuthStore()
 const toast = useToastStore()
 
 const groups = ref<MuscleGroupOut[]>([])
+
+// UNIFIED-LISTINGS: esta lista YA era una sola (mías + globales, sin
+// sección aparte) — lo único que faltaba para "sorted sensibly" (mismo
+// criterio que RoutineList/ExerciseManager) es el orden mías-primero. El
+// backend devuelve .order_by(MuscleGroup.id), mezclando ambas categorías;
+// aquí se reordena en buckets (mías, luego globales), alfabético dentro de
+// cada uno por la etiqueta ya localizada.
+const sortedGroups = computed(() => {
+  const byLabel = (a: MuscleGroupOut, b: MuscleGroupOut) => groupLabel(a).localeCompare(groupLabel(b))
+  const own = groups.value.filter((g) => g.owner_id === auth.user?.id).sort(byLabel)
+  const global = groups.value.filter((g) => g.owner_id === null).sort(byLabel)
+  return [...own, ...global]
+})
 
 function groupLabel(group: MuscleGroupOut): string {
   return auth.user?.locale === 'en' ? group.name_en : group.name_es
@@ -174,9 +187,9 @@ async function confirmDelete() {
   <div class="space-y-4">
     <BkCard :title="$t('library.muscleGroups')">
       <div class="space-y-4">
-        <div v-if="ready && groups.length > 0" class="space-y-2">
+        <div v-if="ready && sortedGroups.length > 0" class="space-y-2">
           <div
-            v-for="group in groups"
+            v-for="group in sortedGroups"
             :key="group.id"
             :data-testid="`muscle-group-row-${group.id}`"
             class="flex items-center justify-between p-2 rounded border border-line text-sm"
@@ -219,7 +232,7 @@ async function confirmDelete() {
           @action="openCreateGroup"
         />
 
-        <div v-if="!ready || groups.length > 0">
+        <div v-if="!ready || sortedGroups.length > 0">
           <BkButton data-testid="open-create-group-btn" @click="openCreateGroup">
             {{ $t('library.newGroup') }}
           </BkButton>

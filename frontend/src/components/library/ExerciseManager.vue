@@ -16,6 +16,7 @@ import BkRune from '@/lib/BkRune.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
+import BkUser from '@/lib/BkUser.vue'
 import { groupRune, primaryMuscleGroup } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 
@@ -26,20 +27,40 @@ const toast = useToastStore()
 const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
 
-// W2 feature 1: antes "propio" era simplemente owner_id !== null porque el
-// backend solo devolvía lo mío + el catálogo — ahora también puede haber
-// ejercicios PÚBLICOS de otros usuarios en el listado, así que "propio"
-// exige comparar contra mi id de verdad
-const ownExercises = computed(() => exercises.value.filter((e) => e.owner_id === auth.user?.id))
-// item 4: catálogo predefinido (owner_id null) EN su propia sección,
-// colapsada por defecto — de solo lectura para un usuario normal; item 5
-// añade edición/borrado ahí mismo para un admin. W2 feature 1: la misma
-// sección también acoge los ejercicios PÚBLICOS de otros usuarios (con
-// hint de atribución), de solo lectura para todo el mundo salvo su dueño
-const catalogExercises = computed(() =>
-  exercises.value.filter((e) => e.owner_id !== auth.user?.id),
-)
-const catalogOpen = ref(false)
+// UNIFIED-LISTINGS: zurdi no quiere "una sección de ejercicios y otra de
+// catálogo" — UNA lista, con una label de quién la creó cuando no es mía.
+// Orden: míos primero, luego el catálogo predefinido, luego los públicos de
+// otros usuarios — cada bucket llega YA ordenado (listExercises hace
+// .order_by(Exercise.name_en) en el backend), así que basta con filtrar en
+// buckets sin reordenar de nuevo.
+//
+// Búsqueda: se DESCARTA adoptar BkSearchList aquí (59 filas de catálogo +
+// públicas de otros es la lista más larga del carril). BkSearchList es un
+// combobox de selección única (role="combobox"/listbox/option, un único
+// item "activo", Enter confirma UNA fila) pensado para pickers — esta lista
+// necesita 0-2 botones de acción POR FILA (editar/borrar), lo que exige
+// botones interactivos dentro de un role="option" ya clicable: mismo
+// anti-patrón de accesibilidad que RoutineList evita desde side-quest 1
+// manteniendo las acciones como HERMANAS del botón de expansión, no anidadas
+// dentro. Añadir búsqueda de verdad aquí pide un patrón nuevo ("lista
+// filtrable con acciones por fila") que no existe todavía — fuera de
+// alcance de una reorganización pura.
+type ExerciseKind = 'own' | 'catalog' | 'other'
+interface DisplayExercise extends ExerciseOut {
+  kind: ExerciseKind
+}
+
+const displayExercises = computed<DisplayExercise[]>(() => [
+  ...exercises.value
+    .filter((e) => e.owner_id === auth.user?.id)
+    .map((e): DisplayExercise => ({ ...e, kind: 'own' })),
+  ...exercises.value
+    .filter((e) => e.owner_id === null)
+    .map((e): DisplayExercise => ({ ...e, kind: 'catalog' })),
+  ...exercises.value
+    .filter((e) => e.owner_id !== null && e.owner_id !== auth.user?.id)
+    .map((e): DisplayExercise => ({ ...e, kind: 'other' })),
+])
 
 const measurementValues: Measurement[] = ['strength', 'bodyweight', 'timed', 'cardio']
 const measurementOptions = computed(() =>
@@ -198,16 +219,20 @@ async function confirmDelete() {
 
 <template>
   <div class="space-y-4">
+    <!-- UNIFIED-LISTINGS: una sola lista (míos + catálogo predefinido +
+         públicos de otros), en vez de una sección propia y un catálogo
+         colapsable aparte — mismo patrón que MuscleGroupManager, que ya
+         vivía así. -->
     <BkCard :title="$t('library.exercises')">
       <div class="space-y-4">
-        <div v-if="ready && ownExercises.length > 0" class="space-y-2">
+        <div v-if="ready && displayExercises.length > 0" class="space-y-2">
           <div
-            v-for="exercise in ownExercises"
+            v-for="exercise in displayExercises"
             :key="exercise.id"
-            :data-testid="`exercise-row-${exercise.id}`"
+            :data-testid="exercise.kind === 'own' ? `exercise-row-${exercise.id}` : `catalog-exercise-row-${exercise.id}`"
             class="flex items-center justify-between gap-2 p-2 rounded border border-line text-sm"
           >
-            <span class="flex items-center gap-2 min-w-0">
+            <span class="flex items-center gap-2 min-w-0 flex-wrap">
               <span class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
               <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
               <span
@@ -222,9 +247,39 @@ async function confirmDelete() {
                 />
                 <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
               </span>
+              <!-- UNIFIED-LISTINGS: label de creador SOLO cuando no es mío —
+                   chip "Catálogo predefinido" para el catálogo admin, BkUser
+                   (punto de color + nombre) para lo público de otro usuario.
+                   Sin owner_color en ExerciseOut (fuera de este carril),
+                   BkUser cae a su fallback aurora. -->
+              <span
+                v-if="exercise.kind !== 'own'"
+                class="shrink-0"
+                :data-testid="`exercise-attribution-${exercise.id}`"
+              >
+                <span
+                  v-if="exercise.kind === 'catalog'"
+                  class="inline-flex items-center rounded-full border border-line px-2 py-0.5 text-xs text-ink-muted"
+                >
+                  {{ $t('library.catalog') }}
+                </span>
+                <BkUser
+                  v-else-if="exercise.owner_username"
+                  :user="{ username: exercise.owner_username, color: null }"
+                  size="sm"
+                />
+              </span>
             </span>
-            <!-- item 1: icon-only, como en RoutineList/AdminCard -->
-            <div class="flex items-center gap-2 shrink-0">
+            <!-- item 1: icon-only, como en RoutineList/AdminCard. item 5: un
+                 admin puede editar/borrar filas predefinidas (owner_id
+                 null), mismo sheet/flow que los ejercicios propios. W2
+                 feature 1: lo público de OTRO usuario NUNCA es editable por
+                 mí (ni siquiera admin — _can_edit es owner-o-admin-de-
+                 global, no admin-de-lo-ajeno), así que sin acciones ahí -->
+            <div
+              v-if="exercise.kind === 'own' || (exercise.kind === 'catalog' && auth.user?.is_admin)"
+              class="flex items-center gap-2 shrink-0"
+            >
               <BkActionBtn
                 icon="edit"
                 :data-testid="`edit-exercise-${exercise.id}`"
@@ -242,7 +297,9 @@ async function confirmDelete() {
         </div>
 
         <!-- item 10: en vacío el botón de crear se muda dentro del BkEmpty;
-             fuera de ahí (aún no listo, o con filas) se queda donde estaba -->
+             fuera de ahí (aún no listo, o con filas) se queda donde estaba.
+             UNIFIED-LISTINGS: una sola vez, cuando NADA de la lista
+             unificada (mías + catálogo + públicas de otros) hay que mostrar -->
         <BkEmpty
           v-else-if="ready"
           :message="$t('library.noExercises')"
@@ -251,96 +308,9 @@ async function confirmDelete() {
           @action="openCreate"
         />
 
-        <BkButton v-if="!ready || ownExercises.length > 0" data-testid="new-exercise-btn" @click="openCreate">
+        <BkButton v-if="!ready || displayExercises.length > 0" data-testid="new-exercise-btn" @click="openCreate">
           {{ $t('library.newExercise') }}
         </BkButton>
-      </div>
-    </BkCard>
-
-    <!-- item 4: catálogo predefinido, colapsado por defecto — mismo patrón
-         de expandir/colapsar que las rutinas de RoutineList -->
-    <BkCard>
-      <div class="space-y-4">
-        <button
-          type="button"
-          class="bk-press flex w-full items-center justify-between text-left"
-          :aria-expanded="catalogOpen ? 'true' : 'false'"
-          data-testid="toggle-catalog"
-          @click="catalogOpen = !catalogOpen"
-        >
-          <h2 class="font-display font-semibold text-ink uppercase tracking-wider text-sm">
-            {{ $t('library.catalog') }}
-          </h2>
-          <svg
-            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round"
-            class="w-4 h-4 shrink-0 text-ink-muted transition-transform"
-            :class="{ 'rotate-180': catalogOpen }"
-            aria-hidden="true"
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
-
-        <div v-if="catalogOpen" :data-testid="'catalog-list'" class="space-y-2">
-          <div v-if="ready && catalogExercises.length > 0" class="space-y-2">
-            <div
-              v-for="exercise in catalogExercises"
-              :key="exercise.id"
-              :data-testid="`catalog-exercise-row-${exercise.id}`"
-              class="flex items-center justify-between gap-2 p-2 rounded border border-line text-sm"
-            >
-              <span class="flex items-center gap-2 min-w-0">
-                <span class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
-                <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
-                <span
-                  v-if="primaryGroup(exercise)"
-                  class="inline-flex items-center gap-1 text-ink-faint shrink-0"
-                  :data-testid="`exercise-group-tag-${exercise.id}`"
-                >
-                  <BkRune
-                    v-if="primaryGroupRune(exercise)"
-                    :name="primaryGroupRune(exercise)!"
-                    :size="14"
-                  />
-                  <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
-                </span>
-                <!-- W2 feature 1: hint de atribución para lo público de OTROS
-                     usuarios — el catálogo admin (owner_username null) no lo lleva -->
-                <span
-                  v-if="exercise.owner_username"
-                  class="text-xs text-ink-faint shrink-0"
-                  :data-testid="`exercise-shared-by-${exercise.id}`"
-                >
-                  {{ $t('common.sharedBy', { username: exercise.owner_username }) }}
-                </span>
-              </span>
-              <!-- item 5: un admin puede editar/borrar filas predefinidas
-                   (owner_id null) — reutiliza el mismo sheet/flow que los
-                   ejercicios propios, el backend ya lo permite ahí. W2
-                   feature 1: lo público de OTRO usuario NUNCA es editable
-                   por mí (ni siquiera admin — _can_edit es owner-o-admin-
-                   de-global, no admin-de-lo-ajeno), así que estos controles
-                   solo aparecen para filas del catálogo, no para públicas -->
-              <div v-if="exercise.owner_id === null && auth.user?.is_admin" class="flex items-center gap-2 shrink-0">
-                <BkActionBtn
-                  icon="edit"
-                  :data-testid="`edit-exercise-${exercise.id}`"
-                  :aria-label="$t('common.edit')"
-                  @click="openEdit(exercise)"
-                />
-                <BkActionBtn
-                  icon="delete"
-                  :data-testid="`delete-exercise-${exercise.id}`"
-                  :aria-label="$t('common.delete')"
-                  @click="askDelete(exercise.id)"
-                />
-              </div>
-            </div>
-          </div>
-
-          <BkEmpty v-else-if="ready" :message="$t('library.noCatalog')" />
-        </div>
       </div>
     </BkCard>
 
