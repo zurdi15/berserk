@@ -75,6 +75,28 @@ describe('BkActionBtn', () => {
     expect(svg.find('path').exists()).toBe(false)
   })
 
+  it('v0.4.0: renders an eye icon (ellipse + circle, no path, no rect) for icon="view"', () => {
+    const wrapper = mount(BkActionBtn, {
+      props: { icon: 'view' },
+      attrs: { 'aria-label': 'Ver' },
+    })
+
+    const svg = wrapper.find('svg')
+    expect(svg.find('ellipse').exists()).toBe(true)
+    expect(svg.find('circle').exists()).toBe(true)
+    expect(svg.find('path').exists()).toBe(false)
+    expect(svg.find('rect').exists()).toBe(false)
+  })
+
+  it('v0.4.0: icon="view" gets the ink-muted styling, not danger', () => {
+    const wrapper = mount(BkActionBtn, {
+      props: { icon: 'view' },
+      attrs: { 'aria-label': 'Ver' },
+    })
+    expect(wrapper.find('button').classes()).toContain('text-ink-muted')
+    expect(wrapper.find('button').classes()).not.toContain('text-danger')
+  })
+
   it('v0.3.2: icon="copy" gets the ink-muted styling, not danger', () => {
     const wrapper = mount(BkActionBtn, {
       props: { icon: 'copy' },

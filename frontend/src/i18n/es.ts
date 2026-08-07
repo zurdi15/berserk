@@ -174,14 +174,23 @@ export const es = {
     noExercisesInRoutine: 'Sin ejercicios en esta rutina aún',
     nameRequired: 'El nombre de la rutina es obligatorio',
     confirm: 'Confirmar',
-    // W2 feature 2: sección Plantillas (globales + públicas de otros)
+    // W2 feature 2: sección Plantillas (globales + públicas de otros).
+    // item 1 (v0.4.0): subtítulo que explica qué es esta sección — la
+    // confusión real de zurdi fue "¿qué es rutina y qué es plantilla?"
     templates: 'Plantillas',
+    templatesHint: 'Rutinas globales y las que otros usuarios han hecho públicas — cópialas a tu lista.',
     noTemplates: 'Sin plantillas disponibles',
     globalTemplate: 'Global',
-    // toggle en la propia tarjeta (el editor está fuera de este carril)
-    isPublic: 'Visible para todos',
+    // toggle en la propia tarjeta (el editor está fuera de este carril).
+    // item 1 (v0.4.0): antes "Visible para todos" no dejaba claro QUÉ pasaba
+    // al activarlo — se relee como la acción real: convertirla en plantilla
+    isPublic: 'Compartir como plantilla',
     copy: 'Copiar',
-    copied: 'Rutina copiada',
+    copied: 'Rutina copiada a tu lista',
+    // item 2 (v0.4.0): fallback cuando el ejercicio de una plantilla no es
+    // visible para quien la mira (el dueño hizo pública la RUTINA pero no
+    // ESE ejercicio) — antes el nombre quedaba en blanco, sin explicación
+    privateExercise: 'Ejercicio privado',
     // segundo control, solo admin, sobre una rutina PROPIA — la convierte
     // en plantilla global (owner_id -> NULL, deja el listado personal)
     globalize: 'Convertir en global',

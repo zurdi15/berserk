@@ -60,6 +60,21 @@ function resolveExercise(exerciseId: number): ExerciseOut | undefined {
   return exerciseCatalog.value.find((exercise) => exercise.id === exerciseId)
 }
 
+// item 2 (v0.4.0 — root cause del bug de visibilidad): una plantilla PÚBLICA
+// puede referenciar un ejercicio que su dueño NUNCA marcó is_public — la
+// rutina en sí es visible (list_templates solo mira Routine.is_public), pero
+// ese ejercicio en concreto no aparece en MI catálogo visible (listExercises
+// solo trae lo mío + lo global + lo público). Antes exerciseName() devolvía
+// '' en silencio para un ExerciseOut undefined y la fila salía completamente
+// en blanco — indistinguible de un fallo real ("no veo los ejercicios").
+// Ahora se explicita con un placeholder: sigue sin filtrar el nombre real
+// (eso sería la fuga de privacidad que _visible_template evita a propósito),
+// pero deja claro POR QUÉ esa fila no tiene nombre.
+function resolvedExerciseName(exerciseId: number, loc: string): string {
+  const exercise = resolveExercise(exerciseId)
+  return exercise ? exerciseName(exercise, loc) : t('routines.privateExercise')
+}
+
 function toggleExpanded(id: number) {
   const next = new Set(expandedIds.value)
   if (next.has(id)) next.delete(id)
@@ -106,9 +121,11 @@ async function confirmDelete(id: number) {
   }
 }
 
-// W2 feature 2: toggle "Visible para todos" en la propia tarjeta — el
-// editor de rutinas está fuera de este carril, así que vive aquí en vez de
-// en RoutineEditorSheet
+// W2 feature 2: toggle "Compartir como plantilla" (item 1, v0.4.0: relabel
+// de "Visible para todos" — el mismo campo is_public, pero leído como la
+// acción real que produce: la rutina pasa a la sección Plantillas de todo el
+// mundo) en la propia tarjeta — el editor de rutinas está fuera de este
+// carril, así que vive aquí en vez de en RoutineEditorSheet
 async function togglePublic(routine: RoutineOut) {
   try {
     await updateRoutine(routine.id, { is_public: !routine.is_public })
@@ -211,11 +228,13 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- W2 feature 2: toggle "Visible para todos" (PATCH-able desde la
-             propia tarjeta — el editor de rutinas está fuera de este
-             carril) + segundo control admin-only para "globalizar". Mismo
-             estilo de chip que GroupRunePicker (border-aurora/bg-aurora/10
-             cuando está activo), sin clases de color interpoladas. -->
+        <!-- W2 feature 2: toggle "Compartir como plantilla" (item 1: relabel
+             de "Visible para todos" — mismo is_public, copy que dice qué
+             pasa de verdad) PATCH-able desde la propia tarjeta — el editor
+             de rutinas está fuera de este carril — + segundo control
+             admin-only para "globalizar". Mismo estilo de chip que
+             GroupRunePicker (border-aurora/bg-aurora/10 cuando está activo),
+             sin clases de color interpoladas. -->
         <div class="flex items-center gap-2 flex-wrap">
           <button
             type="button"
@@ -311,8 +330,21 @@ onMounted(() => {
     <!-- W2 feature 2: sección "Plantillas" — globales (admin) + públicas de
          otros usuarios, de solo lectura salvo la acción de copiar. Debajo
          del listado propio, siempre visible (no colapsable, a diferencia
-         del catálogo de ExerciseManager: pocas plantillas esperadas). -->
-    <BkCard v-if="ready" :title="$t('routines.templates')" data-testid="templates-section">
+         del catálogo de ExerciseManager: pocas plantillas esperadas).
+         item 1 (v0.4.0): sin :title de BkCard — el título necesita un
+         subtítulo justo debajo explicando qué es esta sección (la confusión
+         real de zurdi: "¿qué es rutina y qué es plantilla?"), y BkCard no
+         tiene slot para eso, así que el header se compone aquí a mano con
+         las mismas clases que el suyo. -->
+    <BkCard v-if="ready" data-testid="templates-section">
+      <div class="mb-3 space-y-1">
+        <h2 class="font-display font-semibold text-ink uppercase tracking-wider text-sm">
+          {{ $t('routines.templates') }}
+        </h2>
+        <p class="text-xs text-ink-muted" data-testid="templates-hint">
+          {{ $t('routines.templatesHint') }}
+        </p>
+      </div>
       <div v-if="templates.length > 0" class="grid gap-3">
         <div
           v-for="template in templates"
@@ -363,7 +395,7 @@ onMounted(() => {
               :style="{ '--bk-stagger-i': i }"
               class="flex items-center justify-between gap-3 text-sm"
             >
-              <span class="text-ink truncate">{{ exerciseName(resolveExercise(ex.exercise_id), locale) }}</span>
+              <span class="text-ink truncate">{{ resolvedExerciseName(ex.exercise_id, locale) }}</span>
               <span class="text-ink-muted shrink-0 text-right">
                 {{ ex.target_sets }}<template v-if="ex.target_reps != null">×{{ ex.target_reps }}</template>
                 <template v-if="ex.target_weight_kg != null"> · {{ formatWeight(ex.target_weight_kg, units) }}</template>

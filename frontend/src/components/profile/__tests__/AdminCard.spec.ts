@@ -6,6 +6,7 @@ import { createI18nInstance } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { ApiError } from '@/api/client'
+import BkUser from '@/lib/BkUser.vue'
 import AdminCard from '../AdminCard.vue'
 
 vi.mock('@/api/backup', () => ({
@@ -96,45 +97,45 @@ describe('AdminCard', () => {
     expect(text).toContain('user2')
   })
 
-  it('gates the users table on readiness: neither the table nor "sin usuarios" show while adminListUsers is pending, the table appears once resolved', async () => {
-    const { adminListUsers } = await import('@/api/domain')
+  // item 6 (v0.4.0): usersReady/invitesReady se fusionaron en una única
+  // bandera `ready` — antes cada tabla se destapaba por separado (la de
+  // usuarios primero, la de invitaciones ~100ms después), empujando el
+  // layout. Ahora TODO el cuerpo async de la card (ambas tablas) aparece de
+  // una vez, completo, aunque una de las dos APIs resuelva antes que la otra.
+  it('gates the WHOLE admin body on a single readiness flag: neither table (nor their empty states) show while either adminListUsers or adminListInvites is pending; both appear together once BOTH resolve', async () => {
+    const { adminListUsers, adminListInvites } = await import('@/api/domain')
     let resolveUsers: (value: never) => void = () => {}
+    let resolveInvites: (value: never) => void = () => {}
     vi.mocked(adminListUsers).mockImplementationOnce(() => new Promise((resolve) => { resolveUsers = resolve }))
+    vi.mocked(adminListInvites).mockImplementationOnce(() => new Promise((resolve) => { resolveInvites = resolve }))
 
     const wrapper = build()
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Sin usuarios aún')
+    expect(wrapper.find('[data-testid^="invite-row-"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Sin invitaciones aún')
 
+    // usuarios resuelve primero: la tabla SIGUE sin aparecer (invites aún pendiente)
     resolveUsers([
       { id: 1, username: 'admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' },
     ] as never)
     await new Promise(resolve => setTimeout(resolve, 0))
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('table').exists()).toBe(true)
-    expect(wrapper.text()).toContain('admin')
-  })
-
-  it('gates the invites list on readiness: neither the list nor "sin invitaciones" show while adminListInvites is pending, the list appears once resolved', async () => {
-    const { adminListInvites } = await import('@/api/domain')
-    let resolveInvites: (value: never) => void = () => {}
-    vi.mocked(adminListInvites).mockImplementationOnce(() => new Promise((resolve) => { resolveInvites = resolve }))
-
-    const wrapper = build()
-    await wrapper.vm.$nextTick()
-    await new Promise(resolve => setTimeout(resolve, 0)) // deja resolver loadUsers (no bloqueado)
-
+    expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.find('[data-testid^="invite-row-"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Sin invitaciones aún')
 
+    // invites resuelve después: AHORA ambas aparecen juntas, de golpe
     resolveInvites([
       { id: 1, created_at: '2026-08-06T10:00:00', expires_at: '2026-08-09T10:00:00', used_at: null },
     ] as never)
     await new Promise(resolve => setTimeout(resolve, 0))
     await wrapper.vm.$nextTick()
 
+    expect(wrapper.find('table').exists()).toBe(true)
+    expect(wrapper.text()).toContain('admin')
     expect(wrapper.find('[data-testid="invite-row-1"]').exists()).toBe(true)
   })
 
@@ -159,6 +160,20 @@ describe('AdminCard', () => {
     const nonAdminRow = wrapper.find('[data-testid="user-row-2"]')
     const badgeInNonAdminRow = nonAdminRow.find('[data-testid="admin-badge"]')
     expect(badgeInNonAdminRow.exists()).toBe(false)
+  })
+
+  it('item 5: each user row renders through BkUser (color dot + username), with the admin star composed alongside it, not inside it', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const adminRow = wrapper.get('[data-testid="user-row-1"]')
+    const bkUser = adminRow.getComponent(BkUser)
+    expect(bkUser.props('user')).toMatchObject({ username: 'admin' })
+    expect(bkUser.find('[data-testid="bk-user-dot"]').exists()).toBe(true)
+    // la estrella vive FUERA del propio BkUser (dato de rol de esta tabla, no del usuario)
+    expect(bkUser.find('[data-testid="admin-badge"]').exists()).toBe(false)
+    expect(adminRow.find('[data-testid="admin-badge"]').exists()).toBe(true)
   })
 
   it('item 3a/3b: action buttons are right-aligned and reset-password shows a key SVG icon, not a glyph', async () => {

@@ -112,11 +112,13 @@ describe('RoutineList', () => {
     await new Promise(resolve => setTimeout(resolve, 50))
     await wrapper.vm.$nextTick()
 
-    // W2 feature 2: la sección "Plantillas" SÍ tiene su propio <h2> (BkCard
-    // title) — lo que sigue sin llevar heading es la lista de rutinas
-    // propias en sí, así que se comprueba que ningún h2 diga "Rutinas"
+    // W2 feature 2: la sección "Plantillas" SÍ tiene su propio <h2> (título +
+    // subtítulo compuestos a mano, item 1) — lo que sigue sin llevar heading
+    // es la lista de rutinas propias en sí, así que se comprueba que ningún
+    // h2 diga "Rutinas" a secas (el subtítulo de Plantillas SÍ contiene la
+    // palabra dentro de una frase — "Rutinas globales…" —, eso es contenido
+    // legítimo, no el heading redundante que este test descarta)
     expect(wrapper.findAll('h2').some((h) => h.text() === 'Rutinas')).toBe(false)
-    expect(wrapper.text()).not.toContain('Rutinas')
 
     const button = wrapper.get('[data-testid="new-routine-btn"]')
     // única hija de su fila: nada a la izquierda que la empuje
@@ -446,6 +448,51 @@ describe('RoutineList', () => {
       expect(section.text()).toContain('Sin plantillas disponibles')
     })
 
+    // item 1: la confusión real de zurdi era "¿qué es rutina y qué es
+    // plantilla?" — la sección ahora se explica con un subtítulo
+    it('item 1: the templates section explains itself with a subtitle under the title', async () => {
+      const wrapper = await buildReady()
+
+      const section = wrapper.get('[data-testid="templates-section"]')
+      expect(section.text()).toContain('Plantillas')
+      expect(section.get('[data-testid="templates-hint"]').text()).toBe(
+        'Rutinas globales y las que otros usuarios han hecho públicas — cópialas a tu lista.',
+      )
+    })
+
+    // item 2 (v0.4.0 — ROOT CAUSE del bug de visibilidad "ni tampoco
+    // ejercicios"): una plantilla pública puede referenciar un ejercicio que
+    // su dueño nunca marcó is_public por separado — la rutina SÍ es visible
+    // (list_templates solo mira Routine.is_public), pero ese ejercicio no
+    // está en el catálogo visible de quien mira (no es suyo, no es global, no
+    // es público). Antes exerciseName() devolvía '' para un ExerciseOut
+    // undefined y la fila salía completamente en blanco, indistinguible de
+    // un fallo real. Ahora se explicita con un placeholder — sin filtrar el
+    // nombre real, que sería la fuga de privacidad que el backend evita.
+    it('item 2: an exercise not visible to the viewer (owner made the routine public but not that exercise) shows a "private exercise" placeholder instead of a blank name', async () => {
+      const { listRoutineTemplates } = await import('@/api/domain')
+      vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
+        {
+          id: 10, owner_id: 9, name: 'Empuje de Freyja', description: null, rune: null, color: null,
+          is_public: true, owner_username: 'freyja',
+          exercises: [
+            // exercise_id 999: NO está en el mock de listExercises (solo 1,2,3) —
+            // simula el ejercicio privado de freyja que nunca hizo público
+            { id: 1, exercise_id: 999, position: 0, target_sets: 3, target_reps: null, target_weight_kg: null, rest_seconds: null },
+          ],
+        },
+      ] as never)
+
+      const wrapper = await buildReady()
+
+      await wrapper.get('[data-testid="toggle-template-10"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      const list = wrapper.get('[data-testid="exercise-list-template-10"]')
+      expect(list.text()).toContain('Ejercicio privado')
+      expect(list.text()).not.toBe('') // nunca una fila muda, sin explicación
+    })
+
     it('renders a GLOBAL template (owner_username null) with the "Global" attribution badge, and a public template from another user with a username hint', async () => {
       const { listRoutineTemplates } = await import('@/api/domain')
       vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
@@ -530,7 +577,7 @@ describe('RoutineList', () => {
     })
   })
 
-  describe('W2 feature 2: "Visible para todos" toggle on own routine card', () => {
+  describe('item 1 (v0.4.0, relabel of W2 feature 2): "Compartir como plantilla" toggle on own routine card', () => {
     async function buildReady() {
       const wrapper = build()
       await wrapper.vm.$nextTick()
@@ -544,7 +591,9 @@ describe('RoutineList', () => {
 
       const toggle = wrapper.get('[data-testid="toggle-public-routine-1"]')
       expect(toggle.attributes('aria-pressed')).toBe('false')
-      expect(toggle.attributes('aria-label')).toBe('Visible para todos')
+      // item 1: relabel de "Visible para todos" — se lee como la acción real
+      expect(toggle.attributes('aria-label')).toBe('Compartir como plantilla')
+      expect(toggle.text()).toBe('Compartir como plantilla')
     })
 
     it('clicking it PATCHes is_public to true and reloads', async () => {

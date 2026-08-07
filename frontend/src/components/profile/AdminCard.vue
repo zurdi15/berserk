@@ -24,6 +24,7 @@ import BkField from '@/lib/BkField.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkSheet from '@/lib/BkSheet.vue'
+import BkUser from '@/lib/BkUser.vue'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -60,16 +61,19 @@ const restoreFile = ref<File | null>(null)
 const restoreConfirmOpen = ref(false)
 const isRestoring = ref(false)
 
-// cada tabla se gatea con su propia bandera (no una compartida): users e
-// invites cargan en paralelo lógico pero secuenciados abajo, y la tabla de
-// usuarios no debería esperar a que termine invites para dejar de estar en
-// blanco — mismo patrón que TodayView, true también en error
-const usersReady = ref(false)
-const invitesReady = ref(false)
+// item 6 (v0.4.0): UNA sola bandera para las dos tablas — antes usersReady/
+// invitesReady eran independientes y, como loadUsers()/loadInvites() se
+// esperaban en secuencia, la tabla de usuarios aparecía primero y ~100ms
+// después la de invitaciones la seguía, empujando el layout (salto visible).
+// Mismo patrón "aparece una vez, completo" que TodayView/RoutineList: las dos
+// cargas van en paralelo (Promise.all) y el panel entero se gatea en su
+// resolución conjunta — true también si alguna falla, para no dejar la
+// sección en blanco.
+const ready = ref(false)
 
 onMounted(async () => {
-  await loadUsers()
-  await loadInvites()
+  await Promise.all([loadUsers(), loadInvites()])
+  ready.value = true
 })
 
 async function loadUsers() {
@@ -77,8 +81,6 @@ async function loadUsers() {
     users.value = await adminListUsers()
   } catch (error) {
     toastApiError(error)
-  } finally {
-    usersReady.value = true
   }
 }
 
@@ -87,8 +89,6 @@ async function loadInvites() {
     invites.value = await adminListInvites()
   } catch (error) {
     toastApiError(error)
-  } finally {
-    invitesReady.value = true
   }
 }
 
@@ -277,9 +277,10 @@ function redeemUrl(token: string): string {
         <!-- Users table: botones icon-only en móvil (aria-label), texto de
              vuelta desde sm — objetivo: sin scroll lateral en 390px. El
              overflow-x-auto queda como red de seguridad, no como caso normal.
-             Gateada en usersReady: sin esto, el "sin usuarios" aparece y
-             ~100ms después la tabla real la reemplaza de golpe. -->
-        <div v-if="usersReady && users.length > 0" class="overflow-x-auto">
+             Gateada en ready (item 6: única bandera compartida con invites,
+             ver script): sin esto, el "sin usuarios" aparece y ~100ms
+             después la tabla real la reemplaza de golpe. -->
+        <div v-if="ready && users.length > 0" class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-line">
@@ -291,7 +292,11 @@ function redeemUrl(token: string): string {
               <tr v-for="user in users" :key="user.id" :data-testid="`user-row-${user.id}`" class="hover:bg-stone/30">
                 <td class="py-2 px-2">
                   <span class="inline-flex items-center gap-2">
-                    {{ user.username }}
+                    <!-- item 5: BkUser (punto de color + nombre) en vez del
+                         username a pelo — la estrella de admin se compone AL
+                         LADO, fuera del propio componente (no es "parte del
+                         usuario", es un dato de rol de esta tabla) -->
+                    <BkUser :user="user" />
                     <!-- estrella en vez de columna: la columna "Administrador"
                          ensanchaba la tabla en móvil sin aportar mucho más que
                          esto — la etiqueta accesible reutiliza admin.isAdmin,
@@ -328,7 +333,7 @@ function redeemUrl(token: string): string {
           </table>
         </div>
 
-        <div v-else-if="usersReady" class="text-sm text-ink-muted">
+        <div v-else-if="ready" class="text-sm text-ink-muted">
           {{ $t('admin.noUsers') }}
         </div>
 
@@ -376,8 +381,10 @@ function redeemUrl(token: string): string {
           </div>
         </div>
 
-        <!-- Invites list: gateada en invitesReady, mismo motivo que la tabla de usuarios -->
-        <div v-if="invitesReady && invites.length > 0" class="space-y-2 pt-4 border-t border-line">
+        <!-- Invites list: gateada en el MISMO ready que la tabla de usuarios
+             (item 6) — antes tenía su propia bandera y aparecía en un
+             segundo salto separado -->
+        <div v-if="ready && invites.length > 0" class="space-y-2 pt-4 border-t border-line">
           <h3 class="text-sm font-medium">{{ $t('admin.invites') }}</h3>
           <div class="space-y-2">
             <div
@@ -414,7 +421,7 @@ function redeemUrl(token: string): string {
           </div>
         </div>
 
-        <div v-else-if="invitesReady" class="text-sm text-ink-muted">
+        <div v-else-if="ready" class="text-sm text-ink-muted">
           {{ $t('admin.noInvites') }}
         </div>
       </div>

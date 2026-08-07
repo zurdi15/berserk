@@ -133,6 +133,49 @@ def test_public_routine_is_a_template_for_others_but_not_for_its_owner(client: T
     assert all(r["id"] != rid for r in freyja.get("/api/v1/routines/templates").json())
 
 
+# item 2 (v0.4.0): root-cause repro del bug de visibilidad reportado por
+# zurdi con dos usuarios reales ("otro user no ve las rutinas que yo he
+# marcado como públicas, ni tampoco ejercicios"). Verificado end-to-end
+# (backend live vía HTTP + curl, no solo TestClient) que list_exercises/
+# list_templates/PATCH is_public ya funcionan correctamente para dos usuarios
+# NO-admin recién creados — ver también los tests de arriba y de
+# test_exercises_api.py, que ya cubrían esto. El gap real que SÍ faltaba
+# cubrir: un usuario marca su RUTINA pública sin marcar también cada
+# ejercicio que contiene (nada en la UI lo exige antes de guardar) — la
+# rutina es igualmente visible como plantilla (esto lo fija este test), y el
+# frontend deja de renderizar un nombre en blanco para ese ejercicio (ver
+# RoutineList.spec.ts "item 2" y RoutineList.vue resolvedExerciseName).
+def test_public_routine_can_reference_an_exercise_the_owner_never_made_public(
+    client: TestClient, app
+):
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    chest = next(g["id"] for g in freyja.get("/api/v1/muscle-groups").json() if g["slug"] == "chest")
+    private_exercise = freyja.post(
+        "/api/v1/exercises",
+        json={
+            "name_es": "Privado", "name_en": "Private", "measurement": "strength",
+            "muscle_groups": [{"muscle_group_id": chest, "is_primary": True}],
+        },
+    ).json()["id"]
+    rid = _routine_with_exercise(freyja, "Empuje", private_exercise, is_public=True)
+
+    make_user(client, "loki")
+    loki = login(app, "loki")
+
+    # la RUTINA sigue siendo visible como plantilla, sin condiciones sobre
+    # sus ejercicios — list_templates solo mira Routine.is_public
+    templates = loki.get("/api/v1/routines/templates").json()
+    listed = next(r for r in templates if r["id"] == rid)
+    assert listed["exercises"][0]["exercise_id"] == private_exercise
+
+    # pero el EJERCICIO en sí sigue siendo privado de freyja: no está en el
+    # catálogo visible de loki (ni propio, ni global, ni público) — el
+    # backend no filtra su nombre; es el frontend quien debe explicar la
+    # ausencia en vez de dejar una fila muda (ver RoutineList.vue)
+    assert all(e["id"] != private_exercise for e in loki.get("/api/v1/exercises").json())
+
+
 def test_copy_creates_independent_routine_owned_by_copier(client: TestClient, app):
     make_user(client, "freyja")
     freyja = login(app, "freyja")
