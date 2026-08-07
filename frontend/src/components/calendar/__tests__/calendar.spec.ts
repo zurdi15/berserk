@@ -1718,10 +1718,10 @@ describe('CalendarView layout (round 6, items 3/4)', () => {
     expect(wrapper.classes().some((c) => c === 'p-4' || c.startsWith('px-'))).toBe(false)
   })
 
-  // v0.5.0 (modelo de scroll único): la vista FLUYE contra <main> y la
-  // cabecera de mes queda visible vía sticky (bg sólido + banda -mt/pt que
-  // cubre el pt-4 del wrapper del shell al pegarse, ver CalendarView.vue)
-  it('v0.5.0: the view flows (no bounded region) and the month-nav row is sticky with a solid background', async () => {
+  // v0.8.3 (zurdi: "el selector de mes puede no ir fijo — no todas las
+  // secciones tienen que tener un header fijo"): la fila de mes vuelve a
+  // flujo normal; la vista sigue fluyendo contra <main> sin regiones acotadas
+  it('v0.8.3: the view flows and the month-nav row is a plain flow row (not sticky)', async () => {
     const wrapper = mount(CalendarView, {
       global: { plugins: [createI18nInstance()] },
     })
@@ -1731,7 +1731,8 @@ describe('CalendarView layout (round 6, items 3/4)', () => {
     expect(wrapper.find('.flex-1.min-h-0.overflow-y-auto').exists()).toBe(false)
 
     const monthNavRow = wrapper.get('[data-testid="month-nav"]')
-    expect(monthNavRow.classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'bk-chrome-bg']))
+    expect(monthNavRow.classes()).not.toContain('sticky')
+    expect(monthNavRow.classes()).not.toContain('bk-chrome-bg')
   })
 
   it('polish wave item 13: the rune-legend trigger is NOT in the month-navigation row anymore (only prev/next live there)', async () => {

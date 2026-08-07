@@ -71,6 +71,52 @@ function cancelRest() {
   timer.clear()
 }
 
+// v0.9.0 (zurdi: "molaría que hacer swipe a derecha o izquierda cambie de
+// sección"): gesto horizontal sobre <main> navega al item anterior/siguiente
+// del nav (sin dar la vuelta en los extremos). Guardas para no secuestrar
+// gestos legítimos: (1) el arrastre debe ser claramente horizontal (≥60px y
+// el doble que su componente vertical); (2) se ignora si empieza sobre un
+// scroller horizontal (tiras de tabs con overflow, heatmap) — se detecta
+// subiendo por el DOM hasta <main>; (3) se ignora sobre el chart (uPlot
+// tiene drag propio) e inputs. Listeners passive: nunca bloquean el scroll.
+let swipeStartX = 0
+let swipeStartY = 0
+let swipeEligible = false
+
+function hasHorizontalScroller(start: Element | null): boolean {
+  let el: Element | null = start
+  while (el && el !== mainEl.value) {
+    if (el.scrollWidth > el.clientWidth + 4) {
+      const overflowX = getComputedStyle(el).overflowX
+      if (overflowX === 'auto' || overflowX === 'scroll') return true
+    }
+    el = el.parentElement
+  }
+  return false
+}
+
+function onMainTouchStart(event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch) return
+  swipeStartX = touch.clientX
+  swipeStartY = touch.clientY
+  const target = event.target as Element | null
+  swipeEligible =
+    !target?.closest('.u-wrap, canvas, input, textarea, [data-no-swipe]') &&
+    !hasHorizontalScroller(target)
+}
+
+function onMainTouchEnd(event: TouchEvent) {
+  if (!swipeEligible) return
+  const touch = event.changedTouches[0]
+  if (!touch) return
+  const dx = touch.clientX - swipeStartX
+  const dy = touch.clientY - swipeStartY
+  if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return
+  const target = items[activeIndex.value + (dx < 0 ? 1 : -1)]
+  if (target) router.push({ name: target.name })
+}
+
 // item 3 (v0.3.0, addendum zurdi): jerarquía del glow del CTA —
 // ruta /workout activa (opacity 1, ya existía) > entreno en curso en otra
 // ruta (opacity tenue) > apagado. Mientras se descansa, el countdown de
@@ -399,7 +445,12 @@ watch(activeIndex, () => nextTick(updateIndicator))
          El scroll interno sobrevive SOLO en cajas hoja con su propia altura
          (lista del picker de Entrenos, overlays/sheets) — nunca como cadena
          de referencias de altura entre niveles. -->
-    <main ref="mainEl" class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable w-full">
+    <main
+      ref="mainEl"
+      class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable w-full"
+      @touchstart.passive="onMainTouchStart"
+      @touchend.passive="onMainTouchEnd"
+    >
       <!-- v0.5.0: wrapper de FLUJO puro — columna centrada, altura por
            contenido, sin calc ni flex-col ni spacer (toda la saga de alturas
            0.4.1→0.4.4 está resumida en el comentario de <main>). pb-24 como

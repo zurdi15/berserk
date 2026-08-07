@@ -174,7 +174,7 @@ watch(exerciseId, () => {
          Sin h1 de sección (item 3): Hoy nunca tuvo uno, mismo patrón aquí.
          Sin padding lateral propio (item 4): <main> del shell ya pone px-4,
          duplicarlo aquí desalineaba el gutter frente a Hoy. -->
-    <div class="sticky top-0 z-10 bk-chrome-bg -mt-4 pt-4 pb-1" data-testid="progress-tabs-sticky">
+    <div class="sticky top-0 z-10 bk-chrome-bg -mt-4 -mx-4 px-4 pt-4 pb-1" data-testid="progress-tabs-sticky">
       <BkTabs v-model="tab" :tabs="mainTabs" />
     </div>
 
@@ -190,10 +190,15 @@ watch(exerciseId, () => {
          ExercisePicker) y el bloque del chart entra DESPLEGÁNDOSE
          (bk-unfold: max-height animada) para que la cesión de espacio de
          la lista sea gradual, no un salto de flex. -->
+    <!-- overflow-hidden (v0.8.3, zurdi: "al salir la gráfica puedo seguir
+         scrolleando hasta perder de vista todo"): backstop categórico — si
+         el contenido del panel excede la altura medida (chart más alto de lo
+         previsto, fuente grande, lo que sea), se RECORTA dentro del panel en
+         vez de desbordar hacia <main> y devolverle el scroll a la página. -->
     <div
       v-if="tab === 'training'"
       ref="trainingPanelEl"
-      class="flex flex-col gap-4 bk-stagger"
+      class="flex flex-col gap-4 bk-stagger overflow-hidden"
       :style="{ height: trainingPanelHeight !== null ? `${trainingPanelHeight}px` : undefined }"
       data-testid="training-panel"
     >

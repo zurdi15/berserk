@@ -418,7 +418,7 @@ onBeforeUnmount(() => {
            v0.5.0: wrapper sticky alrededor del slab — ver el comentario del
            script (crono visible mientras se scrollea la lista). -->
       <div
-        class="sticky top-0 z-10 bk-chrome-bg -mt-4 pt-4 pb-1"
+        class="sticky top-0 z-10 bk-chrome-bg -mt-4 -mx-4 px-4 pt-4 pb-1"
         data-testid="workout-header-sticky"
         :style="{ '--bk-stagger-i': 0 }"
       >

@@ -187,7 +187,11 @@ watch(() => athlete.userId, () => {
          rejilla y la actividad del año, como un enlace suelto en vez de un
          icono en esta fila. sticky (v0.5.0): chrome pegado arriba del
          scrollport de <main>, ver comentario del script. -->
-    <div class="sticky top-0 z-10 bk-chrome-bg -mt-4 pt-4 pb-2 flex items-center gap-2" data-testid="month-nav">
+    <!-- v0.8.3 (zurdi): la fila de mes vuelve a FLUJO normal — "no todas las
+         secciones tienen que tener un header fijo"; el sticky de la v0.5.0
+         se retira de aquí (queda en las tiras de tabs de Perfil/Progresión
+         y el crono del entreno) -->
+    <div class="flex items-center gap-2" data-testid="month-nav">
       <BkButton variant="ghost" size="sm" :aria-label="$t('calendar.prevMonth')" @click="prevMonth">
         <span aria-hidden="true">‹</span>
         <span class="hidden sm:inline">{{ $t('calendar.prevMonth') }}</span>

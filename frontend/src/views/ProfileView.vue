@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { toastApiError } from '@/utils/apiErrors'
 import { useTabHash } from '@/composables/useTabHash'
 import { resetMainScroll } from '@/composables/useMainScroll'
+import BkSheet from '@/lib/BkSheet.vue'
 import BkTabs from '@/lib/BkTabs.vue'
 import BkButton from '@/lib/BkButton.vue'
 import SettingsCard from '@/components/profile/SettingsCard.vue'
@@ -18,11 +19,6 @@ import MuscleGroupManager from '@/components/library/MuscleGroupManager.vue'
 import { useAuthStore } from '@/stores/auth'
 
 type ProfileTab = 'profile' | 'routines' | 'library' | 'admin'
-// item 5 (v0.4.2): sub-selector DENTRO del panel Biblioteca — no anclado al
-// hash (a diferencia de activeTab): el hash solo distingue PANELES de
-// perfil, no el estado de un widget dentro de uno. #library sigue llegando
-// siempre al mismo sitio, con Ejercicios por defecto.
-type LibrarySection = 'exercises' | 'muscleGroups'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -38,19 +34,19 @@ function validProfileTabs(): ProfileTab[] {
 const activeTab = useTabHash<ProfileTab>('profile', validProfileTabs)
 
 // item 5: mini BkTabs, mismo idioma que el filtro de kind de récords (ver
-// PrList) — un toggle de qué manager se ve, no una sección nueva
-const librarySection = ref<LibrarySection>('exercises')
-const librarySectionTabs = computed(() => [
-  { value: 'exercises', label: t('library.exercises') },
-  { value: 'muscleGroups', label: t('library.muscleGroups') },
-])
+// v0.9.0 (zurdi: "no me convence en biblioteca el layout de doble tab"):
+// muere el sub-selector Ejercicios/Grupos — la biblioteca ES el catálogo de
+// ejercicios (lo que se consulta y toca de verdad), y los grupos musculares
+// (mantenimiento ocasional) se gestionan desde un sheet abierto por un
+// botón: jerarquía primario/secundario en vez de dos niveles de tabs, mismo
+// idiom de drawers que el resto de flujos secundarios de la app.
+const groupsSheetOpen = ref(false)
 
 // v0.5.0 (modelo de scroll único): los paneles ya no tienen scroller propio
 // que nazca en 0 al remontar — cambiar de pestaña (activeTab, cambia el
-// hash, NO el path: el reset de ShellView no lo ve) o de sección de
-// biblioteca (librarySection, v-show sin remount) debe resetear el scroll
+// hash, NO el path: el reset de ShellView no lo ve) debe resetear el scroll
 // de <main> explícitamente, o el panel nuevo aparece ya desplazado.
-watch([activeTab, librarySection], () => {
+watch(activeTab, () => {
   resetMainScroll()
 })
 
@@ -93,18 +89,12 @@ async function handleLogout() {
 
 <template>
   <div class="space-y-4">
-    <!-- v0.5.0: bloque sticky ÚNICO con la tira principal y, en Biblioteca,
-         la de sección debajo — ver comentario del script. La tira de sección
-         vive AQUÍ (no dentro del panel) precisamente para poder pegarse
-         junto a la principal sin apilar stickies. -->
-    <div class="sticky top-0 z-10 bk-chrome-bg -mt-4 pt-4 pb-1 space-y-3" data-testid="profile-tabs-sticky">
+    <!-- v0.9.0: tira sticky ÚNICA (el sub-selector de biblioteca murió, ver
+         script) — a sangre completa (-mx-4 px-4: cruza el padding del
+         wrapper hasta los bordes de la pantalla; sin esto el contenido
+         scrolleado asomaba a su derecha, bug reportado por zurdi) -->
+    <div class="sticky top-0 z-10 bk-chrome-bg -mt-4 -mx-4 px-4 pt-4 pb-1" data-testid="profile-tabs-sticky">
       <BkTabs v-model="activeTab" :tabs="tabs" />
-      <BkTabs
-        v-if="activeTab === 'library'"
-        data-testid="library-section-tabs"
-        v-model="librarySection"
-        :tabs="librarySectionTabs"
-      />
     </div>
 
     <!-- bk-stagger en cada panel: v-if remonta el panel entero al cambiar de
@@ -135,19 +125,29 @@ async function handleLogout() {
       <RoutineList v-if="activeTab === 'routines'" />
     </Transition>
 
-    <!-- item 10: sin título "Biblioteca" (la pestaña de Perfil ya lo dice,
-         mismo tratamiento que Rutinas). item 5 (v0.4.2): mini selector
-         Ejercicios/Grupos musculares (ahora en el bloque sticky de arriba) —
-         AMBOS managers se montan juntos al entrar al panel, solo el visible
-         se alterna con v-show, nunca v-if: el flip del selector es un cambio
-         de DATO (qué manager mirar), no de sección, y no repite la animación
-         de entrada ni relanza la carga/gating propia de cada manager. El
-         gating de "primer montaje" de cada manager (su propio ready/skeleton)
-         no cambia: solo pasa una vez, al entrar aquí. v0.5.0: el panel fluye
-         contra <main>, sin región de scroll propia. -->
-    <div v-if="activeTab === 'library'" class="bk-stagger">
-      <div v-show="librarySection === 'exercises'" :style="{ '--bk-stagger-i': 0 }"><ExerciseManager /></div>
-      <div v-show="librarySection === 'muscleGroups'" :style="{ '--bk-stagger-i': 0 }"><MuscleGroupManager /></div>
+    <!-- v0.9.0: la biblioteca ES el catálogo de ejercicios; los grupos
+         musculares (mantenimiento ocasional) viven en un sheet abierto por
+         el botón de arriba — ver comentario del script. El manager de
+         grupos se monta solo al abrir el sheet (v-if): carga fresca con su
+         propio skeleton, y sus drawers internos de crear/editar apilan
+         sobre este sheet vía layerStack (Escape cierra el de arriba). -->
+    <div v-if="activeTab === 'library'" class="space-y-3 bk-stagger">
+      <div class="flex justify-end" :style="{ '--bk-stagger-i': 0 }">
+        <BkButton
+          variant="ghost"
+          size="sm"
+          data-testid="open-muscle-groups-btn"
+          @click="groupsSheetOpen = true"
+        >
+          {{ $t('library.muscleGroups') }}
+        </BkButton>
+      </div>
+      <div :style="{ '--bk-stagger-i': 1 }"><ExerciseManager /></div>
+      <BkSheet :open="groupsSheetOpen" :title="$t('library.muscleGroups')" @close="groupsSheetOpen = false">
+        <div v-if="groupsSheetOpen" class="p-4">
+          <MuscleGroupManager />
+        </div>
+      </BkSheet>
     </div>
 
     <Transition name="bk-rise" appear>

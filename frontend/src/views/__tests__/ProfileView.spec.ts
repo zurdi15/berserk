@@ -358,22 +358,24 @@ describe('ProfileView', () => {
   // scroll de <main> explícitamente (el hash no cambia el path, así que el
   // reset de ShellView no aplica)
   describe('v0.5.0: single-scroll model (sticky strips, flowing panels)', () => {
-    it('root flows (no bounded chain) and both strips live in ONE sticky block with a solid background', async () => {
+    it('root flows (no bounded chain); the single sticky strip is full-bleed (-mx-4 px-4) and never grows a second strip', async () => {
       wrapper = build()
       await flushPromises()
 
       expect(wrapper.classes()).not.toContain('h-full')
 
       const stickyBlock = wrapper.get('[data-testid="profile-tabs-sticky"]')
-      expect(stickyBlock.classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'bk-chrome-bg']))
+      // v0.9.0: a sangre completa — sin esto las cards scrolleadas asomaban
+      // a la derecha de la tira (bug reportado por zurdi con muchas rutinas)
+      expect(stickyBlock.classes()).toEqual(
+        expect.arrayContaining(['sticky', 'top-0', 'bk-chrome-bg', '-mx-4', 'px-4']),
+      )
 
-      // la tira de sección de biblioteca SOLO existe dentro del bloque sticky
-      // cuando la pestaña activa es Biblioteca
-      expect(stickyBlock.find('[data-testid="library-section-tabs"]').exists()).toBe(false)
+      // v0.9.0: el sub-selector de biblioteca murió — nunca hay segunda tira
       const libraryTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')!
       await libraryTab.trigger('click')
       await flushPromises()
-      expect(stickyBlock.find('[data-testid="library-section-tabs"]').exists()).toBe(true)
+      expect(stickyBlock.find('[data-testid="library-section-tabs"]').exists()).toBe(false)
     })
 
     it('panels flow: no internal scroll containers left in profile, routines, library or admin', async () => {
@@ -403,10 +405,9 @@ describe('ProfileView', () => {
       expect(w.findComponent({ name: 'AdminCard' }).classes()).not.toContain('overflow-y-auto')
     })
 
-    // v0.5.0: el scroll vive en <main> — cambiar de pestaña o de sección de
-    // biblioteca lo resetea vía resetMainScroll (los paneles ya no remontan
-    // un scroller propio que nazca en 0)
-    it('switching the profile tab or the library sub-selector resets <main> scrollTop', async () => {
+    // v0.5.0: el scroll vive en <main> — cambiar de pestaña lo resetea vía
+    // resetMainScroll (los paneles ya no remontan un scroller propio)
+    it('switching the profile tab resets <main> scrollTop', async () => {
       const mainEl = document.createElement('main')
       document.body.appendChild(mainEl)
 
@@ -419,86 +420,58 @@ describe('ProfileView', () => {
       await flushPromises()
       expect(mainEl.scrollTop).toBe(0)
 
-      mainEl.scrollTop = 250
-      const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
-      await sectionTabs[1].trigger('click')
-      await flushPromises()
-      expect(mainEl.scrollTop).toBe(0)
-
       mainEl.remove()
     })
   })
 
-  describe('item 5 (v0.4.2): library gets the records-tab layout', () => {
+  // v0.9.0 (zurdi: "no me convence el layout de doble tab en biblioteca"):
+  // la biblioteca ES el catálogo de ejercicios; los grupos musculares viven
+  // en un sheet abierto por un botón — jerarquía primario/secundario
+  describe('v0.9.0: library = exercises + muscle-groups sheet', () => {
     async function openLibraryTab(w: VueWrapper) {
       const libraryTab = w.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
       await libraryTab!.trigger('click')
       await flushPromises()
     }
 
-    it('renders a segmented Ejercicios/Grupos musculares selector, with Ejercicios active by default', async () => {
+    afterEach(() => {
+      // BkSheet teletransporta a body: limpiar para no heredar sheets huérfanos
+      document.body.innerHTML = ''
+    })
+
+    it('shows ExerciseManager directly (no sub-selector) with the muscle-groups button; the groups manager is NOT mounted', async () => {
       wrapper = build()
       await flushPromises()
       await openLibraryTab(wrapper)
 
-      const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
-      expect(sectionTabs.map((tab) => tab.text())).toEqual(['Ejercicios', 'Grupos musculares'])
-      expect(sectionTabs[0].attributes('aria-selected')).toBe('true')
-      expect(sectionTabs[1].attributes('aria-selected')).toBe('false')
+      expect(wrapper.find('[data-testid="library-section-tabs"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="new-exercise-btn"]').isVisible()).toBe(true)
+      expect(wrapper.findComponent({ name: 'ExerciseManager' }).exists()).toBe(true)
+      expect(wrapper.findComponent({ name: 'MuscleGroupManager' }).exists()).toBe(false)
+      expect(wrapper.get('[data-testid="open-muscle-groups-btn"]').text()).toBe('Grupos musculares')
     })
 
-    it('flipping the selector shows one manager at a time — real controls, not stubs, only one visible', async () => {
+    it('the muscle-groups button opens a sheet mounting MuscleGroupManager fresh', async () => {
       wrapper = build()
       await flushPromises()
       await openLibraryTab(wrapper)
 
-      const newExerciseBtn = wrapper.get('[data-testid="new-exercise-btn"]')
-      const newGroupBtn = wrapper.get('[data-testid="open-create-group-btn"]')
-      expect(newExerciseBtn.isVisible()).toBe(true)
-      expect(newGroupBtn.isVisible()).toBe(false)
-
-      const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
-      await sectionTabs[1].trigger('click')
+      await wrapper.get('[data-testid="open-muscle-groups-btn"]').trigger('click')
       await flushPromises()
 
-      expect(newExerciseBtn.isVisible()).toBe(false)
-      expect(newGroupBtn.isVisible()).toBe(true)
-      expect(sectionTabs[1].attributes('aria-selected')).toBe('true')
+      expect(wrapper.findComponent({ name: 'MuscleGroupManager' }).exists()).toBe(true)
+      // el control de crear grupo vive dentro del sheet, visible
+      expect(document.querySelector('[data-testid="open-create-group-btn"]')).not.toBeNull()
     })
 
-    it('flipping back and forth does not remount either manager (same DOM node, no re-animation/re-fetch)', async () => {
-      const { listExercises, listMuscleGroups } = await import('@/api/domain')
-
-      wrapper = build()
-      await flushPromises()
-      await openLibraryTab(wrapper)
-
-      const exerciseManagerBefore = wrapper.findComponent({ name: 'ExerciseManager' }).element
-      const groupManagerBefore = wrapper.findComponent({ name: 'MuscleGroupManager' }).element
-      const exerciseCallsAfterMount = vi.mocked(listExercises).mock.calls.length
-      const groupCallsAfterMount = vi.mocked(listMuscleGroups).mock.calls.length
-
-      const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
-      await sectionTabs[1].trigger('click')
-      await flushPromises()
-      await sectionTabs[0].trigger('click')
-      await flushPromises()
-
-      expect(wrapper.findComponent({ name: 'ExerciseManager' }).element).toBe(exerciseManagerBefore)
-      expect(wrapper.findComponent({ name: 'MuscleGroupManager' }).element).toBe(groupManagerBefore)
-      expect(vi.mocked(listExercises).mock.calls.length).toBe(exerciseCallsAfterMount)
-      expect(vi.mocked(listMuscleGroups).mock.calls.length).toBe(groupCallsAfterMount)
-    })
-
-    it('mounting with #library in the hash lands on the panel with Ejercicios selected by default', async () => {
+    it('mounting with #library in the hash lands on the exercises catalog', async () => {
       mockRoute.hash = '#library'
       wrapper = build()
       await flushPromises()
 
       expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')?.attributes('aria-selected')).toBe('true')
-      const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
-      expect(sectionTabs[0].attributes('aria-selected')).toBe('true')
       expect(wrapper.get('[data-testid="new-exercise-btn"]').isVisible()).toBe(true)
+      expect(wrapper.findComponent({ name: 'MuscleGroupManager' }).exists()).toBe(false)
     })
   })
 })

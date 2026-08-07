@@ -165,6 +165,51 @@ describe('ShellView nav', () => {
   // nazcan en 0 al remontar) — ShellView resetea su scrollTop observando
   // route.path. El hash queda fuera: las pestañas ancladas en URL
   // (useTabHash) no deben resetear la página al cambiar de tab.
+  // v0.9.0 (zurdi): swipe horizontal sobre <main> navega entre secciones —
+  // los eventos táctiles se fabrican a mano (happy-dom no trae TouchEvent)
+  it('v0.9.0: a horizontal swipe on <main> navigates to the adjacent section; a vertical drag does not', async () => {
+    const router = buildRouter('today')
+    await router.isReady()
+    const wrapper = mount(ShellView, {
+      global: {
+        plugins: [router, createI18nInstance()],
+        stubs: { RouterView: true, RouterLink: true, AthleteBanner: true },
+      },
+    })
+    const main = wrapper.get('main').element
+
+    const touch = (type: string, x: number, y: number) => {
+      const event = new Event(type) as Event & { touches: unknown[]; changedTouches: unknown[] }
+      event.touches = [{ clientX: x, clientY: y }]
+      event.changedTouches = [{ clientX: x, clientY: y }]
+      main.dispatchEvent(event)
+    }
+
+    // swipe a la izquierda: hoy → calendario (siguiente en el orden del nav)
+    touch('touchstart', 300, 400)
+    touch('touchend', 150, 410)
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('calendar')
+
+    // arrastre vertical (scroll normal): no navega
+    touch('touchstart', 200, 200)
+    touch('touchend', 180, 500)
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('calendar')
+
+    // swipe a la derecha: calendario → hoy
+    touch('touchstart', 150, 400)
+    touch('touchend', 320, 395)
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('today')
+
+    // en el extremo izquierdo, swipe a la derecha no da la vuelta
+    touch('touchstart', 150, 400)
+    touch('touchend', 320, 395)
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('today')
+  })
+
   it('v0.5.0: navigating to another section resets <main> scrollTop; a hash-only change does not', async () => {
     const router = buildRouter('today')
     await router.isReady()
