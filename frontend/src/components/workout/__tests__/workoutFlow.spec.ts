@@ -722,6 +722,33 @@ describe('WorkoutExerciseCard', () => {
       expect(actions.setExerciseRest).toHaveBeenCalledWith(20, 120)
     })
 
+    // item 7 (v0.4.3, zurdi): entrada manual (stepper) JUNTO a los presets —
+    // un gimnasta puede querer un valor entre saltos de 30 (p.ej. 95s)
+    it('item 7: the picker also shows a manual stepper (step 5, bounds 5-900) that calls setExerciseRest with the exact resulting seconds, without closing the picker', async () => {
+      const actions = makeActions()
+      const wrapper = mountCard({ actions })
+      await wrapper.get('[data-testid="rest-toggle-20"]').trigger('click')
+
+      const manual = wrapper.get('[data-testid="rest-manual-20"]')
+      const stepper = manual.findComponent({ name: 'BkStepper' })
+      expect(stepper.props('step')).toBe(5)
+      expect(stepper.props('min')).toBe(5)
+      expect(stepper.props('max')).toBe(900)
+      // valor de arranque: el descanso EFECTIVO actual (90, default sin
+      // override ni rutina), no un 0/vacío desconectado del resto del picker
+      expect(stepper.props('modelValue')).toBe(90)
+
+      const plusButton = manual.findAll('button').find((b) => b.attributes('aria-label') === 'Aumentar')!
+      await plusButton.trigger('pointerdown')
+      await plusButton.trigger('pointerup')
+      await flushPromises()
+
+      expect(actions.setExerciseRest).toHaveBeenCalledWith(20, 95)
+      // a diferencia de un preset, el stepper NO cierra el picker (se pulsa
+      // varias veces seguidas para afinar)
+      expect(wrapper.find('[data-testid="rest-picker-20"]').exists()).toBe(true)
+    })
+
     it('reflects the workout exercise override over the routine target', () => {
       const overridden = { ...pushExercise, rest_seconds: 60 }
       const wrapper = mountCard({ workoutExercise: overridden, routines, routineId: 1 })

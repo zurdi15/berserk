@@ -28,9 +28,10 @@ import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
+import BkStepper from '@/lib/BkStepper.vue'
 import type { RuneName } from '@/lib/runes'
 import CardioCountdown from './CardioCountdown.vue'
-import { REST_PRESETS, restFor } from './rest'
+import { REST_MAX_SECONDS, REST_MIN_SECONDS, REST_PRESETS, REST_STEP_SECONDS, restFor } from './rest'
 import { resolveNewSetDefaults } from './setDefaults'
 import { formatHistoryLine, formatHistorySetLines } from './setHistoryFormat'
 import SetForm from './SetForm.vue'
@@ -334,6 +335,20 @@ async function pickRest(seconds: number) {
   }
 }
 
+// item 7 (v0.4.3, zurdi): entrada manual vía stepper, JUNTO a los presets —
+// a diferencia de pickRest() (chip de preset), esto NO cierra el picker: un
+// stepper se pulsa varias veces seguidas para afinar el valor (mismo motivo
+// por el que los steppers de peso/reps del cajón de series tampoco cierran
+// nada al tocarlos), cerrar en cada tap obligaría a reabrir el picker entre
+// cada +5s
+async function pickRestManual(seconds: number) {
+  try {
+    await props.actions.setExerciseRest(props.workoutExercise.id, seconds)
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
 async function confirmRemove() {
   removeConfirming.value = false
   try {
@@ -433,6 +448,25 @@ async function moveDown() {
         >
           {{ preset }}s
         </button>
+      </div>
+      <!-- item 7 (v0.4.3, zurdi): entrada manual además de los presets — un
+           gimnasta puede querer 75s, no solo los saltos de 30 de los chips.
+           Visible junto a los presets (no tras un chip "otro" aparte): ya
+           está detrás del mismo toggle rest-toggle-*, un nivel de revelado
+           es suficiente. w-36 (bounded, item 11): BkStepper es w-full por
+           dentro, así que necesita un contenedor con ancho propio para no
+           estirarse a todo el ancho de la tarjeta — un stepper de descanso
+           no pide ese protagonismo. -->
+      <div v-if="restPickerOpen" class="w-36 mt-2" :data-testid="`rest-manual-${workoutExercise.id}`">
+        <BkStepper
+          :model-value="effectiveRestSeconds"
+          size="compact"
+          :step="REST_STEP_SECONDS"
+          :min="REST_MIN_SECONDS"
+          :max="REST_MAX_SECONDS"
+          suffix="s"
+          @update:model-value="pickRestManual"
+        />
       </div>
     </div>
 
