@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.8.0 - 2026-08-07
+
+- Supersets are now created where exercises are added: tick "Superset" in the add-exercise sheet and pick two — they land already linked in their block. The chain buttons between cards are gone; the block header carries the single dissolve control.
+- The exercise picker list now takes up most of the screen instead of a short strip.
+
 ## 0.7.0 - 2026-08-07
 
 - Supersets can now be created and dissolved inside the live workout: a chain toggle between cards links or splits them (closed chain = linked, in the editor too), works offline, and grouped exercises render inside one aurora-bordered block with a single "Superset A" header.
