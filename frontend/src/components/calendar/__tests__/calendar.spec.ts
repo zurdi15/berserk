@@ -1387,3 +1387,37 @@ describe('CalendarView item 8: opens today\'s day sheet from a ?day= query', () 
     wrapper.unmount()
   })
 })
+
+// item 4 (v0.4.0, ROOT CAUSE del bug real de zurdi: "en el calendario no
+// veo los dots de otro user al que le he compartido y me ha compartido").
+// athleteThreading.spec.ts ya prueba que getMonth se LLAMA con el userId
+// correcto, pero con un mock que siempre resuelve {scheduled:[],workouts:[]}
+// — nunca comprueba que, dado un payload real con datos, el CalendarView
+// completo (no solo MonthGrid montado a mano) los PINTA. La causa real
+// terminó siendo que athlete.viewing no sobrevivía a una recarga (ver
+// stores/athlete.ts), pero este test cierra el hueco de cobertura real que
+// hizo falta abrir para descartar esta capa durante el diagnóstico.
+describe('CalendarView athlete mode (item 4): renders dots from the target athlete\'s data', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('mounts already viewing an athlete and paints dots from the workouts/scheduled the API returns for them', async () => {
+    vi.mocked(domain.getMonth).mockResolvedValueOnce({
+      scheduled: [
+        { id: 9, date: '2026-08-11', time: null, routine_id: null, status: 'planned', workout_id: null, note: null },
+      ],
+      workouts: [
+        { id: 42, date: '2026-08-05', feeling: 4, muscle_group_ids: [] },
+      ],
+    })
+
+    useAthleteStore().view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
+    const wrapper = mount(CalendarView, { global: { plugins: [createI18nInstance()] } })
+    await flushPromises()
+
+    expect(domain.getMonth).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), 7)
+    const doneDot = wrapper.get('[data-testid="day-cell-2026-08-05"] [data-status="done"]')
+    expect(doneDot.classes()).toContain('bg-[var(--bk-day-dot)]')
+    const plannedDot = wrapper.get('[data-testid="day-cell-2026-08-11"] [data-status="planned"]')
+    expect(plannedDot.classes()).toContain('border-[var(--bk-day-dot)]')
+  })
+})
