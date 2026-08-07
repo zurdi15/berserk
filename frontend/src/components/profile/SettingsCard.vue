@@ -10,6 +10,8 @@ import BkSelect from '@/lib/BkSelect.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { USER_COLOR_SWATCHES } from '@/tokens/userColors'
+import { setTheme } from '@/utils/theme'
+import { getThemeMode, type ThemeMode } from '@/utils/uiPrefs'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -21,6 +23,10 @@ const timezone = ref(auth.user!.timezone)
 const timezones = Intl.supportedValuesOf('timeZone')
 // null = sin color propio, cae al aurora del tema (ver USER_COLOR_SWATCHES)
 const color = ref<string | null>(auth.user!.color ?? null)
+// v0.4.0: preferencia de tema — puramente de cliente (localStorage vía
+// uiPrefs), NO pasa por updateSettings/el backend, a diferencia de todo lo
+// demás en esta tarjeta (ver el why-comment en utils/uiPrefs.ts)
+const theme = ref<ThemeMode>(getThemeMode())
 
 async function save(partial: Parameters<typeof updateSettings>[0]) {
   try {
@@ -37,11 +43,28 @@ function pickColor(value: string | null) {
   color.value = value
   save({ color: value })
 }
+
+function pickTheme(mode: ThemeMode) {
+  theme.value = mode
+  setTheme(mode)
+}
 </script>
 
 <template>
   <BkCard :title="$t('profile.settings')">
     <div class="space-y-4">
+      <BkSelect
+        v-model="theme"
+        :label="$t('profile.theme')"
+        :options="[
+          { value: 'system', label: $t('profile.themeSystem') },
+          { value: 'dark', label: $t('profile.themeDark') },
+          { value: 'light', label: $t('profile.themeLight') },
+        ]"
+        data-testid="theme-select"
+        @update:model-value="(val) => pickTheme(val as ThemeMode)"
+      />
+
       <BkSelect
         v-model="locale"
         :label="$t('profile.locale')"

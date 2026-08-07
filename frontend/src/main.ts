@@ -16,6 +16,13 @@ import { router } from './router'
 import { useAuthStore } from './stores/auth'
 import { useAthleteStore } from './stores/athlete'
 import { useActiveWorkoutStore } from './stores/activeWorkout'
+import { initTheme } from './utils/theme'
+
+// el script inline de index.html ya aplicó la clase/meta correctas antes del
+// primer paint (evita el flash) — esto reafirma el estado y, sobre todo,
+// engancha el listener de prefers-color-scheme para el modo 'system' (el
+// script inline es un IIFE de un solo disparo, no puede dejar nada vivo)
+initTheme()
 
 const app = createApp(App)
 app.use(createPinia())

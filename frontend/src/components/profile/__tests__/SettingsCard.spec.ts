@@ -20,6 +20,12 @@ vi.mock('@/api/auth', () => ({
   })),
 }))
 
+// v0.4.0: el picker de tema es puramente de cliente — mockeado para
+// verificar CON QUÉ se llama, sin depender de localStorage/DOM reales
+vi.mock('@/utils/theme', () => ({
+  setTheme: vi.fn(),
+}))
+
 describe('SettingsCard', () => {
   let wrapper: VueWrapper | null = null
 
@@ -150,5 +156,49 @@ describe('SettingsCard', () => {
     await flushPromises()
 
     expect(updateSettings).toHaveBeenCalledWith({ color: null })
+  })
+
+  describe('v0.4.0: theme picker (Oscuro / Claro / Sistema)', () => {
+    it('defaults to "Sistema" (the select shows the system option) when nothing was persisted yet', () => {
+      build()
+      const themeSelect = wrapper!.get('[data-testid="theme-select"] [role="combobox"]')
+      expect(themeSelect.text()).toContain('Sistema')
+    })
+
+    it('picking "Claro" calls setTheme("light") — a purely client-side effect, never the backend updateSettings call the rest of this card uses', async () => {
+      const { updateSettings } = await import('@/api/auth')
+      vi.mocked(updateSettings).mockClear()
+      const { setTheme } = await import('@/utils/theme')
+      vi.mocked(setTheme).mockClear()
+      build()
+
+      const themeTrigger = wrapper!.get('[data-testid="theme-select"] [role="combobox"]')
+      await themeTrigger.trigger('click')
+
+      const lightOption = Array.from(document.querySelectorAll('[role="option"]'))
+        .find((o) => o.textContent?.trim() === 'Claro') as HTMLElement
+      expect(lightOption).not.toBeUndefined()
+      lightOption.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+
+      expect(setTheme).toHaveBeenCalledWith('light')
+      expect(updateSettings).not.toHaveBeenCalled()
+    })
+
+    it('picking "Oscuro" calls setTheme("dark")', async () => {
+      const { setTheme } = await import('@/utils/theme')
+      vi.mocked(setTheme).mockClear()
+      build()
+
+      const themeTrigger = wrapper!.get('[data-testid="theme-select"] [role="combobox"]')
+      await themeTrigger.trigger('click')
+
+      const darkOption = Array.from(document.querySelectorAll('[role="option"]'))
+        .find((o) => o.textContent?.trim() === 'Oscuro') as HTMLElement
+      darkOption.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+
+      expect(setTheme).toHaveBeenCalledWith('dark')
+    })
   })
 })

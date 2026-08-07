@@ -137,4 +137,28 @@ describe('base styles', () => {
     const rule = css.slice(css.indexOf('.bk-scroll-stable'))
     expect(rule).toContain('scrollbar-gutter: stable')
   })
+
+  describe('v0.4.0 light theme', () => {
+    it('html.bk-light sets color-scheme to light (html itself declares dark — verified this stays a per-theme override, not a duplicate/conflicting rule)', () => {
+      expect(css).toContain('color-scheme: dark')
+      const lightRule = css.slice(css.indexOf('html.bk-light {'), css.indexOf('html.bk-light {') + 60)
+      expect(lightRule).toContain('color-scheme: light')
+    })
+
+    it('bridges the scrim token into Tailwind (bg-scrim), so BkSheet never has to hand-pick a theme-appropriate overlay color itself', () => {
+      expect(css).toContain('--color-scrim: var(--bk-scrim)')
+    })
+
+    it('.bk-slab reads its box-shadow from the slab-shadow token, not a hardcoded inset — dark and light need genuinely different formulas (inset highlight vs. drop shadow), not just a different color plugged into the same shape', () => {
+      const rule = css.slice(css.indexOf('.bk-slab {'), css.indexOf('.bk-slab {') + 300)
+      expect(rule).toContain('box-shadow: var(--bk-slab-shadow)')
+      expect(rule).not.toMatch(/box-shadow:\s*inset 0 1px 0 var\(--bk-line\)/)
+    })
+
+    it('the noise overlay opacity comes from a token, not a hardcoded 0.035 — the same turbulence reads as grime on a light surface at dark-tuned opacity', () => {
+      const rule = css.slice(css.indexOf('body::before {'), css.indexOf('body::before {') + 300)
+      expect(rule).toContain('opacity: var(--bk-noise-opacity)')
+      expect(rule).not.toMatch(/opacity:\s*0\.035/)
+    })
+  })
 })

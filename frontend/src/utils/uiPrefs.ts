@@ -87,3 +87,35 @@ export function clearPersistedCardioCountdown(): void {
     // no-op: si tampoco se pudo persistir al empezar, no hay nada que limpiar
   }
 }
+
+// v0.4.0 LIGHT THEME: preferencia de tema, puramente de cliente (nunca un
+// ajuste de servidor — es instantánea y por dispositivo, no algo que tenga
+// sentido sincronizar entre sesiones). Mismo patrón try/catch degradado que
+// el resto de este archivo. 'system' es el default: sigue prefers-color-scheme
+// hasta que el usuario elige explícitamente oscuro o claro.
+export type ThemeMode = 'dark' | 'light' | 'system'
+const THEME_KEY = 'berserk:theme'
+const VALID_THEME_MODES: readonly ThemeMode[] = ['dark', 'light', 'system']
+
+function isThemeMode(value: string | null): value is ThemeMode {
+  return value !== null && (VALID_THEME_MODES as readonly string[]).includes(value)
+}
+
+export function getThemeMode(): ThemeMode {
+  try {
+    const raw = localStorage.getItem(THEME_KEY)
+    // valor corrupto/ajeno (versión vieja, u otra clave que colisionara):
+    // se trata igual que "nada persistido" en vez de arrastrarlo
+    return isThemeMode(raw) ? raw : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+export function setThemeMode(mode: ThemeMode): void {
+  try {
+    localStorage.setItem(THEME_KEY, mode)
+  } catch {
+    // no persiste, pero la clase ya aplicada en <html> sigue en pie en memoria
+  }
+}

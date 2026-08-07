@@ -4,8 +4,10 @@ import {
   clearPersistedCardioCountdown,
   getPersistedCardioCountdown,
   getRestAutoEnabled,
+  getThemeMode,
   setPersistedCardioCountdown,
   setRestAutoEnabled,
+  setThemeMode,
 } from '../uiPrefs'
 
 // entorno de este repo: el localStorage global es un stub roto de Node
@@ -159,5 +161,66 @@ describe('uiPrefs: persisted cardio countdown', () => {
       removeItem: () => { throw new Error('blocked') },
     })
     expect(() => clearPersistedCardioCountdown()).not.toThrow()
+  })
+})
+
+// v0.4.0 LIGHT THEME: mismo patrón try/catch degradado, pero con un enum
+// validado (dark/light/system) en vez de un booleano o un shape libre — un
+// valor corrupto o de una versión ajena debe caer a 'system', nunca colarse tal cual
+describe('uiPrefs: theme mode', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('defaults to "system" when nothing was persisted yet', () => {
+    vi.stubGlobal('localStorage', mockStorage())
+    expect(getThemeMode()).toBe('system')
+  })
+
+  it('setThemeMode persists under a namespaced key, and getThemeMode reads it back', () => {
+    vi.stubGlobal('localStorage', mockStorage())
+
+    setThemeMode('light')
+    expect(localStorage.getItem('berserk:theme')).toBe('light')
+    expect(getThemeMode()).toBe('light')
+
+    setThemeMode('dark')
+    expect(getThemeMode()).toBe('dark')
+
+    setThemeMode('system')
+    expect(getThemeMode()).toBe('system')
+  })
+
+  it('survives a reload: a fresh read against the same backing store still sees the persisted mode', () => {
+    const storage = mockStorage()
+    vi.stubGlobal('localStorage', storage)
+    setThemeMode('light')
+
+    vi.stubGlobal('localStorage', storage)
+    expect(getThemeMode()).toBe('light')
+  })
+
+  it('falls back to "system" instead of trusting a corrupted/foreign stored value (stale shape from another key, or garbage)', () => {
+    const storage = mockStorage()
+    storage.setItem('berserk:theme', 'sepia')
+    vi.stubGlobal('localStorage', storage)
+
+    expect(getThemeMode()).toBe('system')
+  })
+
+  it('degrades to "system" instead of throwing when localStorage.getItem fails', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => { throw new Error('blocked') },
+      setItem: () => {},
+    })
+    expect(getThemeMode()).toBe('system')
+  })
+
+  it('degrades silently instead of throwing when localStorage.setItem fails', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => { throw new Error('quota exceeded') },
+    })
+    expect(() => setThemeMode('light')).not.toThrow()
   })
 })

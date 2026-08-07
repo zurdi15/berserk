@@ -15,6 +15,9 @@
   --bk-danger: #E5604F;
   --bk-aurora-glow: rgba(79, 216, 196, 0.25);
   --bk-ember-glow: rgba(255, 138, 61, 0.30);
+  --bk-scrim: rgba(10, 12, 15, 0.7);
+  --bk-slab-shadow: inset 0 1px 0 var(--bk-line);
+  --bk-noise-opacity: 0.035;
   --bk-radius-xs: 2px;
   --bk-radius-sm: 6px;
   --bk-radius-md: 10px;
@@ -49,11 +52,14 @@ html.bk-light {
   --bk-ink: #1A2028;
   --bk-ink-muted: #5A6472;
   --bk-ink-faint: #8B95A1;
-  --bk-accent-aurora: #1F9C8A;
-  --bk-accent-aurora-deep: #157A6C;
-  --bk-accent-ember: #D97A2E;
-  --bk-accent-ember-deep: #C05F1F;
+  --bk-accent-aurora: #197D6E;
+  --bk-accent-aurora-deep: #146459;
+  --bk-accent-ember: #A85B1E;
+  --bk-accent-ember-deep: #874918;
   --bk-danger: #C74436;
-  --bk-aurora-glow: rgba(31, 156, 138, 0.20);
-  --bk-ember-glow: rgba(217, 122, 46, 0.25);
+  --bk-aurora-glow: rgba(25, 125, 110, 0.28);
+  --bk-ember-glow: rgba(168, 91, 30, 0.32);
+  --bk-scrim: rgba(26, 32, 40, 0.45);
+  --bk-slab-shadow: 0 1px 3px rgba(20, 26, 35, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --bk-noise-opacity: 0.02;
 }

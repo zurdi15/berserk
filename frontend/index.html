@@ -8,6 +8,40 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/pwa-192.png" />
     <link rel="apple-touch-icon" href="/icons/pwa-192.png" />
     <title>Berserk</title>
+    <!--
+      v0.4.0 LIGHT THEME — guard contra el flash de tema incorrecto (FOUC).
+      TIENE que ser un script inline y bloqueante, sin type="module" y sin
+      defer/async (no un módulo, no diferido): main.ts es type="module" y
+      por tanto SIEMPRE se ejecuta
+      después de que el parser ya montó el DOM y el navegador ya pintó el
+      primer frame — para cuando main.ts (vía utils/theme.ts::initTheme)
+      pudiera aplicar html.bk-light, la página ya se vio nacer en el tema
+      equivocado un instante y luego saltar al correcto. Este script corre
+      SÍNCRONO mientras el parser todavía está construyendo <head>, antes de
+      que exista nada que pintar.
+
+      Los hex #0A0C0F / #F2F4F6 de abajo DUPLICAN a propósito
+      themes.dark['bg-void'] / themes.light['bg-void'] de tokens/index.ts:
+      no se puede importar ese módulo aquí (rompería el bloqueo síncrono con
+      una carga de JS real), así que se copian a mano. index.html.spec.ts los
+      mantiene sincronizados automáticamente — un test falla si alguno de los
+      dos lados cambia sin el otro.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('berserk:theme')
+          var mode = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system'
+          var isLight = mode === 'light' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches)
+          if (isLight) document.documentElement.classList.add('bk-light')
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', isLight ? '#F2F4F6' : '#0A0C0F')
+        } catch (e) {
+          // localStorage bloqueado (privado agresivo) o matchMedia ausente:
+          // se queda en el oscuro por defecto — nunca debe romper el arranque
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>
