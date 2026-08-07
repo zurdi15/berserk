@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.11.3 - 2026-08-08
+
+### Fixed
+- El encabezado de editar entreno ya no se rompe en móviles estrechos: la flecha de volver y el título comparten fila, y "Guardar como rutina" es un botón a todo el ancho debajo.
+
 ## 0.11.2 - 2026-08-08
 
 ### Changed
