@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.4.3 - 2026-08-07
+
+- App-wide scroll model: every section pins its chrome (tab strips, headers) and scrolls its own content internally, ending cleanly above the bottom bar — and section changes always start at the top.
+- The central button hosts the whole rest-timer story now: fixed height in every state (no more navbar resize), and while resting on the workout screen a tap expands it to reveal the cancel action.
+- Rest seconds accept manual values besides the presets; steppers pin minus and plus to the row edges so x.5 values never shift the buttons.
+- Library and admin lists load with skeleton rows instead of jumping; new routines default to Global; day-sheet user chips are uniform and show your own name and color.
+- Assorted polish: "New routine" sits below the list, routine cards center their rune and actions, and the redundant auto-rest label is gone.
+
 ## 0.4.2 - 2026-08-07
 
 - The day sheet grows per-user tabs: opening a day shows your training and, one tab per sharing user who trained that day, theirs — read-only, with their records of the day.
