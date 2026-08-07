@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.9.4 - 2026-08-07
+
+- Cardio blocks are now self-contained: the duration/distance form lives right on the card (no more "Add cardio" button or drawer detour) and cardio never triggers a rest — no rest control, no auto timer.
+- The cardio countdown ends with real feedback: 0:00 pulses with a glow and a "Time's up!" caption, holds for a beat, then hands off smoothly — and the PR celebration rune fades in instead of popping.
+- Default rest between sets is now 60s (was 90s).
+- Exercise library: a search bar and a muscle-group filter over the whole list. Search matches both languages and the measurement type (typing "cardio" finds the treadmill), non-strength rows carry a type chip, and everything sorts by the name you actually see. The add-exercise search in workouts matches the same way.
+- The exercise form's redundant "Global" and "Visible to everyone" checkboxes merged into a single visibility select: private, visible to everyone, or global catalog.
+- Live workout polish: the muscle-group chips moved into the header under the timer, and each card's remove control is now a delete icon sharing the row with "Add set".
+
 ## 0.9.3 - 2026-08-07
 
 - Progress > Workouts: picking an exercise now opens its chart in a drawer (titled with the exercise) instead of rendering it under the list — the tab is just the list, nothing else ever scrolls.
