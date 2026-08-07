@@ -902,7 +902,14 @@ describe('ProgressView', () => {
     expect(domain.getRecords).toHaveBeenCalledWith({ exercise_id: 1, userId: undefined })
   })
 
-  it('switches the BkChart points when the metric tab flips to est_1rm', async () => {
+  // v0.9.3: la gráfica vive en un drawer (BkSheet teletransportado a body) —
+  // las tabs de métrica se buscan en document, no en el wrapper
+  function metricTabs(): HTMLElement[] {
+    return [...document.querySelectorAll('[data-testid="chart-sheet-body"] [role="tab"]')] as HTMLElement[]
+  }
+
+  it('switches the BkChart points when the metric tab flips to est_1rm (inside the chart drawer)', async () => {
+    document.body.innerHTML = ''
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
@@ -918,8 +925,7 @@ describe('ProgressView', () => {
       { date: '2026-07-08', value: 85 },
     ])
 
-    const metricTablist = wrapper.findAll('[role="tablist"]')[1]
-    await metricTablist.findAll('[role="tab"]')[2].trigger('click')
+    metricTabs()[2].click()
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'BkChart' }).props('points')).toEqual([
@@ -928,7 +934,8 @@ describe('ProgressView', () => {
     ])
   })
 
-  it('item 7 exception: flipping the metric tab (peso/volumen/est. 1RM) does NOT remount the chart block — same DOM node, no re-animation', async () => {
+  it('item 7 exception: flipping the metric tab does NOT remount the chart — same DOM node, no re-animation', async () => {
+    document.body.innerHTML = ''
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
@@ -939,19 +946,13 @@ describe('ProgressView', () => {
     await wrapper.find('[data-testid="exercise-option-1"]').trigger('click')
     await flushPromises()
 
-    const chartWrapperBefore = wrapper.findAll('[style*="--bk-stagger-i: 1"]')[0].element
     const chartBefore = wrapper.findComponent({ name: 'BkChart' }).element
 
-    const metricTablist = wrapper.findAll('[role="tablist"]')[1]
-    await metricTablist.findAll('[role="tab"]')[2].trigger('click')
+    metricTabs()[2].click()
     await flushPromises()
 
-    const chartWrapperAfter = wrapper.findAll('[style*="--bk-stagger-i: 1"]')[0].element
-    // el metric switch es un cambio de dato, no de sección: el nodo que
-    // dispara la animación de entrada (bk-stagger-i) es el MISMO antes y
-    // después, así que la animación de montaje no se repite en cada tap
-    expect(chartWrapperAfter).toBe(chartWrapperBefore)
-    // item 2: tampoco el propio BkChart (:key="exerciseId", no lleva metric)
+    // item 2: el metric switch es cambio de DATO — BkChart (:key=exerciseId,
+    // sin metric en la key) conserva el mismo nodo, sin re-animación
     expect(wrapper.findComponent({ name: 'BkChart' }).element).toBe(chartBefore)
   })
 
@@ -1138,9 +1139,11 @@ describe('ProgressView', () => {
       await flushPromises()
 
       replace.mockClear()
-      const metricTablist = wrapper.findAll('[role="tablist"]')[1]
-      expect(metricTablist).not.toBeUndefined()
-      await metricTablist.findAll('[role="tab"]')[1].trigger('click') // Volumen
+      // v0.9.3: las tabs de métrica viven en el drawer teletransportado
+      const tabs = [...document.querySelectorAll('[data-testid="chart-sheet-body"] [role="tab"]')] as HTMLElement[]
+      expect(tabs.length).toBeGreaterThan(0)
+      tabs[1].click() // Volumen
+      await flushPromises()
 
       expect(replace).not.toHaveBeenCalled()
     })

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut, PersonalRecordOut, SeriesPoint, StatsOut } from '@/api/domain'
 import { getRecords, getSeries, getStats, listExercises } from '@/api/domain'
+import { exerciseName } from '@/components/routines/exerciseName'
 import BodySection from '@/components/progress/BodySection.vue'
 import ExercisePicker from '@/components/progress/ExercisePicker.vue'
 import PrList from '@/components/progress/PrList.vue'
@@ -16,6 +17,7 @@ import { resetMainScroll } from '@/composables/useMainScroll'
 import BkCard from '@/lib/BkCard.vue'
 import BkChart from '@/lib/BkChart.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
+import BkSheet from '@/lib/BkSheet.vue'
 import BkTabs from '@/lib/BkTabs.vue'
 import { useAthleteStore } from '@/stores/athlete'
 import { toastApiError } from '@/utils/apiErrors'
@@ -69,6 +71,18 @@ watch(tab, async (value) => {
 onMounted(() => window.addEventListener('resize', measureTrainingPanel))
 onUnmounted(() => window.removeEventListener('resize', measureTrainingPanel))
 const exerciseId = ref<number | null>(null)
+
+// v0.9.3 (zurdi: "sigue habiendo un scroll larguísimo bajo la gráfica —
+// cámbialo a un drawer"): la gráfica vive en un BkSheet que se abre al
+// elegir ejercicio — la vista queda SOLO con la lista (única superficie de
+// scroll, panel acotado por medida) y la clase entera de problemas de
+// alturas lista+chart desaparece. Cerrar el drawer deselecciona: la lista
+// vuelve completa y los récords pierden el filtro.
+const { locale } = useI18n()
+const selectedExerciseName = computed(() => {
+  const exercise = exercises.value.find((e) => e.id === exerciseId.value)
+  return exercise ? exerciseName(exercise, locale.value) : ''
+})
 
 const exercises = ref<ExerciseOut[]>([])
 const records = ref<PersonalRecordOut[]>([])
@@ -195,29 +209,23 @@ watch(exerciseId, () => {
          el contenido del panel excede la altura medida (chart más alto de lo
          previsto, fuente grande, lo que sea), se RECORTA dentro del panel en
          vez de desbordar hacia <main> y devolverle el scroll a la página. -->
+    <!-- v0.9.3 (zurdi): la pestaña es SOLO la lista (panel acotado por
+         medida, overflow-hidden como backstop — nada puede devolverle el
+         scroll a la página); la gráfica vive en el drawer de abajo -->
     <div
       v-if="tab === 'training'"
       ref="trainingPanelEl"
-      class="flex flex-col gap-4 bk-stagger overflow-hidden"
+      class="flex flex-col bk-stagger overflow-hidden"
       :style="{ height: trainingPanelHeight !== null ? `${trainingPanelHeight}px` : undefined }"
       data-testid="training-panel"
     >
       <div class="flex-1 min-h-0 flex flex-col" :style="{ '--bk-stagger-i': 0 }">
         <ExercisePicker v-model="exerciseId" />
       </div>
-
-      <Transition name="bk-unfold">
-        <div v-if="exerciseId !== null" class="shrink-0 space-y-3" :style="{ '--bk-stagger-i': 1 }">
-        <BkTabs v-model="metric" :tabs="metricTabs" />
-        <!-- :key="exerciseId" (item 2): remonta el chart al cambiar de
-             ejercicio para repetir el revelado progresivo de la serie — el
-             metric NO va en la key, así que cambiar peso/volumen/1RM solo
-             actualiza :points sin remontar (progress.spec.ts:563 fija justo eso) -->
-        <BkChart v-if="chartPoints.length" :key="exerciseId" :points="chartPoints" color="aurora" :suffix="` ${units}`" />
-        <BkEmpty v-else :message="t('progress.noSeries')" />
-        </div>
-      </Transition>
     </div>
+
+    <!-- (el drawer de la gráfica vive al final del template para no romper
+         la cadena v-if/v-else-if de los paneles) -->
 
     <!-- Récords: solo PrList (item 4, v0.4.2 — antes también DistributionBars,
          ver comentario largo en TodayView.vue sobre por qué se mudó).
@@ -245,5 +253,25 @@ watch(exerciseId, () => {
     <Transition v-else name="bk-rise" appear>
       <BodySection />
     </Transition>
+
+    <!-- v0.9.3 (zurdi): drawer de la gráfica — se abre al elegir ejercicio,
+         titulado con su nombre; cerrarlo deselecciona (la lista vuelve
+         completa y los récords pierden el filtro) -->
+    <BkSheet
+      :open="tab === 'training' && exerciseId !== null"
+      :title="selectedExerciseName"
+      @close="exerciseId = null"
+    >
+      <div class="space-y-3 p-4" data-testid="chart-sheet-body">
+        <BkTabs v-model="metric" :tabs="metricTabs" />
+        <!-- :key="exerciseId" (item 2): remonta el chart al cambiar de
+             ejercicio para repetir el revelado progresivo de la serie — el
+             metric NO va en la key, así que cambiar peso/volumen/1RM solo
+             actualiza :points sin remontar (el spec de metric-sin-remontar
+             fija justo eso) -->
+        <BkChart v-if="chartPoints.length" :key="exerciseId ?? 0" :points="chartPoints" color="aurora" :suffix="` ${units}`" />
+        <BkEmpty v-else :message="t('progress.noSeries')" />
+      </div>
+    </BkSheet>
   </div>
 </template>
