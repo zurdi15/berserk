@@ -200,6 +200,29 @@
   opacity: 1;
 }
 
+/* v0.8.2 — despliegue VERTICAL del bloque del chart en Entrenos (misma
+   familia que bk-cta-x, eje Y): el panel está acotado al viewport y la lista
+   toma el resto por flex, así que sin esto el chart entraría de golpe y la
+   lista daría un salto de tamaño — el max-height animado hace la cesión de
+   espacio gradual. 26rem es un techo holgado sobre el alto real del bloque
+   (tabs de métrica + chart), no una medida exacta. Salida animada incluida:
+   deseleccionar/cambiar de ejercicio pliega el bloque en vez de esfumarlo. */
+.bk-unfold-enter-active,
+.bk-unfold-leave-active {
+  overflow: hidden;
+  transition: max-height var(--bk-dur-4) var(--bk-ease-out), opacity var(--bk-dur-3) var(--bk-ease-out);
+}
+.bk-unfold-enter-from,
+.bk-unfold-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+.bk-unfold-enter-to,
+.bk-unfold-leave-from {
+  max-height: 26rem;
+  opacity: 1;
+}
+
 /* stagger: el contenedor asigna --bk-stagger-i por hijo */
 .bk-stagger > * {
   animation: bk-rise var(--bk-dur-3) var(--bk-ease-out) backwards;

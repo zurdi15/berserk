@@ -435,19 +435,17 @@ describe('ExercisePicker', () => {
     expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([1])
   })
 
-  // v0.8.1 (zurdi): "Todos los ejercicios" murió — seleccionaba null y con
-  // null ni siquiera se pintaba chart. La lista además crece hasta el fondo
-  // sin selección (70dvh) y se encoge al elegir (40dvh) con transición.
-  it('v0.8.1: no "all exercises" option; the list height is tall when nothing is picked and shrinks on selection', async () => {
-    const unpicked = mount(ExercisePicker, { props: { modelValue: null }, ...withI18n() })
+  // v0.8.1: "Todos los ejercicios" murió (seleccionaba null → sin chart).
+  // v0.8.2: la lista rellena el hueco del panel acotado por flex (flex-1
+  // min-h-0) — los topes en dvh estimados generaban el mini-scroll de página
+  it('v0.8.2: no "all exercises" option; the list fills its bounded parent via flex, no dvh caps', async () => {
+    const wrapper = mount(ExercisePicker, { props: { modelValue: null }, ...withI18n() })
     await flushPromises()
-    expect(unpicked.find('[data-testid="exercise-option-all"]').exists()).toBe(false)
-    expect(unpicked.get('[data-testid="exercise-picker-list"]').classes()).toContain('max-h-[70dvh]')
-    unpicked.unmount()
-
-    const picked = mount(ExercisePicker, { props: { modelValue: 1 }, ...withI18n() })
-    await flushPromises()
-    expect(picked.get('[data-testid="exercise-picker-list"]').classes()).toContain('max-h-[40dvh]')
+    expect(wrapper.find('[data-testid="exercise-option-all"]').exists()).toBe(false)
+    const list = wrapper.get('[data-testid="exercise-picker-list"]')
+    expect(list.classes()).toEqual(expect.arrayContaining(['flex-1', 'min-h-0', 'overflow-y-auto']))
+    expect(list.classes().some((c) => c.startsWith('max-h'))).toBe(false)
+    expect(wrapper.classes()).toContain('h-full')
   })
 
   it('item 3a: shows shimmer skeleton rows (not the real list) while listExercises is pending, swaps to the real list once resolved', async () => {
@@ -1040,24 +1038,28 @@ describe('ProgressView', () => {
     expect(prScrollArea.classes()).not.toContain('max-h-72')
   })
 
-  it('v0.5.0: training panel flows; the exercise-picker list is the one bounded leaf (max-h + overflow of its own)', async () => {
+  // v0.8.2 (zurdi: "solo debería scrollear la lista"): el panel de Entrenos
+  // es la ÚNICA superficie acotada — columna flex donde la lista toma el
+  // resto (flex-1 min-h-0) y el bloque del chart es shrink-0; la altura en
+  // px la mide measureTrainingPanel contra <main> (aquí no hay <main>, así
+  // que queda sin fijar — se verifica la estructura, la medida es de Chromium)
+  it('v0.8.2: training panel is a bounded flex column — picker fills, chart block is shrink-0, page never scrolls', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
-    // item 8: Totales (default) también usa bk-stagger, así que hay que
-    // entrar en Entrenos explícitamente para probar SU panel
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
     await mainTablist.findAll('[role="tab"]')[2].trigger('click')
     await flushPromises()
 
-    const trainingPanel = wrapper.find('.bk-stagger')
-    expect(trainingPanel.classes()).not.toContain('flex-1')
-    expect(trainingPanel.classes()).not.toContain('overflow-y-auto')
+    const trainingPanel = wrapper.get('[data-testid="training-panel"]')
+    expect(trainingPanel.classes()).toEqual(expect.arrayContaining(['flex', 'flex-col']))
+
+    const pickerWrapper = wrapper.findComponent({ name: 'ExercisePicker' }).element.parentElement!
+    expect(pickerWrapper.classList.contains('flex-1')).toBe(true)
+    expect(pickerWrapper.classList.contains('min-h-0')).toBe(true)
 
     const pickerList = wrapper.find('[data-testid="exercise-picker-list"]')
-    // v0.8.1: sin selección la lista llega hasta el fondo (70dvh)
-    expect(pickerList.classes()).toContain('max-h-[70dvh]')
-    expect(pickerList.classes()).toContain('overflow-y-auto')
+    expect(pickerList.classes()).toEqual(expect.arrayContaining(['flex-1', 'min-h-0', 'overflow-y-auto']))
   })
 
   it('round 6 items 3/4: has no view-level h1 (Hoy never had one) and no horizontal padding of its own on the root', async () => {

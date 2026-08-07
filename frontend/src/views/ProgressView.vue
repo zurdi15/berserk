@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut, PersonalRecordOut, SeriesPoint, StatsOut } from '@/api/domain'
@@ -41,6 +41,33 @@ watch(tab, () => {
 })
 
 const metric = ref<MetricKey>('top_weight')
+
+// v0.8.2 (zurdi: "solo debería scrollear la lista"): la pestaña Entrenos se
+// acota al hueco visible EXACTO — altura en px medida contra <main> en vez
+// de un calc estático: un calc no puede conocer los banners condicionales
+// (atleta/offline), el breakpoint del top bar ni el pb-24 del wrapper, y
+// cualquier estimación en dvh deja o un mini-scroll o un hueco muerto (el
+// bug exacto que motivó esto). Se mide al activar la pestaña y en resize;
+// PB_RESERVE = los 6rem del pb-24 del wrapper del shell, que quedan FUERA
+// del panel (si el panel llegara hasta el navbar, ese padding alargaría el
+// scrollHeight de <main> y la página volvería a scrollear).
+const trainingPanelEl = ref<HTMLElement | null>(null)
+const trainingPanelHeight = ref<number | null>(null)
+const PB_RESERVE = 96
+function measureTrainingPanel() {
+  const el = trainingPanelEl.value
+  const main = document.querySelector('main')
+  if (!el || !main) return
+  const top = el.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop
+  trainingPanelHeight.value = Math.max(240, main.clientHeight - top - PB_RESERVE)
+}
+watch(tab, async (value) => {
+  if (value !== 'training') return
+  await nextTick()
+  measureTrainingPanel()
+}, { immediate: true })
+onMounted(() => window.addEventListener('resize', measureTrainingPanel))
+onUnmounted(() => window.removeEventListener('resize', measureTrainingPanel))
 const exerciseId = ref<number | null>(null)
 
 const exercises = ref<ExerciseOut[]>([])
@@ -152,22 +179,30 @@ watch(exerciseId, () => {
     </div>
 
     <!-- Entrenos (v0.5.0): la lista del picker es una caja HOJA con su propia
-         altura y scroll interno (ver ExercisePicker.vue — max-h-[50dvh]), y
-         el chart + selector de métrica la siguen en flujo: en un móvil
-         normal ambos caben en pantalla (que era el punto del viejo diseño
-         "anclado abajo"), y si no caben, el scroll de página con la tira
-         sticky sigue siendo coherente — sin cadena de alturas. -->
-    <div v-if="tab === 'training'" class="space-y-4 bk-stagger">
-      <div :style="{ '--bk-stagger-i': 0 }">
+         altura y scroll interno, y el chart la sigue.
+         v0.8.2 (zurdi: "esa vista tiene un pequeño scroll que no debería —
+         solo debería scrollear la lista, ocupe lo que ocupe, con o sin la
+         gráfica"): el panel entero se ACOTA al hueco visible con una altura
+         en px MEDIDA contra <main> (measureTrainingPanel — robusta ante
+         banners condicionales, breakpoints y el pb-24 del wrapper, que un
+         calc estático no puede conocer) — la página no scrollea nunca en
+         esta pestaña; la lista toma el resto por flex (flex-1 min-h-0 en
+         ExercisePicker) y el bloque del chart entra DESPLEGÁNDOSE
+         (bk-unfold: max-height animada) para que la cesión de espacio de
+         la lista sea gradual, no un salto de flex. -->
+    <div
+      v-if="tab === 'training'"
+      ref="trainingPanelEl"
+      class="flex flex-col gap-4 bk-stagger"
+      :style="{ height: trainingPanelHeight !== null ? `${trainingPanelHeight}px` : undefined }"
+      data-testid="training-panel"
+    >
+      <div class="flex-1 min-h-0 flex flex-col" :style="{ '--bk-stagger-i': 0 }">
         <ExercisePicker v-model="exerciseId" />
       </div>
 
-      <!-- v0.8.1 (zurdi): el bloque del chart ENTRA con animación al elegir
-           ejercicio (bk-rise) mientras la lista del picker se encoge con su
-           transición de max-height (ver ExercisePicker) — el hueco vacío
-           reservado bajo la lista murió con la opción "Todos los ejercicios" -->
-      <Transition name="bk-rise">
-        <div v-if="exerciseId !== null" class="space-y-3" :style="{ '--bk-stagger-i': 1 }">
+      <Transition name="bk-unfold">
+        <div v-if="exerciseId !== null" class="shrink-0 space-y-3" :style="{ '--bk-stagger-i': 1 }">
         <BkTabs v-model="metric" :tabs="metricTabs" />
         <!-- :key="exerciseId" (item 2): remonta el chart al cambiar de
              ejercicio para repetir el revelado progresivo de la serie — el
