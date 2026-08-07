@@ -30,10 +30,59 @@ describe('api client', () => {
     expect((error as ApiError).slug).toBe('invalid_credentials')
   })
 
-  it('falls back to generic slug on non-string detail (422 pydantic)', async () => {
-    mockFetch(422, { detail: [{ msg: 'password_too_long' }] })
-    const error: unknown = await api('/auth/bootstrap', { method: 'POST', body: {} }).catch((e) => e)
-    expect((error as ApiError).slug).toBe('generic')
+  // item (v0.4.0): antes CUALQUIER 422 de pydantic (detail siempre es una
+  // lista, nunca un string) colapsaba al slug fijo 'generic' — "Algo ha
+  // fallado" sin decir qué corregir. Los 3 casos de abajo usan el shape REAL
+  // que devuelve FastAPI/pydantic v2 (comprobado contra el backend, ver
+  // fromValidationList en client.ts), no una forma inventada.
+
+  it('extracts the embedded slug from a custom @field_validator ValueError (e.g. password_too_long)', async () => {
+    mockFetch(422, {
+      detail: [
+        {
+          type: 'value_error',
+          loc: ['body', 'new_password'],
+          msg: 'Value error, password_too_long',
+          input: 'x'.repeat(80),
+          ctx: { error: {} },
+        },
+      ],
+    })
+    const error: unknown = await api('/auth/password', { method: 'POST', body: {} }).catch((e) => e)
+    expect((error as ApiError).slug).toBe('password_too_long')
+    expect((error as ApiError).field).toBeUndefined()
+  })
+
+  it('builds a <field>_too_short slug from a Field(min_length=) violation, aliasing new_password to password', async () => {
+    mockFetch(422, {
+      detail: [
+        {
+          type: 'string_too_short',
+          loc: ['body', 'new_password'],
+          msg: 'String should have at least 8 characters',
+          input: 'short',
+          ctx: { min_length: 8 },
+        },
+      ],
+    })
+    const error: unknown = await api('/auth/password', { method: 'POST', body: {} }).catch((e) => e)
+    expect((error as ApiError).slug).toBe('password_too_short')
+  })
+
+  it('falls back to the fielded "validation" slug (with the raw field name) for a violation type with no mapped suffix', async () => {
+    mockFetch(422, {
+      detail: [
+        {
+          type: 'int_parsing',
+          loc: ['body', 'is_admin'],
+          msg: 'Input should be a valid integer',
+          input: 'not-a-bool',
+        },
+      ],
+    })
+    const error: unknown = await api('/admin/users/1', { method: 'PATCH', body: {} }).catch((e) => e)
+    expect((error as ApiError).slug).toBe('validation')
+    expect((error as ApiError).field).toBe('is_admin')
   })
 
   it('calls handler on 401 with not_authenticated slug', async () => {

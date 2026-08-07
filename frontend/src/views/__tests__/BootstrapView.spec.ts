@@ -38,4 +38,18 @@ describe('BootstrapView', () => {
     expect(wrapper.find('form').exists()).toBe(true)
     expect(wrapper.findAll('input')).toHaveLength(2)
   })
+
+  // item (v0.4.0): validación de cliente ANTES de someter — mismo arreglo
+  // que PasswordCard.vue/RedeemView.vue
+  it('a too-short password shows an inline error and blocks the submit (no navigation)', async () => {
+    const wrapper = build()
+    const inputs = wrapper.findAll('input')
+    await inputs[0].setValue('root')
+    await inputs[1].setValue('short')
+    await wrapper.find('form').trigger('submit.prevent')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('La contraseña debe tener al menos 8 caracteres.')
+    expect(push).not.toHaveBeenCalled()
+  })
 })

@@ -2,6 +2,11 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public slug: string,
+    // item (v0.4.0): nombre del campo (snake_case, tal cual lo reporta
+    // pydantic) cuando slug es el fallback genérico "validation" — permite
+    // interpolar errors.validation ("Valor no válido en {field}") en vez de
+    // un mensaje mudo. undefined para cualquier otro slug.
+    public field?: string,
   ) {
     super(slug)
   }
@@ -15,10 +20,59 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
 
 const BASE = '/api/v1'
 
-// los 422 de pydantic traen detail como lista de objetos: para el usuario son
-// un fallo de validación genérico, los slugs útiles siempre son string
-function toSlug(detail: unknown): string {
-  return typeof detail === 'string' ? detail : 'generic'
+// item (v0.4.0): los 422 de pydantic traen detail como una LISTA de errores
+// de validación (uno por campo), nunca un string — antes CUALQUIERA de estos
+// colapsaba al slug fijo 'generic' ("Algo ha fallado", inútil para saber qué
+// corregir: zurdi lo reportó al escribir una contraseña inválida). Ahora se
+// extrae el PRIMER error de la lista:
+//  - los ValueError propios de un @field_validator (password_too_long,
+//    color_invalid, timezone_invalid...) llevan su slug literal incrustado
+//    en el mensaje que antepone pydantic ("Value error, <slug>") — se separa
+//    con una regex, así los slugs YA existentes en errors.* se reutilizan
+//    sin tocar el backend.
+//  - las violaciones de longitud de Field(min_length=/max_length=) no traen
+//    slug propio: se intenta <campo>_<tipo> (p.ej. "password_too_short",
+//    ver FIELD_ALIASES/TYPE_SUFFIXES) — si esa clave no existe en errors.*,
+//    toastApiError cae más abajo a errors.validation con el campo interpolado.
+const FIELD_ALIASES: Record<string, string> = {
+  // new_password (PasswordChangeIn) y current_password comparten las mismas
+  // claves de error que password (Credentials/UserUpdateIn) — no tiene
+  // sentido una clave new_password_too_short aparte de password_too_short
+  new_password: 'password',
+  current_password: 'password',
+}
+
+const TYPE_SUFFIXES: Record<string, string> = {
+  string_too_short: 'too_short',
+  string_too_long: 'too_long',
+}
+
+interface PydanticValidationEntry {
+  type?: unknown
+  loc?: unknown
+  msg?: unknown
+}
+
+function fromValidationList(detail: unknown[]): { slug: string; field?: string } {
+  const first = detail[0] as PydanticValidationEntry
+  const loc = Array.isArray(first?.loc) ? first.loc : []
+  const field = loc.length ? String(loc[loc.length - 1]) : undefined
+
+  if (first?.type === 'value_error' && typeof first.msg === 'string') {
+    const match = /^Value error,\s*(.+)$/.exec(first.msg)
+    if (match) return { slug: match[1] }
+  }
+  if (field && typeof first?.type === 'string') {
+    const suffix = TYPE_SUFFIXES[first.type]
+    if (suffix) return { slug: `${FIELD_ALIASES[field] ?? field}_${suffix}`, field }
+  }
+  return { slug: 'validation', field: field ?? 'unknown' }
+}
+
+function toSlug(detail: unknown): { slug: string; field?: string } {
+  if (typeof detail === 'string') return { slug: detail }
+  if (Array.isArray(detail) && detail.length > 0) return fromValidationList(detail)
+  return { slug: 'generic' }
 }
 
 export async function api<T = unknown>(
@@ -33,13 +87,13 @@ export async function api<T = unknown>(
   })
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}))
-    const slug = toSlug((payload as { detail?: unknown }).detail)
+    const { slug, field } = toSlug((payload as { detail?: unknown }).detail)
     // solo not_authenticated dispara el handler: invalid_credentials (login fallido)
     // es un error de usuario, no una sesión muerta a mitad de uso
     if (response.status === 401 && slug === 'not_authenticated') {
       unauthorizedHandler?.()
     }
-    throw new ApiError(response.status, slug)
+    throw new ApiError(response.status, slug, field)
   }
   if (response.status === 204) return undefined as T
   return (await response.json()) as T

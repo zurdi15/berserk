@@ -61,6 +61,20 @@ describe('RedeemView', () => {
     expect(root.classes()).not.toContain('overflow-hidden')
   })
 
+  // item (v0.4.0): validación de cliente ANTES de someter — mismo arreglo
+  // que PasswordCard.vue/BootstrapView.vue
+  it('a too-short password shows an inline error and blocks the submit (no API call)', async () => {
+    const wrapper = build()
+    const inputs = wrapper.findAll('input')
+    await inputs[0].setValue('runa')
+    await inputs[1].setValue('short')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('La contraseña debe tener al menos 8 caracteres.')
+    expect(authApi.redeemInvite).not.toHaveBeenCalled()
+  })
+
   it('shows the invite_invalid error message when the token is dead', async () => {
     vi.mocked(authApi.redeemInvite).mockRejectedValue(new ApiError(410, 'invite_invalid'))
 

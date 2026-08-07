@@ -28,4 +28,25 @@ describe('toastApiError', () => {
       'Algo ha fallado. Inténtalo de nuevo.',
     ])
   })
+
+  // item (v0.4.0): tercer nivel de fallback — un slug reconstruido por
+  // client.ts que SÍ tiene traducción propia (p.ej. password_too_short) usa
+  // esa, antes de siquiera mirar el campo
+  it('maps a reconstructed validation slug (password_too_short) through its own translation, not the generic fielded fallback', () => {
+    toastApiError(new ApiError(422, 'password_too_short', 'new_password'))
+    const store = useToastStore()
+    expect(store.toasts[0].message).toBe('La contraseña debe tener al menos 8 caracteres.')
+  })
+
+  it('falls back to errors.validation with the field interpolated when the slug itself has no translation', () => {
+    toastApiError(new ApiError(422, 'validation', 'is_admin'))
+    const store = useToastStore()
+    expect(store.toasts[0].message).toBe('Valor no válido en is_admin.')
+  })
+
+  it('falls back to plain generic for a slug with no translation and no field (not the realistic client.ts path, but still safe)', () => {
+    toastApiError(new ApiError(422, 'some_future_slug_nobody_mapped'))
+    const store = useToastStore()
+    expect(store.toasts[0].message).toBe('Algo ha fallado. Inténtalo de nuevo.')
+  })
 })
