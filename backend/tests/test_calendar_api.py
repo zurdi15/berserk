@@ -131,3 +131,51 @@ def test_month_view_returns_target_workouts_to_a_shared_viewer(client: TestClien
     month_for_admin = client.get(f"/api/v1/calendar/2026/8?user_id={freyja_id}").json()
     assert [w["id"] for w in month_for_admin["workouts"]] == [freyja_workout["id"]]
     assert month_for_admin["scheduled"] == []
+
+
+def test_month_view_shared_overlay_matrix(client: TestClient, app):
+    """SHARED-DOTS OVERLAY (v0.4.1, pivote de producto de zurdi): "quiero que
+    EN MI PROPIO calendario salgan los puntitos de los otros users, no tener
+    que verlo en su perfil". Matriz end-to-end sobre `shared` en
+    GET /calendar/{y}/{m}: solo aparece el que me ha CONCEDIDO acceso
+    (ShareGrant owner->yo, dirección exacta de resolve_target_user), con sus
+    días de entreno terminado; nadie más se filtra (loki no comparte
+    conmigo); revocar el grant lo hace desaparecer; y en modo atleta el campo
+    entero se OMITE del JSON (nunca "shared": [] ni "shared": null) — ahí ya
+    se está en la vista de otro, el overlay ambient no aplica.
+    """
+    make_user(client, "freyja")
+    make_user(client, "loki")
+    admin_id = client.get("/api/v1/auth/me").json()["id"]
+
+    freyja = login(app, "freyja")
+    freyja_id = freyja.get("/api/v1/auth/me").json()["id"]
+    freyja_workout = freyja.post("/api/v1/workouts", json={"date": "2026-08-05"}).json()
+    freyja.post(f"/api/v1/workouts/{freyja_workout['id']}/finish")
+
+    # loki tiene un entreno terminado pero NUNCA me concede acceso: no debe
+    # filtrarse a mi shared bajo ninguna circunstancia
+    loki = login(app, "loki")
+    loki_workout = loki.post("/api/v1/workouts", json={"date": "2026-08-06"}).json()
+    loki.post(f"/api/v1/workouts/{loki_workout['id']}/finish")
+
+    assert freyja.post("/api/v1/sharing", json={"username": "admin"}).status_code == 201
+
+    month = client.get("/api/v1/calendar/2026/8").json()
+    assert [s["username"] for s in month["shared"]] == ["freyja"]
+    shared_entry = month["shared"][0]
+    assert shared_entry["user_id"] == freyja_id
+    assert shared_entry["dates"] == ["2026-08-05"]
+    assert set(shared_entry.keys()) == {"user_id", "username", "color", "dates"}
+
+    # modo atleta: viendo a freyja (grant mutuo asumido no hace falta, freyja
+    # ya me ha compartido A MÍ) — el campo entero desaparece del JSON
+    athlete_view_resp = client.get(f"/api/v1/calendar/2026/8?user_id={freyja_id}")
+    assert athlete_view_resp.status_code == 200
+    assert "shared" not in athlete_view_resp.json()
+
+    # revocación: freyja (dueña del grant) revoca el acceso del admin (viewer)
+    # -> deja de aparecer en el propio shared del admin
+    assert freyja.delete(f"/api/v1/sharing/{admin_id}").status_code == 204
+    month_after_revoke = client.get("/api/v1/calendar/2026/8").json()
+    assert month_after_revoke["shared"] == []

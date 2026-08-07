@@ -80,6 +80,7 @@ beforeEach(() => {
 import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
 import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
+import BkUser from '@/lib/BkUser.vue'
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
@@ -482,6 +483,178 @@ describe('MonthGrid', () => {
     expect(runes.length).toBe(3)
 
     warnSpy.mockRestore()
+  })
+
+  // SHARED-DOTS OVERLAY (v0.4.1, pivote de producto de zurdi): "quiero que
+  // EN MI PROPIO calendario salgan los puntitos de los otros users". Estos
+  // tests cubren la composición en MonthGrid: month.shared es undefined en
+  // modo atleta (el backend omite la clave, ver api/domain.ts), así que
+  // "sin overlay" se prueba simplemente NO pasando `shared` en month.
+  describe('SHARED-DOTS OVERLAY (v0.4.1)', () => {
+    it('renders a shared dot with inline backgroundColor from the sharer\'s color and a title with their username', async () => {
+      const wrapper = mount(MonthGrid, {
+        props: {
+          month: {
+            scheduled: [],
+            workouts: [],
+            shared: [
+              { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
+            ],
+          },
+          year: 2026,
+          monthNum: 8,
+          groupMap: createGroupMap(),
+        },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      const dot = wrapper.get('[data-shared-user="freyja"]')
+      expect(dot.attributes('style')).toContain('background-color: #3b82f6')
+      expect(dot.attributes('title')).toBe('freyja')
+      expect(dot.attributes('data-status')).toBe('done')
+    })
+
+    it('falls back to the aurora token when the sharer has no color of their own', async () => {
+      const wrapper = mount(MonthGrid, {
+        props: {
+          month: {
+            scheduled: [],
+            workouts: [],
+            shared: [{ user_id: 7, username: 'freyja', color: null, dates: ['2026-08-05'] }],
+          },
+          year: 2026,
+          monthNum: 8,
+          groupMap: createGroupMap(),
+        },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      const dot = wrapper.get('[data-shared-user="freyja"]')
+      expect(dot.attributes('style')).toContain('background-color: var(--color-aurora)')
+    })
+
+    it('composes own dots with shared dots on the same day, mine first', async () => {
+      const wrapper = mount(MonthGrid, {
+        props: {
+          month: {
+            scheduled: [],
+            workouts: [{ id: 1, date: '2026-08-05', feeling: null, muscle_group_ids: [] }],
+            shared: [
+              { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
+            ],
+          },
+          year: 2026,
+          monthNum: 8,
+          groupMap: createGroupMap(),
+        },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      const cell = wrapper.get('[data-testid="day-cell-2026-08-05"]')
+      const dots = cell.findAll('[data-status="done"]')
+      expect(dots).toHaveLength(2)
+      // mía primero: sin backgroundColor inline (se pinta vía --bk-day-dot)
+      expect(dots[0].attributes('style')).toBeUndefined()
+      expect(dots[1].attributes('data-shared-user')).toBe('freyja')
+    })
+
+    it('caps the composed row at 3, prioritizing own dots over shared ones', async () => {
+      const wrapper = mount(MonthGrid, {
+        props: {
+          month: {
+            scheduled: [],
+            workouts: [
+              { id: 1, date: '2026-08-05', feeling: null, muscle_group_ids: [] },
+              { id: 2, date: '2026-08-05', feeling: null, muscle_group_ids: [] },
+              { id: 3, date: '2026-08-05', feeling: null, muscle_group_ids: [] },
+            ],
+            shared: [
+              { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
+            ],
+          },
+          year: 2026,
+          monthNum: 8,
+          groupMap: createGroupMap(),
+        },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      const cell = wrapper.get('[data-testid="day-cell-2026-08-05"]')
+      const dots = cell.findAll('[data-status="done"]')
+      expect(dots).toHaveLength(3)
+      expect(cell.find('[data-shared-user="freyja"]').exists()).toBe(false)
+    })
+
+    it('one dot per shared user with a workout that day, each in their own color', async () => {
+      const wrapper = mount(MonthGrid, {
+        props: {
+          month: {
+            scheduled: [],
+            workouts: [],
+            shared: [
+              { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
+              { user_id: 9, username: 'loki', color: '#f97316', dates: ['2026-08-05'] },
+            ],
+          },
+          year: 2026,
+          monthNum: 8,
+          groupMap: createGroupMap(),
+        },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      const cell = wrapper.get('[data-testid="day-cell-2026-08-05"]')
+      const freyjaDot = cell.get('[data-shared-user="freyja"]')
+      const lokiDot = cell.get('[data-shared-user="loki"]')
+      expect(freyjaDot.attributes('style')).toContain('#3b82f6')
+      expect(lokiDot.attributes('style')).toContain('#f97316')
+    })
+
+    it('does not add a shared dot on a day absent from the sharer\'s dates', async () => {
+      const wrapper = mount(MonthGrid, {
+        props: {
+          month: {
+            scheduled: [],
+            workouts: [],
+            shared: [{ user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] }],
+          },
+          year: 2026,
+          monthNum: 8,
+          groupMap: createGroupMap(),
+        },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      const otherCell = wrapper.get('[data-testid="day-cell-2026-08-06"]')
+      expect(otherCell.find('[data-status]').exists()).toBe(false)
+    })
+
+    it('athlete mode: month.shared is undefined (the backend omits the key), so no shared dots render at all', async () => {
+      const wrapper = mount(MonthGrid, {
+        props: {
+          month: {
+            scheduled: [],
+            workouts: [{ id: 1, date: '2026-08-05', feeling: null, muscle_group_ids: [] }],
+            // sin `shared`: exactamente lo que envía el backend en modo atleta
+          },
+          year: 2026,
+          monthNum: 8,
+          groupMap: createGroupMap(),
+        },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-shared-user]').exists()).toBe(false)
+      // el propio dot sigue intacto (.get() ya lanza si no existe)
+      wrapper.get('[data-testid="day-cell-2026-08-05"] [data-status="done"]')
+    })
   })
 })
 
@@ -1492,5 +1665,52 @@ describe('CalendarView athlete mode (item 4): renders dots from the target athle
     expect(doneDot.classes()).toContain('bg-[var(--bk-day-dot)]')
     const plannedDot = wrapper.get('[data-testid="day-cell-2026-08-11"] [data-status="planned"]')
     expect(plannedDot.classes()).toContain('border-[var(--bk-day-dot)]')
+  })
+})
+
+// SHARED-DOTS OVERLAY (v0.4.1): la leyenda bajo la rejilla (BkUser por cada
+// usuario compartido) solo cuando monthData.shared trae algo — nunca en modo
+// atleta, donde el backend omite la clave entera del JSON (ver
+// api/domain.ts::CalendarMonthOut).
+describe('CalendarView shared legend (v0.4.1)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('renders a BkUser dot per shared user, with their color and username, when shared is non-empty', async () => {
+    vi.mocked(domain.getMonth).mockResolvedValueOnce({
+      scheduled: [],
+      workouts: [],
+      shared: [
+        { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
+        { user_id: 9, username: 'loki', color: null, dates: [] },
+      ],
+    })
+
+    const wrapper = mount(CalendarView, { global: { plugins: [createI18nInstance()] } })
+    await flushPromises()
+
+    const legend = wrapper.get('[data-testid="shared-legend"]')
+    const users = legend.findAllComponents(BkUser)
+    expect(users).toHaveLength(2)
+    expect(users[0].props('user')).toEqual({ username: 'freyja', color: '#3b82f6' })
+    expect(users[1].props('user')).toEqual({ username: 'loki', color: null })
+  })
+
+  it('does not render the legend when shared is an empty array (no one has shared with me)', async () => {
+    vi.mocked(domain.getMonth).mockResolvedValueOnce({ scheduled: [], workouts: [], shared: [] })
+
+    const wrapper = mount(CalendarView, { global: { plugins: [createI18nInstance()] } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="shared-legend"]').exists()).toBe(false)
+  })
+
+  it('does not render the legend when shared is absent (athlete mode: the field is omitted, not sent empty)', async () => {
+    useAthleteStore().view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
+    vi.mocked(domain.getMonth).mockResolvedValueOnce({ scheduled: [], workouts: [] })
+
+    const wrapper = mount(CalendarView, { global: { plugins: [createI18nInstance()] } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="shared-legend"]').exists()).toBe(false)
   })
 })

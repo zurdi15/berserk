@@ -279,6 +279,9 @@ export const es = {
     logPastWorkoutOr: 'o',
     prsOfDay: 'Récords del día',
     plannedEyebrow: 'Planificado',
+    // SHARED-DOTS OVERLAY (v0.4.1): leyenda bajo la rejilla, solo con datos
+    // compartidos no vacíos (ver CalendarView.vue)
+    sharedLegend: 'Compartido contigo:',
   },
   progress: {
     kinds: {
