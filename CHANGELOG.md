@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.10.0 - 2026-08-07
+
+- Rest timer ending feels finished now: the central button holds an aurora check with a full glow for a beat, the cancel X folds away, and the rune carves itself back in — no more abrupt vanish.
+- Cardio cards show your last 4 sessions and offer two clean actions: log the time you did, or start the countdown (targeting your last time) that logs itself on completion. The inline form is gone.
+- Editing a routine now works exactly like the live workout: exercise cards, superset blocks with their edit sheet, and the same add-exercise search — supersets included via the pair check.
+- The add-exercise sheet and the Progress exercise picker carry the library's muscle-group filter and its smarter search (typing "cardio" finds the treadmill anywhere).
+
 ## 0.9.5 - 2026-08-07
 
 - The auto-rest toggle now lives in the workout header, under the timer and date, sharing a row with the muscle-group chips.
