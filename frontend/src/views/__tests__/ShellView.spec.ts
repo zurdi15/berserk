@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { createI18nInstance } from '../../i18n'
@@ -125,6 +125,39 @@ describe('ShellView nav', () => {
     expect(main.classes()).toContain('bk-scroll-stable')
     expect(main.classes()).toContain('overflow-y-auto')
   })
+
+  // item 3 (v0.4.0, scrollbar): <main> pasa a ancho completo (su scrollbar
+  // pinta en el borde real de la ventana) y la columna centrada se mueve a un
+  // <div> interno que envuelve RouterView y hereda el px/py que antes llevaba
+  // <main> directamente
+  it("item 3: <main> is full-width (no max-w-3xl/mx-auto of its own) and an inner wrapper div carries the centered column + h-full flex context for RouterView", async () => {
+    const router = buildRouter('today')
+    await router.isReady()
+    const wrapper = mount(ShellView, {
+      global: {
+        plugins: [router, createI18nInstance()],
+        stubs: { RouterView: true, RouterLink: true, AthleteBanner: true },
+      },
+    })
+    const main = wrapper.get('main')
+    expect(main.classes()).not.toContain('max-w-3xl')
+    expect(main.classes()).not.toContain('mx-auto')
+    expect(main.classes()).toContain('w-full')
+    // pb-24 (hueco del navbar móvil fijo) se queda en <main>, no en el wrapper
+    expect(main.classes()).toContain('pb-24')
+
+    const innerWrapper = main.get('div')
+    expect(innerWrapper.classes()).toContain('max-w-3xl')
+    expect(innerWrapper.classes()).toContain('mx-auto')
+    expect(innerWrapper.classes()).toContain('w-full')
+    // h-full (no min-h-full): es lo que le da a ProgressView (y cualquier vista
+    // con su propio h-full) una referencia de altura DEFINIDA para resolver su
+    // porcentaje — min-height por sí solo no propaga esa referencia a los hijos
+    // (verificado en real, ver comentario en ShellView.vue)
+    expect(innerWrapper.classes()).toContain('h-full')
+    expect(innerWrapper.classes()).toContain('flex')
+    expect(innerWrapper.classes()).toContain('flex-col')
+  })
 })
 
 describe('ShellView active section indicator (item 3, round 9)', () => {
@@ -157,21 +190,17 @@ describe('ShellView active section indicator (item 3, round 9)', () => {
     expect(indicator.attributes('style')).toContain('translateX(0%)')
   })
 
-  it('desktop underline: scales in on the active item, excluding "workout" which never gets one', async () => {
+  // item 1 (v0.4.0): los subrayados por item se retiran — reemplazados por el
+  // indicador deslizante único de abajo (nav-indicator-desktop), igual patrón
+  // que el de móvil
+  it('desktop nav: no per-item underline remains anywhere, active or not', async () => {
     const wrapper = await mountWithRoute('progress')
     await flushPromises()
 
-    // 4 subrayados, no 5: "workout" (CTA) nunca lleva subrayado, activo o no
-    const underlines = wrapper.findAll('[data-testid="nav-underline"]')
-    expect(underlines).toHaveLength(4)
-    // orden de items sin "workout": today, calendar, progress, profile
-    expect(underlines[0].classes()).toContain('scale-x-0')
-    expect(underlines[1].classes()).toContain('scale-x-0')
-    expect(underlines[2].classes()).toContain('scale-x-100') // progress, activo
-    expect(underlines[3].classes()).toContain('scale-x-0')
+    expect(wrapper.findAll('[data-testid="nav-underline"]')).toHaveLength(0)
   })
 
-  it('route=workout: the mobile sliding bar stays mounted but fades to opacity 0 (no instant pop), and the desktop underline never renders for the CTA item', async () => {
+  it('route=workout: the mobile sliding bar stays mounted but fades to opacity 0 (no instant pop)', async () => {
     const wrapper = await mountWithRoute('workout')
     await flushPromises()
 
@@ -180,8 +209,73 @@ describe('ShellView active section indicator (item 3, round 9)', () => {
     const indicator = wrapper.get('[data-testid="nav-indicator"]')
     expect(indicator.attributes('aria-hidden')).toBe('true')
     expect(indicator.attributes('style')).toContain('opacity: 0')
-    // 4 subrayados (today/calendar/progress/profile): ninguno para "workout"
-    expect(wrapper.findAll('[data-testid="nav-underline"]')).toHaveLength(4)
+  })
+
+  // item 2 (v0.4.0): la fila de items desktop se alinea por abajo (no
+  // stretch) para que label+runa asienten en la línea del border-b del
+  // header en vez de "flotar" a media barra — ver comentario en ShellView.vue
+  it('item 2: the desktop nav row aligns items to the bottom (items-end) and the header is the positioning context for the indicator', async () => {
+    const wrapper = await mountWithRoute('progress')
+    await flushPromises()
+
+    const desktopHeader = wrapper.findAll('header')[0]
+    expect(desktopHeader.classes()).toContain('relative')
+    const ul = desktopHeader.get('ul')
+    expect(ul.classes()).toContain('items-end')
+    expect(ul.classes()).toContain('justify-center')
+  })
+
+  // item 1 (v0.4.0): indicador deslizante también en desktop — sigue el mismo
+  // contrato visual que el de móvil (montado siempre, crossfade en /workout)
+  // pero medido en px (offsetLeft/offsetWidth del item activo) porque los
+  // items son de ancho variable, no columnas iguales
+  it('item 1: desktop sliding indicator sits bottom-0 of the header and mirrors the mobile bar\'s opacity crossfade (hidden on /workout, visible elsewhere)', async () => {
+    const onWorkout = await mountWithRoute('workout')
+    await flushPromises()
+    const workoutIndicator = onWorkout.get('[data-testid="nav-indicator-desktop"]')
+    expect(workoutIndicator.classes()).toContain('bottom-0')
+    expect(workoutIndicator.attributes('aria-hidden')).toBe('true')
+    expect(workoutIndicator.attributes('style')).toContain('opacity: 0')
+
+    const onToday = await mountWithRoute('today')
+    await flushPromises()
+    expect(onToday.get('[data-testid="nav-indicator-desktop"]').attributes('style')).toContain('opacity: 1')
+  })
+
+  it('item 1: desktop sliding indicator transform/width track the active item\'s measured offsetLeft/offsetWidth and update on route change (jsdom has no real layout — offsetLeft/offsetWidth stubbed per <li>)', async () => {
+    const wrapper = await mountWithRoute('today')
+    await flushPromises()
+
+    const desktopItems = wrapper.findAll('header')[0].findAll('li')
+    expect(desktopItems).toHaveLength(5)
+    // geometría determinista y distinta por item: índice i -> left i*120, width 80+i*4
+    desktopItems.forEach((li, i) => {
+      Object.defineProperty(li.element, 'offsetLeft', { configurable: true, value: i * 120 })
+      Object.defineProperty(li.element, 'offsetWidth', { configurable: true, value: 80 + i * 4 })
+    })
+
+    // progress = índice 3 de 5 (today, calendar, workout, progress, profile)
+    await wrapper.vm.$router.push({ name: 'progress' })
+    await flushPromises()
+
+    const indicator = wrapper.get('[data-testid="nav-indicator-desktop"]')
+    expect(indicator.attributes('style')).toContain('translateX(360px)') // 3 * 120
+    expect(indicator.attributes('style')).toContain('width: 92px') // 80 + 3*4
+  })
+
+  it('item 1: desktop sliding indicator recomputes on window resize and cleans up the listener on unmount', async () => {
+    const addSpy = vi.spyOn(window, 'addEventListener')
+    const removeSpy = vi.spyOn(window, 'removeEventListener')
+    const wrapper = await mountWithRoute('today')
+    await flushPromises()
+
+    expect(addSpy).toHaveBeenCalledWith('resize', expect.any(Function))
+    const resizeCall = addSpy.mock.calls.find(([event]) => event === 'resize')
+    expect(resizeCall).toBeTruthy()
+    const handler = resizeCall![1]
+
+    wrapper.unmount()
+    expect(removeSpy).toHaveBeenCalledWith('resize', handler)
   })
 
   it('route=workout: the CTA glow fades in to full opacity on both bars (no breathing anymore — reverted to a single transition-driven layer)', async () => {

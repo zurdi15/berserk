@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import BkRune from '@/lib/BkRune.vue'
@@ -49,6 +49,41 @@ const activeIndex = computed(() => {
   return idx === -1 ? 0 : idx
 })
 
+// item 1 (v0.4.0, desktop nav polish): indicador deslizante también arriba,
+// como el de abajo — pero aquí los items son de ancho VARIABLE (etiquetas de
+// texto), no columnas iguales de 1/5, así que en vez de fracciones fijas se
+// mide el rectángulo real del item activo (offsetLeft/offsetWidth) y el
+// indicador se posiciona con transform+width en píxeles. El <header> es el
+// contexto de posicionamiento (position:relative, ver template) para que el
+// translateX() sea relativo al header entero (donde el <ul> vive centrado),
+// no al <li> — y para que el indicador pueda vivir bottom-0 DEL HEADER (item
+// 2), sobre la misma línea que su border-b.
+const desktopItemRefs = ref<(HTMLLIElement | null)[]>([])
+function setDesktopItemRef(el: Element | null, index: number) {
+  desktopItemRefs.value[index] = el as HTMLLIElement | null
+}
+
+const indicatorLeft = ref(0)
+const indicatorWidth = ref(0)
+
+function updateIndicator() {
+  const el = desktopItemRefs.value[activeIndex.value]
+  if (!el) return
+  indicatorLeft.value = el.offsetLeft
+  indicatorWidth.value = el.offsetWidth
+}
+
+onMounted(() => {
+  updateIndicator()
+  window.addEventListener('resize', updateIndicator)
+})
+onUnmounted(() => {
+  window.removeEventListener('resize', updateIndicator)
+})
+// activeIndex, no route.name: el ancho de los items es estático (5 fijos),
+// así que solo hace falta remedir cuando cambia CUÁL item está activo
+watch(activeIndex, () => nextTick(updateIndicator))
+
 // h-dvh (no min-h-dvh) en la raíz de abajo: un tope real de altura es lo que
 // permite que <main> reparta con flex-1 un alto DEFINIDO — sin él, una vista
 // que pida "ocupa el resto del viewport" (progresión, item 3) no tiene
@@ -63,14 +98,25 @@ const activeIndex = computed(() => {
 
 <template>
   <div class="h-dvh flex flex-col">
-    <!-- Desktop navbar: barra superior centrada con destinos (identidad por ahora en móvil) -->
-    <header class="hidden sm:block border-b border-line">
+    <!-- Desktop navbar: barra superior centrada con destinos (identidad por ahora en móvil).
+         relative: contexto de posicionamiento del indicador deslizante de abajo (item 1/2) —
+         translateX() queda relativo al header entero (donde el <ul> vive centrado), y el
+         indicador puede vivir bottom-0 DE AQUÍ, sobre la misma línea que border-b. -->
+    <header class="hidden sm:block border-b border-line relative">
       <nav :aria-label="$t('app.nav.label')">
-        <ul class="flex justify-center gap-2">
-          <li v-for="item in items" :key="item.name">
+        <!-- items-end (item 2): sin esto, align-items:stretch (default) estira cada <li> al
+             alto del más alto (la CTA, por su slab) pero el contenido de los DEMÁS items
+             (RouterLink, altura de contenido) se queda arriba de ESE <li> más alto, dejando
+             hueco vacío debajo antes de tocar el borde — los items "flotan" a media barra en
+             vez de asentar en la línea del border-b. items-end alinea cada <li> por su propio
+             borde inferior en vez de estirarlo, así que label+runa quedan al mismo nivel en
+             todos los items normales; la CTA sigue sobresaliendo por debajo vía su propio
+             -mb-5 (pintado fuera de su caja de layout, ver más abajo), sin tocar eso. -->
+        <ul class="flex items-end justify-center gap-2">
+          <li v-for="(item, index) in items" :key="item.name" :ref="(el) => setDesktopItemRef(el as Element | null, index)">
             <RouterLink
               :to="{ name: item.name }"
-              class="relative flex flex-col items-center gap-1 px-3 py-2 text-ink-faint hover:text-ink"
+              class="flex flex-col items-center gap-1 px-3 py-2 text-ink-faint hover:text-ink"
               active-class="text-aurora"
             >
               <span class="text-xs tracking-wide">{{ $t(item.label) }}</span>
@@ -103,21 +149,26 @@ const activeIndex = computed(() => {
                 </template>
                 <BkRune v-else :name="item.rune" :size="20" :carve="false" class="relative" />
               </span>
-              <!-- subrayado por item: entra con scale-in cuando la sección está
-                   activa — la CTA de entreno no lleva subrayado, su affordance
-                   ya es el glow fijo de arriba -->
-              <span
-                v-if="item.name !== 'workout'"
-                class="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-aurora"
-                :class="route.name === item.name ? 'scale-x-100' : 'scale-x-0'"
-                style="transition: transform var(--bk-dur-2) var(--bk-ease-out); transform-origin: center"
-                aria-hidden="true"
-                data-testid="nav-underline"
-              />
             </RouterLink>
           </li>
         </ul>
       </nav>
+      <!-- item 1: indicador deslizante único (no uno por item) — igual patrón que el de
+           móvil (SIEMPRE montado, cruza a opacity 0 en vez de desmontarse en /workout, ver
+           comentario de nav-indicator más abajo), pero medido en px porque los items no son
+           columnas iguales. width/transform con los mismos tokens dur-3/ease-out. -->
+      <div
+        class="absolute bottom-0 left-0 h-0.5 rounded-full bg-aurora"
+        :style="{
+          transform: `translateX(${indicatorLeft}px)`,
+          width: `${indicatorWidth}px`,
+          opacity: route.name === 'workout' ? 0 : 1,
+          transition:
+            'transform var(--bk-dur-3) var(--bk-ease-out), width var(--bk-dur-3) var(--bk-ease-out), opacity var(--bk-dur-3) var(--bk-ease-out)',
+        }"
+        aria-hidden="true"
+        data-testid="nav-indicator-desktop"
+      />
     </header>
     <AthleteBanner />
     <!-- Mobile bottom nav: barra inferior fija en móvil; oculta en desktop (por ahora sin cabecera de identidad) -->
@@ -186,15 +237,35 @@ const activeIndex = computed(() => {
         </ul>
       </div>
     </nav>
-    <main class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable px-4 py-4 pb-24 max-w-3xl w-full mx-auto">
-      <!-- sin Transition aquí a propósito (item 4): esto envolvía la vista
-           ENTERA en un fade bk-rise MIENTRAS su propio bk-stagger interno
-           corría con su propio delay — dos sistemas de animación a la vez,
-           el viewport se veía negro los primeros ~80ms tras navegar porque
-           las opacidades de ambos se multiplican. Cada vista es dueña de su
-           única animación de entrada ahora (bk-stagger/bk-rise propio, o
-           ninguna si no hace falta) — ver auditoría por vista en el informe. -->
-      <RouterView />
+    <!-- item 3 (v0.4.0, scrollbar): <main> es ahora el scroll container A ANCHO COMPLETO
+         (sin max-w-3xl/mx-auto) — así su scrollbar pinta en el borde real de la ventana,
+         no pegada al canto de la columna de contenido. La columna centrada vive en el
+         <div> de abajo, que absorbe el px/py que antes llevaba <main>. bk-scroll-stable
+         se queda en <main> (es donde el scroll ocurre de verdad); pb-24 igual, para que
+         el hueco del navbar móvil fijo se reserve en el contenedor que scrollea. -->
+    <main class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable pb-24 w-full">
+      <!-- h-full (NO min-h-full): probado en real (headless Chromium) que min-height por
+           sí solo NO alcanza — un <div> con solo min-height:100% resuelve su propia caja a
+           esa altura cuando el contenido es corto, pero un hijo con height:100% (el h-full
+           de ProgressView, ver ProgressView.vue) NO hereda esa referencia: el spec trata la
+           altura del padre como "auto" (depende de contenido) para propósitos de % en los
+           hijos salvo que la propiedad height (no min-height) esté fijada explícitamente.
+           height:100% aquí SÍ resuelve h-full/flex-1/min-h-0 de las vistas (ProgressView,
+           el chart anclado abajo de Entrenos, el flex-fill de Récords) y, con overflow
+           visible (default, sin overflow-hidden en esta caja), las vistas ALTAS (más
+           contenido que el viewport) siguen desbordando con normalidad hacia el scroll
+           real de <main> — verificado también en real: main.scrollHeight crece igual con
+           contenido de 2000px de alto dentro de esta caja de altura fija. -->
+      <div class="max-w-3xl mx-auto w-full h-full flex flex-col px-4 pt-4">
+        <!-- sin Transition aquí a propósito (item 4): esto envolvía la vista
+             ENTERA en un fade bk-rise MIENTRAS su propio bk-stagger interno
+             corría con su propio delay — dos sistemas de animación a la vez,
+             el viewport se veía negro los primeros ~80ms tras navegar porque
+             las opacidades de ambos se multiplican. Cada vista es dueña de su
+             única animación de entrada ahora (bk-stagger/bk-rise propio, o
+             ninguna si no hace falta) — ver auditoría por vista en el informe. -->
+        <RouterView />
+      </div>
     </main>
   </div>
 </template>
