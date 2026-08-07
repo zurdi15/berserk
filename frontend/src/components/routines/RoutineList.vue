@@ -159,27 +159,31 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4">
-    <!-- item 7: sin título "Rutinas" (la pestaña de Perfil ya lo dice) — el
-         botón de crear queda solo, pegado al borde izquierdo de esta fila.
-         item 10: en vacío el botón se muda DENTRO del BkEmpty de abajo, así
-         que esta fila solo vive antes de listo (evita el flash "sin botón")
-         o cuando SÍ hay algo en la lista unificada — nunca los dos botones
-         a la vez. -->
-    <div v-if="!ready || displayRoutines.length > 0" class="flex items-center">
-      <BkButton
-        variant="primary"
-        size="sm"
-        data-testid="new-routine-btn"
-        @click="openEditor()"
+    <!-- item 2/3 (v0.4.3, zurdi): esqueleto (shimmer) mientras carga, mismo
+         hueco que las cards reales — antes esto era un gate a blanco
+         (v-if="ready") que hacía saltar el layout al llegar los datos
+         (Biblioteca/Admin tenían el mismo problema, ver esos componentes).
+         Filas aprox. del mismo alto que una card real (rune 32px + 2 líneas
+         de texto), mismo idiom bk-shimmer que ExercisePicker. -->
+    <div v-if="!ready" class="grid gap-3" data-testid="routine-list-skeleton">
+      <div
+        v-for="n in 3"
+        :key="n"
+        class="p-4 border border-line rounded-sm bg-stone flex items-center gap-3"
+        aria-hidden="true"
       >
-        {{ $t('routines.newRoutine') }}
-      </BkButton>
+        <div class="w-8 h-8 rounded-sm bk-shimmer shrink-0" />
+        <div class="flex-1 min-w-0 space-y-2">
+          <div class="h-4 w-2/3 rounded-sm bk-shimmer" />
+          <div class="h-3 w-1/3 rounded-sm bk-shimmer" />
+        </div>
+      </div>
     </div>
 
     <!-- UNIFIED-LISTINGS: UNA lista con mías + plantillas globales/públicas
          de otros — gateada en ready para no mostrar el vacío y luego
          reemplazarlo de golpe por la lista real. -->
-    <div v-if="ready && displayRoutines.length > 0" class="grid gap-3">
+    <div v-else-if="displayRoutines.length > 0" class="grid gap-3">
       <div
         v-for="item in displayRoutines"
         :key="`${item.kind}-${item.id}`"
@@ -192,10 +196,18 @@ onMounted(() => {
              real (toggle de expansión, side-quest 1 follow-up): las acciones
              quedan FUERA de él como hermano, para que editar/borrar/copiar
              no disparen también el expand/collapse. -->
-        <div class="flex items-start gap-3">
+        <!-- item 12 (v0.4.3, zurdi): items-center (antes items-start) — la
+             runa y el grupo de acciones (BkActionBtn) centran contra el alto
+             REAL de la fila, que lo pone el botón de info (el más alto,
+             nombre+descripción+contador pueden ser 2-3 líneas). items-center
+             TAMBIÉN dentro del propio botón (ver su clase, justo debajo): sin
+             eso, aunque el botón ya fuera el hijo más alto de la fila, la
+             runa se quedaría pegada arriba DENTRO de él, no centrada contra
+             su propio bloque de texto. -->
+        <div class="flex items-center gap-3">
           <button
             type="button"
-            class="bk-press flex flex-1 min-w-0 items-start gap-3 text-left"
+            class="bk-press flex flex-1 min-w-0 items-center gap-3 text-left"
             :aria-expanded="expandedIds.has(item.id) ? 'true' : 'false'"
             :data-testid="item.kind === 'own' ? `toggle-routine-${item.id}` : `toggle-template-${item.id}`"
             @click="toggleExpanded(item.id)"
@@ -322,12 +334,29 @@ onMounted(() => {
          sola vez, cuando NADA de la lista unificada (mías + plantillas) hay
          que mostrar — ya no un BkEmpty separado por sección. -->
     <BkEmpty
-      v-else-if="ready"
+      v-else
       :message="$t('routines.noRoutines')"
       :action-label="$t('routines.newRoutine')"
       action-testid="new-routine-btn"
       @action="openEditor()"
     />
+
+    <!-- item 1 (v0.4.3, zurdi): "Nueva rutina" se muda DEBAJO de la lista
+         (antes vivía arriba, a la izquierda) — mismo criterio que
+         ExerciseManager/MuscleGroupManager, donde "Nuevo ejercicio"/"Nuevo
+         grupo" ya vivían bajo su lista. Vive antes/durante ready o con la
+         lista no vacía (nunca en el estado vacío: el botón de BkEmpty ya lo
+         cubre arriba, evita el duplicado). -->
+    <div v-if="!ready || displayRoutines.length > 0" class="flex items-center">
+      <BkButton
+        variant="primary"
+        size="sm"
+        data-testid="new-routine-btn"
+        @click="openEditor()"
+      >
+        {{ $t('routines.newRoutine') }}
+      </BkButton>
+    </div>
 
     <!-- Editor Sheet -->
     <RoutineEditorSheet

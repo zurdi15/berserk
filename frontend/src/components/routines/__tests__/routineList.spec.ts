@@ -101,6 +101,34 @@ describe('RoutineList', () => {
     expect(editor.props('routine')).toBeUndefined()
   })
 
+  // item 1 (v0.4.3, zurdi): "Nueva rutina" se muda debajo de la lista
+  it('item 1: the new-routine button renders AFTER the list in the DOM (below it), not before', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    await wrapper.vm.$nextTick()
+
+    const root = wrapper.get('.space-y-4').element
+    const grid = wrapper.get('.grid.gap-3').element
+    const button = wrapper.get('[data-testid="new-routine-btn"]').element
+    const children = Array.from(root.children)
+    expect(children.indexOf(grid)).toBeLessThan(children.indexOf(button.parentElement!))
+  })
+
+  // item 12 (v0.4.3, zurdi): la runa y el grupo de acciones centran contra
+  // el alto de la fila (antes items-start, top-aligned contra una columna
+  // de info de varias líneas)
+  it('item 12: the card row and its info button center their content vertically (items-center)', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    await wrapper.vm.$nextTick()
+
+    const row = wrapper.get('[data-testid="toggle-routine-1"]').element.parentElement!
+    expect(row.classList.contains('items-center')).toBe(true)
+    expect(wrapper.get('[data-testid="toggle-routine-1"]').classes()).toContain('items-center')
+  })
+
   it('displays routines after loading', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
@@ -380,7 +408,11 @@ describe('RoutineList', () => {
     })
   })
 
-  it('gates the list on readiness: neither the list nor the empty state show while listRoutines is pending, both possibilities appear once it resolves', async () => {
+  // item 2/3 (v0.4.3, zurdi): el gate-a-blanco se reemplaza por un esqueleto
+  // shimmer con el mismo hueco que la lista real — ya no "nada" mientras
+  // carga, sino filas placeholder; ni la lista real ni el vacío conviven con
+  // el esqueleto, y al resolver se intercambian limpiamente.
+  it('gates the list on readiness: the skeleton shows while listRoutines is pending (no real list, no empty state), swapped once it resolves', async () => {
     const { listRoutines } = await import('@/api/domain')
     let resolveList: (value: never) => void = () => {}
     vi.mocked(listRoutines).mockImplementationOnce(() => new Promise((resolve) => { resolveList = resolve }))
@@ -388,15 +420,17 @@ describe('RoutineList', () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
 
-    // pendiente: ni la lista (grid) ni el mensaje vacío deben estar en el DOM
-    expect(wrapper.find('.grid.gap-3').exists()).toBe(false)
+    // pendiente: esqueleto presente, ni la lista real ni el mensaje vacío
+    expect(wrapper.find('[data-testid="routine-list-skeleton"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="routine-list-skeleton"] .bk-shimmer').length).toBeGreaterThan(0)
     expect(wrapper.text()).not.toContain('Sin rutinas aún')
 
     resolveList([] as never)
     await new Promise(resolve => setTimeout(resolve, 0))
     await wrapper.vm.$nextTick()
 
-    // resuelto (vacío en este caso): ahora sí aparece el mensaje
+    // resuelto (vacío en este caso): el esqueleto se retira y aparece el mensaje
+    expect(wrapper.find('[data-testid="routine-list-skeleton"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Sin rutinas aún')
   })
 
