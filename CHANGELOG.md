@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.11.0 - 2026-08-07
+
+### Added
+- Objetivo de peso corporal: card en Progresión → Cuerpo para fijar tu peso objetivo, con saludo de cuánto te queda cada vez que registras un peso (`users.goal_weight_kg`, migración `664da4568810`).
+- Grupo muscular **Cardio** (global, runa raidho): primario de todos los ejercicios de cardio y visible en todos los selectores de grupo.
+- `GroupFilterSelect`: el filtro por grupo muscular es ahora un componente compartido, presente en la biblioteca, en añadir ejercicio y en el picker de progresión.
+- Registrar un entreno pasado desde el calendario permite elegir la hora de inicio (antes se forzaba a las 12:00).
+
+### Changed
+- El panel de hora (`BkTimeField`) pierde el botón Cancelar — Escape o tocar fuera ya cancelan — y su pie deja de desbordar por la derecha en móvil.
+
 ## 0.10.0 - 2026-08-07
 
 - Rest timer ending feels finished now: the central button holds an aurora check with a full glow for a beat, the cancel X folds away, and the rune carves itself back in — no more abrupt vanish.
