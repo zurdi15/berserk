@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.9.3 - 2026-08-07
+
+- Progress > Workouts: picking an exercise now opens its chart in a drawer (titled with the exercise) instead of rendering it under the list — the tab is just the list, nothing else ever scrolls.
+
 ## 0.9.2 - 2026-08-07
 
 - Fixed the "cards repaint in a different shade right after their entrance animation" glitch across every section: the global grain overlay now always sits above the content, animating or not.
