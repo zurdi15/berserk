@@ -42,13 +42,30 @@ function onClick(direction: 1 | -1, event: MouseEvent) {
 }
 
 onBeforeUnmount(release)
+
+// item 11 (v0.4.3, zurdi): fila EDGE-TO-EDGE — "−" pinned al borde
+// izquierdo, "+" al borde derecho, valor centrado entre los dos (w-full +
+// justify-between en la raíz del template, en vez de un gap fijo entre 3
+// hijos). Antes el valor llevaba un min-w propio (fix post-0.3.0 para el
+// jitter de pesos x.5: "22.5 kg" es más ancho que "20 kg") que empujaba el
+// botón "+" cuando el texto crecía — cada CONTENEDOR ahora le da a este root
+// un ancho acotado (grid column, div de bloque, o flex-col con w-full
+// ganando sobre items-center) y este flex se limita a repartir ESE ancho:
+// los botones quedan en los extremos SIEMPRE, sin importar cuánto mida el
+// valor, así que el min-w del span ya no hace falta — más simple y más
+// estable a la vez (fix real, no solo paliativo). El tabular-nums que pedía
+// el fix ya lo da bk-metric (font-variant-numeric, ver base.css), sin
+// repetirlo como utilidad Tailwind aparte.
+// (comentario aquí y no como primer hijo de <template>: un comentario ahí
+// convierte la raíz en un fragmento de dos nodos y rompe wrapper.classes()
+// en los tests, ver el mismo criterio en ProgressView.vue/BkChart.vue)
 </script>
 
 <template>
-  <div class="flex items-center" :class="size === 'compact' ? 'gap-1.5' : 'gap-3'">
+  <div class="w-full flex items-center justify-between gap-2">
     <button
       type="button"
-      class="bk-press bk-slab select-none text-ink-muted hover:text-ink"
+      class="bk-press bk-slab select-none text-ink-muted hover:text-ink shrink-0"
       :class="size === 'compact' ? 'w-8 h-8 text-lg' : 'w-12 h-12 text-xl'"
       style="touch-action: manipulation"
       :aria-label="$t('common.decrease')"
@@ -61,13 +78,13 @@ onBeforeUnmount(release)
     </button>
     <span
       class="bk-metric text-ink text-center"
-      :class="size === 'compact' ? 'text-lg min-w-11' : 'text-2xl min-w-16'"
+      :class="size === 'compact' ? 'text-lg' : 'text-2xl'"
     >
       {{ modelValue }}<span v-if="suffix" class="text-sm text-ink-faint ml-1">{{ suffix }}</span>
     </span>
     <button
       type="button"
-      class="bk-press bk-slab select-none text-aurora"
+      class="bk-press bk-slab select-none text-aurora shrink-0"
       :class="size === 'compact' ? 'w-8 h-8 text-lg' : 'w-12 h-12 text-xl'"
       style="touch-action: manipulation"
       :aria-label="$t('common.increase')"

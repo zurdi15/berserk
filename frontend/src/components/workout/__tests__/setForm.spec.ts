@@ -250,7 +250,7 @@ describe('SetForm', () => {
 
     it('item 4b: weight and reps are laid out as a stable two-column grid (never flex-wrap) for strength', () => {
       wrapper = build('strength')
-      const grid = wrapper.get('.bk-set-grid')
+      const grid = wrapper.get('.grid.grid-cols-2')
       expect(grid.classes()).toEqual(expect.arrayContaining(['grid', 'grid-cols-2']))
       const columns = Array.from(grid.element.children)
       expect(columns).toHaveLength(2)
@@ -259,13 +259,13 @@ describe('SetForm', () => {
 
     it('item 4b: reps and (optional) weight are also a two-column grid for bodyweight', () => {
       wrapper = build('bodyweight')
-      const grid = wrapper.get('.bk-set-grid')
+      const grid = wrapper.get('.grid.grid-cols-2')
       expect(grid.classes()).toEqual(expect.arrayContaining(['grid', 'grid-cols-2']))
     })
 
     it('item 4b: duration and distance are a two-column grid for cardio', () => {
       wrapper = build('cardio')
-      const grid = wrapper.get('.bk-set-grid')
+      const grid = wrapper.get('.grid.grid-cols-2')
       expect(grid.classes()).toEqual(expect.arrayContaining(['grid', 'grid-cols-2']))
     })
 
@@ -275,7 +275,7 @@ describe('SetForm', () => {
       // columnas en un móvil real (ver la aritmética en SetForm.vue)
       for (const measurement of ['strength', 'bodyweight', 'cardio'] as const) {
         wrapper = build(measurement)
-        const gridButtons = wrapper.get('.bk-set-grid').findAll('button')
+        const gridButtons = wrapper.get('.grid.grid-cols-2').findAll('button')
         expect(gridButtons.length).toBeGreaterThan(0)
         for (const button of gridButtons) {
           expect(button.classes()).toEqual(expect.arrayContaining(['w-8', 'h-8']))
@@ -287,7 +287,7 @@ describe('SetForm', () => {
 
     it('item 2 (post-0.3.0): the strength grid uses the tighter gap-2 (not the old gap-3) between columns', () => {
       wrapper = build('strength')
-      const grid = wrapper.get('.bk-set-grid')
+      const grid = wrapper.get('.grid.grid-cols-2')
       expect(grid.classes()).toContain('gap-2')
       expect(grid.classes()).not.toContain('gap-3')
     })

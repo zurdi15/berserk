@@ -164,6 +164,53 @@ describe('BkStepper', () => {
     expect(plus.classes()).toEqual(expect.arrayContaining(['w-8', 'h-8']))
     expect(minus.classes()).not.toContain('w-12')
   })
+
+  // item 11 (v0.4.3, zurdi): "−"/"+" pinned a los bordes del contenedor
+  // (w-full + justify-between), el valor centrado entre los dos — un valor
+  // más ancho (p.ej. "22.5" frente a "20") ya no desplaza los botones,
+  // porque su posición depende del CONTENEDOR, no del texto del valor.
+  it('item 11: root spans the full width and distributes children edge-to-edge (justify-between)', () => {
+    const wrapper = mount(BkStepper, {
+      props: { modelValue: 5 },
+      global: { plugins: [createI18nInstance()] },
+    })
+    expect(wrapper.classes()).toEqual(expect.arrayContaining(['w-full', 'flex', 'items-center', 'justify-between']))
+  })
+
+  it('item 11: both buttons carry shrink-0 (fixed square size, never compressed by a wide value at narrow widths)', () => {
+    const wrapper = mount(BkStepper, {
+      props: { modelValue: 5 },
+      global: { plugins: [createI18nInstance()] },
+    })
+    const [minus, plus] = wrapper.findAll('button')
+    expect(minus.classes()).toContain('shrink-0')
+    expect(plus.classes()).toContain('shrink-0')
+  })
+
+  it('item 11: the value span carries no fixed/min width — its footprint no longer needs to be pre-sized to keep the buttons still', () => {
+    const wrapper = mount(BkStepper, {
+      props: { modelValue: 5 },
+      global: { plugins: [createI18nInstance()] },
+    })
+    const value = wrapper.get('.bk-metric')
+    expect(value.classes()).not.toContain('min-w-11')
+    expect(value.classes()).not.toContain('min-w-16')
+  })
+
+  it('item 11: a value that grows wider (x.5) never moves the buttons out of their DOM position — the layout model (edge-pinning), not the value width, keeps them still', async () => {
+    const wrapper = mount(BkStepper, {
+      props: { modelValue: 20, step: 2.5 },
+      global: { plugins: [createI18nInstance()] },
+    })
+    const buttonsBefore = wrapper.findAll('button').map((b) => b.classes().join(' '))
+    await wrapper.setProps({ modelValue: 22.5 })
+    const buttonsAfter = wrapper.findAll('button').map((b) => b.classes().join(' '))
+    // las clases (y por tanto el tamaño/posición estructural) de los
+    // botones son IDÉNTICAS antes y después: nada en su propio markup
+    // reacciona al ancho del valor — la estabilidad pixel-real la da el
+    // modelo de layout (edge-to-edge), no un ajuste por valor
+    expect(buttonsAfter).toEqual(buttonsBefore)
+  })
 })
 
 describe('BkRing', () => {

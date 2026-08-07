@@ -47,6 +47,17 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+// item 11 (v0.4.3, zurdi): el <style scoped> que vivía aquí (ancho FIJO por
+// :deep(.bk-metric), uno por columna vía .bk-set-col-*) queda retirado — era
+// el arreglo del jitter de pesos x.5 empujando el botón "+" (ver git
+// history), pero dependía de que el ancho del VALOR determinara dónde caían
+// los botones. BkStepper.vue ahora se estabiliza a sí mismo (w-full +
+// justify-between: los botones se pinnean a los bordes del contenedor, el
+// valor cambia de ancho SIN moverlos) — la fijación por columna de aquí ya
+// no aportaba nada, solo duplicaba la lógica de estabilidad en dos sitios.
+// Las columnas grid-cols-2 del template siguen dándole a cada BkStepper un
+// ancho ACOTADO (el propio track de la columna), que es todo lo que el
+// nuevo modelo necesita.
 const units = computed(() => props.units)
 
 // paso/valores por defecto en el espacio de la unidad del usuario: 2.5 kg es
@@ -162,40 +173,40 @@ function onCountdownCancel() {
          propia línea. Con grid grid-cols-2 cada columna tiene un ancho FIJO
          (independiente del contenido); min-w-0 es la garantía estándar de
          Tailwind para que ese contenido nunca fuerce la columna a crecer -->
-    <div v-if="measurement === 'strength'" class="w-full grid grid-cols-2 gap-2 bk-set-grid">
-      <div class="min-w-0 flex flex-col items-center bk-set-col-weight">
+    <div v-if="measurement === 'strength'" class="w-full grid grid-cols-2 gap-2">
+      <div class="min-w-0 flex flex-col items-center">
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weight') }}</span>
         <BkStepper v-model="weightDisplay" size="compact" :step="WEIGHT_UI[units].step" :min="2.5" :max="WEIGHT_UI[units].max" :suffix="units" />
       </div>
-      <div class="min-w-0 flex flex-col items-center bk-set-col-reps">
+      <div class="min-w-0 flex flex-col items-center">
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
         <BkStepper v-model="reps" size="compact" :step="1" :min="1" :max="100" />
       </div>
     </div>
 
-    <div v-else-if="measurement === 'bodyweight'" class="w-full grid grid-cols-2 gap-2 bk-set-grid">
-      <div class="min-w-0 flex flex-col items-center bk-set-col-reps">
+    <div v-else-if="measurement === 'bodyweight'" class="w-full grid grid-cols-2 gap-2">
+      <div class="min-w-0 flex flex-col items-center">
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
         <BkStepper v-model="reps" size="compact" :step="1" :min="1" :max="100" />
       </div>
-      <div class="min-w-0 flex flex-col items-center bk-set-col-weight">
+      <div class="min-w-0 flex flex-col items-center">
         <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weightOptional') }}</span>
         <BkStepper v-model="weightDisplay" size="compact" :step="WEIGHT_UI[units].step" :min="0" :max="WEIGHT_UI[units].max" :suffix="units" />
       </div>
     </div>
 
-    <div v-else-if="measurement === 'timed'" class="flex flex-col items-center">
+    <div v-else-if="measurement === 'timed'" class="w-full flex flex-col items-center">
       <span class="block text-xs text-ink-muted mb-2">{{ t('workout.duration') }}</span>
       <BkStepper v-model="durationSeconds" :step="15" :min="1" :max="3600" suffix="s" />
     </div>
 
     <div v-else-if="measurement === 'cardio'" class="w-full space-y-3 flex flex-col items-center">
-      <div class="w-full grid grid-cols-2 gap-2 bk-set-grid">
-        <div class="min-w-0 flex flex-col items-center bk-set-col-duration">
+      <div class="w-full grid grid-cols-2 gap-2">
+        <div class="min-w-0 flex flex-col items-center">
           <span class="block text-xs text-ink-muted mb-2">{{ t('workout.duration') }}</span>
           <BkStepper v-model="durationSeconds" size="compact" :step="60" :min="1" :max="21600" suffix="s" />
         </div>
-        <div class="min-w-0 flex flex-col items-center bk-set-col-distance">
+        <div class="min-w-0 flex flex-col items-center">
           <span class="block text-xs text-ink-muted mb-2">{{ t('workout.distanceOptional') }}</span>
           <BkStepper v-model="distanceM" size="compact" :step="100" :min="0" :max="100000" suffix="m" />
         </div>
@@ -246,41 +257,3 @@ function onCountdownCancel() {
   </form>
 </template>
 
-<style scoped>
-/* item 4b (round anterior): BkStepper.vue le da al valor un min-width, no un
-   ancho fijo: con pesos x.5 ("22.5 kg" frente a "20 kg") la fila entera del
-   stepper cambiaba de tamaño. Aquí, solo para las columnas del cajón de
-   series (.bk-set-grid), se fija un ancho CONSTANTE al slot del valor con
-   :deep() — acotado a este componente y no alcanza a CardioCountdown (vive
-   en este archivo pero fuera de la rejilla) ni a otros consumidores de
-   BkStepper (p.ej. RoutineEditorSheet).
-
-   item 2 (post-0.3.0): en un móvil real, "md" + gap-3 + 6rem por columna NO
-   cabía en dos columnas desde 360px — la "−" de Peso y el stepper de Reps
-   se solapaban. Aritmética del arreglo (size="compact" en BkStepper: botón
-   2rem, gap interno 1.5rem/2 = 0.375rem×2, ver BkStepper.vue):
-     por stepper = 2rem(botón) + 0.375rem(gap) + VALOR + 0.375rem(gap) + 2rem(botón)
-                 = 4.75rem + VALOR
-   Peso/Reps (fila strength y bodyweight):
-     Peso  (VALOR 5rem, cabe "888.8kg" con margen) → 9.75rem
-     Reps  (VALOR 2.75rem, cabe "100")             → 7.5rem
-     total = 9.75 + 7.5 + 0.5rem (gap-2 de la rejilla) = 17.75rem = 284px
-   Duración/Distancia (fila cardio):
-     Duración  (VALOR 4rem, cabe "21600s")   → 8.75rem
-     Distancia (VALOR 4.5rem, cabe "100000m") → 9.25rem
-     total = 8.75 + 9.25 + 0.5rem = 18.5rem = 296px
-   Ambas filas ≤ 328px (360px de viewport − 2rem de padding del BkSheet, p-4
-   a cada lado) — el peor caso real, con margen. */
-.bk-set-col-weight :deep(.bk-metric) {
-  width: 5rem;
-}
-.bk-set-col-reps :deep(.bk-metric) {
-  width: 2.75rem;
-}
-.bk-set-col-duration :deep(.bk-metric) {
-  width: 4rem;
-}
-.bk-set-col-distance :deep(.bk-metric) {
-  width: 4.5rem;
-}
-</style>
