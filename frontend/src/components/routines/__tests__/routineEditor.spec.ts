@@ -480,14 +480,17 @@ describe('RoutineEditorSheet', () => {
   // editor, disponible a CUALQUIER usuario sobre su propia rutina (nunca
   // admin-only, sin confirm — a diferencia del extinto flujo globalize).
   describe('ROUTINES-OPEN: "Global" checkbox', () => {
-    it('is unchecked by default when creating a new routine, even for a non-admin user', async () => {
+    // v0.4.3 item 10 (zurdi): el default de creación pasó de false a true —
+    // la mayoría de rutinas nuevas se quieren compartidas de entrada, mismo
+    // criterio que el default del backend (RoutineIn.is_global)
+    it('is checked by default when creating a new routine, even for a non-admin user', async () => {
       const wrapper = build()
       await wrapper.vm.$nextTick()
 
       const dialogs = document.querySelectorAll('[role="dialog"]')
       const dialog = dialogs[dialogs.length - 1] as HTMLElement
       const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
-      expect(checkbox.checked).toBe(false)
+      expect(checkbox.checked).toBe(true)
     })
 
     it('reflects the routine\'s is_global when editing an existing one', async () => {
@@ -507,7 +510,7 @@ describe('RoutineEditorSheet', () => {
       expect(checkbox.checked).toBe(true)
     })
 
-    it('checking it and saving a NEW routine sends is_global: true to createRoutine', async () => {
+    it('saving a NEW routine without touching the (already-checked) checkbox sends is_global: true to createRoutine', async () => {
       const { createRoutine } = await import('@/api/domain')
       vi.mocked(createRoutine).mockClear()
 
@@ -519,9 +522,9 @@ describe('RoutineEditorSheet', () => {
 
       const dialogs = document.querySelectorAll('[role="dialog"]')
       const dialog = dialogs[dialogs.length - 1] as HTMLElement
+      // sin tocar el checkbox: ya nace marcado (item 10)
       const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
-      checkbox.checked = true
-      checkbox.dispatchEvent(new Event('change'))
+      expect(checkbox.checked).toBe(true)
       await wrapper.vm.$nextTick()
 
       const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
@@ -530,6 +533,31 @@ describe('RoutineEditorSheet', () => {
       await new Promise(resolve => setTimeout(resolve, 0))
 
       expect(createRoutine).toHaveBeenCalledWith(expect.objectContaining({ is_global: true }))
+    })
+
+    it('unchecking it on CREATE sends is_global: false to createRoutine (the user opted out)', async () => {
+      const { createRoutine } = await import('@/api/domain')
+      vi.mocked(createRoutine).mockClear()
+
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+
+      const vm = wrapper.vm as any
+      vm.name = 'Private routine'
+
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const dialog = dialogs[dialogs.length - 1] as HTMLElement
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
+      checkbox.checked = false
+      checkbox.dispatchEvent(new Event('change'))
+      await wrapper.vm.$nextTick()
+
+      const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+      saveButton!.click()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(createRoutine).toHaveBeenCalledWith(expect.objectContaining({ is_global: false }))
     })
 
     it('unchecking it and saving an existing GLOBAL routine sends is_global: false to updateRoutine (round trip)', async () => {

@@ -137,7 +137,11 @@ async function initializeForm() {
     name.value = ''
     description.value = ''
     selectedRune.value = null
-    isGlobal.value = false
+    // v0.4.3 item 10 (zurdi): "Global" nace marcado al crear — la mayoría de
+    // rutinas nuevas se quieren compartidas de entrada, y el backend ya
+    // asume lo mismo (RoutineIn.is_global default True). Editar sigue
+    // leyendo el valor REAL de la rutina (rama de arriba, sin cambios).
+    isGlobal.value = true
     exercises.value = []
   }
 

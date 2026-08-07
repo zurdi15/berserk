@@ -8,7 +8,11 @@ class RoutineIn(BaseModel):
     color: str | None = Field(None, max_length=30)
     # ROUTINES-OPEN: el check "Global" del editor se puede marcar ya al
     # crear, no solo al editar (a diferencia del viejo flujo globalize)
-    is_global: bool = False
+    # v0.4.3 item 10 (zurdi): default a True — la mayoría de rutinas que se
+    # crean se quieren compartidas de entrada; quien de verdad la quiere
+    # privada ya sabe destildar el check antes de guardar. PATCH no toca este
+    # default (RoutinePatchIn.is_global sigue en None = no lo toques).
+    is_global: bool = True
 
 
 class RoutinePatchIn(BaseModel):

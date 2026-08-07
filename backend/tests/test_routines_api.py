@@ -98,9 +98,11 @@ def test_put_exercises_rejects_invisible_exercise(client: TestClient, app):
 
 
 def _routine_with_exercise(caller, name: str, exercise_id: int, *, is_global: bool = False) -> int:
-    rid = caller.post("/api/v1/routines", json={"name": name}).json()["id"]
-    if is_global:
-        caller.patch(f"/api/v1/routines/{rid}", json={"is_global": True})
+    # is_global explícito en el propio POST (v0.4.3 item 10: el default de la
+    # API pasó a True) — así el default False de ESTE helper (la mayoría de
+    # tests de este archivo quieren una rutina PRIVADA) sigue produciendo una
+    # rutina privada de verdad, sin depender de un PATCH aparte
+    rid = caller.post("/api/v1/routines", json={"name": name, "is_global": is_global}).json()["id"]
     caller.put(
         f"/api/v1/routines/{rid}/exercises", json=[{"exercise_id": exercise_id, "target_sets": 3}]
     )
@@ -302,7 +304,10 @@ def test_legacy_owner_null_routine_stays_visible_and_admin_editable(client: Test
 
 
 def test_is_global_toggle_via_patch(client: TestClient):
-    rid = client.post("/api/v1/routines", json={"name": "Toggle"}).json()["id"]
+    # is_global explícito a False: este test cubre el round-trip del PATCH,
+    # no el default de creación (ver test_create_routine_defaults_to_global
+    # para eso) — v0.4.3 item 10 cambió ese default a True
+    rid = client.post("/api/v1/routines", json={"name": "Toggle", "is_global": False}).json()["id"]
     assert client.get(f"/api/v1/routines/{rid}").json()["is_global"] is False
 
     resp = client.patch(f"/api/v1/routines/{rid}", json={"is_global": True})
@@ -336,6 +341,17 @@ def test_create_routine_with_is_global_true_is_immediately_visible_to_others(
     rid = client.post(
         "/api/v1/routines", json={"name": "Full body", "is_global": True}
     ).json()["id"]
+
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    assert any(r["id"] == rid for r in freyja.get("/api/v1/routines/templates").json())
+
+
+# v0.4.3 item 10 (zurdi): "Global" nace marcado — crear sin mandar el campo
+# (a diferencia del test de arriba, que lo manda explícito) debe salir global
+def test_create_routine_without_is_global_defaults_to_global(client: TestClient, app):
+    rid = client.post("/api/v1/routines", json={"name": "Full body"}).json()["id"]
+    assert client.get(f"/api/v1/routines/{rid}").json()["is_global"] is True
 
     make_user(client, "freyja")
     freyja = login(app, "freyja")
