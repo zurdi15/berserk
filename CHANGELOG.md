@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.9.5 - 2026-08-07
+
+- The auto-rest toggle now lives in the workout header, under the timer and date, sharing a row with the muscle-group chips.
+
 ## 0.9.4 - 2026-08-07
 
 - Cardio blocks are now self-contained: the duration/distance form lives right on the card (no more "Add cardio" button or drawer detour) and cardio never triggers a rest — no rest control, no auto timer.
