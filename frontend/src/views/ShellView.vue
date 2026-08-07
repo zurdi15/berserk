@@ -237,26 +237,77 @@ watch(activeIndex, () => nextTick(updateIndicator))
         </ul>
       </div>
     </nav>
-    <!-- item 3 (v0.4.0, scrollbar): <main> es ahora el scroll container A ANCHO COMPLETO
-         (sin max-w-3xl/mx-auto) — así su scrollbar pinta en el borde real de la ventana,
-         no pegada al canto de la columna de contenido. La columna centrada vive en el
-         <div> de abajo, que absorbe el px/py que antes llevaba <main>. bk-scroll-stable
-         se queda en <main> (es donde el scroll ocurre de verdad); pb-24 igual, para que
-         el hueco del navbar móvil fijo se reserve en el contenedor que scrollea. -->
-    <main class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable pb-24 w-full">
-      <!-- h-full (NO min-h-full): probado en real (headless Chromium) que min-height por
-           sí solo NO alcanza — un <div> con solo min-height:100% resuelve su propia caja a
-           esa altura cuando el contenido es corto, pero un hijo con height:100% (el h-full
-           de ProgressView, ver ProgressView.vue) NO hereda esa referencia: el spec trata la
-           altura del padre como "auto" (depende de contenido) para propósitos de % en los
-           hijos salvo que la propiedad height (no min-height) esté fijada explícitamente.
-           height:100% aquí SÍ resuelve h-full/flex-1/min-h-0 de las vistas (ProgressView,
-           el chart anclado abajo de Entrenos, el flex-fill de Récords) y, con overflow
-           visible (default, sin overflow-hidden en esta caja), las vistas ALTAS (más
-           contenido que el viewport) siguen desbordando con normalidad hacia el scroll
-           real de <main> — verificado también en real: main.scrollHeight crece igual con
-           contenido de 2000px de alto dentro de esta caja de altura fija. -->
-      <div class="max-w-3xl mx-auto w-full h-full flex flex-col px-4 pt-4">
+    <!-- item 3 (v0.4.0, scrollbar): <main> es el scroll container A ANCHO COMPLETO (sin
+         max-w-3xl/mx-auto) — así su scrollbar pinta en el borde real de la ventana, no
+         pegada al canto de la columna de contenido. La columna centrada vive en el <div>
+         de abajo. bk-scroll-stable se queda en <main> (es donde el scroll ocurre de
+         verdad).
+         v0.4.1: <main> ya NO lleva pb-24/padding — ver el comentario del spacer, más abajo,
+         para el porqué completo (el hueco del navbar fijo se mudó a un elemento de flujo
+         real, DENTRO del wrapper, no a un padding de <main>). -->
+    <main class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable w-full">
+      <!-- v0.4.1 — HISTORIA COMPLETA DEL MODELO DE ALTURA (bug real de zurdi en móvil: "se
+           ha roto el scroll — parte del content de abajo se esconde detrás de la bottom
+           navbar"). Este wrapper sigue siendo una caja de altura DEFINIDA (nunca min-height,
+           ver por qué al final), pero YA NO es exactamente h-full de <main> — es
+           h-[calc(100%-6rem)]: 100% de <main> MENOS los 6rem (96px, el mismo valor que el
+           pb-24 histórico) que reserva el spacer de abajo. Dos problemas distintos, dos
+           partes de este mismo fix:
+
+           1) EL BUG ORIGINAL (contenido tapado): con h-full puro + pb-24 como padding
+              —fuera en <main>, fuera en este wrapper, da igual dónde— el padding-bottom de
+              una caja se reserva SIEMPRE justo tras la altura RESUELTA de esa caja, nunca
+              tras lo que sus hijos desborden. Una vista más alta que el viewport (Hoy con
+              mucho registro) se pinta más allá del borde de la caja (overflow visible,
+              default) — y como el padding vivía DENTRO de esa misma caja de altura fija, su
+              hueco quedaba a mitad del contenido desbordado, no al final: main.scrollHeight
+              SÍ crecía con el desborde (el overflow de un descendiente cuenta para el scroll
+              del ancestro real aunque el padre intermedio tenga overflow visible), pero el
+              scroll llegaba hasta el ÚLTIMO píxel de contenido sin ningún hueco reservado ahí
+              — tapado por el navbar fijo. Verificado en Chromium real (headless, 390×844):
+              con pb-24 en <main> (v0.4.0), el último elemento de Hoy quedaba a -38px del
+              navbar (38px POR DEBAJO de su borde superior, tapado).
+              Fix de ESTA parte: pb-24 pasa de padding a un <div> SPACER real (ver más abajo)
+              — un hijo de flujo, hermano de RouterView, no una propiedad de caja. Un hijo
+              flex NO se recorta a la altura resuelta de su padre: el algoritmo de flex apila
+              cada item por su tamaño real (auto/contenido para RouterView, fijo para el
+              spacer) uno tras otro, así que el spacer siempre queda inmediatamente DESPUÉS
+              del contenido real de RouterView, se desborde la caja padre o no.
+
+           2) SEGUNDO BUG, encontrado verificando el primer intento en Chromium real: mover
+              el spacer DENTRO de un wrapper que se quedaba en h-full (100% COMPLETO de
+              <main>, sin descontar los 6rem del spacer) le daba a las vistas con su propio
+              h-full interno (ProgressView) una referencia de altura MAYOR que antes — la
+              vista entera crecía ~80px de más y el contenido "anclado abajo" (el chart de
+              Entrenos) se plantaba a ras del viewport, bajo el navbar, en vez de quedar
+              claro por encima como siempre. Contraintuitivo: el spacer vive DESPUÉS de
+              RouterView como hermano de flujo, así que en teoría "no debería" afectar el
+              100% que ve RouterView — pero SÍ afecta, porque ProgressView no usa flex-grow
+              para ocupar hueco (eso solo sirve para repartir espacio libre), usa
+              height:100% (percentage) directamente contra la altura RESUELTA de este
+              wrapper — un valor que no sabe nada de sus hermanos de flujo (el spacer), solo
+              del padre. Si el wrapper reporta 100% de <main> completo, ProgressView ocupa
+              ESO completo, ajeno a que el spacer se va a comer 96px después.
+              Fix de ESTA parte: h-[calc(100%-6rem)] en vez de h-full — el wrapper declara
+              explícitamente que su propio 100% (la referencia que ProgressView hereda) es
+              el alto de <main> MENOS la reserva del spacer, no el alto completo. Esto NO
+              afecta a vistas sin altura propia (Hoy: su tamaño lo pone su contenido, no el
+              wrapper, así que desbordar un wrapper de 748px o de 844px da exactamente el
+              mismo resultado — el spacer sigue el final real del contenido igual).
+              Verificado en Chromium real (390×844, dev build): con h-[calc(100%-6rem)], el
+              chart de Entrenos vuelve a la MISMA posición exacta que en v0.4.0 (wrapper
+              748px, idéntico al viejo main con pb-24), en vez de quedar 80px más abajo.
+
+           Por qué sigue siendo una caja DEFINIDA (nunca min-h-full, aunque "crecer con el
+           contenido" suene tentador para el bug 1): min-h-full aquí se probó y ROMPE la
+           cadena flex/% de ProgressView — un hijo flex-1/h-full varios niveles más adentro
+           (ExercisePicker, ver su comentario) deja de recibir una referencia DEFINIDA en
+           cuanto el ancestro de arriba pasa de height fijo a min-height (min-height no
+           cuenta como "definido" para % de descendientes, y tampoco deja que flex-grow
+           reparta espacio de forma fiable cuando el propio contenedor está en modo
+           auto-size). Chromium real lo confirmó: el listado de ejercicios dejaba de tener su
+           propio scroll interno y arrastraba a <main> entero a desbordar miles de px. -->
+      <div class="max-w-3xl mx-auto w-full h-[calc(100%-6rem)] flex flex-col px-4 pt-4">
         <!-- sin Transition aquí a propósito (item 4): esto envolvía la vista
              ENTERA en un fade bk-rise MIENTRAS su propio bk-stagger interno
              corría con su propio delay — dos sistemas de animación a la vez,
@@ -265,6 +316,18 @@ watch(activeIndex, () => nextTick(updateIndicator))
              única animación de entrada ahora (bk-stagger/bk-rise propio, o
              ninguna si no hace falta) — ver auditoría por vista en el informe. -->
         <RouterView />
+        <!-- v0.4.1: spacer real (no padding) que reserva el hueco del navbar móvil fijo —
+             ver la historia completa (punto 1) en el comentario de arriba. h-24 = 6rem,
+             MISMO valor que el calc(100%-6rem) de arriba: si este cambia, el de arriba tiene
+             que cambiar con él (es la misma reserva, expresada dos veces por necesidad —
+             una como tamaño propio del spacer, otra como descuento en el techo del
+             wrapper). Verificado en Chromium real (390×844, dev build): el último elemento
+             de Hoy pasa de -38px (tapado) a +58px (58px de margen limpio) sobre el navbar;
+             Progresión/Entrenos con contenido corto sigue con el chart anclado abajo y la
+             lista ocupando el resto en la MISMA posición que en v0.4.0 (ver punto 2 arriba);
+             scrollbar sigue en el borde real de la ventana sin gutter shift entre vistas
+             cortas y largas. -->
+        <div class="shrink-0 h-24" aria-hidden="true" data-testid="mobile-nav-clearance" />
       </div>
     </main>
   </div>
