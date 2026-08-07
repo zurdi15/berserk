@@ -143,7 +143,10 @@ describe('ExerciseManager', () => {
     expect(wrapper.find('[data-testid="exercise-group-tag-12"]').exists()).toBe(false)
   })
 
-  it('gates the list on readiness: neither rows nor the empty state show while pending, the loaded rows appear once resolved', async () => {
+  // item 2/3 (v0.4.3, zurdi): el gate-a-blanco se reemplaza por un esqueleto
+  // shimmer mientras carga (mismo hueco que las filas reales) — ya no
+  // "nada", y al resolver se intercambia limpiamente por la lista real.
+  it('gates the list on readiness: the skeleton shows while pending (no rows, no empty state), the loaded rows appear once resolved', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     let resolveExercises: (value: never) => void = () => {}
     vi.mocked(listExercises).mockImplementationOnce(() => new Promise((resolve) => { resolveExercises = resolve }))
@@ -152,7 +155,8 @@ describe('ExerciseManager', () => {
     const wrapper = buildExerciseManager()
     await flushPromises()
 
-    // pendiente: ni una fila de ejercicio propio ni el mensaje vacío
+    // pendiente: esqueleto presente, ni una fila de ejercicio propio ni el mensaje vacío
+    expect(wrapper.find('[data-testid="exercise-list-skeleton"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid^="exercise-row-"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Sin ejercicios aún')
 
@@ -161,6 +165,7 @@ describe('ExerciseManager', () => {
     ] as never)
     await flushPromises()
 
+    expect(wrapper.find('[data-testid="exercise-list-skeleton"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="exercise-row-12"]').exists()).toBe(true)
   })
 
@@ -813,7 +818,8 @@ describe('MuscleGroupManager', () => {
     expect(byTestId('group-slug-field').exists()).toBe(true)
   })
 
-  it('gates the list on readiness: neither rows nor the empty state show while pending, rows appear once resolved', async () => {
+  // item 2/3 (v0.4.3, zurdi): esqueleto shimmer mientras carga, en vez de nada
+  it('gates the list on readiness: the skeleton shows while pending (no rows, no empty state), rows appear once resolved', async () => {
     const { listMuscleGroups } = await import('@/api/domain')
     let resolveGroups: (value: never) => void = () => {}
     vi.mocked(listMuscleGroups).mockImplementationOnce(() => new Promise((resolve) => { resolveGroups = resolve }))
@@ -821,6 +827,7 @@ describe('MuscleGroupManager', () => {
     const wrapper = buildMuscleGroupManager()
     await flushPromises()
 
+    expect(wrapper.find('[data-testid="muscle-group-list-skeleton"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid^="muscle-group-row-"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Sin grupos musculares aún')
 
@@ -829,6 +836,7 @@ describe('MuscleGroupManager', () => {
     ] as never)
     await flushPromises()
 
+    expect(wrapper.find('[data-testid="muscle-group-list-skeleton"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="muscle-group-row-2"]').exists()).toBe(true)
   })
 

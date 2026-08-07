@@ -103,7 +103,11 @@ describe('AdminCard', () => {
   // usuarios primero, la de invitaciones ~100ms después), empujando el
   // layout. Ahora TODO el cuerpo async de la card (ambas tablas) aparece de
   // una vez, completo, aunque una de las dos APIs resuelva antes que la otra.
-  it('gates the WHOLE admin body on a single readiness flag: neither table (nor their empty states) show while either adminListUsers or adminListInvites is pending; both appear together once BOTH resolve', async () => {
+  // item 2/3 (v0.4.3, zurdi): el gate-a-blanco se reemplaza por esqueletos
+  // shimmer (mismo hueco que las filas reales) — ya no "nada" mientras
+  // carga, y ambos esqueletos se retiran juntos al resolver, igual que antes
+  // hacían las tablas reales.
+  it('gates the WHOLE admin body on a single readiness flag: skeletons show (no table, no empty states) while either adminListUsers or adminListInvites is pending; both real sections appear together once BOTH resolve', async () => {
     const { adminListUsers, adminListInvites } = await import('@/api/domain')
     let resolveUsers: (value: never) => void = () => {}
     let resolveInvites: (value: never) => void = () => {}
@@ -113,6 +117,8 @@ describe('AdminCard', () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
 
+    expect(wrapper.find('[data-testid="admin-users-skeleton"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="admin-invites-skeleton"]').exists()).toBe(true)
     expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Sin usuarios aún')
     expect(wrapper.find('[data-testid^="invite-row-"]').exists()).toBe(false)
@@ -128,13 +134,15 @@ describe('AdminCard', () => {
     expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.find('[data-testid^="invite-row-"]').exists()).toBe(false)
 
-    // invites resuelve después: AHORA ambas aparecen juntas, de golpe
+    // invites resuelve después: AHORA ambas aparecen juntas, de golpe, y los esqueletos se retiran
     resolveInvites([
       { id: 1, created_at: '2026-08-06T10:00:00', expires_at: '2026-08-09T10:00:00', used_at: null },
     ] as never)
     await new Promise(resolve => setTimeout(resolve, 0))
     await wrapper.vm.$nextTick()
 
+    expect(wrapper.find('[data-testid="admin-users-skeleton"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="admin-invites-skeleton"]').exists()).toBe(false)
     expect(wrapper.find('table').exists()).toBe(true)
     expect(wrapper.text()).toContain('admin')
     expect(wrapper.find('[data-testid="invite-row-1"]').exists()).toBe(true)

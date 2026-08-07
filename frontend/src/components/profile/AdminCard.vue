@@ -349,7 +349,26 @@ function redeemUrl(token: string): string {
              Gateada en ready (item 6: única bandera compartida con invites,
              ver script): sin esto, el "sin usuarios" aparece y ~100ms
              después la tabla real la reemplaza de golpe. -->
-        <div v-if="ready && users.length > 0" class="overflow-x-auto">
+        <!-- item 2/3 (v0.4.3, zurdi): esqueleto shimmer mientras carga, mismo
+             hueco que una fila real (nombre a la izquierda, dos acciones
+             icon-only a la derecha) — reemplaza el gate a blanco que hacía
+             saltar el layout al llegar los datos. -->
+        <div v-if="!ready" class="space-y-1" data-testid="admin-users-skeleton">
+          <div
+            v-for="n in 4"
+            :key="n"
+            class="flex items-center justify-between py-2 px-2"
+            aria-hidden="true"
+          >
+            <div class="h-4 w-1/3 rounded-sm bk-shimmer" />
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-sm bk-shimmer" />
+              <div class="w-8 h-8 rounded-sm bk-shimmer" />
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="users.length > 0" class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-line">
@@ -418,7 +437,7 @@ function redeemUrl(token: string): string {
           </table>
         </div>
 
-        <div v-else-if="ready" class="text-sm text-ink-muted">
+        <div v-else class="text-sm text-ink-muted">
           {{ $t('admin.noUsers') }}
         </div>
 
@@ -466,10 +485,24 @@ function redeemUrl(token: string): string {
           </div>
         </div>
 
+        <!-- item 2/3 (v0.4.3, zurdi): mismo esqueleto shimmer que la tabla de
+             usuarios (gateada en el mismo `ready`, ver arriba) -->
+        <div v-if="!ready" class="space-y-2 pt-4 border-t border-line" data-testid="admin-invites-skeleton">
+          <div
+            v-for="n in 2"
+            :key="n"
+            class="p-2 rounded border border-line space-y-1.5"
+            aria-hidden="true"
+          >
+            <div class="h-3 w-1/2 rounded-sm bk-shimmer" />
+            <div class="h-3 w-1/3 rounded-sm bk-shimmer" />
+          </div>
+        </div>
+
         <!-- Invites list: gateada en el MISMO ready que la tabla de usuarios
              (item 6) — antes tenía su propia bandera y aparecía en un
              segundo salto separado -->
-        <div v-if="ready && invites.length > 0" class="space-y-2 pt-4 border-t border-line">
+        <div v-else-if="invites.length > 0" class="space-y-2 pt-4 border-t border-line">
           <h3 class="text-sm font-medium">{{ $t('admin.invites') }}</h3>
           <div class="space-y-2">
             <div
@@ -506,7 +539,7 @@ function redeemUrl(token: string): string {
           </div>
         </div>
 
-        <div v-else-if="ready" class="text-sm text-ink-muted">
+        <div v-else class="text-sm text-ink-muted">
           {{ $t('admin.noInvites') }}
         </div>
       </div>

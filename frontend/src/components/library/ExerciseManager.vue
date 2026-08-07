@@ -225,7 +225,29 @@ async function confirmDelete() {
          vivía así. -->
     <BkCard :title="$t('library.exercises')">
       <div class="space-y-4">
-        <div v-if="ready && displayExercises.length > 0" class="space-y-2">
+        <!-- item 2/3 (v0.4.3, zurdi): esqueleto shimmer mientras carga, mismo
+             hueco que las filas reales (nombre+chip a la izquierda, dos
+             acciones icon-only a la derecha) — reemplaza el gate a blanco
+             (v-if="ready") que hacía saltar el layout al llegar los datos. -->
+        <div v-if="!ready" class="space-y-2" data-testid="exercise-list-skeleton">
+          <div
+            v-for="n in 5"
+            :key="n"
+            class="flex items-center justify-between gap-2 p-2 rounded border border-line"
+            aria-hidden="true"
+          >
+            <div class="flex-1 min-w-0 space-y-1.5">
+              <div class="h-4 w-1/2 rounded-sm bk-shimmer" />
+              <div class="h-3 w-1/4 rounded-sm bk-shimmer" />
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <div class="w-8 h-8 rounded-sm bk-shimmer" />
+              <div class="w-8 h-8 rounded-sm bk-shimmer" />
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="displayExercises.length > 0" class="space-y-2">
           <div
             v-for="exercise in displayExercises"
             :key="exercise.id"
@@ -315,7 +337,7 @@ async function confirmDelete() {
              UNIFIED-LISTINGS: una sola vez, cuando NADA de la lista
              unificada (mías + catálogo + públicas de otros) hay que mostrar -->
         <BkEmpty
-          v-else-if="ready"
+          v-else
           :message="$t('library.noExercises')"
           :action-label="$t('library.newExercise')"
           action-testid="new-exercise-btn"

@@ -187,7 +187,25 @@ async function confirmDelete() {
   <div class="space-y-4">
     <BkCard :title="$t('library.muscleGroups')">
       <div class="space-y-4">
-        <div v-if="ready && sortedGroups.length > 0" class="space-y-2">
+        <!-- item 2/3 (v0.4.3, zurdi): esqueleto shimmer mientras carga, mismo
+             hueco que las filas reales — reemplaza el gate a blanco
+             (v-if="ready") que hacía saltar el layout al llegar los datos. -->
+        <div v-if="!ready" class="space-y-2" data-testid="muscle-group-list-skeleton">
+          <div
+            v-for="n in 5"
+            :key="n"
+            class="flex items-center justify-between p-2 rounded border border-line"
+            aria-hidden="true"
+          >
+            <div class="h-4 w-1/3 rounded-sm bk-shimmer" />
+            <div class="flex items-center gap-2 shrink-0">
+              <div class="w-8 h-8 rounded-sm bk-shimmer" />
+              <div class="w-8 h-8 rounded-sm bk-shimmer" />
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="sortedGroups.length > 0" class="space-y-2">
           <div
             v-for="group in sortedGroups"
             :key="group.id"
@@ -239,7 +257,7 @@ async function confirmDelete() {
 
         <!-- item 10: en vacío el botón de crear se muda dentro del BkEmpty -->
         <BkEmpty
-          v-else-if="ready"
+          v-else
           :message="$t('library.noGroups')"
           :action-label="$t('library.newGroup')"
           action-testid="open-create-group-btn"
