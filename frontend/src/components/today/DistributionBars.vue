@@ -54,10 +54,11 @@ function groupRune(muscleGroupId: number): RuneName | null {
 <template>
   <div class="space-y-3">
     <!-- STATS-CLARITY: subtítulo honesto bajo el título "Distribución muscular"
-         (título que vive en ProgressView vía BkCard, fuera de este componente)
-         — dice la ventana real (4 semanas fijas, ver ProgressView.getDistribution)
-         y que solo cuenta el grupo PRIMARIO de cada ejercicio, no un total
-         histórico ni todos los grupos trabajados -->
+         (título que vive en TodayView vía BkCard, fuera de este componente —
+         item 4 v0.4.2: se mudó aquí desde ProgressView, ver comentario largo
+         en TodayView.vue) — dice la ventana real (4 semanas fijas, ver
+         TodayView.getDistribution) y que solo cuenta el grupo PRIMARIO de
+         cada ejercicio, no un total histórico ni todos los grupos trabajados -->
     <p class="text-xs text-ink-muted" data-testid="distribution-subtitle">{{ t('progress.distributionSubtitle') }}</p>
     <BkEmpty v-if="!items.length" :message="t('progress.noDistribution')" />
     <div v-else class="space-y-3">

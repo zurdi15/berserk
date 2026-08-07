@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
-import type { PersonalRecordOut, WorkoutOut, ScheduledOut, ExerciseOut, MuscleGroupOut } from '@/api/domain'
-import { getStreak, getMonth, listWorkouts, getRecords, listExercises, listMuscleGroups } from '@/api/domain'
+import type { PersonalRecordOut, WorkoutOut, ScheduledOut, ExerciseOut, MuscleGroupOut, DistributionItem } from '@/api/domain'
+import { getStreak, getMonth, listWorkouts, getRecords, listExercises, listMuscleGroups, getDistribution } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { todayIso, getMondayOfWeek } from '@/utils/dates'
 import { useAthleteStore } from '@/stores/athlete'
+import BkCard from '@/lib/BkCard.vue'
 import StreakCard from '@/components/today/StreakCard.vue'
 import TodaySessionCard from '@/components/today/TodaySessionCard.vue'
 import WeekSummaryCard from '@/components/today/WeekSummaryCard.vue'
+import DistributionBars from '@/components/today/DistributionBars.vue'
 import RecentPrs from '@/components/today/RecentPrs.vue'
 
+const { t } = useI18n()
 const athlete = useAthleteStore()
 
 const streak = ref<{ weeks: number } | null>(null)
@@ -19,6 +23,9 @@ const workouts = ref<WorkoutOut[]>([])
 const records = ref<PersonalRecordOut[]>([])
 const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
+// item 4 (v0.4.2): distribución muscular, mudada aquí desde el panel de
+// Récords — ver comentario largo del bloque en el template más abajo
+const distribution = ref<DistributionItem[]>([])
 // gatea el montaje de las cards a datos ya resueltos: sin esto, las cards
 // entran con el estado vacío (streak 0, tono ink) y ~100ms después load()
 // las repinta de golpe — un doble-render visible. Con v-if="ready" solo
@@ -44,6 +51,7 @@ async function load() {
       recordsList,
       exercisesList,
       muscleGroupsList,
+      distributionData,
     ] = await Promise.all([
       getStreak(athlete.userId),
       getMonth(year, month, athlete.userId),
@@ -51,6 +59,9 @@ async function load() {
       getRecords({ userId: athlete.userId }),
       listExercises({ userId: athlete.userId }),
       listMuscleGroups(athlete.userId),
+      // item 4 (v0.4.2): mismo hilo de atleta y mismo Promise.all que el
+      // resto de esta vista, gateado por el ready de más abajo como todo lo demás
+      getDistribution(4, athlete.userId),
     ])
 
     streak.value = streakData
@@ -59,6 +70,7 @@ async function load() {
     records.value = recordsList
     exercises.value = exercisesList
     muscleGroups.value = muscleGroupsList
+    distribution.value = distributionData
   } catch (error) {
     toastApiError(error)
   } finally {
@@ -83,7 +95,19 @@ watch(() => athlete.userId, () => load(), { immediate: true })
     <div :style="{ '--bk-stagger-i': 2 }">
       <WeekSummaryCard :workouts="workouts" :exercises="exercises" :muscle-groups="muscleGroups" />
     </div>
+    <!-- item 4 (v0.4.2): Distribución muscular se muda aquí desde el panel de
+         Récords (ProgressView) — su ventana de datos es fija a 4 semanas
+         (getDistribution(4, ...), ver services/progress.py), un recorte de
+         tiempo que encaja mejor en el contexto de Hoy que en un panel de
+         récords históricos sin ventana. Va DIRECTAMENTE debajo de "Esta
+         semana" (mismo bloque de ritmo reciente). Título vía BkCard con la
+         key progress.distribution ya existente — se reusa, no se duplica -->
     <div :style="{ '--bk-stagger-i': 3 }">
+      <BkCard :title="t('progress.distribution')">
+        <DistributionBars :items="distribution" :groups="muscleGroups" />
+      </BkCard>
+    </div>
+    <div :style="{ '--bk-stagger-i': 4 }">
       <RecentPrs :records="records" :exercises="exercises" />
     </div>
   </div>

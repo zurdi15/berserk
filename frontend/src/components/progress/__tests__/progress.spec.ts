@@ -99,10 +99,8 @@ vi.mock('@/api/domain', () => ({
   deleteBody: vi.fn(async () => undefined),
 }))
 
-import { barWidth } from '@/components/progress/distribution'
 import { seriesFor } from '@/components/progress/series'
 import BodySection from '@/components/progress/BodySection.vue'
-import DistributionBars from '@/components/progress/DistributionBars.vue'
 import ExercisePicker from '@/components/progress/ExercisePicker.vue'
 import PrList from '@/components/progress/PrList.vue'
 import StatsGrid from '@/components/progress/StatsGrid.vue'
@@ -142,143 +140,12 @@ describe('seriesFor', () => {
   })
 })
 
-describe('barWidth', () => {
-  it('computes the percentage relative to the max', () => {
-    expect(barWidth(31, 50)).toBe('62%')
-  })
-
-  it('rounds to the nearest integer percentage', () => {
-    expect(barWidth(1, 3)).toBe('33%')
-  })
-
-  it('returns 0% when max is zero or negative', () => {
-    expect(barWidth(5, 0)).toBe('0%')
-  })
-})
-
-describe('DistributionBars', () => {
-  // reduced-motion forzado: estos tests leen el número final sin avanzar rAF —
-  // useAnimatedNumber (item 1) salta directo al objetivo en este modo
-  beforeEach(() => vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList))
-  afterEach(() => vi.restoreAllMocks())
-
-  it('renders bars sorted by sets desc, each with rune, name and bar width', () => {
-    const wrapper = mount(DistributionBars, {
-      props: { items: fixtures.distribution as never, groups: fixtures.muscleGroups as never },
-      ...withI18n(),
-    })
-    const rows = wrapper.findAll('[data-testid^="distribution-row-"]')
-    expect(rows).toHaveLength(2)
-
-    // legs (40 sets) va primero: mayor barra arriba
-    expect(rows[0].attributes('data-testid')).toBe('distribution-row-2')
-    expect(rows[0].text()).toContain('Piernas')
-    expect(rows[0].find('[data-testid="distribution-sets"]').text()).toBe('40')
-
-    expect(rows[1].attributes('data-testid')).toBe('distribution-row-1')
-    expect(rows[1].text()).toContain('Pecho')
-    expect(rows[1].find('[data-testid="distribution-sets"]').text()).toBe('20')
-
-    const runes = wrapper.findAllComponents({ name: 'BkRune' })
-    expect(runes[0].props('name')).toBe('legs')
-    expect(runes[1].props('name')).toBe('chest')
-  })
-
-  // STATS-CLARITY: la fuente (services/progress.py muscle_distribution +
-  // routers/progress.py) confirma que el rango es fijo a 4 semanas
-  // (ProgressView llama getDistribution(4, ...)) y solo cuenta el grupo
-  // PRIMARIO de cada ejercicio — el subtítulo debe decir exactamente eso, no
-  // "total histórico"
-  it('STATS-CLARITY: shows a subtitle stating the metric is effective sets by primary group over the last 4 weeks', () => {
-    const wrapper = mount(DistributionBars, {
-      props: { items: fixtures.distribution as never, groups: fixtures.muscleGroups as never },
-      ...withI18n(),
-    })
-    const subtitle = wrapper.find('[data-testid="distribution-subtitle"]')
-    expect(subtitle.exists()).toBe(true)
-    // item 9: sin em-dash — coma en su lugar
-    expect(subtitle.text()).toBe('Series efectivas por grupo principal, últimas 4 semanas')
-  })
-
-  it('STATS-CLARITY: the subtitle is shown even in the empty state, so the empty message reads in context', () => {
-    const wrapper = mount(DistributionBars, { props: { items: [], groups: [] }, ...withI18n() })
-    expect(wrapper.find('[data-testid="distribution-subtitle"]').exists()).toBe(true)
-  })
-
-  it('STATS-CLARITY: each per-bar number carries a title attr spelling out the unit (count + "series")', () => {
-    const wrapper = mount(DistributionBars, {
-      props: { items: fixtures.distribution as never, groups: fixtures.muscleGroups as never },
-      ...withI18n(),
-    })
-    const rows = wrapper.findAll('[data-testid^="distribution-row-"]')
-    // legs primero (40 sets), ver el test de orden de arriba
-    expect(rows[0].find('[data-testid="distribution-sets"]').attributes('title')).toBe('40 series efectivas')
-    expect(rows[1].find('[data-testid="distribution-sets"]').attributes('title')).toBe('20 series efectivas')
-  })
-
-  it('shows the empty state when there are no items', () => {
-    const wrapper = mount(DistributionBars, { props: { items: [], groups: [] }, ...withI18n() })
-    expect(wrapper.text()).toContain('Aún no hay datos de distribución')
-  })
-
-  it('item 14(c): a bar\'s rune icon uses the group\'s dedicated rune, overriding the slug-derived one', () => {
-    const groups = [
-      { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null, rune: 'ansuz' },
-      { id: 2, slug: 'legs', name_es: 'Piernas', name_en: 'Legs', owner_id: null },
-    ]
-    const wrapper = mount(DistributionBars, {
-      props: { items: fixtures.distribution as never, groups: groups as never },
-      ...withI18n(),
-    })
-    const runes = wrapper.findAllComponents({ name: 'BkRune' })
-    // legs primero (40 sets, sin override -> cae al slug), pecho segundo (override)
-    expect(runes[0].props('name')).toBe('legs')
-    expect(runes[1].props('name')).toBe('ansuz')
-  })
-
-  it('item 6: bars carry the growth animation class with a per-bar --bar-dur proportional to the bar\'s magnitude (longer bar takes longer)', () => {
-    const wrapper = mount(DistributionBars, {
-      props: { items: fixtures.distribution as never, groups: fixtures.muscleGroups as never },
-      ...withI18n(),
-    })
-    const rows = wrapper.findAll('[data-testid^="distribution-row-"]')
-    // legs (40/40 sets = 100% del máximo) primero, pecho (20/40 = 50%) segundo
-    // — mismo orden que el test de arriba
-    const legsBar = rows[0].find('.bk-grow-x')
-    const chestBar = rows[1].find('.bk-grow-x')
-    expect(legsBar.exists()).toBe(true)
-    expect(chestBar.exists()).toBe(true)
-
-    const legsDur = parseInt((legsBar.element as HTMLElement).style.getPropertyValue('--bar-dur'), 10)
-    const chestDur = parseInt((chestBar.element as HTMLElement).style.getPropertyValue('--bar-dur'), 10)
-
-    // barra al 100% del máximo: la duración completa del token base (dur[5])
-    expect(legsDur).toBe(parseInt(core.dur[5], 10))
-    // barra al 50%: la mitad — y por tanto más corta que la de legs (100%)
-    expect(chestDur).toBeLessThan(legsDur)
-    expect(chestDur).toBe(Math.round(parseInt(core.dur[5], 10) * 0.5))
-  })
-
-  it('item 6: a tiny bar still gets a floor duration (dur[1]) instead of an instant/near-zero animation', () => {
-    const tinyItems = [
-      { muscle_group_id: 1, sets: 1 },
-      { muscle_group_id: 2, sets: 1000 },
-    ]
-    const wrapper = mount(DistributionBars, {
-      props: { items: tinyItems as never, groups: fixtures.muscleGroups as never },
-      ...withI18n(),
-    })
-    const rows = wrapper.findAll('[data-testid^="distribution-row-"]')
-    const tinyBar = rows[1].find('.bk-grow-x') // 1/1000 sets: la barra minúscula, ordenada al final (desc)
-    const tinyDur = parseInt((tinyBar.element as HTMLElement).style.getPropertyValue('--bar-dur'), 10)
-    expect(tinyDur).toBe(parseInt(core.dur[1], 10))
-  })
-})
-
 describe('PrList', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    // reduced-motion forzado: mismo motivo que en DistributionBars arriba
+    // reduced-motion forzado: useAnimatedNumber (item 1) salta directo al
+    // objetivo en este modo, mismo motivo que en today.spec.ts (DistributionBars,
+    // mudado allí en v0.4.2)
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
   })
   afterEach(() => vi.restoreAllMocks())
@@ -362,6 +229,28 @@ describe('PrList', () => {
     expect(rows).toHaveLength(3)
   })
 
+  it('item 3 (v0.4.2): hides the per-row kind label once a specific kind filter is active, restores it on Todos', async () => {
+    const wrapper = mount(PrList, {
+      props: { records: mixedKindRecords as never, exercises: fixtures.exercises as never },
+      ...withI18n(),
+    })
+    const tabs = wrapper.findAll('[role="tab"]')
+
+    // Todos (default): la etiqueta de kind sigue en cada fila (ver test de
+    // arriba, "Peso Máx" en rows[0])
+    let rows = wrapper.findAll('[data-testid^="pr-row-"]')
+    expect(rows[0].text()).toContain('Peso Máx')
+
+    await tabs[1].trigger('click') // Peso Máx: el selector ya lo dice, la fila lo omite
+    rows = wrapper.findAll('[data-testid^="pr-row-"]')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].text()).not.toContain('Peso Máx')
+
+    await tabs[0].trigger('click') // Todos: la etiqueta vuelve
+    rows = wrapper.findAll('[data-testid^="pr-row-"]')
+    expect(rows.some((row) => row.text().includes('Peso Máx'))).toBe(true)
+  })
+
   it('item 7: filtering to a kind with no matches shows the empty state but keeps the selector', async () => {
     // fixtures.records solo tiene max_weight/max_volume, ningún est_1rm
     const wrapper = mount(PrList, {
@@ -396,8 +285,8 @@ describe('PrList', () => {
 describe('StatsGrid', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    // reduced-motion forzado: mismo motivo que DistributionBars/PrList arriba
-    // — useAnimatedNumber salta directo al valor final sin esperar el rAF
+    // reduced-motion forzado: mismo motivo que PrList arriba (y DistributionBars
+    // en today.spec.ts) — useAnimatedNumber salta directo al valor final sin esperar el rAF
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
   })
   afterEach(() => vi.restoreAllMocks())
@@ -900,8 +789,11 @@ describe('ProgressView', () => {
     push.mockClear()
     replace.mockClear()
     vi.mocked(domain.listExercises).mockClear().mockResolvedValue(fixtures.exercises as never)
+    // item 4 (v0.4.2): ProgressView ya no pide grupos musculares/distribución
+    // (se mudaron a TodayView) — el reset de listMuscleGroups sigue haciendo
+    // falta porque ExercisePicker, montado dentro de la pestaña Entrenos,
+    // llama a esta misma función por su cuenta
     vi.mocked(domain.listMuscleGroups).mockClear().mockResolvedValue(fixtures.muscleGroups as never)
-    vi.mocked(domain.getDistribution).mockClear().mockResolvedValue(fixtures.distribution as never)
     vi.mocked(domain.getRecords).mockClear().mockResolvedValue(fixtures.records as never)
     vi.mocked(domain.getSeries).mockClear().mockResolvedValue({ series: fixtures.series } as never)
     vi.mocked(domain.getStats).mockClear().mockResolvedValue(fixtures.stats as never)
@@ -912,13 +804,11 @@ describe('ProgressView', () => {
     vi.mocked(domain.getTrainedExercises).mockClear().mockResolvedValue({ exercise_ids: fixtures.trainedExerciseIds } as never)
   })
 
-  it('loads catalog/distribution/records/stats data on mount regardless of the active tab', async () => {
+  it('loads catalog/records/stats data on mount regardless of the active tab', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
     expect(domain.listExercises).toHaveBeenCalledWith({ userId: undefined })
-    expect(domain.listMuscleGroups).toHaveBeenCalledWith(undefined)
-    expect(domain.getDistribution).toHaveBeenCalledWith(4, undefined)
     expect(domain.getRecords).toHaveBeenCalledWith({ exercise_id: undefined, userId: undefined })
     // round 8: getStats se pide de arranque igual que el resto de la vista,
     // no en diferido al abrir la pestaña Estadísticas (item 8: que además
@@ -1098,27 +988,26 @@ describe('ProgressView', () => {
     expect(wrapper.findComponent({ name: 'BodySection' }).exists()).toBe(true)
   })
 
-  it('item 3b/item 8: Récords is its own tab (now last) with PrList and DistributionBars, hidden from the default totales tab', async () => {
+  it('item 4 (v0.4.2): Récords is its own tab (last), records-only now — DistributionBars moved to Hoy, hidden from the default totales tab', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
-    // Totales (pestaña activa por defecto): ni PrList ni DistributionBars
-    // están montados ahí
+    // Totales (pestaña activa por defecto): PrList no está montado ahí
     expect(wrapper.findComponent({ name: 'PrList' }).exists()).toBe(false)
-    expect(wrapper.findComponent({ name: 'DistributionBars' }).exists()).toBe(false)
 
     const mainTablist = wrapper.findAll('[role="tablist"]')[0]
     await mainTablist.findAll('[role="tab"]')[3].trigger('click') // Récords (ahora la última)
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'PrList' }).exists()).toBe(true)
-    expect(wrapper.findComponent({ name: 'DistributionBars' }).exists()).toBe(true)
     expect(wrapper.text()).toContain('Press banca') // fila real de PrList
-    expect(wrapper.text()).toContain('Piernas') // fila real de DistributionBars
+    // item 4: DistributionBars ya no vive en ProgressView en absoluto (se
+    // mudó a TodayView, ver today.spec.ts)
+    expect(wrapper.findComponent({ name: 'DistributionBars' }).exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'ExercisePicker' }).exists()).toBe(false)
   })
 
-  it('item 8: records panel is a bounded flex column with PrList taking the remaining space and DistributionBars pinned at the bottom', async () => {
+  it('item 4 (v0.4.2): records panel is a bounded flex column with PrList taking the FULL height (no more pinned-distribution split)', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
@@ -1136,8 +1025,9 @@ describe('ProgressView', () => {
     expect(recordsArea.classes()).toContain('flex-1')
     expect(recordsArea.classes()).toContain('min-h-0')
 
-    const distributionArea = recordsPanel.findAll('[style*="--bk-stagger-i: 1"]')[0]
-    expect(distributionArea.classes()).toContain('shrink-0')
+    // item 4: ya no hay un segundo hijo shrink-0 anclado abajo (antes,
+    // DistributionBars) — el panel de récords se simplificó a un único hijo
+    expect(recordsPanel.findAll('[style*="--bk-stagger-i: 1"]')).toHaveLength(0)
 
     // PrList: su root se lleva el resto del alto (flex-1 min-h-0) y apila el
     // selector de kind (item 7, shrink-0) sobre el área que scrollea de

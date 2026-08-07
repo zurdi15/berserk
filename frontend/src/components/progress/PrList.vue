@@ -72,9 +72,10 @@ function formatAchievedDate(dateStr: string): string {
          del <div> sería un nodo extra en el fragmento y rompería tanto el
          fall-through de atributos como la resolución de root del componente)
          Todos/Peso Máx/Volumen Máx/Est. 1RM: reusa las mismas etiquetas que
-         cada fila (progress.kinds.*) — redundante-pero-inofensivo cuando ya
-         está filtrado (fila y selector dicen lo mismo), da contexto cuando
-         está en Todos (kinds mezclados) -->
+         cada fila (progress.kinds.*) — da contexto cuando está en Todos
+         (kinds mezclados). item 3 (v0.4.2): con un kind concreto activo el
+         selector YA lo dice, así que la etiqueta de kind por fila (debajo)
+         se oculta para no repetirlo; solo en Todos se muestra -->
     <BkTabs class="shrink-0" v-model="kindFilter" :tabs="kindTabs" />
 
     <BkEmpty v-if="!filteredRecords.length" :message="t('progress.noRecords')" class="flex-1 min-h-0" />
@@ -90,7 +91,8 @@ function formatAchievedDate(dateStr: string): string {
         <div class="flex items-center gap-2 min-w-0">
           <BkRune name="pr" :size="20" tone="ember" />
           <div class="min-w-0">
-            <p class="text-sm font-medium text-ink-muted">{{ t(`progress.kinds.${record.kind}`) }}</p>
+            <!-- item 3 (v0.4.2): solo en Todos, ver comentario del selector arriba -->
+            <p v-if="kindFilter === 'all'" class="text-sm font-medium text-ink-muted">{{ t(`progress.kinds.${record.kind}`) }}</p>
             <p class="text-sm text-ink truncate">{{ getExerciseName(record.exercise_id) }}</p>
           </div>
         </div>

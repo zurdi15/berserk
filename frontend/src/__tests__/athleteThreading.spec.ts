@@ -85,6 +85,9 @@ describe('TodayView athlete threading', () => {
     vi.mocked(domain.getRecords).mockClear()
     vi.mocked(domain.listExercises).mockClear()
     vi.mocked(domain.listMuscleGroups).mockClear()
+    // item 4 (v0.4.2): Distribución muscular se mudó aquí desde ProgressView
+    // — la aserción de su hilo de atleta se mueve con ella (ver más abajo)
+    vi.mocked(domain.getDistribution).mockClear()
   })
 
   it('threads the viewed athlete id through every read on mount', async () => {
@@ -97,6 +100,7 @@ describe('TodayView athlete threading', () => {
     expect(domain.listWorkouts).toHaveBeenCalledWith(expect.objectContaining({ userId: 7 }))
     expect(domain.getRecords).toHaveBeenCalledWith({ userId: 7 })
     expect(domain.listMuscleGroups).toHaveBeenCalledWith(7)
+    expect(domain.getDistribution).toHaveBeenCalledWith(4, 7)
   })
 
   it('re-fetches every read when switching athlete mid-session, and again on exit', async () => {
@@ -105,17 +109,20 @@ describe('TodayView athlete threading', () => {
     await flushPromises()
     expect(domain.getStreak).toHaveBeenLastCalledWith(undefined)
     expect(domain.getRecords).toHaveBeenLastCalledWith({ userId: undefined })
+    expect(domain.getDistribution).toHaveBeenLastCalledWith(4, undefined)
 
     athlete.view(ATHLETE)
     await flushPromises()
     expect(domain.getStreak).toHaveBeenLastCalledWith(7)
     expect(domain.getRecords).toHaveBeenLastCalledWith({ userId: 7 })
     expect(domain.listWorkouts).toHaveBeenLastCalledWith(expect.objectContaining({ userId: 7 }))
+    expect(domain.getDistribution).toHaveBeenLastCalledWith(4, 7)
 
     athlete.clear()
     await flushPromises()
     expect(domain.getStreak).toHaveBeenLastCalledWith(undefined)
     expect(domain.getRecords).toHaveBeenLastCalledWith({ userId: undefined })
+    expect(domain.getDistribution).toHaveBeenLastCalledWith(4, undefined)
   })
 })
 
@@ -161,7 +168,6 @@ describe('CalendarView athlete threading', () => {
 describe('ProgressView athlete threading', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    vi.mocked(domain.getDistribution).mockClear()
     vi.mocked(domain.getRecords).mockClear()
     vi.mocked(domain.getSeries).mockClear()
     vi.mocked(domain.listBody).mockClear()
@@ -169,12 +175,11 @@ describe('ProgressView athlete threading', () => {
     vi.mocked(domain.getTrainedExercises).mockClear()
   })
 
-  it('threads the viewed athlete id through distribution and records on mount, and getTrainedExercises once the training tab is entered', async () => {
+  it('threads the viewed athlete id through records on mount, and getTrainedExercises once the training tab is entered', async () => {
     useAthleteStore().view(ATHLETE)
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
-    expect(domain.getDistribution).toHaveBeenCalledWith(4, 7)
     expect(domain.getRecords).toHaveBeenCalledWith({ exercise_id: undefined, userId: 7 })
     // item 8: Totales es la pestaña activa por defecto, ExercisePicker (y su
     // fetch de entrenados) solo monta al entrar en Entrenos (3ª pestaña
@@ -216,20 +221,18 @@ describe('ProgressView athlete threading', () => {
     expect(domain.listBody).toHaveBeenCalledWith(7)
   })
 
-  it('re-fetches distribution and records when switching athlete, and again on exit', async () => {
+  it('re-fetches records when switching athlete, and again on exit', async () => {
     const athlete = useAthleteStore()
     mount(ProgressView, withI18n())
     await flushPromises()
-    expect(domain.getDistribution).toHaveBeenLastCalledWith(4, undefined)
+    expect(domain.getRecords).toHaveBeenLastCalledWith({ exercise_id: undefined, userId: undefined })
 
     athlete.view(ATHLETE)
     await flushPromises()
-    expect(domain.getDistribution).toHaveBeenLastCalledWith(4, 7)
     expect(domain.getRecords).toHaveBeenLastCalledWith({ exercise_id: undefined, userId: 7 })
 
     athlete.clear()
     await flushPromises()
-    expect(domain.getDistribution).toHaveBeenLastCalledWith(4, undefined)
     expect(domain.getRecords).toHaveBeenLastCalledWith({ exercise_id: undefined, userId: undefined })
   })
 })

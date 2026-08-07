@@ -2,10 +2,9 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { DistributionItem, ExerciseOut, MuscleGroupOut, PersonalRecordOut, SeriesPoint, StatsOut } from '@/api/domain'
-import { getDistribution, getRecords, getSeries, getStats, listExercises, listMuscleGroups } from '@/api/domain'
+import type { ExerciseOut, PersonalRecordOut, SeriesPoint, StatsOut } from '@/api/domain'
+import { getRecords, getSeries, getStats, listExercises } from '@/api/domain'
 import BodySection from '@/components/progress/BodySection.vue'
-import DistributionBars from '@/components/progress/DistributionBars.vue'
 import ExercisePicker from '@/components/progress/ExercisePicker.vue'
 import PrList from '@/components/progress/PrList.vue'
 import type { MetricKey } from '@/components/progress/series'
@@ -36,8 +35,6 @@ const metric = ref<MetricKey>('top_weight')
 const exerciseId = ref<number | null>(null)
 
 const exercises = ref<ExerciseOut[]>([])
-const muscleGroups = ref<MuscleGroupOut[]>([])
-const distribution = ref<DistributionItem[]>([])
 const records = ref<PersonalRecordOut[]>([])
 const series = ref<SeriesPoint[]>([])
 const stats = ref<StatsOut | null>(null)
@@ -68,16 +65,12 @@ const metricTabs = computed(() => [
 
 const chartPoints = computed(() => seriesFor(series.value, metric.value, units.value))
 
-async function loadCatalogAndDistribution() {
+// item 4 (v0.4.2): antes cargaba también grupos musculares + distribución
+// para DistributionBars, que se mudó a Hoy (ver TodayView.vue) — aquí ya
+// solo queda el catálogo de ejercicios que necesita PrList
+async function loadCatalog() {
   try {
-    const [exercisesList, groupsList, dist] = await Promise.all([
-      listExercises({ userId: athlete.userId }),
-      listMuscleGroups(athlete.userId),
-      getDistribution(4, athlete.userId),
-    ])
-    exercises.value = exercisesList
-    muscleGroups.value = groupsList
-    distribution.value = dist
+    exercises.value = await listExercises({ userId: athlete.userId })
   } catch (error) {
     toastApiError(error)
   }
@@ -119,7 +112,7 @@ async function loadStats() {
 watch(
   () => athlete.userId,
   () => {
-    loadCatalogAndDistribution()
+    loadCatalog()
     loadRecords()
     loadSeries()
     loadStats()
@@ -176,20 +169,15 @@ watch(exerciseId, () => {
       </div>
     </div>
 
-    <!-- Récords: PrList + DistributionBars, movidos aquí desde Entrenos (item 3b).
-         item 8: mismo patrón flex que la pestaña Entrenos de arriba —
-         Distribución se queda anclada abajo con su alto natural (shrink-0) y
-         Récords se lleva TODO el resto del alto (flex-1 min-h-0, scroll
-         interno vía PrList — ver PrList.vue, ya sin su tope max-h-72) -->
-    <div v-else-if="tab === 'records'" class="flex-1 min-h-0 flex flex-col gap-4 bk-stagger">
+    <!-- Récords: solo PrList (item 4, v0.4.2 — antes también DistributionBars,
+         ver comentario largo en TodayView.vue sobre por qué se mudó). Sin el
+         split que anclaba Distribución abajo (shrink-0), el panel se
+         simplifica a un único hijo que se lleva TODO el alto (flex-1 min-h-0,
+         scroll interno vía PrList — ver PrList.vue, ya sin su tope max-h-72) -->
+    <div v-else-if="tab === 'records'" class="flex-1 min-h-0 flex flex-col bk-stagger">
       <div class="flex-1 min-h-0" :style="{ '--bk-stagger-i': 0 }">
         <BkCard :title="t('progress.records')" class="h-full flex flex-col">
           <PrList :records="records" :exercises="exercises" />
-        </BkCard>
-      </div>
-      <div class="shrink-0" :style="{ '--bk-stagger-i': 1 }">
-        <BkCard :title="t('progress.distribution')">
-          <DistributionBars :items="distribution" :groups="muscleGroups" />
         </BkCard>
       </div>
     </div>
