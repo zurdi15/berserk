@@ -230,46 +230,60 @@ async function confirmDelete() {
             v-for="exercise in displayExercises"
             :key="exercise.id"
             :data-testid="exercise.kind === 'own' ? `exercise-row-${exercise.id}` : `catalog-exercise-row-${exercise.id}`"
-            class="flex items-center justify-between gap-2 p-2 rounded border border-line text-sm"
+            class="flex items-start justify-between gap-2 p-2 rounded border border-line text-sm"
           >
-            <span class="flex items-center gap-2 min-w-0 flex-wrap">
-              <span class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</span>
-              <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
-              <span
-                v-if="primaryGroup(exercise)"
-                class="inline-flex items-center gap-1 text-ink-faint shrink-0"
-                :data-testid="`exercise-group-tag-${exercise.id}`"
-              >
-                <BkRune
-                  v-if="primaryGroupRune(exercise)"
-                  :name="primaryGroupRune(exercise)!"
-                  :size="14"
-                />
-                <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
-              </span>
-              <!-- UNIFIED-LISTINGS: label de creador SOLO cuando no es mío —
-                   chip "Catálogo predefinido" para el catálogo admin, BkUser
-                   (punto de color + nombre) para lo público de otro usuario.
-                   Sin owner_color en ExerciseOut (fuera de este carril),
-                   BkUser cae a su fallback aurora. -->
-              <span
-                v-if="exercise.kind !== 'own'"
-                class="shrink-0"
-                :data-testid="`exercise-attribution-${exercise.id}`"
+            <div class="min-w-0 flex-1">
+              <p class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</p>
+              <!-- item 2+6 (v0.4.2, records-tab layout): fila de chips
+                   DEDICADA debajo del nombre, más pequeña (text-2xs) que el
+                   cuerpo de la fila — mismo criterio que la fila de
+                   atribución de RoutineList, un nivel más compacto porque
+                   aquí comparte sitio con el chip de grupo. El grupo primario
+                   (item 6) sale en TODA fila (propia o no); la atribución
+                   (item 2) solo en las que no son mías — comparten esta
+                   misma fila cuando ambas existen en vez de apilar dos filas
+                   sueltas, así que una fila propia SIN grupo primario no
+                   renderiza esta fila en absoluto (item 2: "own items get no
+                   chip row at all"). -->
+              <div
+                v-if="primaryGroup(exercise) || exercise.kind !== 'own'"
+                class="flex items-center gap-1.5 flex-wrap mt-1"
               >
                 <span
-                  v-if="exercise.kind === 'catalog'"
-                  class="inline-flex items-center rounded-full border border-line px-2 py-0.5 text-xs text-ink-muted"
+                  v-if="primaryGroup(exercise)"
+                  class="inline-flex items-center gap-1 rounded-full border border-line px-1.5 py-0.5 text-2xs text-ink-faint"
+                  :data-testid="`exercise-group-tag-${exercise.id}`"
                 >
-                  {{ $t('library.catalog') }}
+                  <BkRune
+                    v-if="primaryGroupRune(exercise)"
+                    :name="primaryGroupRune(exercise)!"
+                    :size="12"
+                  />
+                  <span>{{ groupLabel(primaryGroup(exercise)!) }}</span>
                 </span>
-                <BkUser
-                  v-else-if="exercise.owner_username"
-                  :user="{ username: exercise.owner_username, color: null }"
-                  size="sm"
-                />
-              </span>
-            </span>
+                <!-- UNIFIED-LISTINGS: label de creador SOLO cuando no es mío —
+                     chip "Catálogo predefinido" para el catálogo admin, BkUser
+                     (punto de color + nombre) para lo público de otro usuario.
+                     Sin owner_color en ExerciseOut (fuera de este carril),
+                     BkUser cae a su fallback aurora. -->
+                <span
+                  v-if="exercise.kind !== 'own'"
+                  :data-testid="`exercise-attribution-${exercise.id}`"
+                >
+                  <span
+                    v-if="exercise.kind === 'catalog'"
+                    class="inline-flex items-center rounded-full border border-line px-1.5 py-0.5 text-2xs text-ink-muted"
+                  >
+                    {{ $t('library.catalog') }}
+                  </span>
+                  <BkUser
+                    v-else-if="exercise.owner_username"
+                    :user="{ username: exercise.owner_username, color: null }"
+                    size="sm"
+                  />
+                </span>
+              </div>
+            </div>
             <!-- item 1: icon-only, como en RoutineList/AdminCard. item 5: un
                  admin puede editar/borrar filas predefinidas (owner_id
                  null), mismo sheet/flow que los ejercicios propios. W2

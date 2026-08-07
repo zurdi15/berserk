@@ -534,6 +534,63 @@ describe('ExerciseManager', () => {
     const ownTag = wrapper.get('[data-testid="exercise-group-tag-12"]')
     expect(ownTag.findComponent({ name: 'BkRune' }).props('name')).toBe('ansuz')
   })
+
+  it('item 6 (v0.4.2): the group chip rune renders at the compact ~12 size', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [{ muscle_group_id: 2, is_primary: true }] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 2, slug: 'shoulders', name_es: 'Hombros', name_en: 'Shoulders', owner_id: null },
+    ] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    const ownTag = wrapper.get('[data-testid="exercise-group-tag-12"]')
+    expect(ownTag.findComponent({ name: 'BkRune' }).props('size')).toBe(12)
+  })
+
+  it('item 2 (v0.4.2): the attribution chip renders on its own row below the name, sized down (text-2xs)', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      {
+        id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null,
+        is_public: false, owner_username: null, muscle_groups: [],
+      },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="catalog-exercise-row-1"]')
+    const nameEl = row.get('p')
+    expect(nameEl.text()).toBe('Press banca')
+
+    const chip = row.get('[data-testid="exercise-attribution-1"] span')
+    expect(chip.text()).toBe('Catálogo predefinido')
+    expect(chip.classes()).toContain('text-2xs')
+    // fila DEDICADA: el chip no vive dentro del párrafo del nombre
+    expect(nameEl.element.contains(chip.element)).toBe(false)
+  })
+
+  it('item 2+6 (v0.4.2): when both exist, the group chip and the attribution chip share the SAME chip row', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [{ muscle_group_id: 1, is_primary: true }] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+    ] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    const groupTag = wrapper.get('[data-testid="exercise-group-tag-1"]')
+    const attribution = wrapper.get('[data-testid="exercise-attribution-1"]')
+    expect(groupTag.element.parentElement).toBe(attribution.element.parentElement)
+  })
 })
 
 describe('MuscleGroupManager', () => {
@@ -867,5 +924,25 @@ describe('MuscleGroupManager', () => {
     await flushPromises()
 
     expect(byTestId('group-is-global-checkbox').exists()).toBe(true)
+  })
+
+  it('item 2 (v0.4.2): the Global badge renders on its own row below the name, sized down (text-2xs)', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'pecho', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+    ] as never)
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="muscle-group-row-1"]')
+    const nameRow = row.get('span.flex.items-center.gap-2')
+    expect(nameRow.text()).toBe('Pecho')
+
+    const badge = row.get('[data-testid="global-group-badge"]')
+    expect(badge.text()).toBe('Global')
+    expect(badge.classes()).toContain('text-2xs')
+    // fila DEDICADA: el badge no vive dentro de la fila del nombre
+    expect(nameRow.element.contains(badge.element)).toBe(false)
   })
 })

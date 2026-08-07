@@ -74,9 +74,16 @@ describe('ProfileView', () => {
 
   // por defecto las tarjetas hijas van con el auto-stub de VTU (contenido
   // irrelevante para estos tests); las pruebas de integración de C1 las
-  // desactivan una a una (stubs: false) para comprobar el control real
+  // desactivan una a una (stubs: false) para comprobar el control real.
+  // attachTo: document.body (item 5, v0.4.2) — igual que library.spec.ts:
+  // wrapper.isVisible() encadena getComputedStyle por el árbol de
+  // ancestros, y happy-dom solo lo calcula bien para nodos conectados al
+  // documento real (un nodo detached devuelve display '' en vez de 'none',
+  // falso positivo de "visible"). afterEach ya desmonta con unmount(), que
+  // limpia el nodo adjuntado.
   function build(stubs: Record<string, boolean> = {}) {
     return mount(ProfileView, {
+      attachTo: document.body,
       global: {
         plugins: [createI18nInstance()],
         stubs: {
@@ -342,6 +349,79 @@ describe('ProfileView', () => {
       await flushPromises()
 
       expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')?.attributes('aria-selected')).toBe('true')
+    })
+  })
+
+  describe('item 5 (v0.4.2): library gets the records-tab layout', () => {
+    async function openLibraryTab(w: VueWrapper) {
+      const libraryTab = w.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
+      await libraryTab!.trigger('click')
+      await flushPromises()
+    }
+
+    it('renders a segmented Ejercicios/Grupos musculares selector, with Ejercicios active by default', async () => {
+      wrapper = build()
+      await flushPromises()
+      await openLibraryTab(wrapper)
+
+      const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
+      expect(sectionTabs.map((tab) => tab.text())).toEqual(['Ejercicios', 'Grupos musculares'])
+      expect(sectionTabs[0].attributes('aria-selected')).toBe('true')
+      expect(sectionTabs[1].attributes('aria-selected')).toBe('false')
+    })
+
+    it('flipping the selector shows one manager at a time — real controls, not stubs, only one visible', async () => {
+      wrapper = build()
+      await flushPromises()
+      await openLibraryTab(wrapper)
+
+      const newExerciseBtn = wrapper.get('[data-testid="new-exercise-btn"]')
+      const newGroupBtn = wrapper.get('[data-testid="open-create-group-btn"]')
+      expect(newExerciseBtn.isVisible()).toBe(true)
+      expect(newGroupBtn.isVisible()).toBe(false)
+
+      const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
+      await sectionTabs[1].trigger('click')
+      await flushPromises()
+
+      expect(newExerciseBtn.isVisible()).toBe(false)
+      expect(newGroupBtn.isVisible()).toBe(true)
+      expect(sectionTabs[1].attributes('aria-selected')).toBe('true')
+    })
+
+    it('flipping back and forth does not remount either manager (same DOM node, no re-animation/re-fetch)', async () => {
+      const { listExercises, listMuscleGroups } = await import('@/api/domain')
+
+      wrapper = build()
+      await flushPromises()
+      await openLibraryTab(wrapper)
+
+      const exerciseManagerBefore = wrapper.findComponent({ name: 'ExerciseManager' }).element
+      const groupManagerBefore = wrapper.findComponent({ name: 'MuscleGroupManager' }).element
+      const exerciseCallsAfterMount = vi.mocked(listExercises).mock.calls.length
+      const groupCallsAfterMount = vi.mocked(listMuscleGroups).mock.calls.length
+
+      const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
+      await sectionTabs[1].trigger('click')
+      await flushPromises()
+      await sectionTabs[0].trigger('click')
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'ExerciseManager' }).element).toBe(exerciseManagerBefore)
+      expect(wrapper.findComponent({ name: 'MuscleGroupManager' }).element).toBe(groupManagerBefore)
+      expect(vi.mocked(listExercises).mock.calls.length).toBe(exerciseCallsAfterMount)
+      expect(vi.mocked(listMuscleGroups).mock.calls.length).toBe(groupCallsAfterMount)
+    })
+
+    it('mounting with #library in the hash lands on the panel with Ejercicios selected by default', async () => {
+      mockRoute.hash = '#library'
+      wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')?.attributes('aria-selected')).toBe('true')
+      const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
+      expect(sectionTabs[0].attributes('aria-selected')).toBe('true')
+      expect(wrapper.get('[data-testid="new-exercise-btn"]').isVisible()).toBe(true)
     })
   })
 })

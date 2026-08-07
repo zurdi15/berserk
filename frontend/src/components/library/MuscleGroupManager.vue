@@ -192,15 +192,29 @@ async function confirmDelete() {
             v-for="group in sortedGroups"
             :key="group.id"
             :data-testid="`muscle-group-row-${group.id}`"
-            class="flex items-center justify-between p-2 rounded border border-line text-sm"
+            class="flex items-start justify-between p-2 rounded border border-line text-sm"
           >
-            <span class="flex items-center gap-2">
-              <BkRune v-if="rowRune(group)" :name="rowRune(group)!" :size="16" />
-              {{ groupLabel(group) }}
-              <span v-if="group.owner_id === null" data-testid="global-group-badge" class="text-xs text-ink-faint uppercase">
-                {{ $t('library.globalGroup') }}
+            <div class="min-w-0">
+              <span class="flex items-center gap-2">
+                <BkRune v-if="rowRune(group)" :name="rowRune(group)!" :size="16" />
+                <span class="truncate">{{ groupLabel(group) }}</span>
               </span>
-            </span>
+              <!-- item 2 (v0.4.2, records-tab layout): "Global" pasa de ir
+                   pegado al nombre a su propia fila de chip debajo, más
+                   pequeña (text-2xs) — mismo criterio y misma clase de chip
+                   que la atribución de ExerciseManager/RoutineList, para que
+                   las tres listas de biblioteca/rutinas compartan el mismo
+                   idioma visual de "atribución". Una fila propia (owner_id
+                   del usuario) no renderiza esta fila en absoluto. -->
+              <div v-if="group.owner_id === null" class="mt-1">
+                <span
+                  data-testid="global-group-badge"
+                  class="inline-flex items-center rounded-full border border-line px-1.5 py-0.5 text-2xs text-ink-faint uppercase"
+                >
+                  {{ $t('library.globalGroup') }}
+                </span>
+              </div>
+            </div>
             <!-- item 1: icon-only, como en RoutineList/AdminCard. item 14:
                  canManage unifica dueño-de-lo-propio y admin-de-lo-global
                  (antes editar solo aparecía en la segunda rama, bug) -->
