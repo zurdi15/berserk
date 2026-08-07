@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { toastApiError } from '@/utils/apiErrors'
+import { useTabHash } from '@/composables/useTabHash'
 import BkTabs from '@/lib/BkTabs.vue'
 import BkButton from '@/lib/BkButton.vue'
 import SettingsCard from '@/components/profile/SettingsCard.vue'
@@ -15,11 +16,20 @@ import ExerciseManager from '@/components/library/ExerciseManager.vue'
 import MuscleGroupManager from '@/components/library/MuscleGroupManager.vue'
 import { useAuthStore } from '@/stores/auth'
 
+type ProfileTab = 'profile' | 'routines' | 'library' | 'admin'
+
 const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 
-const activeTab = ref('profile')
+// item 1 (v0.3.2): #admin no es válido para un no-admin — cae al default
+// (ver useTabHash), aunque llegue por hash de un enlace viejo/compartido
+function validProfileTabs(): ProfileTab[] {
+  const base: ProfileTab[] = ['profile', 'routines', 'library']
+  return auth.user?.is_admin ? [...base, 'admin'] : base
+}
+
+const activeTab = useTabHash<ProfileTab>('profile', validProfileTabs)
 
 // Compute tabs based on user role
 const tabs = computed(() => {

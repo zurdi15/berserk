@@ -12,6 +12,7 @@ import type { MetricKey } from '@/components/progress/series'
 import { seriesFor } from '@/components/progress/series'
 import StatsGrid from '@/components/progress/StatsGrid.vue'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
+import { useTabHash } from '@/composables/useTabHash'
 import BkCard from '@/lib/BkCard.vue'
 import BkChart from '@/lib/BkChart.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
@@ -22,9 +23,15 @@ import { toastApiError } from '@/utils/apiErrors'
 const { t } = useI18n()
 const athlete = useAthleteStore()
 
+type ProgressTab = 'training' | 'records' | 'stats' | 'body'
+const PROGRESS_TABS: readonly ProgressTab[] = ['stats', 'body', 'training', 'records']
+
 // item 8 (v0.3.0): orden totales → cuerpo → entreno → récords, con
 // Totales como pestaña activa por defecto (antes era Entrenos)
-const tab = ref<'training' | 'records' | 'stats' | 'body'>('stats')
+// item 1 (v0.3.2): anclada al hash de la URL (ver useTabHash) — el selector
+// de métrica (metric, debajo) es un toggle de DATO dentro de la pestaña
+// Entrenos, no una sección propia, y queda fuera de esto a propósito
+const tab = useTabHash<ProgressTab>('stats', () => PROGRESS_TABS)
 const metric = ref<MetricKey>('top_weight')
 const exerciseId = ref<number | null>(null)
 

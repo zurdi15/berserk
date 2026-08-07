@@ -1,5 +1,6 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { reactive } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
@@ -7,7 +8,15 @@ import { useAuthStore } from '@/stores/auth'
 import ProfileView from '../ProfileView.vue'
 
 const push = vi.fn()
-vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
+const replace = vi.fn()
+// item 1 (v0.3.2): reactivo de verdad (no un objeto plano) — useTabHash
+// observa route.hash, así que los tests de "cambio de hash tras montar"
+// (atrás/adelante del navegador) necesitan que mutarlo dispare el watcher
+const mockRoute = reactive({ hash: '' })
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push, replace }),
+  useRoute: () => mockRoute,
+}))
 
 vi.mock('@/api/auth', () => ({
   updateSettings: vi.fn(),
@@ -46,6 +55,7 @@ describe('ProfileView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    mockRoute.hash = ''
     const auth = useAuthStore()
     auth.user = {
       id: 1,
@@ -273,6 +283,60 @@ describe('ProfileView', () => {
       const userRow = wrapper.find('[data-testid="user-row-1"]')
       expect(userRow.exists()).toBe(true)
       expect(userRow.text()).toContain('root-admin')
+    })
+  })
+
+  describe('item 1 (v0.3.2): tab anchored to the URL hash', () => {
+    it('mounting with #routines in the hash activates the routines tab (real RoutineList renders, not just the tab label)', async () => {
+      mockRoute.hash = '#routines'
+      wrapper = build()
+      await flushPromises()
+
+      const newRoutineBtn = wrapper.findAll('button').find((b) => b.text() === 'Nueva rutina')
+      expect(newRoutineBtn).not.toBeUndefined()
+      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Rutinas')?.attributes('aria-selected')).toBe('true')
+    })
+
+    it('clicking a tab calls router.replace with the tab hash (not push — no history spam per tap)', async () => {
+      wrapper = build()
+      await flushPromises()
+      replace.mockClear()
+
+      const libraryTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')!
+      await libraryTab.trigger('click')
+      await flushPromises()
+
+      expect(replace).toHaveBeenCalledWith({ hash: '#library' })
+      expect(push).not.toHaveBeenCalled()
+    })
+
+    it('an invalid/junk hash falls back to the default (profile) tab', async () => {
+      mockRoute.hash = '#not-a-real-tab'
+      wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Perfil')?.attributes('aria-selected')).toBe('true')
+    })
+
+    it('a non-admin loading #admin falls back to the default (profile) tab', async () => {
+      mockRoute.hash = '#admin'
+      // auth.user ya es no-admin por el beforeEach
+      wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Perfil')?.attributes('aria-selected')).toBe('true')
+      expect(wrapper.find('table').exists()).toBe(false)
+    })
+
+    it('a hash change after mount (browser back/forward) switches the active tab', async () => {
+      wrapper = build()
+      await flushPromises()
+      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Perfil')?.attributes('aria-selected')).toBe('true')
+
+      mockRoute.hash = '#library'
+      await flushPromises()
+
+      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')?.attributes('aria-selected')).toBe('true')
     })
   })
 })

@@ -1,7 +1,21 @@
 import type { VueWrapper } from '@vue/test-utils'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { reactive } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// item 1 (v0.3.2): ProgressView ahora usa useTabHash (useRoute/useRouter) —
+// sin este mock, CUALQUIER montaje de ProgressView revienta con "injection
+// route location not found". Reactivo de verdad (no un objeto plano): los
+// tests de "cambio de hash tras montar" necesitan que mutarlo dispare el
+// watcher de useTabHash.
+const push = vi.fn()
+const replace = vi.fn()
+const mockRoute = reactive({ hash: '' })
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push, replace }),
+  useRoute: () => mockRoute,
+}))
 
 // vi.mock se hoist-ea por encima de los imports: las fixtures que usan las
 // factories deben declararse con vi.hoisted para no chocar con la TDZ
@@ -815,6 +829,9 @@ describe('BodySection', () => {
 describe('ProgressView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    mockRoute.hash = ''
+    push.mockClear()
+    replace.mockClear()
     vi.mocked(domain.listExercises).mockClear().mockResolvedValue(fixtures.exercises as never)
     vi.mocked(domain.listMuscleGroups).mockClear().mockResolvedValue(fixtures.muscleGroups as never)
     vi.mocked(domain.getDistribution).mockClear().mockResolvedValue(fixtures.distribution as never)
@@ -1115,5 +1132,73 @@ describe('ProgressView', () => {
     await mainTablist.findAll('[role="tab"]')[1].trigger('click') // Cuerpo
     await flushPromises()
     expect(wrapper.findComponent({ name: 'BodySection' }).classes()).toContain('flex-1')
+  })
+
+  describe('item 1 (v0.3.2): tab anchored to the URL hash', () => {
+    it('mounting with #training in the hash activates the training tab (real ExercisePicker renders, not just the tab label)', async () => {
+      mockRoute.hash = '#training'
+      const wrapper = mount(ProgressView, withI18n())
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'ExercisePicker' }).exists()).toBe(true)
+      const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+      expect(mainTablist.findAll('[role="tab"]')[2].attributes('aria-selected')).toBe('true')
+    })
+
+    it('clicking a tab calls router.replace with the tab hash (not push — no history spam per tap) — never fired by the metric sub-toggle', async () => {
+      const wrapper = mount(ProgressView, withI18n())
+      await flushPromises()
+      replace.mockClear()
+
+      const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+      await mainTablist.findAll('[role="tab"]')[3].trigger('click') // Récords
+      await flushPromises()
+
+      expect(replace).toHaveBeenCalledWith({ hash: '#records' })
+      expect(push).not.toHaveBeenCalled()
+    })
+
+    it('the chart metric selector (peso/volumen/est. 1RM) is a data toggle, not a URL-anchored section — clicking it never calls router.replace', async () => {
+      const wrapper = mount(ProgressView, withI18n())
+      await flushPromises()
+
+      const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+      await mainTablist.findAll('[role="tab"]')[2].trigger('click') // Entrenos
+      await flushPromises()
+
+      // el ExercisePicker necesita un ejercicio elegido (no "todos", que
+      // emite null) para que aparezca el selector de métrica (segundo
+      // tablist) — se elige el primero del fixture (id 1)
+      await wrapper.find('[data-testid="exercise-option-1"]').trigger('click')
+      await flushPromises()
+
+      replace.mockClear()
+      const metricTablist = wrapper.findAll('[role="tablist"]')[1]
+      expect(metricTablist).not.toBeUndefined()
+      await metricTablist.findAll('[role="tab"]')[1].trigger('click') // Volumen
+
+      expect(replace).not.toHaveBeenCalled()
+    })
+
+    it('an invalid/junk hash falls back to the default (stats) tab', async () => {
+      mockRoute.hash = '#not-a-real-tab'
+      const wrapper = mount(ProgressView, withI18n())
+      await flushPromises()
+
+      const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+      expect(mainTablist.findAll('[role="tab"]')[0].attributes('aria-selected')).toBe('true') // Totales
+    })
+
+    it('a hash change after mount (browser back/forward) switches the active tab', async () => {
+      const wrapper = mount(ProgressView, withI18n())
+      await flushPromises()
+      const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+      expect(mainTablist.findAll('[role="tab"]')[0].attributes('aria-selected')).toBe('true') // Totales
+
+      mockRoute.hash = '#records'
+      await flushPromises()
+
+      expect(mainTablist.findAll('[role="tab"]')[3].attributes('aria-selected')).toBe('true') // Récords
+    })
   })
 })

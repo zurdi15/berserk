@@ -11,9 +11,12 @@ vi.mock('uplot', () => ({
 
 const routerPush = vi.fn()
 const routeQuery: Record<string, unknown> = {}
+// item 1 (v0.3.2): ProgressView usa useTabHash (route.hash + router.replace)
+// — este archivo no ejerce el anclaje de pestaña al hash (eso vive en
+// progress.spec.ts), solo necesita que el mock no reviente al montar
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: routerPush }),
-  useRoute: () => ({ query: routeQuery }),
+  useRouter: () => ({ push: routerPush, replace: vi.fn() }),
+  useRoute: () => ({ query: routeQuery, hash: '' }),
 }))
 
 const EXERCISE = {
