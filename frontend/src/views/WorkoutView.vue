@@ -7,6 +7,7 @@ import { ApiError } from '@/api/client'
 import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutOut } from '@/api/domain'
 import { listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
 import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
+import { isLastOfSuperset, nextSupersetIndex, supersetLabels } from '@/lib/supersets'
 import { parseUtc } from '@/utils/datetime'
 import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
@@ -74,6 +75,20 @@ const resumedCardioCountdown = ref<PersistedCardioCountdown | null>(null)
 const units = computed(() => ((auth.user?.units as 'kg' | 'lb') || 'kg'))
 const exerciseMap = computed(() => new Map(exercises.value.map((e) => [e.id, e])))
 const exerciseIds = computed(() => activeWorkout.workout?.exercises.map((e) => e.id) ?? [])
+
+// v0.5.0 superseries: el agrupado se computa AQUÍ por contigüidad (la
+// tarjeta no ve a sus hermanas) y baja resuelto como props — ver
+// lib/supersets.ts para la semántica (runs contiguos, singles disueltos)
+const supersetValues = computed(() =>
+  (activeWorkout.workout?.exercises ?? []).map((e) => e.superset_group ?? null),
+)
+const supersetLabelByIndex = computed(() => supersetLabels(supersetValues.value))
+const supersetLastByIndex = computed(() =>
+  supersetValues.value.map((_, i) => isLastOfSuperset(supersetValues.value, i)),
+)
+// id del WorkoutExercise marcado como "siguiente" del grupo (chip pequeño)
+// tras registrar una serie en el miembro anterior — ver onLogged
+const supersetNextUpId = ref<number | null>(null)
 
 // runa del ejercicio que acaba de batir el récord — 'pr' es el comodín cuando
 // el catálogo no resuelve un grupo muscular primario (nunca dejar el prop sin runa)
@@ -260,7 +275,16 @@ async function triggerNeonPulse() {
   neonPulse.value = true
 }
 
-function onLogged(hasNewRecords: boolean) {
+function onLogged(index: number, hasNewRecords: boolean) {
+  // v0.5.0 superseries: cada serie registrada re-evalúa el "siguiente" —
+  // en un miembro no-último, se marca el siguiente del grupo (se encadena
+  // sin descanso); en el último (la ronda se cierra y arranca el descanso)
+  // o en un suelto, se limpia cualquier marca anterior
+  const nextIdx =
+    supersetLastByIndex.value[index] === false ? nextSupersetIndex(supersetValues.value, index) : null
+  supersetNextUpId.value =
+    nextIdx != null ? (activeWorkout.workout?.exercises[nextIdx]?.id ?? null) : null
+
   if (hasNewRecords) return
   triggerNeonPulse()
 }
@@ -418,8 +442,11 @@ onBeforeUnmount(() => {
         :rest-enabled="restAutoEnabled"
         :workout-id="activeWorkout.workout.id"
         :resumed-countdown="resumedCardioCountdown"
+        :superset-label="supersetLabelByIndex[i]"
+        :superset-last="supersetLastByIndex[i]"
+        :superset-next="we.id === supersetNextUpId"
         @recorded="onRecorded"
-        @logged="onLogged"
+        @logged="onLogged(i, $event)"
       />
 
       <BkButton

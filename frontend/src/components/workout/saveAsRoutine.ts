@@ -72,6 +72,11 @@ export function buildRoutineExercisesFromWorkout(workout: WorkoutOut): RoutineEx
       target_reps: clampInt(mode(reps), 1, 200),
       target_weight_kg: lastWeight != null && lastWeight > 0 ? Math.min(1000, lastWeight) : null,
       rest_seconds: clampInt(we.rest_seconds, 5, 900),
+      // v0.5.0 superseries: el grouping del entreno viaja a la rutina tal
+      // cual (mismo orden de ejercicios → misma contigüidad); si un reorden
+      // mid-workout lo rompió, todos los lectores normalizan por contigüidad
+      // (lib/supersets.ts) así que un run de 1 se disuelve solo
+      superset_group: we.superset_group ?? null,
     }
   })
 }

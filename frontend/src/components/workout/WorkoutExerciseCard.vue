@@ -70,6 +70,19 @@ const props = withDefaults(
     // null si no hay ninguno, o si el que hay no es de ESTE ejercicio (el
     // filtro por workoutExerciseId vive en el watch de abajo)
     resumedCountdown?: PersistedCardioCountdown | null
+    // v0.5.0 superseries: quien monta la tarjeta (WorkoutView) computa el
+    // agrupado por contigüidad (lib/supersets.ts) y lo baja ya resuelto —
+    // la tarjeta no ve a sus hermanas, así que no puede computarlo sola.
+    // supersetLabel: 'A'/'B'… o null = suelto (sin frame ni chip).
+    supersetLabel?: string | null
+    // ¿es el ÚLTIMO miembro (por orden) de su grupo? Regla posicional del
+    // auto-descanso: SOLO el último miembro dispara descanso al registrar
+    // una serie; los demás encadenan al siguiente sin descansar. true por
+    // defecto (un suelto siempre "cierra su ronda" y descansa normal).
+    supersetLast?: boolean
+    // marcado como "siguiente" tras registrar una serie en el miembro
+    // anterior del grupo — chip pequeño, puramente presentacional
+    supersetNext?: boolean
   }>(),
   {
     muscleGroups: () => [],
@@ -80,6 +93,9 @@ const props = withDefaults(
     restEnabled: true,
     workoutId: null,
     resumedCountdown: null,
+    supersetLabel: null,
+    supersetLast: true,
+    supersetNext: false,
   },
 )
 
@@ -140,6 +156,16 @@ const effectiveSetCount = computed(
 const effectiveRestSeconds = computed(() =>
   restFor(props.workoutExercise.rest_seconds, props.routineId, props.routines, props.workoutExercise.exercise_id),
 )
+
+// v0.5.0 superseries: el auto-descanso solo salta al cerrar la ronda del
+// grupo — un miembro que NO es el último encadena al siguiente sin descanso.
+// Regla posicional pura: da igual cuántas series lleve cada miembro. El
+// descanso MANUAL (picker de arriba) y la cancelación no cambian.
+// En el template, las cards de un grupo comparten el frame de borde lateral
+// aurora (mismo idiom que el acento de cardio) + chip "Superserie A" — el
+// comentario vive AQUÍ y no como primer hijo del <template> (gotcha: un
+// comentario raíz convierte la raíz en fragmento y rompe fallthrough).
+const autoRestFires = computed(() => props.supersetLabel == null || props.supersetLast)
 
 // item 3: se pide en cuanto se conoce el exercise_id (no solo al abrir el
 // drawer): también alimenta el hint de la tarjeta cuando aún no hay series
@@ -249,7 +275,7 @@ async function onDrawerSubmit(value: SetIn, keepOpen: boolean) {
     // mano): nunca debe quedar una entrada "zombie" en localStorage tras un
     // logueo real de este mismo ejercicio
     clearPersistedCardioCountdownForThisExercise()
-    if (props.restEnabled) {
+    if (props.restEnabled && autoRestFires.value) {
       // nombre del ejercicio → cuerpo de la notificación de fin de descanso
       restTimer.start(effectiveRestSeconds.value, name.value)
     }
@@ -300,7 +326,7 @@ async function onResumedDone() {
     const result = await props.actions.logSet(persisted.workoutExerciseId, body)
     clearPersistedCardioCountdown()
     resumedActive.value = null
-    if (props.restEnabled) restTimer.start(effectiveRestSeconds.value, name.value)
+    if (props.restEnabled && autoRestFires.value) restTimer.start(effectiveRestSeconds.value, name.value)
     if (result.new_records.length) emit('recorded', result.new_records)
     emit('logged', result.new_records.length > 0)
   } catch (error) {
@@ -384,11 +410,25 @@ async function moveDown() {
 </script>
 
 <template>
-  <BkCard :class="isCardio && 'border-l-2 border-aurora/50 pl-3'">
+  <BkCard :class="(isCardio || supersetLabel) && 'border-l-2 border-aurora/50 pl-3'">
     <div class="flex items-center justify-between mb-2">
       <div class="flex items-center gap-2 min-w-0">
         <BkRune v-if="primaryRune" :name="primaryRune" :size="14" />
         <h3 class="font-display font-semibold text-ink truncate">{{ name }}</h3>
+        <span
+          v-if="supersetLabel"
+          :data-testid="`superset-chip-${workoutExercise.id}`"
+          class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5 shrink-0"
+        >
+          {{ t('workout.superset', { label: supersetLabel }) }}
+        </span>
+        <span
+          v-if="supersetNext"
+          :data-testid="`superset-next-${workoutExercise.id}`"
+          class="text-xs text-aurora bg-aurora/15 border border-aurora rounded-sm px-1.5 py-0.5 shrink-0"
+        >
+          {{ t('workout.supersetNext') }}
+        </span>
         <span
           v-if="effectiveSetCount"
           class="bk-metric text-xs text-ink-faint shrink-0"
