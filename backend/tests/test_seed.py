@@ -12,7 +12,7 @@ def test_seed_populates_and_is_idempotent(db_session):
     ensure_catalog(db_session)
     groups = count_global(db_session, models.MuscleGroup)
     exercises = count_global(db_session, models.Exercise)
-    assert groups == 7
+    assert groups == 8
     assert exercises == len(SEED_EXERCISES) >= 40
     ensure_catalog(db_session)  # segunda pasada: no duplica
     assert count_global(db_session, models.MuscleGroup) == groups
@@ -30,4 +30,4 @@ def test_every_exercise_has_exactly_one_primary_group(db_session):
 
 def test_app_startup_seeds(app, db_session):
     # create_app corre el seed con su propio sessionmaker sobre el mismo engine
-    assert count_global(db_session, models.MuscleGroup) == 7
+    assert count_global(db_session, models.MuscleGroup) == 8

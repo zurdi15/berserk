@@ -33,6 +33,9 @@ class User(Base):
     timezone: Mapped[str] = mapped_column(String(50), default="Europe/Madrid")
     # NULL = sin color propio; el frontend cae al aurora del tema como default
     color: Mapped[str | None] = mapped_column(String(7), default=None)
+    # v0.11.0 (zurdi: "objetivos de peso — cuánto te queda al añadir un
+    # peso"): peso corporal objetivo, en kg canónicos; NULL = sin objetivo
+    goal_weight_kg: Mapped[float | None] = mapped_column(Float, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     sessions: Mapped[list["AuthSession"]] = relationship(

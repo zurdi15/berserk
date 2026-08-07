@@ -115,9 +115,12 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
     if payload.finished:
         # duración real desconocida en un registro retroactivo: started==ended
         # mantiene las stats honestas (total_gym_seconds += 0) en vez de
-        # inventar una duración que nunca se midió. Mediodía naive-UTC es un
-        # placeholder estable (no un intento de acertar la hora real del día)
-        started_at = datetime.combine(payload.date, time(12, 0))
+        # inventar una duración que nunca se midió. v0.11.0 (zurdi: "al añadir
+        # desde el calendario no se puede editar la hora de inicio"): si el
+        # cliente manda started_at, se honra como hora real de inicio (la
+        # duración sigue siendo 0 hasta que se edite); mediodía naive-UTC
+        # queda como placeholder estable solo cuando no llega hora.
+        started_at = payload.started_at or datetime.combine(payload.date, time(12, 0))
         ended_at = started_at
     else:
         started_at = payload.started_at or utcnow()

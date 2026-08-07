@@ -342,11 +342,29 @@ function editWorkout(id: number) {
 // precargados + rest_seconds + grupos derivados) para el camino finished
 // exactamente igual que para el en vivo — no está condicionado a `finished`
 // en el backend (ver routers/workouts.py::start_workout)
+// v0.11.0 (zurdi: "al añadir un entrenamiento desde el calendario no se
+// puede editar la hora de inicio"): hora opcional en el propio picker retro —
+// local HH:MM del día elegido → UTC ISO (el backend la honra como started_at
+// real, con duración 0 editable después). Sin hora: placeholder de mediodía.
+const pastWorkoutTime = ref<string | null>(null)
+
+function retroStartedAtUtc(): string | undefined {
+  if (!pastWorkoutTime.value) return undefined
+  const local = new Date(`${props.date}T${pastWorkoutTime.value}:00`)
+  return local.toISOString().slice(0, 19)
+}
+
 async function logPastWorkout(routineId?: number) {
   pastWorkoutPickerOpen.value = false
   try {
     loggingPastWorkout.value = true
-    const workout = await startWorkout({ date: props.date, finished: true, routine_id: routineId })
+    const workout = await startWorkout({
+      date: props.date,
+      finished: true,
+      routine_id: routineId,
+      started_at: retroStartedAtUtc(),
+    })
+    pastWorkoutTime.value = null
     router.push({ name: 'workout-edit', params: { id: workout.id } })
   } catch (error) {
     toastApiError(error)
@@ -557,6 +575,13 @@ loadDayInfo()
         @close="pastWorkoutPickerOpen = false"
       >
         <div class="space-y-3 p-4">
+          <!-- v0.11.0: hora de inicio opcional del retro, elegible YA al crear -->
+          <BkTimeField
+            v-model="pastWorkoutTime"
+            :label="$t('workout.startTime')"
+            :hint="$t('calendar.optional')"
+            data-testid="past-workout-time"
+          />
           <BkButton
             variant="primary"
             block

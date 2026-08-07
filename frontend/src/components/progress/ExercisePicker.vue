@@ -9,7 +9,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useAthleteStore } from '@/stores/athlete'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
-import BkSelect from '@/lib/BkSelect.vue'
+import GroupFilterSelect from '@/lib/GroupFilterSelect.vue'
 import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 
@@ -56,10 +56,6 @@ async function load() {
 // mismo pajar (nombre ES+EN + etiqueta del tipo — "cardio" encuentra la
 // cinta) y mismo filtro de grupo muscular que ExerciseManager
 const filterGroupId = ref('')
-const groupFilterOptions = computed(() => [
-  { value: '', label: t('library.allGroups') },
-  ...muscleGroups.value.map((g) => ({ value: String(g.id), label: groupLabel(g) })),
-])
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
@@ -103,14 +99,10 @@ watch(() => athlete.userId, load)
          (comentario dentro de la raíz para no crear un fragmento de dos
          raíces que rompa el fall-through de atributos) -->
     <BkField v-model="query" :label="t('progress.searchExercise')" class="shrink-0" />
-    <!-- v0.10.0: mismo filtro de grupo que la biblioteca -->
-    <BkSelect
-      v-model="filterGroupId"
-      :label="t('library.muscleGroups')"
-      :options="groupFilterOptions"
-      class="shrink-0"
-      data-testid="picker-group-filter"
-    />
+    <!-- v0.11.0: filtro de grupo compartido (GroupFilterSelect) -->
+    <div class="shrink-0" data-testid="picker-group-filter">
+      <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
+    </div>
 
     <!-- esqueleto mientras carga: mismo hueco que la lista real -->
     <div v-if="!ready" class="flex-1 min-h-0 overflow-y-auto space-y-1" data-testid="exercise-list-skeleton">

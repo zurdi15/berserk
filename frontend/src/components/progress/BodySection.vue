@@ -9,6 +9,9 @@ import { toastApiError } from '@/utils/apiErrors'
 import { todayIso } from '@/utils/dates'
 import { displayToKg, formatWeight, kgToDisplay } from '@/utils/units'
 import { useAthleteStore } from '@/stores/athlete'
+import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
+import { updateSettings } from '@/api/auth'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkChart from '@/lib/BkChart.vue'
@@ -19,6 +22,66 @@ import BkSheet from '@/lib/BkSheet.vue'
 
 const { t } = useI18n()
 const athlete = useAthleteStore()
+const auth = useAuthStore()
+const toast = useToastStore()
+
+// v0.11.0 (zurdi: "objetivos de peso — pantalla de bienvenida de gordito, de
+// cuánto te queda para tu objetivo al añadir un peso"): objetivo de peso
+// corporal (users.goal_weight_kg, kg canónicos). La card de arriba saluda
+// con lo que queda; al guardar una entrada CON peso, un toast repite el
+// progreso ("te quedan X" / "objetivo alcanzado").
+const goalKg = computed(() => auth.user?.goal_weight_kg ?? null)
+const goalEditing = ref(false)
+const goalStr = ref('')
+
+const latestWeightKg = computed(() => {
+  for (const entry of [...entries.value].reverse()) {
+    if (entry.weight_kg != null) return entry.weight_kg
+  }
+  return null
+})
+
+const goalRemainingKg = computed(() => {
+  if (goalKg.value == null || latestWeightKg.value == null) return null
+  // redondeo a 1 decimal: la resta de dos floats arrastra basura binaria
+  // (81.4 - 78 = 3.4000000000000057) y formatWeight conserva la precisión
+  // que recibe
+  return Math.round((latestWeightKg.value - goalKg.value) * 10) / 10
+})
+
+const goalReached = computed(
+  () => goalRemainingKg.value !== null && Math.abs(goalRemainingKg.value) <= 0.1,
+)
+
+function openGoalEdit() {
+  goalStr.value = goalKg.value != null ? String(kgToDisplay(goalKg.value, units.value)) : ''
+  goalEditing.value = true
+}
+
+async function saveGoal() {
+  const raw = goalStr.value.trim().replace(',', '.')
+  const parsed = raw === '' ? null : Number(raw)
+  if (parsed !== null && (!Number.isFinite(parsed) || parsed <= 0)) return
+  try {
+    const user = await updateSettings({
+      goal_weight_kg: parsed === null ? null : displayToKg(parsed, units.value),
+    })
+    auth.user = user
+    goalEditing.value = false
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
+function goalProgressToast(weightKg: number) {
+  if (goalKg.value == null) return
+  const remaining = Math.round((weightKg - goalKg.value) * 10) / 10
+  if (Math.abs(remaining) <= 0.1) {
+    toast.push('ember', t('body.goalReached'))
+  } else {
+    toast.push('info', t('body.goalRemaining', { amount: formatWeight(Math.abs(remaining), units.value) }))
+  }
+}
 
 const units = useDisplayUnits()
 // datos de cuerpo son de escritura estrictamente propia (el backend solo
@@ -190,6 +253,8 @@ async function save() {
     loading.value = true
     await upsertBody(date.value, body)
     sheetOpen.value = false
+    // v0.11.0: feedback de objetivo al registrar un peso nuevo
+    if (body.weight_kg != null) goalProgressToast(body.weight_kg)
     await load()
   } catch (error) {
     toastApiError(error)
@@ -215,6 +280,53 @@ watch(() => athlete.userId, load, { immediate: true })
 
 <template>
   <div class="space-y-4">
+    <!-- v0.11.0: la "pantalla de bienvenida" del objetivo — saluda con lo
+         que queda (o celebra) y se edita en sitio; solo en el cuerpo PROPIO -->
+    <div
+      v-if="isViewingSelf"
+      class="bk-slab p-4 space-y-2"
+      data-testid="goal-card"
+    >
+      <template v-if="!goalEditing">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-sm text-ink-muted">{{ t('body.goalTitle') }}</p>
+          <BkActionBtn
+            icon="edit"
+            data-testid="goal-edit-btn"
+            :aria-label="t('body.goalSet')"
+            @click="openGoalEdit"
+          />
+        </div>
+        <p v-if="goalKg == null" class="text-sm text-ink-faint">{{ t('body.goalNone') }}</p>
+        <template v-else>
+          <p v-if="goalReached" class="text-lg text-ember font-semibold" data-testid="goal-status">
+            {{ t('body.goalReached') }}
+          </p>
+          <p v-else-if="goalRemainingKg !== null" class="text-lg text-ink" data-testid="goal-status">
+            {{ t('body.goalRemaining', { amount: formatWeight(Math.abs(goalRemainingKg), units) }) }}
+          </p>
+          <p v-else class="text-sm text-ink-faint" data-testid="goal-status">{{ t('body.goalNoWeightYet') }}</p>
+          <p class="text-xs text-ink-faint">
+            {{ t('body.goalDetail', {
+              goal: formatWeight(goalKg, units),
+              current: latestWeightKg != null ? formatWeight(latestWeightKg, units) : '—',
+            }) }}
+          </p>
+        </template>
+      </template>
+      <template v-else>
+        <BkField v-model="goalStr" :label="t('body.goalLabel', { units })" data-testid="goal-input" />
+        <div class="flex gap-2">
+          <BkButton variant="primary" size="sm" data-testid="goal-save" @click="saveGoal">
+            {{ t('common.save') }}
+          </BkButton>
+          <BkButton variant="ghost" size="sm" @click="goalEditing = false">
+            {{ t('common.cancel') }}
+          </BkButton>
+        </div>
+      </template>
+    </div>
+
     <div v-if="chartPoints.length">
       <p class="text-sm text-ink-muted mb-2">{{ t('body.weightOverTime') }}</p>
       <BkChart :points="chartPoints" color="aurora" :suffix="` ${units}`" />

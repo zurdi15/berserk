@@ -41,6 +41,8 @@ class UserOut(BaseModel):
     units: str
     timezone: str
     color: str | None
+    # v0.11.0: objetivo de peso corporal (kg canónicos), null = sin objetivo
+    goal_weight_kg: float | None = None
 
     model_config = {"from_attributes": True}
 

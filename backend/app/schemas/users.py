@@ -19,6 +19,9 @@ class SettingsIn(BaseModel):
     # a diferencia de locale/units/timezone, color SÍ es anulable: un null
     # explícito es la forma de volver al aurora del tema (ver users.py)
     color: str | None = None
+    # v0.11.0: objetivo de peso corporal (kg canónicos) — anulable: un null
+    # explícito retira el objetivo
+    goal_weight_kg: float | None = Field(None, gt=0, le=500)
 
     @field_validator("timezone")
     @classmethod

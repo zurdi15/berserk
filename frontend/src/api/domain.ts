@@ -421,6 +421,9 @@ export const startWorkout = (body: {
   // entreno retroactivo: crea ya cerrado (ver backend WorkoutStartIn) — date
   // pasa a ser obligatorio en ese caso, el backend 422 si falta
   finished?: boolean
+  // v0.11.0: hora de inicio real de un retro (UTC ISO, sin zona) — el
+  // backend la honra en vez del placeholder de mediodía
+  started_at?: string
   // v0.6.0 offline: UUID de replay idempotente (solo lo manda el outbox)
   client_id?: string
 }) =>

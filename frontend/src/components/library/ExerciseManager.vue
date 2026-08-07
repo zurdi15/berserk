@@ -14,6 +14,7 @@ import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSelect from '@/lib/BkSelect.vue'
+import GroupFilterSelect from '@/lib/GroupFilterSelect.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkUser from '@/lib/BkUser.vue'
@@ -88,11 +89,6 @@ const displayExercises = computed<DisplayExercise[]>(() => [
 // muscle_group_id del backend.
 const query = ref('')
 const filterGroupId = ref('')
-
-const groupFilterOptions = computed(() => [
-  { value: '', label: t('library.allGroups') },
-  ...muscleGroups.value.map((g) => ({ value: String(g.id), label: groupLabel(g) })),
-])
 
 const filteredExercises = computed<DisplayExercise[]>(() => {
   const q = query.value.trim().toLowerCase()
@@ -312,12 +308,10 @@ async function confirmDelete() {
               :label="$t('library.searchExercises')"
               data-testid="exercise-search-field"
             />
-            <BkSelect
-              v-model="filterGroupId"
-              :label="$t('library.muscleGroups')"
-              :options="groupFilterOptions"
-              data-testid="exercise-group-filter"
-            />
+            <!-- v0.11.0: filtro de grupo compartido (GroupFilterSelect) -->
+            <div data-testid="exercise-group-filter">
+              <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
+            </div>
           </div>
 
           <div v-if="filteredExercises.length > 0" class="space-y-2">

@@ -9,8 +9,8 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useAuthStore } from '@/stores/auth'
 import BkRune from '@/lib/BkRune.vue'
 import BkSearchList from '@/lib/BkSearchList.vue'
-import BkSelect from '@/lib/BkSelect.vue'
 import BkSheet from '@/lib/BkSheet.vue'
+import GroupFilterSelect from '@/lib/GroupFilterSelect.vue'
 import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 import type { WorkoutActions } from './workoutActions'
@@ -64,13 +64,9 @@ function searchTextFor(exercise: ExerciseOut): string {
   return `${exercise.name_es} ${exercise.name_en} ${t(`library.measurements.${exercise.measurement}`)}`
 }
 
-// v0.10.0 (zurdi: "mismos filtros que en la biblioteca"): filtro de grupo
-// muscular sobre la lista, idéntico a ExerciseManager
+// v0.10.0 (zurdi: "mismos filtros que en la biblioteca") — v0.11.0: el
+// selector es el componente compartido GroupFilterSelect
 const filterGroupId = ref('')
-const groupFilterOptions = computed(() => [
-  { value: '', label: t('library.allGroups') },
-  ...muscleGroups.value.map((g) => ({ value: String(g.id), label: groupLabel(g) })),
-])
 const groupFiltered = computed(() => {
   const groupId = filterGroupId.value ? Number(filterGroupId.value) : null
   if (groupId === null) return exercises.value
@@ -155,14 +151,9 @@ watch(
     <!-- v0.8.0 (zurdi: "la lista debería ocupar más pantalla"): de la
          max-h-64 por defecto de BkSearchList a media pantalla larga — dvh
          para que la UI del navegador móvil no la empuje bajo el borde -->
-    <!-- v0.10.0: filtro de grupo idéntico al de la biblioteca -->
-    <div v-if="catalogReady" class="pb-2">
-      <BkSelect
-        v-model="filterGroupId"
-        :label="t('library.muscleGroups')"
-        :options="groupFilterOptions"
-        data-testid="add-exercise-group-filter"
-      />
+    <!-- v0.11.0: filtro de grupo compartido (GroupFilterSelect) -->
+    <div v-if="catalogReady" class="pb-2" data-testid="add-exercise-group-filter">
+      <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
     </div>
     <BkSearchList
       v-if="catalogReady"

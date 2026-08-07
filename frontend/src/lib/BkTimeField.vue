@@ -291,12 +291,13 @@ watch(() => props.modelValue, (value) => {
               >{{ m }}</li>
             </ul>
           </div>
+          <!-- v0.11.0 (zurdi: "cancelar y limpiar son redundantes y hacen
+               overflow por la derecha"): Cancelar muere — Escape y tocar
+               fuera ya cancelan (layerStack), el botón solo duplicaba esos
+               gestos y empujaba a Aplicar fuera del panel en 390px -->
           <div class="flex items-center gap-2 p-2 border-t border-line">
             <button type="button" class="bk-press text-sm text-ink-muted hover:text-ink px-2 py-1" data-testid="time-field-clear" @click="clear">
               {{ t('common.clear') }}
-            </button>
-            <button type="button" class="bk-press text-sm text-ink-muted hover:text-ink px-2 py-1" @click="cancel">
-              {{ t('common.cancel') }}
             </button>
             <button type="button" class="bk-press ml-auto text-sm text-aurora font-semibold px-3 py-1 rounded-sm border border-aurora hover:bg-aurora/10" data-testid="time-field-apply" @click="apply">
               {{ t('common.apply') }}

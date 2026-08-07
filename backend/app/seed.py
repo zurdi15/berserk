@@ -1,4 +1,4 @@
-"""Catálogo global: 7 grupos musculares y ejercicios comunes con nombres ES/EN.
+"""Catálogo global: 8 grupos musculares y ejercicios comunes con nombres ES/EN.
 
 Idempotente por conteo: solo siembra cuando no hay filas globales, así los
 usuarios pueden borrar/ignorar el catálogo sin que reaparezca en cada arranque.
@@ -17,6 +17,10 @@ SEED_MUSCLE_GROUPS = [
     ("shoulders", "Hombros", "Shoulders"),
     ("legs", "Piernas", "Legs"),
     ("core", "Core", "Core"),
+    # v0.11.0 (zurdi: "un grupo debería ser cardio y que salga en todos los
+    # selectores") — runa raidho (viaje/movimiento) vía la columna dedicada,
+    # el slug 'cardio' no es nombre de runa (ver ensure_catalog)
+    ("cardio", "Cardio", "Cardio"),
 ]
 
 # (name_es, name_en, measurement, primary_slug, [secondary_slugs])
@@ -81,13 +85,13 @@ SEED_EXERCISES = [
     ("Rueda abdominal", "Ab wheel rollout", "bodyweight", "core", ["back"]),
     ("Russian twist", "Russian twist", "bodyweight", "core", []),
     ("Farmer walk", "Farmer walk", "timed", "core", ["back", "legs"]),
-    # Cardio
-    ("Cinta de correr", "Treadmill", "cardio", "legs", []),
-    ("Bicicleta estática", "Stationary bike", "cardio", "legs", []),
-    ("Elíptica", "Elliptical", "cardio", "legs", []),
-    ("Remo ergómetro", "Rowing machine", "cardio", "back", ["legs", "core"]),
-    ("Comba", "Jump rope", "cardio", "legs", ["core"]),
-    ("Escaleras", "Stair climber", "cardio", "legs", []),
+    # Cardio — primario 'cardio' (v0.11.0), el trabajo muscular como secundario
+    ("Cinta de correr", "Treadmill", "cardio", "cardio", ["legs"]),
+    ("Bicicleta estática", "Stationary bike", "cardio", "cardio", ["legs"]),
+    ("Elíptica", "Elliptical", "cardio", "cardio", ["legs"]),
+    ("Remo ergómetro", "Rowing machine", "cardio", "cardio", ["back", "legs", "core"]),
+    ("Comba", "Jump rope", "cardio", "cardio", ["legs", "core"]),
+    ("Escaleras", "Stair climber", "cardio", "cardio", ["legs"]),
 ]
 
 
@@ -97,6 +101,9 @@ def ensure_catalog(db: Session) -> None:
     groups: dict[str, MuscleGroup] = {}
     for slug, name_es, name_en in SEED_MUSCLE_GROUPS:
         group = MuscleGroup(slug=slug, name_es=name_es, name_en=name_en)
+        # cardio no tiene runa homónima: raidho vía la columna dedicada
+        if slug == "cardio":
+            group.rune = "raidho"
         db.add(group)
         groups[slug] = group
     db.flush()
