@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.4.2 - 2026-08-07
+
+- The day sheet grows per-user tabs: opening a day shows your training and, one tab per sharing user who trained that day, theirs — read-only, with their records of the day.
+- Routines simplified to one "Global" check: marked global and everyone can see, use or duplicate it (ownership stays yours); duplicating works on your own routines too, and the admin-only globalize conversion is gone.
+- The library splits into Exercises and Muscle groups tabs; ownership chips sit smaller on their own row, and every exercise shows its primary group as a rune-plus-name chip.
+- Muscle distribution now lives in Today below the week summary; filtered records drop the redundant kind label; the shared-users legend is just the users, and the rune legend got its info icon back.
+
 ## 0.4.1 - 2026-08-07
 
 - Fixed mobile scrolling: content no longer hides behind the bottom navigation bar.
