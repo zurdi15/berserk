@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.8.2 - 2026-08-07
+
+- Progress > Workouts no longer scrolls the page at all: the exercise list is the only thing that scrolls, sized to the exact visible space, and picking an exercise unfolds the chart smoothly while the list cedes room gradually.
+
 ## 0.8.1 - 2026-08-07
 
 - Progress > Workouts: the exercise list now fills the screen until you pick one — then it shrinks smoothly while the chart block animates in. The pointless "All exercises" option is gone.
