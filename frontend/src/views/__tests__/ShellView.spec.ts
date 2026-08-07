@@ -130,7 +130,7 @@ describe('ShellView nav', () => {
   // pinta en el borde real de la ventana) y la columna centrada se mueve a un
   // <div> interno que envuelve RouterView y hereda el px/py que antes llevaba
   // <main> directamente
-  it("item 3: <main> is full-width (no max-w-3xl/mx-auto of its own) and an inner wrapper div carries the centered column + h-full flex context for RouterView", async () => {
+  it("item 3: <main> is full-width (no max-w-3xl/mx-auto of its own) and an inner wrapper div carries the centered column + a definite flex context for RouterView", async () => {
     const router = buildRouter('today')
     await router.isReady()
     const wrapper = mount(ShellView, {
@@ -143,20 +143,67 @@ describe('ShellView nav', () => {
     expect(main.classes()).not.toContain('max-w-3xl')
     expect(main.classes()).not.toContain('mx-auto')
     expect(main.classes()).toContain('w-full')
-    // pb-24 (hueco del navbar móvil fijo) se queda en <main>, no en el wrapper
-    expect(main.classes()).toContain('pb-24')
+    // pb-24 ya NO vive en <main> (v0.4.1: ver el spacer de abajo) — sigue
+    // siendo w-full puro, sin padding-bottom propio
+    expect(main.classes()).not.toContain('pb-24')
 
     const innerWrapper = main.get('div')
     expect(innerWrapper.classes()).toContain('max-w-3xl')
     expect(innerWrapper.classes()).toContain('mx-auto')
     expect(innerWrapper.classes()).toContain('w-full')
-    // h-full (no min-h-full): es lo que le da a ProgressView (y cualquier vista
-    // con su propio h-full) una referencia de altura DEFINIDA para resolver su
-    // porcentaje — min-height por sí solo no propaga esa referencia a los hijos
-    // (verificado en real, ver comentario en ShellView.vue)
-    expect(innerWrapper.classes()).toContain('h-full')
+    // h-[calc(100%-6rem)] (v0.4.1, NO h-full puro y NO min-h-full — ambos
+    // descartados, ver comentario largo en ShellView.vue): sigue siendo una
+    // altura DEFINIDA (100% de <main>) — lo que le da a ProgressView (y a
+    // cualquier vista con su propio h-full/flex-1 interno) una referencia
+    // resoluble para sus porcentajes — pero MENOS los 6rem que reserva el
+    // spacer de abajo, para que ese 100% no incluya la zona reservada
+    // (si no, el chart anclado abajo de Entrenos se plantaba bajo el navbar)
+    expect(innerWrapper.classes()).toContain('h-[calc(100%-6rem)]')
+    expect(innerWrapper.classes()).not.toContain('h-full')
+    expect(innerWrapper.classes()).not.toContain('min-h-full')
     expect(innerWrapper.classes()).toContain('flex')
     expect(innerWrapper.classes()).toContain('flex-col')
+  })
+
+  // v0.4.1 (fix de scroll móvil — bug real de zurdi, en su móvil: "se ha roto
+  // el scroll — parte del content de abajo se esconde detrás de la bottom
+  // navbar"). pb-24 pasó de ser padding de <main> (o del wrapper) a un <div>
+  // SPACER real, hermano de RouterView, DENTRO del wrapper de altura fija —
+  // un hijo de flujo no se recorta a la altura resuelta de su padre: el
+  // algoritmo de flex lo apila justo después del contenido real de RouterView
+  // (por su tamaño real, no por el de la caja), así que el hueco de 96px
+  // sigue siempre al ÚLTIMO contenido pintado, se desborde el wrapper o no —
+  // a diferencia de padding-bottom, que se reserva contra la altura resuelta
+  // de SU PROPIA caja y quedaba a mitad del desborde en vistas más altas que
+  // el viewport. El wrapper TAMBIÉN descuenta esos mismos 6rem de su propio
+  // h-[calc(100%-6rem)] (ver test de arriba) — si no, ProgressView (que usa
+  // height:100%, no flex-grow, para "ocupar el resto") heredaría el 100%
+  // COMPLETO de <main>, ajeno a que el spacer se come 96px después, y su
+  // contenido anclado abajo (el chart de Entrenos) se plantaría bajo el
+  // navbar en vez de quedar claro por encima (ver comentario largo en
+  // ShellView.vue, verificado en Chromium real: Hoy pasa de -38px de solape
+  // con el navbar a +58px de margen; el chart de Entrenos vuelve a la MISMA
+  // posición exacta que en v0.4.0, en vez de quedar ~80px más abajo).
+  it('v0.4.1: a shrink-0 spacer sibling of RouterView (not padding) reserves the mobile-nav clearance, inside the h-[calc(100%-6rem)] wrapper', async () => {
+    const router = buildRouter('today')
+    await router.isReady()
+    const wrapper = mount(ShellView, {
+      global: {
+        plugins: [router, createI18nInstance()],
+        stubs: { RouterView: true, RouterLink: true, AthleteBanner: true },
+      },
+    })
+    const innerWrapper = wrapper.get('main').get('div')
+    const spacer = innerWrapper.get('[data-testid="mobile-nav-clearance"]')
+    expect(spacer.classes()).toContain('shrink-0')
+    expect(spacer.classes()).toContain('h-24')
+    expect(spacer.attributes('aria-hidden')).toBe('true')
+
+    // hermano DIRECTO de RouterView (el stub se renderiza como <router-view-stub>),
+    // último hijo del wrapper — así el flex-column lo apila justo tras el
+    // contenido real, no antes
+    const children = innerWrapper.element.children
+    expect(children[children.length - 1]).toBe(spacer.element)
   })
 })
 

@@ -1182,7 +1182,9 @@ describe('ProgressView', () => {
     expect(wrapper.find('h1').exists()).toBe(false)
     // <main> del shell ya pone px-4: la raíz de la vista no debe duplicarlo
     expect(wrapper.classes().some((c) => c === 'p-4' || c.startsWith('px-'))).toBe(false)
-    // el chain h-full/flex-col (item 3 del round 3) sigue intacto sin el h1
+    // el chain h-full/flex-col (item 3 del round 3) sigue intacto sin el h1 — v0.4.1
+    // probó cambiar esto a flex-1 min-h-0 y lo descartó (ver comentario largo en
+    // ShellView.vue: rompía la cadena flex/% de ExercisePicker en Chromium real)
     expect(wrapper.classes()).toContain('h-full')
     expect(wrapper.classes()).toContain('flex-col')
   })

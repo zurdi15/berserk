@@ -135,8 +135,21 @@ watch(exerciseId, () => {
 
 <template>
   <div class="h-full flex flex-col gap-4">
-    <!-- h-full: <main> del shell ya acota la altura real (ver ShellView.vue) —
-         sin ese tope, "ocupa el resto del viewport" no tiene contra qué medirse.
+    <!-- h-full (SIN CAMBIOS de clase desde v0.4.0): <main> del shell ya acota la altura
+         real con una caja de height FIJO — sin ese tope, "ocupa el resto del viewport" no
+         tiene contra qué medirse.
+         v0.4.1 (fix de scroll móvil, ver el comentario largo en ShellView.vue): esa caja
+         fija de <main> pasó de h-full a h-[calc(100%-6rem)] — 100% MENOS la reserva del
+         navbar móvil, que ahora vive en un spacer de flujo en vez de en padding. Esta raíz
+         no necesita ningún cambio de CLASE: sigue siendo h-full de SU padre, que es
+         justamente la caja que cambió — el 100% que hereda ahora YA EXCLUYE la reserva,
+         así que el chart anclado abajo de Entrenos queda en la MISMA posición exacta que
+         antes de v0.4.1 (verificado en Chromium real). Se probó primero cambiar esto a
+         flex-1 min-h-0 (acompañando un wrapper min-h-full en vez de h-[calc(...)]) —
+         DESCARTADO: min-height no da una referencia de altura DEFINIDA a un hijo con
+         height:100%, y tampoco deja que flex-grow reparta espacio de forma fiable cuando
+         el propio wrapper está en modo auto-size; en Chromium real, ExercisePicker perdía
+         su scroll interno y arrastraba a <main> entero a desbordar miles de px.
          (comentario DENTRO de la raíz: como primer hijo del template crearía un
          fragmento de dos raíces y rompería el fall-through de atributos)
          Sin h1 de sección (item 3): Hoy nunca tuvo uno, mismo patrón aquí.
