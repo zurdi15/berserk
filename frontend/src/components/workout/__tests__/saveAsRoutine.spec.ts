@@ -117,3 +117,23 @@ describe('buildRoutineExercisesFromWorkout (item 5)', () => {
     })
   })
 })
+
+// v0.5.0 superseries: el grouping del entreno viaja a la rutina tal cual
+// (mismo orden → misma contigüidad); los lectores normalizan por contigüidad
+describe('buildRoutineExercisesFromWorkout: superset_group passthrough (v0.5.0)', () => {
+  it('carries superset_group through per exercise, null for loose ones', () => {
+    const w = workout([
+      { id: 20, exercise_id: 5, position: 0, note: null, rest_seconds: null, superset_group: 0, sets: [set()] },
+      { id: 21, exercise_id: 7, position: 1, note: null, rest_seconds: null, superset_group: 0, sets: [set()] },
+      { id: 22, exercise_id: 9, position: 2, note: null, rest_seconds: null, superset_group: null, sets: [set()] },
+    ])
+    expect(buildRoutineExercisesFromWorkout(w).map((i) => i.superset_group)).toEqual([0, 0, null])
+  })
+
+  it('defaults to null when the field is absent (older fixtures / pre-migration payloads)', () => {
+    const w = workout([
+      { id: 20, exercise_id: 5, position: 0, note: null, rest_seconds: null, sets: [set()] },
+    ])
+    expect(buildRoutineExercisesFromWorkout(w)[0].superset_group).toBeNull()
+  })
+})

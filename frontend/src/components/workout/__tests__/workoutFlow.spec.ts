@@ -948,3 +948,85 @@ describe('WorkoutExerciseCard', () => {
     expect(toast.toasts.length).toBeGreaterThan(0)
   })
 })
+
+// v0.5.0 superseries: la tarjeta recibe el agrupado YA resuelto (label /
+// last / next, computado por WorkoutView vía lib/supersets.ts) — aquí se
+// prueba el contrato de la tarjeta: gating del auto-descanso y chips
+describe('v0.5.0 superseries: rest gating and chips', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('a NON-last group member logs the set but NEVER starts the rest timer (it chains into the next member)', async () => {
+    const actions = makeActions()
+    const restTimer = useRestTimerStore()
+    const startSpy = vi.spyOn(restTimer, 'start')
+
+    const wrapper = mountCard({ actions, supersetLabel: 'A', supersetLast: false })
+    await openDrawer(20)
+    await drawerForm().trigger('submit')
+    await flushPromises()
+
+    expect(actions.logSet).toHaveBeenCalled()
+    expect(startSpy).not.toHaveBeenCalled()
+    // la serie sigue emitiendo logged: el pulso neón y el marcado de
+    // "siguiente" en la vista no dependen del descanso
+    expect(wrapper.emitted('logged')).toBeTruthy()
+  })
+
+  it('the LAST group member starts the rest timer normally when logging (the round is closed)', async () => {
+    const actions = makeActions()
+    const restTimer = useRestTimerStore()
+    const startSpy = vi.spyOn(restTimer, 'start')
+
+    mountCard({ actions, supersetLabel: 'A', supersetLast: true })
+    await openDrawer(20)
+    await drawerForm().trigger('submit')
+    await flushPromises()
+
+    expect(startSpy).toHaveBeenCalledWith(90, 'Press banca')
+  })
+
+  it('a loose exercise (default props: no label) keeps firing auto-rest — only group members are gated', async () => {
+    const actions = makeActions()
+    const restTimer = useRestTimerStore()
+    const startSpy = vi.spyOn(restTimer, 'start')
+
+    mountCard({ actions })
+    await openDrawer(20)
+    await drawerForm().trigger('submit')
+    await flushPromises()
+
+    expect(startSpy).toHaveBeenCalledWith(90, 'Press banca')
+  })
+
+  it('renders the "Superserie A" chip and the aurora side-frame for a grouped card', () => {
+    const wrapper = mountCard({ supersetLabel: 'A' })
+    expect(wrapper.get('[data-testid="superset-chip-20"]').text()).toBe('Superserie A')
+    expect(wrapper.classes()).toEqual(expect.arrayContaining(['border-l-2', 'border-aurora/50']))
+  })
+
+  it('renders no superset chip nor frame for a loose card', () => {
+    const wrapper = mountCard()
+    expect(wrapper.find('[data-testid="superset-chip-20"]').exists()).toBe(false)
+    expect(wrapper.classes()).not.toContain('border-l-2')
+  })
+
+  it('shows the "Siguiente" chip only when supersetNext is set', () => {
+    const without = mountCard({ supersetLabel: 'A' })
+    expect(without.find('[data-testid="superset-next-20"]').exists()).toBe(false)
+    without.unmount()
+
+    const withNext = mountCard({ supersetLabel: 'A', supersetNext: true })
+    expect(withNext.get('[data-testid="superset-next-20"]').text()).toBe('Siguiente')
+  })
+
+  it('the MANUAL rest picker stays available on a non-last member (only AUTO rest is gated)', () => {
+    const wrapper = mountCard({ supersetLabel: 'A', supersetLast: false })
+    expect(wrapper.find('[data-testid="rest-toggle-20"]').exists()).toBe(true)
+  })
+})

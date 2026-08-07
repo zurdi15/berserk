@@ -37,6 +37,7 @@ import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { useToastStore } from '@/stores/toast'
+import WorkoutExerciseCard from '@/components/workout/WorkoutExerciseCard.vue'
 import WorkoutView from '../WorkoutView.vue'
 
 function build() {
@@ -1068,5 +1069,121 @@ describe('WorkoutView', () => {
 
       expect(storage.getItem('berserk:cardio-countdown')).toBeNull()
     })
+  })
+})
+
+// v0.5.0 superseries: la vista computa el agrupado por CONTIGÜIDAD
+// (lib/supersets.ts) y lo baja resuelto a cada tarjeta; el marcado de
+// "siguiente" vive aquí (la tarjeta solo lo pinta)
+describe('WorkoutView v0.5.0 superseries: render agrupado y encadenado', () => {
+  const groupedFixture = {
+    id: 1,
+    date: '2026-08-06',
+    started_at: '2026-08-06T09:00:00Z',
+    ended_at: null,
+    routine_id: null,
+    note: null,
+    feeling: null,
+    stretched: false,
+    exercises: [
+      { id: 20, exercise_id: 5, position: 1, note: null, rest_seconds: null, superset_group: 0, sets: [] },
+      { id: 21, exercise_id: 6, position: 2, note: null, rest_seconds: null, superset_group: 0, sets: [] },
+      { id: 22, exercise_id: 7, position: 3, note: null, rest_seconds: null, superset_group: null, sets: [] },
+    ],
+    muscle_tag_ids: [],
+  }
+
+  let wrapper: VueWrapper | null = null
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
+    document.body.innerHTML = ''
+  })
+
+  function mountGrouped() {
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+      activeWorkout.workout = groupedFixture as never
+    })
+    return mount(WorkoutView, { global: { plugins: [createI18nInstance()] }, attachTo: document.body })
+  }
+
+  it('labels the contiguous group members "Superserie A" and leaves the loose card unlabeled', async () => {
+    wrapper = mountGrouped()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="superset-chip-20"]').text()).toBe('Superserie A')
+    expect(wrapper.get('[data-testid="superset-chip-21"]').text()).toBe('Superserie A')
+    expect(wrapper.find('[data-testid="superset-chip-22"]').exists()).toBe(false)
+  })
+
+  it('wires the positional rest gating: non-last member gets supersetLast=false, last and loose get true', async () => {
+    wrapper = mountGrouped()
+    await flushPromises()
+
+    const cards = wrapper.findAllComponents(WorkoutExerciseCard)
+    expect(cards).toHaveLength(3)
+    expect(cards[0].props('supersetLabel')).toBe('A')
+    expect(cards[0].props('supersetLast')).toBe(false)
+    expect(cards[1].props('supersetLabel')).toBe('A')
+    expect(cards[1].props('supersetLast')).toBe(true)
+    expect(cards[2].props('supersetLabel')).toBeNull()
+    expect(cards[2].props('supersetLast')).toBe(true)
+  })
+
+  it('logging on a NON-last member marks the NEXT member "Siguiente"; logging on the last member clears the mark', async () => {
+    wrapper = mountGrouped()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="superset-next-21"]').exists()).toBe(false)
+
+    const cards = wrapper.findAllComponents(WorkoutExerciseCard)
+    cards[0].vm.$emit('logged', false)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="superset-next-21"]').text()).toBe('Siguiente')
+
+    // cerrar la ronda (serie en el último miembro) limpia el marcado
+    cards[1].vm.$emit('logged', false)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="superset-next-21"]').exists()).toBe(false)
+  })
+
+  it('logging on a loose exercise clears any pending "Siguiente" mark (the chain was abandoned)', async () => {
+    wrapper = mountGrouped()
+    await flushPromises()
+
+    const cards = wrapper.findAllComponents(WorkoutExerciseCard)
+    cards[0].vm.$emit('logged', false)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="superset-next-21"]').exists()).toBe(true)
+
+    cards[2].vm.$emit('logged', false)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="superset-next-21"]').exists()).toBe(false)
+  })
+
+  it('a group whose contiguity was broken (reorder mid-workout) renders NO group at all — singles dissolve', async () => {
+    const broken = {
+      ...groupedFixture,
+      exercises: [
+        { id: 20, exercise_id: 5, position: 1, note: null, rest_seconds: null, superset_group: 0, sets: [] },
+        { id: 22, exercise_id: 7, position: 2, note: null, rest_seconds: null, superset_group: null, sets: [] },
+        { id: 21, exercise_id: 6, position: 3, note: null, rest_seconds: null, superset_group: 0, sets: [] },
+      ],
+    }
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+      activeWorkout.workout = broken as never
+    })
+    wrapper = mount(WorkoutView, { global: { plugins: [createI18nInstance()] }, attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="superset-chip-20"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="superset-chip-21"]').exists()).toBe(false)
   })
 })

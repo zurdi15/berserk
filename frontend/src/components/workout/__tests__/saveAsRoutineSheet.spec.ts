@@ -81,7 +81,9 @@ describe('SaveAsRoutineSheet (item 5)', () => {
 
     expect(domain.createRoutine).toHaveBeenCalledWith({ name: 'Mi rutina' })
     expect(domain.replaceRoutineExercises).toHaveBeenCalledWith(42, [
-      { exercise_id: 5, target_sets: 1, target_reps: 8, target_weight_kg: 80, rest_seconds: 90 },
+      // v0.5.0 superseries: el payload SIEMPRE lleva superset_group (null =
+      // suelto, el fixture no venía agrupado)
+      { exercise_id: 5, target_sets: 1, target_reps: 8, target_weight_kg: 80, rest_seconds: 90, superset_group: null },
     ])
     expect(toast.toasts.some((t) => t.message === 'Rutina guardada')).toBe(true)
     expect(wrapper.emitted('close')).toBeTruthy()
