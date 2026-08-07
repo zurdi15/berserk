@@ -5,6 +5,7 @@ import uPlot from 'uplot'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import { core } from '@/tokens'
+import { cssVar, resolveSeriesStroke } from './chartColors'
 import { tweenFrame } from './chartTween'
 
 const props = withDefaults(
@@ -33,9 +34,6 @@ const cancelFrame = typeof cancelAnimationFrame === 'function' ? cancelAnimation
 const reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 // misma duración que tenía el barrido bk-reveal que este tween sustituye
 const duration = parseInt(core.dur[5], 10)
-
-const cssVar = (name: string) =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
 function toXY(): [number[], number[]] {
   return [
@@ -87,9 +85,7 @@ function build(animate: boolean) {
   cancelFrame(raf)
   chart?.destroy()
   const [xs, ys] = toXY()
-  const stroke = cssVar(
-    props.color === 'aurora' ? '--bk-accent-aurora' : props.color === 'ember' ? '--bk-accent-ember' : '--bk-ink',
-  )
+  const stroke = resolveSeriesStroke(props.color)
   const xRange = pinnedRange(xs)
   const yRange = pinnedRange(ys)
   // fechas sin hora se anclan a UTC para que el eje no regale un día según el huso
@@ -144,10 +140,21 @@ function build(animate: boolean) {
   raf = requestFrame(step)
 }
 
+// v0.4.0 light theme: uPlot pinta ejes/grid/serie en <canvas>, así que un
+// toggle de html.bk-light no lo recolorea solo (CSS no llega dentro de un
+// canvas). utils/theme.ts dispara este evento global en cada aplicación de
+// tema (toggle manual Y cambio en vivo del tema del sistema); reconstruir
+// aquí es un "remonte" aceptado a propósito — más simple y fiable que
+// intentar mutar in-place las series/ejes ya creados de uPlot.
+function onThemeChange() {
+  build(false)
+}
+
 onMounted(() => {
   build(true)
   observer = new ResizeObserver(() => chart?.setSize({ width: host.value!.clientWidth, height: 220 }))
   if (host.value) observer.observe(host.value)
+  window.addEventListener('bk:theme-change', onThemeChange)
 })
 watch(() => props.points, () => build(false), { deep: true })
 watch(() => props.color, () => build(false))
@@ -156,6 +163,7 @@ onBeforeUnmount(() => {
   cancelFrame(raf)
   observer?.disconnect()
   chart?.destroy()
+  window.removeEventListener('bk:theme-change', onThemeChange)
 })
 </script>
 

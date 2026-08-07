@@ -50,9 +50,13 @@ watch(
 <template>
   <Teleport to="body">
     <Transition name="bk-sheet-backdrop">
+      <!-- v0.4.0 light theme: era bg-void/70 — void es casi negro en oscuro
+           (cuela como scrim) pero niebla pálida en claro (aclararía en vez de
+           atenuar). bg-scrim es su propio token, siempre oscuro en los dos
+           temas (ver tokens/index.ts::scrim). -->
       <div
         v-if="open"
-        class="fixed inset-0 z-(--bk-z-sheet) bg-void/70"
+        class="fixed inset-0 z-(--bk-z-sheet) bg-scrim"
         @click="emit('close')"
       />
     </Transition>

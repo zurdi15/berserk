@@ -151,7 +151,7 @@ describe('BkSheet', () => {
     const panel = document.querySelector('[role="dialog"]') as HTMLElement
     expect(panel.classList.contains('bk-sheet-panel-enter-active')).toBe(true)
 
-    const backdrop = document.querySelector('.bg-void\\/70') as HTMLElement
+    const backdrop = document.querySelector('.bg-scrim') as HTMLElement
     expect(backdrop.classList.contains('bk-sheet-backdrop-enter-active')).toBe(true)
 
     wrapper.unmount()

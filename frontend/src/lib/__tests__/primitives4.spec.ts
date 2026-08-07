@@ -384,6 +384,63 @@ describe('BkChart', () => {
     expect(mockInstance.destroy).toHaveBeenCalledTimes(1)
   })
 
+  // v0.4.0 light theme: uPlot pinta en <canvas>, así que un toggle de
+  // html.bk-light no lo recolorea solo (CSS no llega dentro de un canvas).
+  // utils/theme.ts dispara 'bk:theme-change' en cada aplicación de tema;
+  // BkChart lo escucha y reconstruye — un "remonte" documentado y aceptado
+  // a propósito (ver el comentario junto a onThemeChange en BkChart.vue)
+  describe('theme re-render (item: v0.4.0 light theme)', () => {
+    // ojo: 'bk:theme-change' es un evento GLOBAL en `window`, y este archivo
+    // no desmonta todos los charts de tests anteriores (varios de los tests
+    // de arriba nunca llaman a wrapper.unmount()) — así que el recuento
+    // absoluto de mockUPlot puede incluir reconstrucciones de instancias
+    // ajenas todavía vivas. Se comprueba con un DELTA relativo al propio
+    // mount de este test, no un total absoluto; mockInstance SÍ es fiable
+    // (se recrea en el beforeEach de este describe, así que solo el chart
+    // de ESTE test puede tener esa referencia exacta en su `chart` interno).
+    it('rebuilds the chart (destroy + new uPlot instance) on a global bk:theme-change event', async () => {
+      const wrapper = mount(BkChart, {
+        props: {
+          points: [
+            { date: '2026-08-05', value: 10 },
+            { date: '2026-08-06', value: 15 },
+          ],
+          color: 'aurora',
+        },
+        global: { stubs: { teleport: true } },
+      })
+      await wrapper.vm.$nextTick()
+      const callsBefore = mockUPlot.mock.calls.length
+
+      window.dispatchEvent(new Event('bk:theme-change'))
+      await wrapper.vm.$nextTick()
+
+      expect(mockInstance.destroy).toHaveBeenCalledTimes(1)
+      expect(mockUPlot.mock.calls.length).toBeGreaterThan(callsBefore)
+
+      wrapper.unmount()
+    })
+
+    it('removes its bk:theme-change listener on unmount (no leak)', async () => {
+      const addSpy = vi.spyOn(window, 'addEventListener')
+      const removeSpy = vi.spyOn(window, 'removeEventListener')
+
+      const wrapper = mount(BkChart, {
+        props: { points: [{ date: '2026-08-05', value: 10 }] },
+        global: { stubs: { teleport: true } },
+      })
+      await wrapper.vm.$nextTick()
+      expect(addSpy).toHaveBeenCalledWith('bk:theme-change', expect.any(Function))
+
+      wrapper.unmount()
+      expect(removeSpy).toHaveBeenCalledWith('bk:theme-change', expect.any(Function))
+      // el listener que se quitó es EL MISMO que se puso (misma referencia
+      // de función) — si no, removeEventListener no habría dado de baja nada
+      expect(removeSpy.mock.calls.find((c) => c[0] === 'bk:theme-change')?.[1])
+        .toBe(addSpy.mock.calls.find((c) => c[0] === 'bk:theme-change')?.[1])
+    })
+  })
+
   describe('progressive reveal (item 2)', () => {
     // mismo fake-rAF que useAnimatedNumber.spec.ts: callbacks capturados a
     // mano, se disparan con pump(ms) para controlar el tween determinísticamente
