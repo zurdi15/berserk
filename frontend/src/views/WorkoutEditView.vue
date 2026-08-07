@@ -224,7 +224,10 @@ onMounted(() => {
   <div v-if="workoutEditor.workout" class="space-y-4 bk-stagger">
     <NeonPulse :show="neonPulse" @done="neonPulse = false" />
 
-    <div class="flex items-center justify-between gap-2" :style="{ '--bk-stagger-i': 0 }">
+    <!-- v0.11.3 (zurdi: en móviles estrechos la fila única envolvía flecha /
+         título / botón en tres líneas): flecha+título en su fila y "Guardar
+         como rutina" como botón block debajo -->
+    <div class="space-y-2" :style="{ '--bk-stagger-i': 0 }">
       <div class="flex items-center gap-2 min-w-0">
         <button
           type="button"
@@ -242,6 +245,7 @@ onMounted(() => {
       <BkButton
         variant="ghost"
         size="sm"
+        block
         data-testid="save-as-routine-btn"
         @click="saveAsRoutineOpen = true"
       >
