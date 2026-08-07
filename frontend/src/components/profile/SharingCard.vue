@@ -9,10 +9,12 @@ import type { UserOut } from '@/api/auth'
 import { toastApiError } from '@/utils/apiErrors'
 import { ApiError } from '@/api/client'
 import BkCard from '@/lib/BkCard.vue'
+import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkSheet from '@/lib/BkSheet.vue'
+import BkUser from '@/lib/BkUser.vue'
 import { useAthleteStore } from '@/stores/athlete'
 import { useToastStore } from '@/stores/toast'
 
@@ -142,15 +144,14 @@ function handleViewUser(user: UserOut) {
           <BkEmpty v-if="givenUsers.length === 0" :message="$t('profile.noSharingGiven')" />
           <div v-else class="space-y-2">
             <div v-for="user in givenUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
-              <span>{{ user.username }}</span>
-              <BkButton
-                variant="ghost"
-                size="sm"
+              <BkUser :user="user" />
+              <!-- item 5: icon-only (borrar = misma X que en el resto de la app) -->
+              <BkActionBtn
+                icon="delete"
                 data-testid="revoke-btn"
+                :aria-label="$t('common.delete')"
                 @click="handleRevoke(user.id)"
-              >
-                {{ $t('common.delete') }}
-              </BkButton>
+              />
             </div>
           </div>
         </template>
@@ -163,26 +164,14 @@ function handleViewUser(user: UserOut) {
           <BkEmpty v-if="receivedUsers.length === 0" :message="$t('profile.noSharingReceived')" />
           <div v-else class="space-y-2">
             <div v-for="user in receivedUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
-              <span class="flex items-center gap-2">
-                <!-- el color de usuario es DATO, no un token del sistema de
-                     diseño (mismo criterio que los datos de gráficas): style
-                     inline en vez de clase, exento del guard de hex crudo -->
-                <span
-                  class="w-2.5 h-2.5 rounded-full shrink-0"
-                  :style="{ backgroundColor: user.color || 'var(--bk-accent-aurora)' }"
-                  data-testid="sharing-user-dot"
-                  aria-hidden="true"
-                />
-                {{ user.username }}
-              </span>
-              <BkButton
-                variant="ghost"
-                size="sm"
+              <BkUser :user="user" />
+              <!-- item 5: icon-only (ojo, nuevo icono de BkActionBtn) -->
+              <BkActionBtn
+                icon="view"
                 data-testid="view-user-btn"
+                :aria-label="$t('profile.view')"
                 @click="handleViewUser(user)"
-              >
-                {{ $t('profile.view') }}
-              </BkButton>
+              />
             </div>
           </div>
         </template>

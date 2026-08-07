@@ -19,8 +19,11 @@
 // v0.3.2: 'copy' para el botón de copiar una plantilla de rutina
 // (RoutineList) — dos cuadrados redondeados solapados, mismo trazo que el
 // resto del set (nunca relleno).
+// v0.4.0: 'view' para "ver a este atleta" (SharingCard, antes texto "Ver")
+// — ojo de trazo: elipse (párpados) + círculo (pupila), sin relleno, mismo
+// stroke-width que el resto del set.
 defineProps<{
-  icon: 'edit' | 'key' | 'delete' | 'skip' | 'replan' | 'copy'
+  icon: 'edit' | 'key' | 'delete' | 'skip' | 'replan' | 'copy' | 'view'
 }>()
 </script>
 
@@ -107,6 +110,22 @@ defineProps<{
            de flecha, no el doble-arco de un "refresh" completo -->
       <path d="M1 4v6h6" />
       <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+    </svg>
+    <svg
+      v-else-if="icon === 'view'"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="w-4 h-4"
+      aria-hidden="true"
+    >
+      <!-- view (v0.4.0): ojo — elipse ancha (párpados) + círculo pequeño
+           centrado (pupila), ambos de trazo, nunca relleno -->
+      <ellipse cx="12" cy="12" rx="9" ry="6" />
+      <circle cx="12" cy="12" r="2.5" />
     </svg>
     <svg
       v-else

@@ -174,14 +174,23 @@ export const en = {
     noExercisesInRoutine: 'No exercises in this routine yet',
     nameRequired: 'Routine name is required',
     confirm: 'Confirm',
-    // W2 feature 2: Templates section (global + others' public)
+    // W2 feature 2: Templates section (global + others' public).
+    // item 1 (v0.4.0): subtitle explaining what this section is — zurdi's
+    // real confusion was "what's a routine and what's a template?"
     templates: 'Templates',
+    templatesHint: 'Global routines and the ones other users have made public — copy them into your list.',
     noTemplates: 'No templates available',
     globalTemplate: 'Global',
-    // toggle on the card itself (the editor is out of this lane)
-    isPublic: 'Visible to everyone',
+    // toggle on the card itself (the editor is out of this lane).
+    // item 1 (v0.4.0): "Visible to everyone" didn't say WHAT turning it on
+    // does — reworded to the actual action: it becomes a template
+    isPublic: 'Share as template',
     copy: 'Copy',
-    copied: 'Routine copied',
+    copied: 'Routine copied to your list',
+    // item 2 (v0.4.0): fallback when a template's exercise isn't visible to
+    // whoever's looking (its owner made the ROUTINE public but not THAT
+    // exercise) — used to render as a blank name, with no explanation
+    privateExercise: 'Private exercise',
     // second control, admin-only, on an OWN routine — turns it into a
     // global template (owner_id -> NULL, leaves the personal list)
     globalize: 'Make global',

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
+import BkUser from '@/lib/BkUser.vue'
 import SharingCard from '../SharingCard.vue'
 
 const push = vi.fn()
@@ -122,25 +123,45 @@ describe('SharingCard', () => {
     expect(push).toHaveBeenCalledWith({ name: 'today' })
   })
 
+  // item 5 (v0.4.0): el punto de color ahora vive dentro de BkUser
+  // (data-testid="bk-user-dot"), no de un span propio de SharingCard
   it('shows a color dot next to each user shared with me', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    const dots = wrapper.findAll('[data-testid="sharing-user-dot"]')
-    expect(dots).toHaveLength(1)
-    expect((dots[0].element as HTMLElement).style.backgroundColor).toBe('#7C8FFF')
+    const dots = wrapper.findAll('[data-testid="bk-user-dot"]')
+    // una por CADA usuario renderizado (given + received): freyja + freyr
+    expect(dots).toHaveLength(2)
+    const freyrDot = wrapper.findAllComponents(BkUser).find((c) => c.props('user').username === 'freyr')!
+    expect((freyrDot.get('[data-testid="bk-user-dot"]').element as HTMLElement).style.backgroundColor).toBe(
+      '#7C8FFF',
+    )
   })
 
-  it('renders button text from i18n', async () => {
+  it('item 5: both lists render through BkUser (color dot + username)', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    // Verify buttons render their text (i18n keys resolved)
-    const text = wrapper.text()
-    expect(text).toContain('Ver') // Spanish for 'view'
-    expect(text).toContain('Borrar') // Spanish for 'delete'
+    const users = wrapper.findAllComponents(BkUser).map((c) => c.props('user').username)
+    expect(users).toEqual(['freyja', 'freyr'])
+  })
+
+  it('item 5: revoke and view render as icon-only BkActionBtn with the correct icon and accessible label (aria-label from existing i18n keys)', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const revokeBtn = wrapper.get('[data-testid="revoke-btn"]')
+    expect(revokeBtn.attributes('aria-label')).toBe('Borrar')
+    expect(revokeBtn.find('svg').exists()).toBe(true)
+    expect(revokeBtn.text()).not.toContain('Borrar') // icon-only: sin texto visible
+
+    const viewBtn = wrapper.get('[data-testid="view-user-btn"]')
+    expect(viewBtn.attributes('aria-label')).toBe('Ver')
+    expect(viewBtn.find('ellipse').exists()).toBe(true) // icono "view" de BkActionBtn
+    expect(viewBtn.text()).not.toContain('Ver')
   })
 
   it('revoke button triggers confirmation sheet', async () => {
