@@ -177,6 +177,10 @@ def copy_routine(routine_id: int, user: CurrentUser, db: Session = Depends(get_d
                 target_reps=item.target_reps,
                 target_weight_kg=item.target_weight_kg,
                 rest_seconds=item.rest_seconds,
+                # v0.5.0 superseries: la copia preserva el grouping — como el
+                # snapshot copia TODOS los ejercicios en el mismo orden, la
+                # contigüidad (que es lo que define el grupo) viaja intacta
+                superset_group=item.superset_group,
             )
         )
     db.commit()

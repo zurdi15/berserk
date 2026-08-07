@@ -131,6 +131,10 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
                     # cambiar luego solo para ESTE entreno (rest_seconds del
                     # WorkoutExercise, no toca la rutina de origen)
                     rest_seconds=item.rest_seconds,
+                    # v0.5.0 superseries: el grouping también es snapshot de
+                    # la rutina (vale igual para el entreno en vivo y el
+                    # retroactivo finished=True — ambos pasan por aquí)
+                    superset_group=item.superset_group,
                 )
             )
         db.flush()
@@ -325,6 +329,10 @@ def add_exercise(
             None,
         )
         rest_seconds = routine_item.rest_seconds if routine_item else None
+    # v0.5.0 superseries: un ejercicio añadido ad-hoc SIEMPRE nace suelto
+    # (superset_group NULL, el default del modelo) — aunque el mismo ejercicio
+    # estuviera agrupado en la rutina de origen: se añade AL FINAL, así que la
+    # contigüidad con su grupo original no existe de todos modos
     wex = WorkoutExercise(
         workout_id=workout.id,
         exercise_id=payload.exercise_id,

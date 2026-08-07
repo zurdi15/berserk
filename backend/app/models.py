@@ -203,6 +203,12 @@ class RoutineExercise(Base):
     target_reps: Mapped[int | None] = mapped_column(default=None)
     target_weight_kg: Mapped[float | None] = mapped_column(Float, default=None)
     rest_seconds: Mapped[int | None] = mapped_column(default=None)
+    # v0.5.0 superseries: ejercicios CONTIGUOS (por position) con el mismo
+    # valor forman un grupo A1/A2; NULL = suelto. El valor es un índice
+    # normalizado (0,1,2…) sin semántica propia — la etiqueta A/B/C que ve el
+    # usuario es presentacional (frontend lib/supersets.ts). Se edita SOLO en
+    # el editor de rutina; el entreno lo recibe copiado (ver WorkoutExercise)
+    superset_group: Mapped[int | None] = mapped_column(default=None)
 
 
 class Workout(Base):
@@ -262,6 +268,12 @@ class WorkoutExercise(Base):
     # rutina de origen o al default general (ver services/workouts.py::
     # resolve_rest_seconds y frontend rest.ts::restFor, misma prioridad)
     rest_seconds: Mapped[int | None] = mapped_column(default=None)
+    # v0.5.0 superseries: snapshot del grouping de la rutina de origen al
+    # empezar el entreno (mismo patrón de copia que rest_seconds). NULL =
+    # suelto; los añadidos ad-hoc a un entreno nacen NULL. En v1 no se edita
+    # mid-workout — gobierna el gating del auto-descanso (frontend
+    # WorkoutExerciseCard: solo descansa el ÚLTIMO miembro del grupo)
+    superset_group: Mapped[int | None] = mapped_column(default=None)
 
     sets: Mapped[list["WorkoutSet"]] = relationship(
         cascade="all, delete-orphan",

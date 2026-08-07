@@ -33,6 +33,11 @@ class RoutineExerciseIn(BaseModel):
     target_reps: int | None = Field(None, ge=1, le=200)
     target_weight_kg: float | None = Field(None, gt=0, le=1000)
     rest_seconds: int | None = Field(None, ge=5, le=900)
+    # v0.5.0 superseries: índice de grupo normalizado (0,1,2…) o None =
+    # suelto. La CONTIGÜIDAD es la que define el grupo (el backend no la
+    # re-valida: el editor normaliza antes de guardar, y todos los lectores
+    # recomputan runs contiguos — ver frontend lib/supersets.ts)
+    superset_group: int | None = Field(None, ge=0)
 
 
 class RoutineExerciseOut(BaseModel):
@@ -43,6 +48,7 @@ class RoutineExerciseOut(BaseModel):
     target_reps: int | None
     target_weight_kg: float | None
     rest_seconds: int | None
+    superset_group: int | None
 
     model_config = {"from_attributes": True}
 

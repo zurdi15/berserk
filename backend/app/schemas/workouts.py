@@ -52,6 +52,11 @@ class WorkoutExerciseOut(BaseModel):
     # item 11: descanso override de ESTE ejercicio en ESTE entreno; None cae
     # al target de la rutina de origen o al default general (ver rest.ts)
     rest_seconds: int | None
+    # v0.5.0 superseries: copiado de la rutina al empezar (None = suelto /
+    # ad-hoc); en v1 NO es parcheable mid-workout (no está en
+    # WorkoutExercisePatchIn a propósito) — solo gobierna render agrupado y
+    # gating del auto-descanso en el frontend
+    superset_group: int | None
     sets: list[SetOut]
 
     model_config = {"from_attributes": True}
