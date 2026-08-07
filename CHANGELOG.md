@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.9.2 - 2026-08-07
+
+- Fixed the "cards repaint in a different shade right after their entrance animation" glitch across every section: the global grain overlay now always sits above the content, animating or not.
+- Library polish: the muscle-groups button is full-width ("Ver grupos musculares") and the drawer shows the list and the new-group button directly under its single title, without a nested card.
+
 ## 0.9.1 - 2026-08-07
 
 - Supersets: the block header now opens an edit sheet — swap either exercise for another (it takes the same slot and stays linked, with a warning if it had logged sets) or dissolve the group.
