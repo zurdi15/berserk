@@ -192,8 +192,10 @@ describe('ProfileView', () => {
     wrapper = build()
     await wrapper.vm.$nextTick()
 
+    // item 2 (v0.3.2): 'Administración' se acortó a 'Admin' (fit de 4
+    // pestañas en 360px, ver BkTabs.vue) — el inglés ya usaba esta forma
     const tabsText = wrapper.text()
-    expect(tabsText).toContain('Administración') // Spanish for 'Admin'
+    expect(tabsText).toContain('Admin')
   })
 
   it('hides admin tab when user is not admin', async () => {
@@ -273,7 +275,10 @@ describe('ProfileView', () => {
       wrapper = build({ AdminCard: false })
       await flushPromises()
 
-      const adminTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Administración')
+      // item 2 (v0.3.2): 'Administración' se acorta a 'Admin' — el inglés ya
+      // usaba esa forma corta; hacía falta para que las 4 pestañas quepan en
+      // 360px (ver la aritmética en BkTabs.vue)
+      const adminTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Admin')
       expect(adminTab).not.toBeUndefined()
       await adminTab!.trigger('click')
       await flushPromises()

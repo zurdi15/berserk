@@ -98,7 +98,7 @@ export const es = {
     tab: 'Perfil',
     routinesTab: 'Rutinas',
     libraryTab: 'Biblioteca',
-    adminTab: 'Administración',
+    adminTab: 'Admin',
     settings: 'Configuración',
     locale: 'Idioma',
     units: 'Unidades',

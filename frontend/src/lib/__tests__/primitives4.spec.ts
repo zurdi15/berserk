@@ -32,6 +32,33 @@ describe('BkTabs', () => {
     expect(wrapper.findAll('[role="tab"]')[1].attributes('aria-selected')).toBe('true')
   })
 
+  describe('item 2 (v0.3.2): compact at phone widths, no elastic scroll feel', () => {
+    it('tabs are compact below sm (px-2, text-2xs) and normal from sm (px-4, text-sm) — see the fit arithmetic comment in BkTabs.vue', () => {
+      const wrapper = mount(BkTabs, { props: { modelValue: 'a', tabs } })
+      for (const tabEl of wrapper.findAll('[role="tab"]')) {
+        expect(tabEl.classes()).toEqual(
+          expect.arrayContaining(['px-2', 'sm:px-4', 'text-2xs', 'sm:text-sm']),
+        )
+      }
+    })
+
+    it('the tablist kills the elastic overscroll feel (overscroll-x-contain) without dropping the overflow-x-auto safety valve', () => {
+      const wrapper = mount(BkTabs, { props: { modelValue: 'a', tabs } })
+      const tablist = wrapper.get('[role="tablist"]')
+      expect(tablist.classes()).toContain('overscroll-x-contain')
+      expect(tablist.classes()).toContain('overflow-x-auto')
+    })
+
+    it('never risks page-widening: the tablist itself absorbs any overflow (overflow-x-auto) and each tab stays non-shrinking/non-wrapping inside it — the same containment that fixed the original phase-4 bug (c111487)', () => {
+      const wrapper = mount(BkTabs, { props: { modelValue: 'a', tabs } })
+      const tablist = wrapper.get('[role="tablist"]')
+      expect(tablist.classes()).toContain('overflow-x-auto')
+      for (const tabEl of wrapper.findAll('[role="tab"]')) {
+        expect(tabEl.classes()).toEqual(expect.arrayContaining(['shrink-0', 'whitespace-nowrap']))
+      }
+    })
+  })
+
   // item 3c: jsdom/happy-dom no hace layout real, así que scrollIntoView no
   // mueve nada de verdad — se espía el prototipo y se comprueba que SE LLAMA
   // con los argumentos correctos, incondicional (sin guardas)
