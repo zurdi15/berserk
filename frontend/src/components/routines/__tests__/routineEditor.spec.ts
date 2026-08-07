@@ -62,6 +62,14 @@ vi.mock('@/api/domain', () => ({
       owner_id: null,
       muscle_groups: [{ muscle_group_id: 4, is_primary: true }],
     },
+    {
+      id: 3,
+      name_es: 'Cinta de correr',
+      name_en: 'Treadmill',
+      measurement: 'cardio',
+      owner_id: null,
+      muscle_groups: [{ muscle_group_id: 4, is_primary: false }],
+    },
   ])),
   listMuscleGroups: vi.fn(() => Promise.resolve([
     { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
@@ -197,6 +205,53 @@ describe('RoutineEditorSheet', () => {
       expect.objectContaining({ exercise_id: 2 }),
       expect.objectContaining({ exercise_id: 1 }),
     ]))
+  })
+
+  it('cardio rows hide reps/weight/rest and save purges them (v0.11.1)', async () => {
+    const { replaceRoutineExercises } = await import('@/api/domain')
+    vi.mocked(replaceRoutineExercises).mockClear()
+
+    const routine = {
+      id: 5,
+      name: 'Test Routine',
+      description: null,
+      rune: null,
+      color: null,
+      exercises: [
+        // rutina VIEJA: la fila de cardio trae reps/peso/descanso guardados
+        { id: 10, exercise_id: 3, position: 0, target_sets: 3, target_reps: 8, target_weight_kg: 50, rest_seconds: 60 },
+        { id: 11, exercise_id: 1, position: 1, target_sets: 3, target_reps: 10, target_weight_kg: 80, rest_seconds: 90 },
+      ],
+    }
+
+    const wrapper = build(routine)
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await wrapper.vm.$nextTick()
+
+    const dialogs = document.querySelectorAll('[role="dialog"]')
+    const dialog = dialogs[dialogs.length - 1] as HTMLElement
+
+    const cardioRow = dialog.querySelector('[data-testid="routine-row-0"]') as HTMLElement
+    const strengthRow = dialog.querySelector('[data-testid="routine-row-1"]') as HTMLElement
+    expect(cardioRow.textContent).toContain('Series objetivo')
+    expect(cardioRow.textContent).not.toContain('Reps objetivo')
+    expect(cardioRow.textContent).not.toContain('Peso objetivo')
+    expect(cardioRow.textContent).not.toContain('Descanso')
+    // la fila de fuerza conserva los cuatro campos
+    expect(strengthRow.textContent).toContain('Reps objetivo')
+    expect(strengthRow.textContent).toContain('Peso objetivo')
+    expect(strengthRow.textContent).toContain('Descanso')
+
+    const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+    saveButton!.click()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(replaceRoutineExercises).toHaveBeenCalledWith(5, [
+      expect.objectContaining({ exercise_id: 3, target_reps: null, target_weight_kg: null, rest_seconds: null }),
+      expect.objectContaining({ exercise_id: 1, target_reps: 10, target_weight_kg: 80, rest_seconds: 90 }),
+    ])
   })
 
   it('sends replaceRoutineExercises with empty array when exercises removed', async () => {

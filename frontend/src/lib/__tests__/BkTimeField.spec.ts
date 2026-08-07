@@ -188,16 +188,32 @@ describe('BkTimeField', () => {
     expect(document.querySelector('[role="listbox"]')).toBeNull()
   })
 
-  it('the Clear button emits null and closes (nullable time, e.g. ScheduleSheet)', async () => {
+  it('the Cancel button closes without emitting a change (v0.11.1 vertical footer)', async () => {
     wrapper = build({ modelValue: '09:00' })
     await wrapper.get('[role="combobox"]').trigger('click')
 
-    const clearBtn = document.querySelector('[data-testid="time-field-clear"]') as HTMLElement
-    clearBtn.click()
+    const cancelBtn = document.querySelector('[data-testid="time-field-cancel"]') as HTMLElement
+    cancelBtn.click()
     await flushPromises()
 
-    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([null])
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
     expect(document.querySelector('[role="listbox"]')).toBeNull()
+  })
+
+  it('footer stacks Apply above Cancel, both full width (no right overflow at 390px)', async () => {
+    wrapper = build({ modelValue: '09:00' })
+    await wrapper.get('[role="combobox"]').trigger('click')
+
+    const apply = document.querySelector('[data-testid="time-field-apply"]') as HTMLElement
+    const cancel = document.querySelector('[data-testid="time-field-cancel"]') as HTMLElement
+    const footer = apply.parentElement as HTMLElement
+
+    expect(footer.className).toContain('flex-col')
+    expect(apply.className).toContain('w-full')
+    expect(cancel.className).toContain('w-full')
+    // Aplicar arriba, Cancelar abajo (orden en el DOM = orden visual en columna)
+    expect(apply.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(document.querySelector('[data-testid="time-field-clear"]')).toBeNull()
   })
 
   describe('min prop (item 1, round 10): disables hours/minutes before a floor time', () => {

@@ -266,15 +266,20 @@ async function saveRoutine() {
     }
 
     // Always save exercises (even if empty)
-    await replaceRoutineExercises(routine.id, exercises.value.map(e => ({
-      exercise_id: e.exercise_id,
-      target_sets: e.target_sets,
-      target_reps: e.target_reps || null,
-      target_weight_kg: e.target_weight_kg || null,
-      rest_seconds: e.rest_seconds ? parseInt(e.rest_seconds, 10) : null,
-      // ya normalizado (0,1,2…): cada mutación local renormaliza
-      superset_group: e.superset_group,
-    })))
+    await replaceRoutineExercises(routine.id, exercises.value.map(e => {
+      // v0.11.1: cardio no tiene reps/peso/descanso — la fila los esconde,
+      // pero una rutina vieja puede traerlos guardados: se purgan al salvar
+      const isCardio = allExercises.value.find(x => x.id === e.exercise_id)?.measurement === 'cardio'
+      return {
+        exercise_id: e.exercise_id,
+        target_sets: e.target_sets,
+        target_reps: isCardio ? null : e.target_reps || null,
+        target_weight_kg: isCardio ? null : e.target_weight_kg || null,
+        rest_seconds: !isCardio && e.rest_seconds ? parseInt(e.rest_seconds, 10) : null,
+        // ya normalizado (0,1,2…): cada mutación local renormaliza
+        superset_group: e.superset_group,
+      }
+    }))
 
     emit('close')
   } catch (error) {

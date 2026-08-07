@@ -45,6 +45,11 @@ const { t } = useI18n()
 
 const exercise = computed(() => props.allExercises.find((e) => e.id === props.row.exercise_id))
 const rune = computed<RuneName | null>(() => primaryRune(exercise.value, props.muscleGroups))
+// v0.11.1 (zurdi: "los ejercicios de cardio tienen reps y peso, no tiene
+// sentido"): paridad con WorkoutExerciseCard — cardio registra duración/
+// distancia y nunca descansa, así que reps/peso/descanso no se muestran
+// (las series objetivo sí: "3 × cinta" es un objetivo legítimo)
+const isCardio = computed(() => exercise.value?.measurement === 'cardio')
 
 const restOptions = [
   { value: '30', label: '30 s' },
@@ -99,7 +104,7 @@ const restOptions = [
       />
     </div>
 
-    <div>
+    <div v-if="!isCardio">
       <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetReps') }}</label>
       <BkStepper
         :model-value="row.target_reps || 0"
@@ -109,7 +114,7 @@ const restOptions = [
       />
     </div>
 
-    <div>
+    <div v-if="!isCardio">
       <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetWeight') }}</label>
       <BkStepper
         :model-value="kgToDisplay(row.target_weight_kg || 0, units)"
@@ -122,6 +127,7 @@ const restOptions = [
     </div>
 
     <BkSelect
+      v-if="!isCardio"
       :model-value="row.rest_seconds || '60'"
       :label="t('routines.restSeconds')"
       :options="restOptions"

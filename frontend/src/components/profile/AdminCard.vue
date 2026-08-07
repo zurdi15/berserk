@@ -454,8 +454,67 @@ function redeemUrl(token: string): string {
     <!-- Invites section -->
     <BkCard :title="$t('admin.invites')">
       <div class="space-y-4">
-        <!-- Generate invite button and token display -->
-        <div class="space-y-3">
+        <!-- item 2/3 (v0.4.3, zurdi): mismo esqueleto shimmer que la tabla de
+             usuarios (gateada en el mismo `ready`, ver arriba) -->
+        <div v-if="!ready" class="space-y-2" data-testid="admin-invites-skeleton">
+          <div
+            v-for="n in 2"
+            :key="n"
+            class="p-2 rounded border border-line space-y-1.5"
+            aria-hidden="true"
+          >
+            <div class="h-3 w-1/2 rounded-sm bk-shimmer" />
+            <div class="h-3 w-1/3 rounded-sm bk-shimmer" />
+          </div>
+        </div>
+
+        <!-- Invites list: gateada en el MISMO ready que la tabla de usuarios
+             (item 6) — antes tenía su propia bandera y aparecía en un
+             segundo salto separado. v0.11.1 (zurdi): la lista va PRIMERO y
+             el botón de generar debajo (el h3 duplicado del título de la
+             card murió con la reordenación) -->
+        <div v-else-if="invites.length > 0" class="space-y-2">
+          <div
+            v-for="invite in invites"
+            :key="invite.id"
+            class="flex items-center justify-between p-2 rounded border border-line text-sm"
+            :data-testid="`invite-row-${invite.id}`"
+          >
+            <div>
+              <div>
+                <span class="text-ink-muted">{{ $t('admin.created') }}: </span>
+                {{ formatDate(invite.created_at) }}
+              </div>
+              <div>
+                <span class="text-ink-muted">{{ $t('admin.expires') }}: </span>
+                {{ formatDate(invite.expires_at) }}
+              </div>
+              <div v-if="isInviteUsed(invite)" class="text-ink-muted">
+                {{ $t('admin.used') }}: {{ formatDate(invite.used_at || '') }}
+              </div>
+              <div v-else class="text-aurora">
+                {{ $t('admin.pending') }}
+              </div>
+            </div>
+            <BkButton
+              variant="danger"
+              size="sm"
+              data-testid="delete-invite-btn"
+              @click="handleDeleteInvite(invite.id)"
+            >
+              {{ $t('common.delete') }}
+            </BkButton>
+          </div>
+        </div>
+
+        <div v-else class="text-sm text-ink-muted">
+          {{ $t('admin.noInvites') }}
+        </div>
+
+        <!-- v0.11.1 (zurdi): generar VA DEBAJO de las invitaciones (o del
+             mensaje de vacío) — el token recién creado se muestra junto al
+             botón que lo generó -->
+        <div class="space-y-3 pt-4 border-t border-line">
           <BkButton
             :loading="isCreatingInvite"
             data-testid="create-invite-btn"
@@ -483,64 +542,6 @@ function redeemUrl(token: string): string {
               {{ $t('admin.tokenOnce') }}
             </div>
           </div>
-        </div>
-
-        <!-- item 2/3 (v0.4.3, zurdi): mismo esqueleto shimmer que la tabla de
-             usuarios (gateada en el mismo `ready`, ver arriba) -->
-        <div v-if="!ready" class="space-y-2 pt-4 border-t border-line" data-testid="admin-invites-skeleton">
-          <div
-            v-for="n in 2"
-            :key="n"
-            class="p-2 rounded border border-line space-y-1.5"
-            aria-hidden="true"
-          >
-            <div class="h-3 w-1/2 rounded-sm bk-shimmer" />
-            <div class="h-3 w-1/3 rounded-sm bk-shimmer" />
-          </div>
-        </div>
-
-        <!-- Invites list: gateada en el MISMO ready que la tabla de usuarios
-             (item 6) — antes tenía su propia bandera y aparecía en un
-             segundo salto separado -->
-        <div v-else-if="invites.length > 0" class="space-y-2 pt-4 border-t border-line">
-          <h3 class="text-sm font-medium">{{ $t('admin.invites') }}</h3>
-          <div class="space-y-2">
-            <div
-              v-for="invite in invites"
-              :key="invite.id"
-              class="flex items-center justify-between p-2 rounded border border-line text-sm"
-              :data-testid="`invite-row-${invite.id}`"
-            >
-              <div>
-                <div>
-                  <span class="text-ink-muted">{{ $t('admin.created') }}: </span>
-                  {{ formatDate(invite.created_at) }}
-                </div>
-                <div>
-                  <span class="text-ink-muted">{{ $t('admin.expires') }}: </span>
-                  {{ formatDate(invite.expires_at) }}
-                </div>
-                <div v-if="isInviteUsed(invite)" class="text-ink-muted">
-                  {{ $t('admin.used') }}: {{ formatDate(invite.used_at || '') }}
-                </div>
-                <div v-else class="text-aurora">
-                  {{ $t('admin.pending') }}
-                </div>
-              </div>
-              <BkButton
-                variant="danger"
-                size="sm"
-                data-testid="delete-invite-btn"
-                @click="handleDeleteInvite(invite.id)"
-              >
-                {{ $t('common.delete') }}
-              </BkButton>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="text-sm text-ink-muted">
-          {{ $t('admin.noInvites') }}
         </div>
       </div>
     </BkCard>

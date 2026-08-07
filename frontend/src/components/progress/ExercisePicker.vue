@@ -6,6 +6,7 @@ import type { ExerciseOut, MuscleGroupOut } from '@/api/domain'
 import { getTrainedExercises, listExercises, listMuscleGroups } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
+import { foldSearchText } from '@/utils/searchFold'
 import { useAthleteStore } from '@/stores/athlete'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -58,12 +59,13 @@ async function load() {
 const filterGroupId = ref('')
 
 const filtered = computed(() => {
-  const q = query.value.trim().toLowerCase()
+  // v0.11.1: pliegue de acentos en ambos lados — "eliptica" encuentra "Elíptica"
+  const q = foldSearchText(query.value.trim())
   const groupId = filterGroupId.value ? Number(filterGroupId.value) : null
   return allExercises.value.filter((e) => {
     if (groupId !== null && !e.muscle_groups.some((l) => l.muscle_group_id === groupId)) return false
     if (!q) return true
-    const haystack = `${e.name_es} ${e.name_en} ${t(`library.measurements.${e.measurement}`)}`.toLowerCase()
+    const haystack = foldSearchText(`${e.name_es} ${e.name_en} ${t(`library.measurements.${e.measurement}`)}`)
     return haystack.includes(q)
   })
 })

@@ -6,6 +6,7 @@ import type { ExerciseOut, Measurement, MuscleGroupOut } from '@/api/domain'
 import { createExercise, deleteExercise, listExercises, listMuscleGroups, updateExercise } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
+import { foldSearchText } from '@/utils/searchFold'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import BkCard from '@/lib/BkCard.vue'
@@ -91,12 +92,13 @@ const query = ref('')
 const filterGroupId = ref('')
 
 const filteredExercises = computed<DisplayExercise[]>(() => {
-  const q = query.value.trim().toLowerCase()
+  // v0.11.1: pliegue de acentos en ambos lados — "eliptica" encuentra "Elíptica"
+  const q = foldSearchText(query.value.trim())
   const groupId = filterGroupId.value ? Number(filterGroupId.value) : null
   return displayExercises.value.filter((e) => {
     if (groupId !== null && !e.muscle_groups.some((l) => l.muscle_group_id === groupId)) return false
     if (!q) return true
-    const haystack = `${e.name_es} ${e.name_en} ${t(`library.measurements.${e.measurement}`)}`.toLowerCase()
+    const haystack = foldSearchText(`${e.name_es} ${e.name_en} ${t(`library.measurements.${e.measurement}`)}`)
     return haystack.includes(q)
   })
 })

@@ -35,6 +35,8 @@
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { foldSearchText } from '@/utils/searchFold'
+
 const props = withDefaults(
   defineProps<{
     items: T[]
@@ -64,10 +66,11 @@ const listId = useId()
 const activeItem = ref<T | null>(null)
 
 const filtered = computed(() => {
-  const q = props.modelValue.trim().toLowerCase()
+  // v0.11.1: pliegue de acentos en ambos lados — "eliptica" encuentra "Elíptica"
+  const q = foldSearchText(props.modelValue.trim())
   if (!q) return props.items
   const haystack = props.searchFn ?? props.labelFn
-  return props.items.filter((item) => haystack(item).toLowerCase().includes(q))
+  return props.items.filter((item) => foldSearchText(haystack(item)).includes(q))
 })
 
 const activeIndex = computed(() => (activeItem.value === null ? -1 : filtered.value.indexOf(activeItem.value)))

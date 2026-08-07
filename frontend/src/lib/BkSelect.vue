@@ -7,6 +7,7 @@
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFloatingPanel } from '@/composables/useFloatingPanel'
+import { foldSearchText } from '@/utils/searchFold'
 
 const props = defineProps<{
   label: string
@@ -34,8 +35,9 @@ const filterInputEl = ref<HTMLInputElement | null>(null)
 
 const filteredOptions = computed(() => {
   if (!isFilterable.value || !filterQuery.value.trim()) return props.options
-  const q = filterQuery.value.trim().toLowerCase()
-  return props.options.filter((o) => o.label.toLowerCase().includes(q))
+  // v0.11.1: pliegue de acentos en ambos lados — "eliptica" encuentra "Elíptica"
+  const q = foldSearchText(filterQuery.value.trim())
+  return props.options.filter((o) => foldSearchText(o.label).includes(q))
 })
 
 const selectedLabel = computed(
@@ -132,11 +134,11 @@ let typeAheadBuffer = ''
 let typeAheadTimer: ReturnType<typeof setTimeout> | null = null
 
 function typeAhead(char: string) {
-  typeAheadBuffer += char.toLowerCase()
+  typeAheadBuffer += foldSearchText(char)
   if (typeAheadTimer) clearTimeout(typeAheadTimer)
   typeAheadTimer = setTimeout(() => { typeAheadBuffer = '' }, 500)
 
-  const match = props.options.find((o) => !o.disabled && o.label.toLowerCase().startsWith(typeAheadBuffer))
+  const match = props.options.find((o) => !o.disabled && foldSearchText(o.label).startsWith(typeAheadBuffer))
   if (match) {
     activeValue.value = match.value
     scrollActiveIntoView()
