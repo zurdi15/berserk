@@ -14,7 +14,8 @@ router = APIRouter(prefix="/routines", tags=["routines"])
 
 def _can_edit_routine(owner_id: int | None, user: User) -> bool:
     """Mirror de exercises._can_edit: dueño siempre puede; un admin además
-    puede sobre plantillas GLOBALES (owner_id NULL) — W2 feature 2."""
+    puede sobre plantillas legacy owner_id NULL (ya no producibles desde la
+    API tras retirar globalize, pero las filas viejas pueden seguir vivas)."""
     return owner_id == user.id or (owner_id is None and user.is_admin)
 
 
@@ -26,12 +27,13 @@ def _editable_routine(db: Session, user: User, routine_id: int) -> Routine:
 
 
 def _visible_template(db: Session, user: User, routine_id: int) -> Routine:
-    """Rutina usable como plantilla (para copiar): GLOBAL (owner_id NULL),
-    pública de otro usuario, o la propia. 404 si no existe o no es visible —
-    nunca 403, mismo criterio de no-filtrar que el resto del backend."""
+    """Rutina usable como plantilla (para duplicar): legacy owner_id NULL,
+    marcada is_global por su dueño, o la propia. 404 si no existe o no es
+    visible — nunca 403, mismo criterio de no-filtrar que el resto del
+    backend."""
     routine = db.get(Routine, routine_id)
     visible = routine is not None and (
-        routine.owner_id is None or routine.is_public or routine.owner_id == user.id
+        routine.owner_id is None or routine.is_global or routine.owner_id == user.id
     )
     if not visible:
         raise HTTPException(status_code=404, detail="not_found")
@@ -66,11 +68,11 @@ def list_routines(target: TargetUser, db: Session = Depends(get_db)):
     ).all()
 
 
-# W2 feature 2: "Plantillas" en RoutineList — plantillas GLOBALES (owner_id
-# NULL, admin) + públicas de OTROS usuarios (las propias ya salen arriba, con
-# su propio toggle). Registrado antes de GET /{routine_id}: si fuera después,
-# FastAPI probaría a castear "templates" a routine_id:int y respondería 422
-# en vez de resolver esta ruta.
+# ROUTINES-OPEN: "Plantillas" en RoutineList — legacy owner_id NULL + rutinas
+# is_global de OTROS usuarios (las propias ya salen arriba, con su propio
+# check en el editor). Registrado antes de GET /{routine_id}: si fuera
+# después, FastAPI probaría a castear "templates" a routine_id:int y
+# respondería 422 en vez de resolver esta ruta.
 @router.get("/templates", response_model=list[RoutineOut])
 def list_templates(user: CurrentUser, db: Session = Depends(get_db)):
     return db.scalars(
@@ -78,7 +80,7 @@ def list_templates(user: CurrentUser, db: Session = Depends(get_db)):
         .where(
             or_(
                 Routine.owner_id.is_(None),
-                (Routine.is_public.is_(True)) & (Routine.owner_id != user.id),
+                (Routine.is_global.is_(True)) & (Routine.owner_id != user.id),
             )
         )
         .order_by(Routine.name)
@@ -142,11 +144,13 @@ def replace_exercises(
     return routine
 
 
-# W2 feature 2: consumo de una plantilla = COPIA, nunca referencia viva —
-# name deduplicado, exercises snapshot (no comparten fila con la fuente). Si
-# la fuente referencia algún ejercicio que YO no pueda ver (privado de su
-# dueño, aunque la rutina en sí sea pública/global) se rechaza entera con
-# 409 en vez de copiar una rutina con huecos silenciosos.
+# ROUTINES-OPEN: "Duplicar" = COPIA, nunca referencia viva — name
+# deduplicado, exercises snapshot (no comparten fila con la fuente). Aplica
+# también a rutinas PROPIAS (variante rápida de una tuya). Si la fuente
+# referencia algún ejercicio que YO no pueda ver (privado de su dueño,
+# aunque la rutina en sí sea global) se rechaza entera con 409 en vez de
+# copiar una rutina con huecos silenciosos. La copia nunca hereda is_global
+# (default False): duplicar no propaga visibilidad, cada dueño decide la suya.
 @router.post("/{routine_id}/copy", response_model=RoutineOut, status_code=201)
 def copy_routine(routine_id: int, user: CurrentUser, db: Session = Depends(get_db)):
     source = _visible_template(db, user, routine_id)
@@ -178,21 +182,3 @@ def copy_routine(routine_id: int, user: CurrentUser, db: Session = Depends(get_d
     db.commit()
     db.refresh(copy)
     return copy
-
-
-# W2 feature 2: UX de v1 (compromiso documentado en el report) — un admin
-# "globaliza" una rutina PROPIA ya existente en vez de crearla ya global (el
-# editor de rutinas está fuera de este carril, sin checkbox is_global). La
-# rutina deja el listado personal del admin (owner_id -> NULL) y pasa a la
-# sección Plantillas para todo el mundo, de solo lectura.
-@router.post("/{routine_id}/globalize", response_model=RoutineOut)
-def globalize_routine(routine_id: int, user: CurrentUser, db: Session = Depends(get_db)):
-    if not user.is_admin:
-        raise HTTPException(status_code=403, detail="admin_only")
-    routine = db.get(Routine, routine_id)
-    if routine is None or routine.owner_id != user.id:
-        raise HTTPException(status_code=404, detail="not_found")
-    routine.owner_id = None
-    db.commit()
-    db.refresh(routine)
-    return routine

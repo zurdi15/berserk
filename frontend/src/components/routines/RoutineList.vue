@@ -6,11 +6,9 @@ import type { ExerciseOut, RoutineOut } from '@/api/domain'
 import {
   copyRoutine,
   deleteRoutine,
-  globalizeRoutine,
   listExercises,
   listRoutineTemplates,
   listRoutines,
-  updateRoutine,
 } from '@/api/domain'
 import { isValidRuneName } from '@/lib/runeResolve'
 import { toastApiError } from '@/utils/apiErrors'
@@ -21,7 +19,6 @@ import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
-import BkSheet from '@/lib/BkSheet.vue'
 import BkUser from '@/lib/BkUser.vue'
 import type { RuneName } from '@/lib/runes'
 import { exerciseName } from './exerciseName'
@@ -43,9 +40,6 @@ const exerciseCatalog = ref<ExerciseOut[]>([])
 const editorOpen = ref(false)
 const selectedRoutine = ref<RoutineOut | undefined>()
 const deleteConfirming = ref<number | null>(null)
-// confirm sheet del control admin-only "convertir en global" (segunda
-// acción, distinta del borrado, solo sobre una rutina PROPIA) — ver globalize()
-const globalizeConfirmId = ref<number | null>(null)
 // qué rutinas tienen su lista de ejercicios expandida (compartido entre
 // mías y plantillas: los ids nunca colisionan, list_templates excluye lo mío)
 const expandedIds = ref<Set<number>>(new Set())
@@ -82,9 +76,9 @@ function resolveExercise(exerciseId: number): ExerciseOut | undefined {
   return exerciseCatalog.value.find((exercise) => exercise.id === exerciseId)
 }
 
-// item 2 (v0.4.0 — root cause del bug de visibilidad): una plantilla PÚBLICA
+// item 2 (v0.4.0 — root cause del bug de visibilidad): una rutina GLOBAL
 // puede referenciar un ejercicio que su dueño NUNCA marcó is_public — la
-// rutina en sí es visible (list_templates solo mira Routine.is_public), pero
+// rutina en sí es visible (list_templates solo mira Routine.is_global), pero
 // ese ejercicio en concreto no aparece en MI catálogo visible (listExercises
 // solo trae lo mío + lo global + lo público). Antes exerciseName() devolvía
 // '' en silencio para un ExerciseOut undefined y la fila salía completamente
@@ -144,35 +138,15 @@ async function confirmDelete(id: number) {
   }
 }
 
-// toggle "Compartir como plantilla" (item 1, v0.4.0: relabel de "Visible
-// para todos" — el mismo campo is_public, pero leído como la acción real que
-// produce: la rutina pasa a la lista unificada de todo el mundo) en la
-// propia tarjeta — el editor de rutinas está fuera de este carril, así que
-// vive aquí. Solo aplica a rutinas PROPIAS.
-async function togglePublic(routine: RoutineOut) {
-  try {
-    await updateRoutine(routine.id, { is_public: !routine.is_public })
-    await loadRoutines()
-  } catch (error) {
-    toastApiError(error)
-  }
-}
-
-async function copyTemplate(id: number) {
+// ROUTINES-OPEN: "Duplicar" — el check "Global" que controla is_global vive
+// ahora en el editor (RoutineEditorSheet), fuera de esta card. Duplicar
+// aplica a CUALQUIER rutina visible, incluidas las propias (variante rápida
+// de una tuya), no solo a las globales de otros.
+async function duplicateRoutine(id: number) {
   try {
     await copyRoutine(id)
     await loadRoutines()
-    toast.push('info', t('routines.copied'))
-  } catch (error) {
-    toastApiError(error)
-  }
-}
-
-async function globalize(id: number) {
-  globalizeConfirmId.value = null
-  try {
-    await globalizeRoutine(id)
-    await loadRoutines()
+    toast.push('info', t('routines.duplicated'))
   } catch (error) {
     toastApiError(error)
   }
@@ -233,31 +207,13 @@ onMounted(() => {
               <h3 class="font-semibold text-ink truncate">{{ item.name }}</h3>
               <p v-if="item.description" class="text-sm text-ink-muted truncate">{{ item.description }}</p>
               <p class="text-sm text-ink-muted mt-1">{{ item.exercises.length }} {{ t('routines.exercises') }}</p>
-              <!-- UNIFIED-LISTINGS: label de creador SOLO cuando no es mía —
-                   chip sutil "Global" para plantillas de admin, BkUser
-                   (punto de color + nombre) para las públicas de otro
-                   usuario. Sin owner_color en RoutineOut (fuera de este
-                   carril, no hay campo en el backend), BkUser cae a su
-                   fallback aurora — sigue siendo la primitiva correcta,
-                   simplemente sin colorear por usuario aquí. -->
-              <p v-if="item.kind !== 'own'" class="mt-1" :data-testid="`template-attribution-${item.id}`">
-                <span
-                  v-if="item.kind === 'global'"
-                  class="inline-flex items-center rounded-full border border-line px-2 py-0.5 text-xs text-ink-muted"
-                >
-                  {{ $t('routines.globalTemplate') }}
-                </span>
-                <BkUser
-                  v-else-if="item.owner_username"
-                  :user="{ username: item.owner_username, color: null }"
-                  size="sm"
-                />
-              </p>
             </div>
           </button>
           <div class="flex items-center gap-2 shrink-0">
             <!-- item 3: icon-only, como en AdminCard. Acciones por
-                 propiedad: mía → editar/borrar; global/de otro → solo copiar -->
+                 propiedad: mía → editar/borrar/duplicar; global/de otro →
+                 solo duplicar (ROUTINES-OPEN: "Duplicar" ya aplica también a
+                 las propias, variante rápida de una tuya) -->
             <template v-if="item.kind === 'own'">
               <BkActionBtn
                 icon="edit"
@@ -274,44 +230,34 @@ onMounted(() => {
               />
             </template>
             <BkActionBtn
-              v-else
               icon="copy"
-              :data-testid="`copy-template-${item.id}`"
-              :aria-label="$t('routines.copy')"
-              @click="copyTemplate(item.id)"
+              :data-testid="`duplicate-routine-${item.id}`"
+              :aria-label="$t('routines.duplicate')"
+              @click="duplicateRoutine(item.id)"
             />
           </div>
         </div>
 
-        <!-- "Compartir como plantilla" + globalizar (admin-only): SOLO en
-             mías — el mismo is_public patcheable desde la propia tarjeta, el
-             editor de rutinas está fuera de este carril. Mismo estilo de
-             chip que GroupRunePicker (border-aurora/bg-aurora/10 cuando está
-             activo), sin clases de color interpoladas. -->
-        <div v-if="item.kind === 'own'" class="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            class="bk-press inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all"
-            :class="item.is_public
-              ? 'border-aurora bg-aurora/10 text-aurora'
-              : 'border-line text-ink-muted hover:border-line-strong hover:text-ink'"
-            :aria-pressed="item.is_public ? 'true' : 'false'"
-            :aria-label="$t('routines.isPublic')"
-            :data-testid="`toggle-public-routine-${item.id}`"
-            @click="togglePublic(item)"
+        <!-- ROUTINES-OPEN: fila de atribución DEDICADA (ya no anidada bajo
+             el título) — solo para lo que no es mío, misma posición para
+             global legacy y para lo is_global de otro usuario. Escala
+             text-2xs, subtle: es metadato secundario, no protagonismo.
+             Chip "Global" para legacy owner_id NULL, BkUser (punto + nombre,
+             size xs) para lo marcado is_global por su dueño. Sin owner_color
+             en RoutineOut (fuera de este carril), BkUser cae a su fallback
+             aurora — sigue siendo la primitiva correcta. -->
+        <div v-if="item.kind !== 'own'" class="flex items-center" :data-testid="`template-attribution-${item.id}`">
+          <span
+            v-if="item.kind === 'global'"
+            class="inline-flex items-center rounded-full border border-line px-2 py-0.5 text-2xs text-ink-faint"
           >
-            {{ $t('routines.isPublic') }}
-          </button>
-          <button
-            v-if="auth.user?.is_admin"
-            type="button"
-            class="bk-press inline-flex items-center rounded-full border border-line px-2.5 py-1 text-xs text-ink-muted hover:border-line-strong hover:text-ink transition-all"
-            :aria-label="$t('routines.globalize')"
-            :data-testid="`globalize-routine-${item.id}`"
-            @click="globalizeConfirmId = item.id"
-          >
-            {{ $t('routines.globalize') }}
-          </button>
+            {{ $t('routines.globalTemplate') }}
+          </span>
+          <BkUser
+            v-else-if="item.owner_username"
+            :user="{ username: item.owner_username, color: null }"
+            size="xs"
+          />
         </div>
 
         <!-- Lista de ejercicios de la rutina, solo lectura: entra con
@@ -382,34 +328,6 @@ onMounted(() => {
       action-testid="new-routine-btn"
       @action="openEditor()"
     />
-
-    <!-- confirm sheet del control admin-only "convertir en global" — mismo
-         patrón que el sheet de borrado de ExerciseManager -->
-    <BkSheet
-      :open="globalizeConfirmId !== null"
-      :title="$t('routines.confirmGlobalize')"
-      @close="globalizeConfirmId = null"
-    >
-      <div class="space-y-4 p-4" data-testid="globalize-confirm-sheet">
-        <p>{{ $t('routines.confirmGlobalizeMessage') }}</p>
-        <div class="flex gap-2">
-          <BkButton
-            variant="ghost"
-            data-testid="globalize-cancel-btn"
-            @click="globalizeConfirmId = null"
-          >
-            {{ $t('common.cancel') }}
-          </BkButton>
-          <BkButton
-            variant="primary"
-            data-testid="globalize-confirm-btn"
-            @click="globalize(globalizeConfirmId!)"
-          >
-            {{ $t('routines.confirm') }}
-          </BkButton>
-        </div>
-      </div>
-    </BkSheet>
 
     <!-- Editor Sheet -->
     <RoutineEditorSheet

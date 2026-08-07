@@ -36,6 +36,14 @@ describe('BkUser', () => {
     expect(sm.find('span.truncate').classes()).toContain('text-xs')
   })
 
+  // ROUTINES-OPEN: 'xs' añadido para la fila de atribución compacta de
+  // RoutineList (dedicated row, text-2xs) — additive, no toca sm/md
+  it('renders size xs even smaller (w-1.5 dot, text-2xs name)', () => {
+    const xs = mount(BkUser, { props: { user: { username: 'freyja' }, size: 'xs' } })
+    expect(xs.get('[data-testid="bk-user-dot"]').classes()).toContain('w-1.5')
+    expect(xs.find('span.truncate').classes()).toContain('text-2xs')
+  })
+
   it('the dot is aria-hidden (decorative; the username text is the accessible content)', () => {
     const wrapper = mount(BkUser, { props: { user: { username: 'thor' } } })
     expect(wrapper.get('[data-testid="bk-user-dot"]').attributes('aria-hidden')).toBe('true')

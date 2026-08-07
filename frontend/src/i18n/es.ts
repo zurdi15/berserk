@@ -183,24 +183,22 @@ export const es = {
     noExercisesInRoutine: 'Sin ejercicios en esta rutina aún',
     nameRequired: 'El nombre de la rutina es obligatorio',
     confirm: 'Confirmar',
-    // UNIFIED-LISTINGS: mías + globales + públicas de otros viven todas en
-    // UNA lista (RoutineList) — el chip de atribución para lo que no es mío
+    // UNIFIED-LISTINGS: mías + legacy owner_id NULL + globales de otros
+    // viven todas en UNA lista (RoutineList) — el chip de atribución para lo
+    // que no es mío
     globalTemplate: 'Global',
-    // toggle en la propia tarjeta (el editor está fuera de este carril).
-    // item 1 (v0.4.0): antes "Visible para todos" no dejaba claro QUÉ pasaba
-    // al activarlo — se relee como la acción real: convertirla en plantilla
-    isPublic: 'Compartir como plantilla',
-    copy: 'Copiar',
-    copied: 'Rutina copiada a tu lista',
-    // item 2 (v0.4.0): fallback cuando el ejercicio de una plantilla no es
-    // visible para quien la mira (el dueño hizo pública la RUTINA pero no
+    // ROUTINES-OPEN (course correction): check en el EDITOR (RoutineEditorSheet),
+    // disponible a cualquier usuario sobre su propia rutina — sustituye al
+    // viejo toggle "Compartir como plantilla" de la tarjeta y a la conversión
+    // admin-only "Convertir en global" (que cedía la propiedad)
+    isGlobal: 'Global',
+    isGlobalHint: 'Visible y usable por todos los usuarios',
+    duplicate: 'Duplicar',
+    duplicated: 'Rutina duplicada a tu lista',
+    // item 2 (v0.4.0): fallback cuando el ejercicio de una rutina global no
+    // es visible para quien la mira (el dueño hizo global la RUTINA pero no
     // ESE ejercicio) — antes el nombre quedaba en blanco, sin explicación
     privateExercise: 'Ejercicio privado',
-    // segundo control, solo admin, sobre una rutina PROPIA — la convierte
-    // en plantilla global (owner_id -> NULL, deja el listado personal)
-    globalize: 'Convertir en global',
-    confirmGlobalize: 'Convertir en plantilla global',
-    confirmGlobalizeMessage: 'Esta rutina dejará tu lista personal y pasará a ser una plantilla global de solo lectura, visible para todos los usuarios. ¿Continuar?',
   },
   library: {
     exercises: 'Ejercicios',
