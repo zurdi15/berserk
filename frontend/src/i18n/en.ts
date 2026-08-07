@@ -279,6 +279,9 @@ export const en = {
     logPastWorkoutOr: 'or',
     prsOfDay: 'PRs of the day',
     plannedEyebrow: 'Planned',
+    // SHARED-DOTS OVERLAY (v0.4.1): legend under the grid, only with
+    // non-empty shared data (see CalendarView.vue)
+    sharedLegend: 'Shared with you:',
   },
   progress: {
     kinds: {

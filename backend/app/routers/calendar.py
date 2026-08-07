@@ -16,6 +16,7 @@ from ..schemas.calendar import (
     SchedulePatchIn,
     WorkoutSummaryOut,
 )
+from ..services.calendar import shared_calendar_users
 from ..services.progress import workout_muscle_group_ids
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
@@ -38,9 +39,10 @@ def schedule(payload: ScheduleIn, user: CurrentUser, db: Session = Depends(get_d
     return session
 
 
-@router.get("/{year}/{month}", response_model=CalendarMonthOut)
+@router.get("/{year}/{month}", response_model=CalendarMonthOut, response_model_exclude_unset=True)
 def month_view(
     target: TargetUser,
+    user: CurrentUser,
     year: int = Path(ge=2000, le=2100),
     month: int = Path(ge=1, le=12),
     db: Session = Depends(get_db),
@@ -62,9 +64,9 @@ def month_view(
         .order_by(Workout.date)
     ).all()
     groups = workout_muscle_group_ids(db, [w.id for w in workouts])
-    return CalendarMonthOut(
-        scheduled=scheduled,
-        workouts=[
+    payload = {
+        "scheduled": scheduled,
+        "workouts": [
             WorkoutSummaryOut(
                 id=w.id,
                 date=w.date,
@@ -73,7 +75,13 @@ def month_view(
             )
             for w in workouts
         ],
-    )
+    }
+    # SHARED-DOTS OVERLAY: solo en MI PROPIO calendario, nunca en modo atleta
+    # (target != user) — ahí ya se está "en la vista de otro", el overlay de
+    # ambient awareness no aplica (ver schemas/calendar.py::CalendarMonthOut)
+    if target.id == user.id:
+        payload["shared"] = shared_calendar_users(db, user.id, first, last)
+    return payload
 
 
 @router.patch("/{session_id}", response_model=ScheduledOut)

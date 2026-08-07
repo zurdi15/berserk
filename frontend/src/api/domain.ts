@@ -186,9 +186,24 @@ export interface WorkoutSummaryOut {
   muscle_group_ids: number[]
 }
 
+// SHARED-DOTS OVERLAY (v0.4.1): un usuario que me ha concedido acceso
+// (ShareGrant owner->yo), con sus días de entreno terminado ese mes — dato
+// mínimo para dots ambient, nunca detalle (eso sigue detrás del modo atleta)
+export interface SharedUserOut {
+  user_id: number
+  username: string
+  color: string | null
+  dates: string[]
+}
+
 export interface CalendarMonthOut {
   scheduled: ScheduledOut[]
   workouts: WorkoutSummaryOut[]
+  // ausente (undefined) en modo atleta: el backend OMITE la clave del JSON
+  // en vez de mandar [] o null (ver backend schemas/calendar.py) — así el
+  // frontend distingue "sin overlay" (viendo a otro) de "overlay vacío" (sin
+  // shares propios) sin un segundo flag
+  shared?: SharedUserOut[]
 }
 
 // Progress types

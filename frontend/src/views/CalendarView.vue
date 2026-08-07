@@ -9,6 +9,7 @@ import BkHeatmap from '@/lib/BkHeatmap.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
+import BkUser from '@/lib/BkUser.vue'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
 import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
 import { isValidRuneName } from '@/lib/runeResolve'
@@ -196,6 +197,25 @@ watch(() => athlete.userId, () => {
       :dot-color="athlete.viewing?.color"
       @select="selectDay"
     />
+
+    <!-- SHARED-DOTS OVERLAY legend (v0.4.1): solo cuando el propio calendario
+         trae usuarios compartidos (nunca en modo atleta, ahí monthData.shared
+         llega undefined — ver api/domain.ts) — reutiliza BkUser tal cual
+         (punto de color + username), mismo idiom que el resto de listados de
+         usuario de la app -->
+    <div
+      v-if="monthData.shared && monthData.shared.length > 0"
+      class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
+      data-testid="shared-legend"
+    >
+      <span class="text-xs text-ink-faint">{{ $t('calendar.sharedLegend') }}</span>
+      <BkUser
+        v-for="sharedUser in monthData.shared"
+        :key="sharedUser.user_id"
+        :user="{ username: sharedUser.username, color: sharedUser.color }"
+        size="sm"
+      />
+    </div>
 
     <!-- Rune legend trigger (item 13): las runas de los squares no se
          autoexplican, pero ya no es un botón-icono junto a los chevrons —

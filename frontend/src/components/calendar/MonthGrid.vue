@@ -39,9 +39,18 @@ const today = computed(() => todayIso())
 // (status 'planned': algo que aún no ha pasado). 'skipped' no deja dot
 // arriba — ni es un entreno ni es algo pendiente, y ya tiene su propia fila
 // en el sheet del día.
-type DayDot = { key: string; kind: 'done' | 'planned' }
+type DayDot = {
+  key: string
+  kind: 'done' | 'planned'
+  // color inline SOLO en dots del overlay compartido (dato de usuario, no
+  // token del sistema de diseño — mismo criterio de exención que BkUser.vue):
+  // los dots PROPIOS siguen pintándose vía la clase bg-[var(--bk-day-dot)],
+  // sin style inline. undefined aquí == "usa el color propio de arriba".
+  color?: string
+  username?: string
+}
 
-const dotsByDate = computed(() => {
+const ownDotsByDate = computed(() => {
   const map = new Map<string, DayDot[]>()
   for (const workout of props.month.workouts) {
     const existing = map.get(workout.date) ?? []
@@ -52,9 +61,45 @@ const dotsByDate = computed(() => {
     const existing = map.get(session.date) ?? []
     map.set(session.date, [...existing, { key: `s-${session.id}`, kind: 'planned' }])
   }
-  // mismo idiom que runesByDate: máximo 3 dots por día, en línea horizontal
-  for (const [date, dots] of map) {
-    if (dots.length > 3) map.set(date, dots.slice(0, 3))
+  return map
+})
+
+// SHARED-DOTS OVERLAY (v0.4.1, pivote de producto de zurdi): un dot 'done'
+// por usuario que me ha compartido su calendario, coloreado con SU color
+// (dato de usuario -> style inline, no token) y con el mismo fallback aurora
+// que --bk-day-dot arriba si no tiene uno propio. `month.shared` llega
+// undefined en modo atleta (el backend lo OMITE del JSON entero, ver
+// api/domain.ts::CalendarMonthOut), así que el `?? []` de abajo apaga el
+// overlay solo, sin repetir el chequeo de "modo atleta" aquí.
+const sharedDotsByDate = computed(() => {
+  const map = new Map<string, DayDot[]>()
+  for (const sharedUser of props.month.shared ?? []) {
+    for (const date of sharedUser.dates) {
+      const existing = map.get(date) ?? []
+      map.set(date, [
+        ...existing,
+        {
+          key: `shared-${sharedUser.user_id}-${date}`,
+          kind: 'done',
+          color: sharedUser.color ?? 'var(--color-aurora)',
+          username: sharedUser.username,
+        },
+      ])
+    }
+  }
+  return map
+})
+
+// composición: mías primero (mismo orden de siempre), compartidas después —
+// cap total a 3 sin cambiar (item 3 wave), pero ahora repartido entre ambas
+// fuentes en vez de solo la propia
+const dotsByDate = computed(() => {
+  const map = new Map<string, DayDot[]>()
+  const dates = new Set([...ownDotsByDate.value.keys(), ...sharedDotsByDate.value.keys()])
+  for (const date of dates) {
+    const mine = ownDotsByDate.value.get(date) ?? []
+    const shared = sharedDotsByDate.value.get(date) ?? []
+    map.set(date, [...mine, ...shared].slice(0, 3))
   }
   return map
 })
@@ -130,7 +175,10 @@ function selectDay(date: string) {
         </span>
 
         <!-- Workout dots: arriba de la celda, uno por entreno (relleno) +
-             uno por sesión aún planificada (hueco) — ver dotsByDate arriba -->
+             uno por sesión aún planificada (hueco) + overlay compartido (ver
+             dotsByDate arriba). Los dots compartidos llevan title (tooltip
+             nativo) con el username y su color por style inline; los propios
+             siguen sin tocar, coloreados por la clase de --bk-day-dot. -->
         <div
           v-if="dotsByDate.has(cell.date)"
           class="absolute inset-x-0 top-1 flex justify-center gap-0.5"
@@ -139,9 +187,14 @@ function selectDay(date: string) {
             v-for="dot in dotsByDate.get(cell.date)!"
             :key="dot.key"
             :data-status="dot.kind"
+            :data-shared-user="dot.username"
+            :title="dot.username"
+            :style="dot.color ? { backgroundColor: dot.color } : undefined"
             :class="[
               'w-1.5 h-1.5 rounded-full',
-              dot.kind === 'done' ? 'bg-[var(--bk-day-dot)]' : 'border-2 border-[var(--bk-day-dot)]',
+              dot.color
+                ? undefined
+                : dot.kind === 'done' ? 'bg-[var(--bk-day-dot)]' : 'border-2 border-[var(--bk-day-dot)]',
             ]"
           />
         </div>
