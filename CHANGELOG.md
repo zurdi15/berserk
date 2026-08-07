@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.9.0 - 2026-08-07
+
+- Swipe left or right anywhere to move between sections (Today, Calendar, Workout, Progress, Profile) — horizontal-scrolling areas and the chart keep their own gestures.
+- The library is now simply the exercise catalog; muscle groups moved to a sheet behind a button instead of a second row of tabs.
+- Pinned tab strips span the full screen width (scrolled cards no longer peek past their edge), the calendar's month selector scrolls with the page again, and Progress > Workouts can no longer overscroll past its chart under any circumstances.
+
 ## 0.8.2 - 2026-08-07
 
 - Progress > Workouts no longer scrolls the page at all: the exercise list is the only thing that scrolls, sized to the exact visible space, and picking an exercise unfolds the chart smoothly while the list cedes room gradually.
