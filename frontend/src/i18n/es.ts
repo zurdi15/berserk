@@ -428,6 +428,11 @@ export const es = {
     supersetPickFirst: 'Elige el primer ejercicio de la superserie',
     supersetPickSecond: '{name} elegido — ahora elige el segundo',
     supersetDissolve: 'Deshacer la superserie',
+    // v0.9.1: sheet de edición del bloque (cambiar miembros o deshacer)
+    supersetEdit: 'Editar superserie',
+    supersetSwap: 'Cambiar ejercicio',
+    supersetSwapPick: 'Elige el ejercicio que lo sustituye',
+    supersetSwapWarning: 'Cambiarlo descarta sus series registradas de este entreno.',
     cardio: {
       loggedWhileAway: 'Cardio registrado: {duration}',
     },

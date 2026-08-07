@@ -1129,20 +1129,50 @@ describe('WorkoutView v0.5.0 superseries: render agrupado y encadenado', () => {
     expect(wrapper.find('[data-testid="superset-chip-20"]').exists()).toBe(false)
   })
 
-  // v0.8.0 (zurdi revoca los toggles de frontera: "ruido visual") — la única
-  // gestión entre cards es DESHACER el bloque desde su cabecera; crear vive
-  // en AddExerciseSheet (check superserie → eliges dos)
-  it('v0.8.0: no boundary toggles remain; the container header carries the single dissolve control that clears the group', async () => {
+  // v0.9.1 (zurdi: "en vez de un icono que la deshaga, un botón de editar"):
+  // la cabecera del bloque abre el sheet de edición — deshacer vive dentro,
+  // junto al cambio de miembros; sin toggles de frontera entre cards
+  it('v0.9.1: the container header opens the edit sheet; dissolving from it clears the group', async () => {
     wrapper = mountGrouped()
     await flushPromises()
 
     expect(wrapper.findAll('[data-testid^="workout-superset-toggle-"]')).toHaveLength(0)
+    expect(wrapper.find('[data-testid="superset-dissolve-A"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="superset-edit-A"]').trigger('click')
+    await flushPromises()
+    // el sheet lista los DOS miembros del grupo con su acción de cambiar
+    expect(document.querySelectorAll('[data-testid^="superset-swap-"]')).toHaveLength(2)
 
     const store = useActiveWorkoutStore()
     const spy = vi.spyOn(store, 'setSupersetGroups').mockResolvedValue(undefined)
-    await wrapper.get('[data-testid="superset-dissolve-A"]').trigger('click')
+    ;(document.querySelector('[data-testid="superset-dissolve-btn"]') as HTMLElement).click()
     await flushPromises()
     expect(spy).toHaveBeenCalledWith([null, null, null])
+    // el sheet se cierra al deshacer
+    expect(document.querySelector('[data-testid="superset-dissolve-btn"]')).toBeNull()
+  })
+
+  it('v0.9.1: picking a replacement in the edit sheet calls swapSupersetMember with old weid and new exercise id', async () => {
+    wrapper = mountGrouped()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="superset-edit-A"]').trigger('click')
+    await flushPromises()
+
+    const store = useActiveWorkoutStore()
+    const spy = vi.spyOn(store, 'swapSupersetMember').mockResolvedValue(undefined)
+
+    // cambiar el primer miembro (weid 20): entra el buscador de sustituto
+    ;(document.querySelector('[data-testid="superset-swap-20"]') as HTMLElement).click()
+    await flushPromises()
+    ;(document.querySelector('[data-testid^="superset-replacement-"]') as HTMLElement).click()
+    await flushPromises()
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    const [oldWeid, newExerciseId] = spy.mock.calls[0]
+    expect(oldWeid).toBe(20)
+    expect(typeof newExerciseId).toBe('number')
   })
 
   it('wires the positional rest gating: non-last member gets supersetLast=false, last and loose get true', async () => {

@@ -418,6 +418,11 @@ export const en = {
     supersetPickFirst: 'Pick the first exercise of the superset',
     supersetPickSecond: '{name} picked — now pick the second one',
     supersetDissolve: 'Dissolve the superset',
+    // v0.9.1: block edit sheet (swap members or dissolve)
+    supersetEdit: 'Edit superset',
+    supersetSwap: 'Swap exercise',
+    supersetSwapPick: 'Pick its replacement',
+    supersetSwapWarning: 'Swapping it discards its logged sets from this workout.',
     cardio: {
       loggedWhileAway: 'Cardio logged: {duration}',
     },

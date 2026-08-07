@@ -16,6 +16,7 @@ vi.mock('@/api/domain', () => ({
   getExerciseHistory: vi.fn(),
   updateWorkoutExercise: vi.fn(),
   listRoutines: vi.fn(),
+  setWorkoutSupersetGroups: vi.fn(),
 }))
 
 import * as domain from '@/api/domain'
@@ -141,6 +142,53 @@ describe('active workout store — offline branches', () => {
 
     expect(domain.getActiveWorkout).not.toHaveBeenCalled()
     expect(store.workout!.id).toBe(4)
+  })
+
+  // v0.9.1 (ONLINE — vive aquí por la infra de storage mockeado): cambiar un
+  // miembro = quitar + añadir + recolocar en el hueco + reenlazar el grupo
+  it('swapSupersetMember replaces the member in place and relinks the group', async () => {
+    online.value = true
+    const store = useActiveWorkoutStore()
+    const base = baseWorkout()
+    base.exercises = [
+      { id: 7, exercise_id: 1, position: 1, note: null, rest_seconds: null, superset_group: 0, sets: [] },
+      { id: 8, exercise_id: 2, position: 2, note: null, rest_seconds: null, superset_group: 0, sets: [] },
+    ]
+    store.workout = base
+
+    const after = (exs: { id: number; group: number | null }[]) => ({
+      ...baseWorkout(),
+      exercises: exs.map((e, i) => ({
+        id: e.id, exercise_id: 90 + i, position: i + 1, note: null,
+        rest_seconds: null, superset_group: e.group, sets: [],
+      })),
+    })
+
+    vi.mocked(domain.removeWorkoutExercise).mockResolvedValue(undefined as never)
+    vi.mocked(domain.addWorkoutExercise).mockResolvedValue({ id: 30 } as never)
+    // refresh tras quitar → queda [8]; refresh tras añadir → [8, 30]
+    vi.mocked(domain.getWorkout)
+      .mockResolvedValueOnce(after([{ id: 8, group: 0 }]) as never)
+      .mockResolvedValueOnce(after([{ id: 8, group: 0 }, { id: 30, group: null }]) as never)
+    vi.mocked(domain.reorderWorkoutExercises).mockResolvedValue(
+      after([{ id: 30, group: null }, { id: 8, group: 0 }]) as never,
+    )
+    vi.mocked(domain.setWorkoutSupersetGroups).mockResolvedValue(
+      after([{ id: 30, group: 0 }, { id: 8, group: 0 }]) as never,
+    )
+
+    await store.swapSupersetMember(7, 55)
+
+    expect(domain.removeWorkoutExercise).toHaveBeenCalledWith(4, 7)
+    expect(domain.addWorkoutExercise).toHaveBeenCalledWith(4, { exercise_id: 55 })
+    // el nuevo (30) se recoloca en el hueco del viejo (posición 0)
+    expect(domain.reorderWorkoutExercises).toHaveBeenCalledWith(4, [30, 8])
+    // y se reenlaza con el miembro restante
+    expect(domain.setWorkoutSupersetGroups).toHaveBeenCalledWith(4, [
+      { workout_exercise_id: 30, superset_group: 0 },
+      { workout_exercise_id: 8, superset_group: 0 },
+    ])
+    expect(store.workout!.exercises.map((e) => e.superset_group)).toEqual([0, 0])
   })
 
   // v0.8.0: añadir un par enlazado compone altas + bulk — offline entero

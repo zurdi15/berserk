@@ -22,6 +22,8 @@ import {
   type PersistedCardioCountdown,
 } from '@/utils/uiPrefs'
 import AddExerciseSheet from '@/components/workout/AddExerciseSheet.vue'
+import SupersetEditSheet from '@/components/workout/SupersetEditSheet.vue'
+import { exerciseName } from '@/components/routines/exerciseName'
 import FinishSummary from '@/components/workout/FinishSummary.vue'
 import NeonPulse from '@/components/workout/NeonPulse.vue'
 import WorkoutExerciseCard from '@/components/workout/WorkoutExerciseCard.vue'
@@ -116,17 +118,38 @@ const workoutBlocks = computed<WorkoutBlock[]>(() => {
   return blocks
 })
 
-// v0.8.0 (zurdi revoca los toggles de frontera de la v0.7.0: "un botón entre
-// cada ejercicio es ruido visual"): las superseries se CREAN desde el sheet
-// de añadir ejercicio (check de superserie → eliges dos, ver
-// AddExerciseSheet + activeWorkout.addSupersetPair) y se DESHACEN desde un
-// único botón en la cabecera del contenedor del bloque — la única superficie
-// de gestión que queda entre las cards.
+// v0.8.0 (zurdi): las superseries se CREAN desde el sheet de añadir
+// ejercicio (check → eliges dos). v0.9.1 (zurdi: "en vez de un icono que la
+// deshaga, un botón de editar"): la cabecera del bloque abre el sheet de
+// edición (SupersetEditSheet) — desde ahí se cambia cualquiera de los
+// miembros o se deshace el grupo entero.
+const editingBlock = ref<WorkoutBlock | null>(null)
+
+const editingMembers = computed(() =>
+  (editingBlock.value?.entries ?? []).map((entry) => {
+    const exercise = exerciseMap.value.get(entry.we.exercise_id)
+    return {
+      weid: entry.we.id,
+      name: exercise ? exerciseName(exercise, auth.user?.locale || 'es') : '',
+      rune: primaryRune(exercise, muscleGroups.value) ?? null,
+      hasSets: entry.we.sets.length > 0,
+    }
+  }),
+)
+
 async function dissolveBlock(block: WorkoutBlock) {
   const values = [...supersetValues.value]
   for (const entry of block.entries) values[entry.index] = null
   try {
     await activeWorkout.setSupersetGroups(normalizeSupersets(values))
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
+async function swapMember(oldWeid: number, newExerciseId: number) {
+  try {
+    await activeWorkout.swapSupersetMember(oldWeid, newExerciseId)
   } catch (error) {
     toastApiError(error)
   }
@@ -480,9 +503,10 @@ onBeforeUnmount(() => {
       <!-- v0.8.0: bloques de superserie — los miembros van DENTRO de un
            contenedor con borde aurora ("los dos ejercicios en una card más
            grande me gusta, déjalo así" — zurdi), con el chip de cabecera y
-           el ÚNICO control de gestión: deshacer el bloque (los toggles de
-           frontera entre cards de la v0.7.0 murieron por ruido visual; las
-           superseries se crean desde el sheet de añadir ejercicio). -->
+           el ÚNICO control de gestión: editar (v0.9.1 — abre el sheet donde
+           se cambia un miembro o se deshace el grupo; el icono directo de
+           deshacer de la v0.8.0 se sustituye por esto). Las superseries se
+           crean desde el sheet de añadir ejercicio. -->
       <template v-for="block in workoutBlocks" :key="`block-${block.entries[0].we.id}`">
         <div
           v-if="block.grouped"
@@ -495,10 +519,10 @@ onBeforeUnmount(() => {
               {{ t('workout.superset', { label: block.label }) }}
             </span>
             <BkActionBtn
-              icon="unlink"
-              :data-testid="`superset-dissolve-${block.label}`"
-              :aria-label="t('workout.supersetDissolve')"
-              @click="dissolveBlock(block)"
+              icon="edit"
+              :data-testid="`superset-edit-${block.label}`"
+              :aria-label="t('workout.supersetEdit')"
+              @click="editingBlock = block"
             />
           </div>
           <template v-for="entry in block.entries" :key="entry.we.id">
@@ -556,6 +580,15 @@ onBeforeUnmount(() => {
       </BkButton>
 
       <AddExerciseSheet :open="addSheetOpen" :actions="activeWorkout" @close="addSheetOpen = false" />
+
+      <SupersetEditSheet
+        :open="editingBlock !== null"
+        :label="editingBlock?.label ?? null"
+        :members="editingMembers"
+        @close="editingBlock = null"
+        @dissolve="editingBlock && dissolveBlock(editingBlock)"
+        @swap="swapMember"
+      />
 
       <!-- item 3: Descartar/Terminar salen de la cabecera y bajan al fondo
            del contenido, tras una línea divisoria — ya no compiten por

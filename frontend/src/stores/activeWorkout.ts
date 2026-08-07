@@ -245,6 +245,34 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     await setSupersetGroups(normalizeSupersets(values))
   }
 
+  // v0.9.1 (zurdi: el editor de superserie permite "cambiar alguno de los
+  // dos ejercicios"): sustituye un miembro del grupo por otro ejercicio —
+  // quitar el viejo (SUS SERIES SE VAN CON ÉL, el sheet lo avisa) + añadir
+  // el nuevo + recolocarlo en el hueco + reenlazar el grupo. El paso de
+  // recolocar usa reorder, que EXIGE red (v1): un cambio de miembro offline
+  // falla con OfflineError y el toast estándar — es una edición excepcional,
+  // no un gesto de gimnasio en túnel.
+  async function swapSupersetMember(oldWeid: number, newExerciseId: number) {
+    const exercises = workout.value!.exercises
+    const oldIndex = exercises.findIndex((e) => e.id === oldWeid)
+    if (oldIndex === -1) return
+    const group = exercises[oldIndex].superset_group ?? null
+
+    await removeExercise(oldWeid)
+    await addExercise(newExerciseId)
+
+    const current = workout.value!.exercises
+    const newWeid = current[current.length - 1].id
+    const ids = current.map((e) => e.id)
+    ids.pop()
+    ids.splice(oldIndex, 0, newWeid)
+    workout.value = await domain.reorderWorkoutExercises(workout.value!.id, ids)
+
+    const values = workout.value!.exercises.map((e) => e.superset_group ?? null)
+    values[oldIndex] = group
+    await setSupersetGroups(normalizeSupersets(values))
+  }
+
   // v0.7.0: superseries editables EN el entreno — recibe el estado completo
   // normalizado por posición (lib/supersets.ts) y lo aplica en bloque
   async function setSupersetGroups(values: (number | null)[]) {
@@ -412,6 +440,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     removeExercise,
     reorder,
     setSupersetGroups,
+    swapSupersetMember,
     logSet,
     updateSet,
     deleteSet,

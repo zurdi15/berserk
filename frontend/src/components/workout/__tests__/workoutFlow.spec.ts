@@ -1028,8 +1028,15 @@ describe('v0.5.0 superseries: rest gating and chips', () => {
     expect(withNext.get('[data-testid="superset-next-20"]').text()).toBe('Siguiente')
   })
 
-  it('the MANUAL rest picker stays available on a non-last member (only AUTO rest is gated)', () => {
-    const wrapper = mountCard({ supersetLabel: 'A', supersetLast: false })
-    expect(wrapper.find('[data-testid="rest-toggle-20"]').exists()).toBe(true)
+  // v0.9.1 (zurdi: "el descanso debería estar solo al final de la
+  // superserie"): el control de descanso ENTERO se esconde en los miembros
+  // no finales — el descanso es de la ronda, y la ronda la cierra el último
+  it('v0.9.1: the rest control is hidden on a non-last member and present on the last one', () => {
+    const nonLast = mountCard({ supersetLabel: 'A', supersetLast: false })
+    expect(nonLast.find('[data-testid="rest-toggle-20"]').exists()).toBe(false)
+    nonLast.unmount()
+
+    const last = mountCard({ supersetLabel: 'A', supersetLast: true })
+    expect(last.find('[data-testid="rest-toggle-20"]').exists()).toBe(true)
   })
 })

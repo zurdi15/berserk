@@ -459,7 +459,13 @@ async function moveDown() {
       </div>
     </div>
 
-    <div v-if="restEnabled" class="mb-2">
+    <!-- v0.9.1 (zurdi: "el descanso debería estar solo al final de la
+         superserie — ahora aparece después de cada ejercicio"): el control
+         de descanso entero se esconde en los miembros NO finales de un
+         grupo — el descanso es un concepto de la RONDA, y la ronda la cierra
+         el último miembro (autoRestFires, la misma condición que ya gateaba
+         el disparo automático; ahora también gobierna la UI). -->
+    <div v-if="restEnabled && autoRestFires" class="mb-2">
       <button
         type="button"
         class="bk-press text-xs text-ink-faint underline decoration-dotted"
