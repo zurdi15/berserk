@@ -85,9 +85,6 @@ export const en = {
     apply: 'Apply',
     hours: 'Hours',
     minutes: 'Minutes',
-    // W2: attribution hint shared between ExerciseManager's catalog-ish
-    // section and RoutineList's Templates section
-    sharedBy: 'by {username}',
   },
   athlete: {
     viewing: 'Viewing {name}',
@@ -186,12 +183,8 @@ export const en = {
     noExercisesInRoutine: 'No exercises in this routine yet',
     nameRequired: 'Routine name is required',
     confirm: 'Confirm',
-    // W2 feature 2: Templates section (global + others' public).
-    // item 1 (v0.4.0): subtitle explaining what this section is — zurdi's
-    // real confusion was "what's a routine and what's a template?"
-    templates: 'Templates',
-    templatesHint: 'Global routines and the ones other users have made public — copy them into your list.',
-    noTemplates: 'No templates available',
+    // UNIFIED-LISTINGS: mine + global + others' public all live in ONE
+    // list (RoutineList) — the attribution chip for anything not mine
     globalTemplate: 'Global',
     // toggle on the card itself (the editor is out of this lane).
     // item 1 (v0.4.0): "Visible to everyone" didn't say WHAT turning it on
@@ -230,10 +223,14 @@ export const en = {
     // W2 feature 1: "public" check on an OWN exercise (create/edit
     // checkbox) — distinct from isGlobal (admin catalog, only visible there)
     isPublic: 'Visible to everyone',
-    noExercises: 'No custom exercises yet',
-    noGroups: 'No custom muscle groups yet',
+    // UNIFIED-LISTINGS: empty message for the UNIFIED list (mine + catalog
+    // + others' public / mine + global) — no longer "custom", since it now
+    // covers the whole list, not just what's mine
+    noExercises: 'No exercises yet',
+    noGroups: 'No muscle groups yet',
+    // UNIFIED-LISTINGS: also the per-row attribution chip text for the
+    // predefined catalog (used to be its collapsible section's title)
     catalog: 'Predefined catalog',
-    noCatalog: 'No exercises in the catalog',
     rune: 'Rune',
     confirmDeleteExercise: 'Delete exercise',
     confirmDeleteExerciseMessage: 'Are you sure you want to delete this exercise?',

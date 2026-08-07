@@ -70,7 +70,7 @@ describe('ExerciseManager', () => {
     setUser()
   })
 
-  it('lists only own exercises, hiding catalog rows owned by nobody', async () => {
+  it('UNIFIED-LISTINGS: renders own exercises AND catalog rows in the SAME list (no separate/collapsed catalog section)', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [] },
@@ -82,7 +82,28 @@ describe('ExerciseManager', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Press Arnold')
-    expect(wrapper.text()).not.toContain('Press banca')
+    // antes de la unificación esto vivía oculto tras un toggle "Catálogo" —
+    // ahora aparece directamente, sin ninguna interacción previa
+    expect(wrapper.text()).toContain('Press banca')
+    expect(wrapper.find('[data-testid="exercise-row-12"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="catalog-exercise-row-1"]').exists()).toBe(true)
+  })
+
+  it('UNIFIED-LISTINGS: sorts the list mine first, then the predefined catalog, then others\' public exercises', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 40, name_es: 'Zancadas de Loki', name_en: 'Loki lunges', measurement: 'strength', owner_id: 9, is_public: true, owner_username: 'loki', muscle_groups: [] },
+      { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [] },
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    const testids = wrapper.findAll('[data-testid^="exercise-row-"], [data-testid^="catalog-exercise-row-"]')
+      .map((row) => row.attributes('data-testid'))
+    expect(testids).toEqual(['exercise-row-12', 'catalog-exercise-row-1', 'catalog-exercise-row-40'])
   })
 
   it('item 6: shows a rune+name tag for the primary muscle group on own AND catalog rows', async () => {
@@ -103,9 +124,7 @@ describe('ExerciseManager', () => {
     expect(ownTag.text()).toContain('Hombros')
     expect(ownTag.findComponent({ name: 'BkRune' }).props('name')).toBe('shoulders')
 
-    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
-    await flushPromises()
-
+    // catálogo visible sin interacción previa (unificado, no colapsado)
     const catalogTag = wrapper.get('[data-testid="exercise-group-tag-1"]')
     expect(catalogTag.text()).toContain('Pecho')
     expect(catalogTag.findComponent({ name: 'BkRune' }).props('name')).toBe('chest')
@@ -135,7 +154,7 @@ describe('ExerciseManager', () => {
 
     // pendiente: ni una fila de ejercicio propio ni el mensaje vacío
     expect(wrapper.find('[data-testid^="exercise-row-"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Sin ejercicios propios aún')
+    expect(wrapper.text()).not.toContain('Sin ejercicios aún')
 
     resolveExercises([
       { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
@@ -313,15 +332,13 @@ describe('ExerciseManager', () => {
 
     const wrapper = buildExerciseManager()
     await flushPromises()
-    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
-    await flushPromises()
     await wrapper.get('[data-testid="edit-exercise-1"]').trigger('click')
     await flushPromises()
 
     expect(byTestId('exercise-is-public-checkbox').exists()).toBe(false)
   })
 
-  it('W2 feature 1: a PUBLIC exercise from another user renders in the catalog-ish section with an attribution hint, unusable for edit/delete even by an admin', async () => {
+  it('UNIFIED-LISTINGS: a PUBLIC exercise from another user renders inline with a BkUser attribution, unusable for edit/delete even by an admin', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       {
@@ -338,18 +355,18 @@ describe('ExerciseManager', () => {
     // no aparece en "mis ejercicios" (owner_id 9 !== 7)
     expect(wrapper.find('[data-testid="exercise-row-40"]').exists()).toBe(false)
 
-    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
-    await flushPromises()
-
+    // visible sin ninguna interacción previa (unificado, no colapsado)
     const row = wrapper.get('[data-testid="catalog-exercise-row-40"]')
     expect(row.text()).toContain('Zancadas de Loki')
-    expect(row.get('[data-testid="exercise-shared-by-40"]').text()).toContain('loki')
+    const attribution = row.get('[data-testid="exercise-attribution-40"]')
+    expect(attribution.text()).toContain('loki')
+    expect(attribution.findComponent({ name: 'BkUser' }).exists()).toBe(true)
     // ni siquiera un admin puede editar/borrar lo público de OTRO usuario
     expect(row.find('[data-testid="edit-exercise-40"]').exists()).toBe(false)
     expect(row.find('[data-testid="delete-exercise-40"]').exists()).toBe(false)
   })
 
-  it('W2 feature 1: the predefined catalog (owner_id null) rows carry no attribution hint', async () => {
+  it('UNIFIED-LISTINGS: the predefined catalog (owner_id null) rows carry a "Catálogo predefinido" attribution chip, not a BkUser', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       {
@@ -361,10 +378,23 @@ describe('ExerciseManager', () => {
 
     const wrapper = buildExerciseManager()
     await flushPromises()
-    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
+
+    const attribution = wrapper.get('[data-testid="exercise-attribution-1"]')
+    expect(attribution.text()).toBe('Catálogo predefinido')
+    expect(attribution.findComponent({ name: 'BkUser' }).exists()).toBe(false)
+  })
+
+  it('UNIFIED-LISTINGS: own exercises never carry an attribution element', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="exercise-shared-by-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="exercise-attribution-12"]').exists()).toBe(false)
   })
 
   it('delete click-through opens the confirm sheet and confirming calls deleteExercise', async () => {
@@ -408,7 +438,7 @@ describe('ExerciseManager', () => {
     expect(deleteBtn.classes()).toContain('text-danger')
   })
 
-  it('item 4: the predefined catalog section is collapsed by default (no rows in the DOM, toggle collapsed)', async () => {
+  it('UNIFIED-LISTINGS: predefined (owner_id null) rows render inline, no collapsible catalog section left', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [] },
@@ -419,13 +449,12 @@ describe('ExerciseManager', () => {
     const wrapper = buildExerciseManager()
     await flushPromises()
 
-    const toggle = wrapper.get('[data-testid="toggle-catalog"]')
-    expect(toggle.attributes('aria-expanded')).toBe('false')
-    expect(wrapper.find('[data-testid="catalog-exercise-row-1"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Catálogo predefinido')
+    // el toggle colapsable desaparece con la consolidación
+    expect(wrapper.find('[data-testid="toggle-catalog"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="catalog-exercise-row-1"]').text()).toContain('Press banca')
   })
 
-  it('item 4: expanding the catalog toggle reveals predefined (owner_id null) rows, read-only for a non-admin user', async () => {
+  it('item 4: catalog (owner_id null) rows are read-only for a non-admin user', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [] },
@@ -437,12 +466,7 @@ describe('ExerciseManager', () => {
     const wrapper = buildExerciseManager()
     await flushPromises()
 
-    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.get('[data-testid="toggle-catalog"]').attributes('aria-expanded')).toBe('true')
     const row = wrapper.get('[data-testid="catalog-exercise-row-1"]')
-    expect(row.text()).toContain('Press banca')
     // solo lectura: sin controles de editar/borrar para un usuario normal
     expect(row.find('[data-testid="edit-exercise-1"]').exists()).toBe(false)
     expect(row.find('[data-testid="delete-exercise-1"]').exists()).toBe(false)
@@ -463,8 +487,6 @@ describe('ExerciseManager', () => {
 
     const wrapper = buildExerciseManager()
     await flushPromises()
-    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
-    await flushPromises()
 
     const row = wrapper.get('[data-testid="catalog-exercise-row-1"]')
     await row.get('[data-testid="edit-exercise-1"]').trigger('click')
@@ -477,7 +499,7 @@ describe('ExerciseManager', () => {
     expect(updateExercise).toHaveBeenCalledWith(1, expect.objectContaining({ name_en: 'Bench press v2' }))
   })
 
-  it('item 4: shows the empty state once loaded if the catalog has no predefined rows', async () => {
+  it('item 10: the unified empty state shows the rune, message and a single "Nuevo ejercicio" action that opens the create form', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([] as never)
     vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
@@ -485,21 +507,7 @@ describe('ExerciseManager', () => {
     const wrapper = buildExerciseManager()
     await flushPromises()
 
-    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Sin ejercicios en el catálogo')
-  })
-
-  it('item 10: own-exercises empty state shows the rune, message and a single "Nuevo ejercicio" action that opens the create form', async () => {
-    const { listExercises, listMuscleGroups } = await import('@/api/domain')
-    vi.mocked(listExercises).mockResolvedValue([] as never)
-    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
-
-    const wrapper = buildExerciseManager()
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Sin ejercicios propios aún')
+    expect(wrapper.text()).toContain('Sin ejercicios aún')
     expect(wrapper.findAllComponents({ name: 'BkRune' }).length).toBeGreaterThan(0)
 
     const buttons = wrapper.findAll('[data-testid="new-exercise-btn"]')
@@ -552,6 +560,29 @@ describe('MuscleGroupManager', () => {
     const ownRow = wrapper.find('[data-testid="muscle-group-row-2"]')
     expect(ownRow.find('[data-testid="delete-muscle-group-btn"]').exists()).toBe(true)
     expect(ownRow.find('[data-testid="global-group-badge"]').exists()).toBe(false)
+  })
+
+  it('UNIFIED-LISTINGS: sorts the list mine first (alphabetically), then global groups (alphabetically) — backend returns them mixed by id', async () => {
+    const { listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'pecho', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+      { id: 2, slug: 'espalda', name_es: 'Espalda', name_en: 'Back', owner_id: null },
+      { id: 3, slug: 'gemelo', name_es: 'Gemelo', name_en: 'Calf', owner_id: 7 },
+      { id: 4, slug: 'antebrazo', name_es: 'Antebrazo', name_en: 'Forearm', owner_id: 7 },
+    ] as never)
+    setUser({ id: 7 })
+
+    const wrapper = buildMuscleGroupManager()
+    await flushPromises()
+
+    const testids = wrapper.findAll('[data-testid^="muscle-group-row-"]').map((row) => row.attributes('data-testid'))
+    // mías (Antebrazo, Gemelo) primero y alfabéticas, luego globales (Espalda, Pecho)
+    expect(testids).toEqual([
+      'muscle-group-row-4',
+      'muscle-group-row-3',
+      'muscle-group-row-2',
+      'muscle-group-row-1',
+    ])
   })
 
   it('item 5: an admin sees edit AND delete on a global row too (a regular user still sees neither)', async () => {
@@ -715,7 +746,7 @@ describe('MuscleGroupManager', () => {
     const wrapper = buildMuscleGroupManager()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Sin grupos musculares propios aún')
+    expect(wrapper.text()).toContain('Sin grupos musculares aún')
     const buttons = wrapper.findAll('[data-testid="open-create-group-btn"]')
     expect(buttons).toHaveLength(1)
 
@@ -734,7 +765,7 @@ describe('MuscleGroupManager', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid^="muscle-group-row-"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Sin grupos musculares propios aún')
+    expect(wrapper.text()).not.toContain('Sin grupos musculares aún')
 
     resolveGroups([
       { id: 2, slug: 'gemelo', name_es: 'Gemelo', name_en: 'Calf', owner_id: 7 },

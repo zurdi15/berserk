@@ -432,7 +432,7 @@ describe('RoutineList', () => {
     expect(wrapper.text()).toContain('Sin rutinas aún')
   })
 
-  describe('W2 feature 2: templates section', () => {
+  describe('UNIFIED-LISTINGS: templates (global + others\' public) live in the same list', () => {
     async function buildReady() {
       const wrapper = build()
       await wrapper.vm.$nextTick()
@@ -440,25 +440,6 @@ describe('RoutineList', () => {
       await wrapper.vm.$nextTick()
       return wrapper
     }
-
-    it('shows the empty-templates message when there are none', async () => {
-      const wrapper = await buildReady()
-
-      const section = wrapper.get('[data-testid="templates-section"]')
-      expect(section.text()).toContain('Sin plantillas disponibles')
-    })
-
-    // item 1: la confusión real de zurdi era "¿qué es rutina y qué es
-    // plantilla?" — la sección ahora se explica con un subtítulo
-    it('item 1: the templates section explains itself with a subtitle under the title', async () => {
-      const wrapper = await buildReady()
-
-      const section = wrapper.get('[data-testid="templates-section"]')
-      expect(section.text()).toContain('Plantillas')
-      expect(section.get('[data-testid="templates-hint"]').text()).toBe(
-        'Rutinas globales y las que otros usuarios han hecho públicas — cópialas a tu lista.',
-      )
-    })
 
     // item 2 (v0.4.0 — ROOT CAUSE del bug de visibilidad "ni tampoco
     // ejercicios"): una plantilla pública puede referenciar un ejercicio que
@@ -493,7 +474,7 @@ describe('RoutineList', () => {
       expect(list.text()).not.toBe('') // nunca una fila muda, sin explicación
     })
 
-    it('renders a GLOBAL template (owner_username null) with the "Global" attribution badge, and a public template from another user with a username hint', async () => {
+    it('renders a GLOBAL template (owner_username null) with the "Global" attribution chip, and a public template from another user via BkUser', async () => {
       const { listRoutineTemplates } = await import('@/api/domain')
       vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
         {
@@ -508,11 +489,65 @@ describe('RoutineList', () => {
 
       const wrapper = await buildReady()
 
-      const section = wrapper.get('[data-testid="templates-section"]')
-      expect(section.text()).toContain('Plantilla admin')
-      expect(section.get('[data-testid="template-attribution-10"]').text()).toBe('Global')
-      expect(section.text()).toContain('Rutina de Freyja')
-      expect(section.get('[data-testid="template-attribution-11"]').text()).toContain('freyja')
+      expect(wrapper.text()).toContain('Plantilla admin')
+      expect(wrapper.get('[data-testid="template-attribution-10"]').text()).toBe('Global')
+      expect(wrapper.text()).toContain('Rutina de Freyja')
+      // UNIFIED-LISTINGS: la atribución de "de otro usuario" es la primitiva
+      // BkUser (dot + nombre), no un texto suelto de "sharedBy"
+      const otherAttribution = wrapper.get('[data-testid="template-attribution-11"]')
+      expect(otherAttribution.text()).toContain('freyja')
+      expect(otherAttribution.findComponent({ name: 'BkUser' }).exists()).toBe(true)
+    })
+
+    it('UNIFIED-LISTINGS: own routines never carry a creator label (no attribution element on own cards)', async () => {
+      const wrapper = await buildReady()
+
+      expect(wrapper.find('[data-testid="template-attribution-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="template-attribution-2"]').exists()).toBe(false)
+    })
+
+    it('UNIFIED-LISTINGS: global and others\' public templates expose only the copy action (no edit, delete, visibility toggle or globalize control)', async () => {
+      const { listRoutineTemplates } = await import('@/api/domain')
+      vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
+        {
+          id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
+          is_public: false, owner_username: null, exercises: [],
+        },
+        {
+          id: 11, owner_id: 9, name: 'Rutina de Freyja', description: null, rune: null, color: null,
+          is_public: true, owner_username: 'freyja', exercises: [],
+        },
+      ] as never)
+
+      const wrapper = await buildReady()
+
+      for (const id of [10, 11]) {
+        expect(wrapper.find(`[data-testid="edit-routine-${id}"]`).exists()).toBe(false)
+        expect(wrapper.find(`[data-testid="delete-routine-${id}"]`).exists()).toBe(false)
+        expect(wrapper.find(`[data-testid="toggle-public-routine-${id}"]`).exists()).toBe(false)
+        expect(wrapper.find(`[data-testid="globalize-routine-${id}"]`).exists()).toBe(false)
+        expect(wrapper.find(`[data-testid="copy-template-${id}"]`).exists()).toBe(true)
+      }
+    })
+
+    it('UNIFIED-LISTINGS: sorts the merged list mine first, then global templates, then others\' public templates', async () => {
+      const { listRoutineTemplates } = await import('@/api/domain')
+      vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
+        {
+          id: 11, owner_id: 9, name: 'Rutina de Freyja', description: null, rune: null, color: null,
+          is_public: true, owner_username: 'freyja', exercises: [],
+        },
+        {
+          id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
+          is_public: false, owner_username: null, exercises: [],
+        },
+      ] as never)
+
+      const wrapper = await buildReady()
+
+      // fixture por defecto de listRoutines: 'Push Day' (1), 'Pull Day' (2)
+      const names = wrapper.findAll('h3').map((h) => h.text())
+      expect(names).toEqual(['Push Day', 'Pull Day', 'Plantilla admin', 'Rutina de Freyja'])
     })
 
     it('clicking the copy button copies the template and reloads the lists', async () => {
@@ -574,6 +609,32 @@ describe('RoutineList', () => {
       const list = wrapper.get('[data-testid="exercise-list-template-10"]')
       expect(list.text()).toContain('Press de banca')
       expect(list.text()).toContain('4×8')
+    })
+
+    it('UNIFIED-LISTINGS: with no own routines but templates present, the list still renders (no BkEmpty)', async () => {
+      const { listRoutines, listRoutineTemplates } = await import('@/api/domain')
+      vi.mocked(listRoutines).mockResolvedValueOnce([])
+      vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
+        {
+          id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
+          is_public: false, owner_username: null, exercises: [],
+        },
+      ] as never)
+
+      const wrapper = await buildReady()
+
+      expect(wrapper.text()).not.toContain('Sin rutinas aún')
+      expect(wrapper.text()).toContain('Plantilla admin')
+    })
+
+    it('UNIFIED-LISTINGS: the single BkEmpty only appears when BOTH own routines and templates are empty', async () => {
+      const { listRoutines, listRoutineTemplates } = await import('@/api/domain')
+      vi.mocked(listRoutines).mockResolvedValueOnce([])
+      vi.mocked(listRoutineTemplates).mockResolvedValueOnce([])
+
+      const wrapper = await buildReady()
+
+      expect(wrapper.text()).toContain('Sin rutinas aún')
     })
   })
 

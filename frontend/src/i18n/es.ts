@@ -85,9 +85,6 @@ export const es = {
     apply: 'Aplicar',
     hours: 'Horas',
     minutes: 'Minutos',
-    // W2: hint de atribución compartido entre el catálogo-ish de
-    // ExerciseManager y la sección Plantillas de RoutineList
-    sharedBy: 'de {username}',
   },
   athlete: {
     viewing: 'Viendo a {name}',
@@ -186,12 +183,8 @@ export const es = {
     noExercisesInRoutine: 'Sin ejercicios en esta rutina aún',
     nameRequired: 'El nombre de la rutina es obligatorio',
     confirm: 'Confirmar',
-    // W2 feature 2: sección Plantillas (globales + públicas de otros).
-    // item 1 (v0.4.0): subtítulo que explica qué es esta sección — la
-    // confusión real de zurdi fue "¿qué es rutina y qué es plantilla?"
-    templates: 'Plantillas',
-    templatesHint: 'Rutinas globales y las que otros usuarios han hecho públicas — cópialas a tu lista.',
-    noTemplates: 'Sin plantillas disponibles',
+    // UNIFIED-LISTINGS: mías + globales + públicas de otros viven todas en
+    // UNA lista (RoutineList) — el chip de atribución para lo que no es mío
     globalTemplate: 'Global',
     // toggle en la propia tarjeta (el editor está fuera de este carril).
     // item 1 (v0.4.0): antes "Visible para todos" no dejaba claro QUÉ pasaba
@@ -230,10 +223,14 @@ export const es = {
     // W2 feature 1: check de "globales" en un ejercicio PROPIO (checkbox de
     // crear/editar) — distinto de isGlobal (catálogo admin, solo visible ahí)
     isPublic: 'Visible para todos',
-    noExercises: 'Sin ejercicios propios aún',
-    noGroups: 'Sin grupos musculares propios aún',
+    // UNIFIED-LISTINGS: mensaje de vacío de la lista UNIFICADA (míos +
+    // catálogo + públicos de otros / míos + globales) — ya no "propios",
+    // porque ahora cubre toda la lista, no solo lo mío
+    noExercises: 'Sin ejercicios aún',
+    noGroups: 'Sin grupos musculares aún',
+    // UNIFIED-LISTINGS: también el texto del chip de atribución por fila
+    // del catálogo predefinido (antes era el título de su sección, colapsable)
     catalog: 'Catálogo predefinido',
-    noCatalog: 'Sin ejercicios en el catálogo',
     rune: 'Runa',
     confirmDeleteExercise: 'Borrar ejercicio',
     confirmDeleteExerciseMessage: '¿Estás seguro de que quieres borrar este ejercicio?',
