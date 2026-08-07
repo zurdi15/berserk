@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.9.1 - 2026-08-07
+
+- Supersets: the block header now opens an edit sheet — swap either exercise for another (it takes the same slot and stays linked, with a warning if it had logged sets) or dissolve the group.
+- The rest control shows only on the last exercise of a superset: rest belongs to the round, not to every member.
+
 ## 0.9.0 - 2026-08-07
 
 - Swipe left or right anywhere to move between sections (Today, Calendar, Workout, Progress, Profile) — horizontal-scrolling areas and the chart keep their own gestures.
