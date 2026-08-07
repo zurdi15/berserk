@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -17,6 +17,11 @@ import MuscleGroupManager from '@/components/library/MuscleGroupManager.vue'
 import { useAuthStore } from '@/stores/auth'
 
 type ProfileTab = 'profile' | 'routines' | 'library' | 'admin'
+// item 5 (v0.4.2): sub-selector DENTRO del panel Biblioteca — no anclado al
+// hash (a diferencia de activeTab): el hash solo distingue PANELES de
+// perfil, no el estado de un widget dentro de uno. #library sigue llegando
+// siempre al mismo sitio, con Ejercicios por defecto.
+type LibrarySection = 'exercises' | 'muscleGroups'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -30,6 +35,14 @@ function validProfileTabs(): ProfileTab[] {
 }
 
 const activeTab = useTabHash<ProfileTab>('profile', validProfileTabs)
+
+// item 5: mini BkTabs, mismo idioma que el filtro de kind de récords (ver
+// PrList) — un toggle de qué manager se ve, no una sección nueva
+const librarySection = ref<LibrarySection>('exercises')
+const librarySectionTabs = computed(() => [
+  { value: 'exercises', label: t('library.exercises') },
+  { value: 'muscleGroups', label: t('library.muscleGroups') },
+])
 
 // Compute tabs based on user role
 const tabs = computed(() => {
@@ -87,10 +100,24 @@ async function handleLogout() {
     </Transition>
 
     <!-- item 10: sin título "Biblioteca" (la pestaña de Perfil ya lo dice,
-         mismo tratamiento que Rutinas) -->
+         mismo tratamiento que Rutinas). item 5 (v0.4.2): layout de pestañas
+         de récords — mini selector Ejercicios/Grupos musculares en vez de
+         los dos managers apilados, uno visible a la vez. AMBOS managers se
+         montan juntos al entrar al panel (como antes) — solo el visible se
+         alterna con v-show, nunca v-if: así el flip del selector es un
+         cambio de DATO (qué manager mirar), no de sección, y no repite la
+         animación de entrada ni relanza la carga/gating propia de cada
+         manager (mismo idioma que el filtro de kind de récords, ver
+         PrList.vue). El gating de "primer montaje" de cada manager (su
+         propio ready/skeleton) no cambia: solo pasa una vez, al entrar aquí. -->
     <div v-if="activeTab === 'library'" class="space-y-4 bk-stagger">
-      <div :style="{ '--bk-stagger-i': 0 }"><ExerciseManager /></div>
-      <div :style="{ '--bk-stagger-i': 1 }"><MuscleGroupManager /></div>
+      <div :style="{ '--bk-stagger-i': 0 }">
+        <BkTabs data-testid="library-section-tabs" v-model="librarySection" :tabs="librarySectionTabs" />
+      </div>
+      <div :style="{ '--bk-stagger-i': 1 }">
+        <div v-show="librarySection === 'exercises'"><ExerciseManager /></div>
+        <div v-show="librarySection === 'muscleGroups'"><MuscleGroupManager /></div>
+      </div>
     </div>
 
     <Transition name="bk-rise" appear>
