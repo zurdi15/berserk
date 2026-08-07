@@ -18,6 +18,13 @@ import BkEmpty from '@/lib/BkEmpty.vue'
 import type { RuneName } from '@/lib/runes'
 import GroupRunePicker from './GroupRunePicker.vue'
 
+// v0.9.2 (zurdi: "card dentro de drawer con el título repetido en ambos no
+// está bien"): frameless — el host (el sheet de biblioteca, ver ProfileView)
+// ya aporta superficie y título, así que el manager pinta su contenido a
+// pelo, sin BkCard ni título propio. El modo con card sigue siendo el
+// default por si el manager vuelve a vivir en una página algún día.
+withDefaults(defineProps<{ frameless?: boolean }>(), { frameless: false })
+
 const { t } = useI18n()
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -185,7 +192,10 @@ async function confirmDelete() {
 
 <template>
   <div class="space-y-4">
-    <BkCard :title="$t('library.muscleGroups')">
+    <component
+      :is="frameless ? 'div' : BkCard"
+      v-bind="frameless ? {} : { title: $t('library.muscleGroups') }"
+    >
       <div class="space-y-4">
         <!-- item 2/3 (v0.4.3, zurdi): esqueleto shimmer mientras carga, mismo
              hueco que las filas reales — reemplaza el gate a blanco
@@ -270,7 +280,7 @@ async function confirmDelete() {
           </BkButton>
         </div>
       </div>
-    </BkCard>
+    </component>
 
     <BkSheet
       :open="createGroupOpen"

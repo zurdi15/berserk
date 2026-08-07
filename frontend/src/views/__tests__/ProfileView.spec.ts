@@ -448,7 +448,7 @@ describe('ProfileView', () => {
       expect(wrapper.get('[data-testid="new-exercise-btn"]').isVisible()).toBe(true)
       expect(wrapper.findComponent({ name: 'ExerciseManager' }).exists()).toBe(true)
       expect(wrapper.findComponent({ name: 'MuscleGroupManager' }).exists()).toBe(false)
-      expect(wrapper.get('[data-testid="open-muscle-groups-btn"]').text()).toBe('Grupos musculares')
+      expect(wrapper.get('[data-testid="open-muscle-groups-btn"]').text()).toBe('Ver grupos musculares')
     })
 
     it('the muscle-groups button opens a sheet mounting MuscleGroupManager fresh', async () => {

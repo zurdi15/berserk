@@ -222,6 +222,7 @@ export const es = {
   library: {
     exercises: 'Ejercicios',
     muscleGroups: 'Grupos musculares',
+    viewMuscleGroups: 'Ver grupos musculares',
     newExercise: 'Nuevo ejercicio',
     newGroup: 'Nuevo grupo',
     nameEs: 'Nombre (ES)',

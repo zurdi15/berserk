@@ -132,20 +132,24 @@ async function handleLogout() {
          propio skeleton, y sus drawers internos de crear/editar apilan
          sobre este sheet vía layerStack (Escape cierra el de arriba). -->
     <div v-if="activeTab === 'library'" class="space-y-3 bk-stagger">
-      <div class="flex justify-end" :style="{ '--bk-stagger-i': 0 }">
+      <!-- v0.9.2 (zurdi): botón block de lado a lado, "Ver grupos musculares" -->
+      <div :style="{ '--bk-stagger-i': 0 }">
         <BkButton
           variant="ghost"
-          size="sm"
+          block
           data-testid="open-muscle-groups-btn"
           @click="groupsSheetOpen = true"
         >
-          {{ $t('library.muscleGroups') }}
+          {{ $t('library.viewMuscleGroups') }}
         </BkButton>
       </div>
       <div :style="{ '--bk-stagger-i': 1 }"><ExerciseManager /></div>
+      <!-- v0.9.2 (zurdi): sin card dentro del drawer — el título lo pone el
+           drawer y el manager pinta lista + botón de nuevo grupo a pelo
+           (frameless) -->
       <BkSheet :open="groupsSheetOpen" :title="$t('library.muscleGroups')" @close="groupsSheetOpen = false">
         <div v-if="groupsSheetOpen" class="p-4">
-          <MuscleGroupManager />
+          <MuscleGroupManager frameless />
         </div>
       </BkSheet>
     </div>

@@ -106,7 +106,16 @@ export const core = {
     inout: 'cubic-bezier(0.45, 0, 0.55, 1)',
     linear: 'linear',
   },
-  z: { nav: '40', sheet: '50', toast: '60', timer: '70' },
+  // noise: la capa de niebla global (body::before) vive POR ENCIMA de todo,
+  // siempre — v0.9.2 (bug real de zurdi: "la animación de entrada y después
+  // las cards se pintan con otro color"): una animación de opacity/transform
+  // convierte al elemento en stacking context y lo pintaba ENCIMA de la
+  // niebla mientras animaba; al terminar volvía a pintarse debajo — ese
+  // salto de grano era el "cambio de color". Con la niebla en el techo del
+  // eje z (pointer-events none, 2% de opacidad) la relación es CONSTANTE
+  // durante y después de cualquier animación, para todo (cards, sheets,
+  // toasts) — y bk-chrome-bg dejó de necesitar su réplica del grano.
+  z: { nav: '40', sheet: '50', toast: '60', timer: '70', noise: '90' },
   shadow: {
     aurora: '0 0 20px var(--bk-aurora-glow)',
     ember: '0 0 24px var(--bk-ember-glow)',

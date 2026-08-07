@@ -111,38 +111,31 @@ html {
   --bk-noise-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* v0.9.2 (bug real de zurdi: "primero la animación de entrada y después las
+   cards se pintan con otro color"): z-index en el TECHO del eje — sin él, la
+   niebla (fixed, z auto) pintaba por debajo de cualquier elemento que
+   estuviera ANIMANDO opacity/transform (una animación crea stacking context)
+   y por encima al terminar: ese salto de grano al acabar la entrada era el
+   "cambio de color" en las cards de todas las secciones. Con la niebla
+   siempre arriba (pointer-events none, 2%), la relación es constante para
+   todo — cards, sheets, toasts — animando o en reposo. */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
+  z-index: var(--bk-z-noise);
   opacity: var(--bk-noise-opacity);
   background-image: var(--bk-noise-image);
 }
 
-/* v0.7.0 (bug real de zurdi: "en los elementos que se quedan fijos, como las
-   tabs o el timer del header, el background tiene otro color y se ve feo"):
-   la niebla de body::before es una capa fija SIN z-index — pinta por encima
-   del contenido normal pero por DEBAJO de cualquier cosa posicionada con
-   z-index, y el chrome sticky del modelo de scroll (v0.5.0) lleva z-10 para
-   que el contenido pase por debajo. Resultado: las bandas sticky eran void
-   PURO junto a una página que es void+grano — se leía como "otro color".
-   Fix: el chrome sticky usa esta clase en vez de bg-void a secas — mismo
-   fondo Y su propia réplica del grano encima (::after con la MISMA imagen y
-   opacidad que la niebla global), así la banda es indistinguible del fondo
-   que tapa. El ::after pinta también sobre los hijos de la banda (tabs),
-   exactamente igual que la niebla global pintaba sobre ellos cuando eran
-   flujo normal pre-v0.5.0. */
+/* v0.7.0 (bug de zurdi: las bandas sticky con z-10 quedaban fuera de la
+   niebla y se leían como "otro color") — originalmente esta clase replicaba
+   el grano en un ::after propio; v0.9.2: la niebla global vive ahora en el
+   TECHO del eje z (ver body::before), así que cubre también las bandas y la
+   réplica murió. La clase queda como el fondo canónico del chrome sticky. */
 .bk-chrome-bg {
   background: var(--bk-bg-void);
-}
-.bk-chrome-bg::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: var(--bk-noise-opacity);
-  background-image: var(--bk-noise-image);
 }
 
 /* losa tallada: borde fino y brillo interior superior, sin sombras blandas.

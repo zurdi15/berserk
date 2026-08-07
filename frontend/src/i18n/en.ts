@@ -220,6 +220,7 @@ export const en = {
   library: {
     exercises: 'Exercises',
     muscleGroups: 'Muscle groups',
+    viewMuscleGroups: 'View muscle groups',
     newExercise: 'New exercise',
     newGroup: 'New group',
     nameEs: 'Name (ES)',
