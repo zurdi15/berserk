@@ -231,6 +231,101 @@ def test_retro_workout_creates_finished_with_synthetic_timestamps(client: TestCl
     assert workout["started_at"] == workout["ended_at"] == "2026-07-20T12:00:00"
 
 
+def retro_workout(client: TestClient, date: str = "2026-07-20") -> dict:
+    return client.post("/api/v1/workouts", json={"date": date, "finished": True}).json()
+
+
+# item 5 (post-0.3.0): timing editable de un entreno retroactivo — 8A lo crea
+# con started_at == ended_at (duración 0), lo que sesgaba las stats de tiempo
+# de gym; zurdi quiere poder corregirlo desde el editor.
+def test_patch_duration_minutes_moves_ended_at(client: TestClient):
+    workout = retro_workout(client)
+    resp = client.patch(f"/api/v1/workouts/{workout['id']}", json={"duration_minutes": 45})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["started_at"] == "2026-07-20T12:00:00"
+    assert body["ended_at"] == "2026-07-20T12:45:00"
+
+
+def test_patch_started_time_sets_started_at_on_the_workout_date(client: TestClient):
+    workout = retro_workout(client)
+    resp = client.patch(f"/api/v1/workouts/{workout['id']}", json={"started_time": "07:15:00"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["started_at"] == "2026-07-20T07:15:00"
+    # duración preservada (era 0 == started==ended): sin esto, mover solo la
+    # hora de inicio dejaría ended_at ANTES que el nuevo started_at
+    assert body["ended_at"] == "2026-07-20T07:15:00"
+
+
+def test_patch_started_time_preserves_a_nonzero_existing_duration(client: TestClient):
+    workout = retro_workout(client)
+    client.patch(f"/api/v1/workouts/{workout['id']}", json={"duration_minutes": 30})
+    resp = client.patch(f"/api/v1/workouts/{workout['id']}", json={"started_time": "07:00:00"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["started_at"] == "2026-07-20T07:00:00"
+    # la duración de 30 min ya fijada se conserva al desplazar started_at
+    assert body["ended_at"] == "2026-07-20T07:30:00"
+
+
+def test_patch_date_rebases_existing_started_and_ended_at_preserving_time_of_day_and_duration(
+    client: TestClient,
+):
+    # fix del hueco de round 10: cambiar la fecha de un entreno retroactivo
+    # dejaba started_at/ended_at en el día viejo
+    workout = retro_workout(client)
+    client.patch(f"/api/v1/workouts/{workout['id']}", json={"started_time": "18:00:00", "duration_minutes": 50})
+
+    resp = client.patch(f"/api/v1/workouts/{workout['id']}", json={"date": "2026-07-25"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["date"] == "2026-07-25"
+    # misma hora-del-día (18:00) y misma duración (50 min), solo el día cambia
+    assert body["started_at"] == "2026-07-25T18:00:00"
+    assert body["ended_at"] == "2026-07-25T18:50:00"
+
+
+def test_patch_date_started_time_and_duration_together_compose_in_order(client: TestClient):
+    # orden documentado: fecha -> started_time -> duration_minutes, todo en
+    # el MISMO patch — cada paso parte del resultado del anterior
+    workout = retro_workout(client)
+    resp = client.patch(
+        f"/api/v1/workouts/{workout['id']}",
+        json={"date": "2026-07-25", "started_time": "06:30:00", "duration_minutes": 20},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["date"] == "2026-07-25"
+    assert body["started_at"] == "2026-07-25T06:30:00"
+    assert body["ended_at"] == "2026-07-25T06:50:00"
+
+
+def test_patch_timing_rejected_on_an_active_not_yet_finished_workout(client: TestClient):
+    active = client.post("/api/v1/workouts", json={}).json()
+
+    resp = client.patch(f"/api/v1/workouts/{active['id']}", json={"duration_minutes": 30})
+    assert resp.status_code == 409 and resp.json()["detail"] == "workout_not_finished"
+
+    resp = client.patch(f"/api/v1/workouts/{active['id']}", json={"started_time": "08:00:00"})
+    assert resp.status_code == 409 and resp.json()["detail"] == "workout_not_finished"
+
+    # el resto de campos del mismo patch (note/feeling/stretched) siguen
+    # funcionando con normalidad en un entreno activo
+    resp = client.patch(f"/api/v1/workouts/{active['id']}", json={"note": "vivo"})
+    assert resp.status_code == 200 and resp.json()["note"] == "vivo"
+
+
+def test_patch_duration_minutes_out_of_range_is_rejected(client: TestClient):
+    workout = retro_workout(client)
+    assert client.patch(
+        f"/api/v1/workouts/{workout['id']}", json={"duration_minutes": -1}
+    ).status_code == 422
+    assert client.patch(
+        f"/api/v1/workouts/{workout['id']}", json={"duration_minutes": 601}
+    ).status_code == 422
+
+
 def test_retro_workout_works_while_another_workout_is_active(client: TestClient):
     active = client.post("/api/v1/workouts", json={}).json()
 

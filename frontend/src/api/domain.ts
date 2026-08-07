@@ -366,6 +366,12 @@ export const updateWorkout = (id: number, body: {
   note?: string | null
   feeling?: number | null
   stretched?: boolean
+  // item 5 (post-0.3.0): timing editable de un entreno retroactivo — solo
+  // aplica sobre uno YA CERRADO (backend: 409 workout_not_finished si no lo
+  // está). started_time es "HH:MM" (nunca null: no tiene semántica de
+  // "borrar la hora de inicio", ver WorkoutEditView.vue)
+  started_time?: string
+  duration_minutes?: number
 }) =>
   api<WorkoutOut>(`/workouts/${id}`, { method: 'PATCH', body })
 

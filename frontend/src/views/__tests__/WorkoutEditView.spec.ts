@@ -222,6 +222,106 @@ describe('WorkoutEditView', () => {
     expect(domain.updateWorkout).toHaveBeenCalledWith(4, { date: '2026-07-25' })
   })
 
+  describe('item 5 (post-0.3.0): editable retro timing', () => {
+    it('shows the start-time/duration row and the derived range for a FINISHED workout (TZ Europe/Madrid, CEST: 12:00 UTC displays as 14:00 local)', async () => {
+      wrapper = build()
+      await flushPromises()
+
+      const timeTrigger = wrapper.findAll('[role="combobox"]')[1]
+      expect(timeTrigger.text()).toContain('14:00')
+      const range = wrapper.get('[data-testid="workout-time-range"]')
+      expect(range.text()).toBe('14:00 → 14:00')
+    })
+
+    it('hides the timing row entirely for a workout that is not finished yet (defensive: this editor never actually sees one)', async () => {
+      vi.mocked(domain.getWorkout).mockResolvedValue({ ...workoutFixture, ended_at: null } as never)
+
+      wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.findAll('[role="combobox"]')).toHaveLength(1) // solo la fecha
+      expect(wrapper.find('[data-testid="workout-time-range"]').exists()).toBe(false)
+    })
+
+    it('picking a new start time (DOM-real) sends the UTC-converted started_time to workoutEditor.patch', async () => {
+      // Madrid en julio es CEST (UTC+2): elegir "09:00" local sin cruzar
+      // medianoche debe mandar "07:00" UTC, sin tocar la fecha
+      vi.mocked(domain.updateWorkout).mockResolvedValue(
+        { ...workoutFixture, started_at: '2026-07-20T07:00:00' } as never,
+      )
+
+      wrapper = build()
+      await flushPromises()
+
+      const timeTrigger = wrapper.findAll('[role="combobox"]')[1]
+      await timeTrigger.trigger('click')
+      await flushPromises()
+
+      const [hourList, minuteList] = document.querySelectorAll('[role="listbox"]')
+      const hour09 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '09')!
+      const minute00 = Array.from(minuteList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '00')!
+      hour09.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      minute00.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      const applyBtn = document.querySelector('[data-testid="time-field-apply"]') as HTMLElement
+      applyBtn.click()
+      await flushPromises()
+
+      expect(domain.updateWorkout).toHaveBeenCalledWith(4, { started_time: '07:00' })
+    })
+
+    it('picking a start time that crosses midnight in UTC also sends the corrected date in the same patch', async () => {
+      // "01:00" local (CEST +2) el 2026-07-20 es "2026-07-19T23:00" UTC —
+      // un día antes: el patch debe llevar TAMBIÉN esa fecha corregida
+      vi.mocked(domain.updateWorkout).mockResolvedValue(workoutFixture as never)
+
+      wrapper = build()
+      await flushPromises()
+
+      const timeTrigger = wrapper.findAll('[role="combobox"]')[1]
+      await timeTrigger.trigger('click')
+      await flushPromises()
+
+      const [hourList, minuteList] = document.querySelectorAll('[role="listbox"]')
+      const hour01 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '01')!
+      const minute00 = Array.from(minuteList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '00')!
+      hour01.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      minute00.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      const applyBtn = document.querySelector('[data-testid="time-field-apply"]') as HTMLElement
+      applyBtn.click()
+      await flushPromises()
+
+      expect(domain.updateWorkout).toHaveBeenCalledWith(4, { date: '2026-07-19', started_time: '23:00' })
+    })
+
+    it('changing the duration stepper debounces and calls workoutEditor.patch with duration_minutes', async () => {
+      vi.useFakeTimers()
+      // este mock acumula llamadas de tests anteriores en el mismo archivo
+      // (no hay un mockClear() global en beforeEach) — se limpia aquí porque
+      // este es el único test que afirma "todavía NO se ha llamado"
+      vi.mocked(domain.updateWorkout).mockClear()
+      vi.mocked(domain.updateWorkout).mockResolvedValue(workoutFixture as never)
+
+      wrapper = build()
+      await flushPromises()
+
+      // stepper compacto de duración: segundo par de botones -/+ del bloque
+      // (el primero es el de horas del BkTimeField)
+      const stepperButtons = document.body.querySelectorAll('[aria-label="Aumentar"]')
+      const durationPlus = stepperButtons[stepperButtons.length - 1] as HTMLElement
+      durationPlus.dispatchEvent(new PointerEvent('pointerdown'))
+      durationPlus.dispatchEvent(new PointerEvent('pointerup'))
+      await flushPromises()
+
+      expect(domain.updateWorkout).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(600)
+
+      expect(domain.updateWorkout).toHaveBeenCalledWith(4, { duration_minutes: 5 })
+
+      vi.useRealTimers()
+    })
+  })
+
   it('redirects to the calendar and toasts when the workout fails to load (e.g. not found)', async () => {
     vi.mocked(domain.getWorkout).mockRejectedValueOnce(new Error('not_found'))
 

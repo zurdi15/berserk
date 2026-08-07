@@ -6,6 +6,8 @@ import { useRoute, useRouter } from 'vue-router'
 import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut } from '@/api/domain'
 import { listExercises, listMuscleGroups } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
+import { formatDateTimeShort, isoDate } from '@/utils/dates'
+import { parseUtc } from '@/utils/datetime'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useWorkoutEditorStore } from '@/stores/workoutEditor'
@@ -17,6 +19,8 @@ import BkButton from '@/lib/BkButton.vue'
 import BkDateField from '@/lib/BkDateField.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
+import BkStepper from '@/lib/BkStepper.vue'
+import BkTimeField from '@/lib/BkTimeField.vue'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -43,6 +47,65 @@ const exerciseIds = computed(() => workoutEditor.workout?.exercises.map((e) => e
 const dateModel = computed({
   get: () => workoutEditor.workout?.date ?? '',
   set: (value: string) => patchDate(value),
+})
+
+// item 5 (post-0.3.0): timing editable de un entreno retroactivo — 8A lo
+// crea con started_at == ended_at (duración 0), lo que sesgaba las stats de
+// tiempo de gym. Solo aplica sobre un entreno YA CERRADO (el backend
+// devuelve 409 workout_not_finished si no lo está; este editor SIEMPRE
+// trabaja sobre entrenos cerrados, pero se guarda igual por si acaso).
+const finished = computed(() => workoutEditor.workout?.ended_at != null)
+
+// se lee con el MISMO pipeline (parseUtc + hora local) que el resto de la
+// app muestra started_at (ver WorkoutDayInfo.vue, round 10) — así el campo
+// de edición y la tarjeta del calendario siempre coinciden en lo que enseñan
+const startTimeModel = computed({
+  get: () => (workoutEditor.workout?.started_at ? formatDateTimeShort(workoutEditor.workout.started_at) : null),
+  set: (value: string | null) => { if (value) patchStartedTime(value) },
+})
+
+// convierte la hora LOCAL elegida (lo que el usuario ve/escribe) a la hora
+// UTC que el backend combina de forma naive con workout.date (mismo criterio
+// que start_workout: ver update_workout en el backend). Si la conversión
+// cruza medianoche, la fecha UTC resultante ya no es workout.date — se
+// manda esa fecha corregida en el MISMO patch (el backend ya sabe componer
+// fecha+hora en un solo request, ver el orden documentado ahí).
+function localTimeToUtcPatch(dateIso: string, hhmm: string): { date?: string; started_time: string } {
+  const [y, m, d] = dateIso.split('-').map(Number)
+  const [h, min] = hhmm.split(':').map(Number)
+  const local = new Date(y, m - 1, d, h, min)
+  const utcDate = isoDate(new Date(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()))
+  const utcTime = `${String(local.getUTCHours()).padStart(2, '0')}:${String(local.getUTCMinutes()).padStart(2, '0')}`
+  return utcDate === dateIso ? { started_time: utcTime } : { date: utcDate, started_time: utcTime }
+}
+
+async function patchStartedTime(hhmm: string) {
+  if (!workoutEditor.workout) return
+  try {
+    await workoutEditor.patch(localTimeToUtcPatch(workoutEditor.workout.date, hhmm))
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
+// minutos: no lleva conversión de huso (es una duración, no un instante
+// absoluto) — solo started_at/ended_at (parseUtc) para calcularla
+const durationMinutes = ref(0)
+
+async function patchDuration(minutes: number) {
+  try {
+    await workoutEditor.patch({ duration_minutes: minutes })
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
+// mismo patrón de debounce que la nota de abajo: evita un request por click
+// del stepper (repite cada 140ms mientras se mantiene pulsado)
+let durationTimeout: ReturnType<typeof setTimeout> | null = null
+watch(durationMinutes, (value) => {
+  if (durationTimeout) clearTimeout(durationTimeout)
+  durationTimeout = setTimeout(() => patchDuration(value), 600)
 })
 
 async function loadCatalog() {
@@ -130,6 +193,13 @@ async function loadWorkout() {
   try {
     await workoutEditor.load(id)
     note.value = workoutEditor.workout?.note || ''
+    const w = workoutEditor.workout
+    if (w?.started_at && w?.ended_at) {
+      durationMinutes.value = Math.max(
+        0,
+        Math.round((parseUtc(w.ended_at).getTime() - parseUtc(w.started_at).getTime()) / 60000),
+      )
+    }
   } catch (error) {
     toastApiError(error)
     router.push({ name: 'calendar' })
@@ -171,8 +241,21 @@ onMounted(() => {
       </BkButton>
     </div>
 
-    <div class="bk-slab p-4" :style="{ '--bk-stagger-i': 1 }">
+    <div class="bk-slab p-4 space-y-3" :style="{ '--bk-stagger-i': 1 }">
       <BkDateField v-model="dateModel" :label="t('calendar.date')" />
+
+      <!-- item 5 (post-0.3.0): timing editable — 8A crea el retroactivo con
+           duración 0, esto deja corregirla desde aquí -->
+      <div v-if="finished" class="grid grid-cols-2 gap-3">
+        <BkTimeField v-model="startTimeModel" :label="t('workout.startTime')" />
+        <div class="min-w-0 flex flex-col items-center">
+          <span class="block text-xs text-ink-muted mb-2">{{ t('workout.durationMinutes') }}</span>
+          <BkStepper v-model="durationMinutes" size="compact" :step="5" :min="0" :max="600" suffix="min" />
+        </div>
+      </div>
+      <p v-if="finished && startTimeModel" class="text-sm text-ink-faint" data-testid="workout-time-range">
+        {{ startTimeModel }} → {{ formatDateTimeShort(workoutEditor.workout.ended_at) }}
+      </p>
     </div>
 
     <div v-if="derivedMuscleGroups.length" class="bk-slab p-4 space-y-2" :style="{ '--bk-stagger-i': 2 }">

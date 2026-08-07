@@ -1,5 +1,5 @@
 from datetime import date as date_type
-from datetime import datetime
+from datetime import datetime, time
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,13 @@ class WorkoutPatchIn(BaseModel):
     # item 8: bool "normal" (no anulable, sin semántica de "sin fijar" — un
     # PATCH sin este campo simplemente no lo toca, vía exclude_unset)
     stretched: bool | None = None
+    # item 5 (post-0.3.0): timing editable de un entreno retroactivo — 8A lo
+    # crea con started_at == ended_at (duración 0), lo que sesga las stats de
+    # tiempo de gym. Solo aplican sobre un entreno YA CERRADO (ver
+    # update_workout); started_time fija la hora de inicio sobre la fecha del
+    # entreno, duration_minutes recalcula ended_at desde ahí.
+    started_time: time | None = None
+    duration_minutes: int | None = Field(None, ge=0, le=600)
 
 
 class SetOut(BaseModel):

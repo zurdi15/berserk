@@ -77,7 +77,14 @@ export const useWorkoutEditorStore = defineStore('workoutEditor', () => {
     await refresh()
   }
 
-  async function patch(body: { date?: string; note?: string | null; feeling?: number | null; stretched?: boolean }) {
+  async function patch(body: {
+    date?: string
+    note?: string | null
+    feeling?: number | null
+    stretched?: boolean
+    started_time?: string
+    duration_minutes?: number
+  }) {
     workout.value = await domain.updateWorkout(workout.value!.id, body)
   }
 

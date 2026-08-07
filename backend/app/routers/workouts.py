@@ -1,5 +1,5 @@
 from datetime import date as date_type
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, select
@@ -209,6 +209,55 @@ def update_workout(
     # date no es anulable: un null explícito no debe machacarla
     if "date" in data and data["date"] is None:
         del data["date"]
+
+    started_time = data.pop("started_time", None)
+    duration_minutes = data.pop("duration_minutes", None)
+
+    # item 5 (post-0.3.0): el timing retroactivo solo tiene sentido sobre un
+    # entreno YA CERRADO (ended_at IS NOT NULL, mismo criterio que finish_workout
+    # usa para "activo"). Uno activo tiene su started_at/ended_at gobernados
+    # por el flujo en vivo (start_workout/finish_workout) — dejar que el editor
+    # retroactivo los pise a mitad de sesión rompería esa fuente de verdad. Se
+    # elige 409 explícito en vez de un no-op silencioso: el cliente necesita
+    # saber que el patch no se aplicó.
+    if (started_time is not None or duration_minutes is not None) and workout.ended_at is None:
+        raise HTTPException(status_code=409, detail="workout_not_finished")
+
+    # orden 1) fecha: si cambia, RE-BASA started_at/ended_at YA EXISTENTES a
+    # la nueva fecha conservando hora-del-día y duración — fix del hueco de
+    # round 10, donde cambiar la fecha dejaba los timestamps en el día viejo
+    if "date" in data:
+        new_date = data.pop("date")
+        if workout.started_at is not None:
+            old_started = workout.started_at
+            rebased_started = datetime.combine(new_date, old_started.time())
+            if workout.ended_at is not None:
+                duration = workout.ended_at - old_started
+                workout.ended_at = rebased_started + duration
+            workout.started_at = rebased_started
+        workout.date = new_date
+
+    # 2) started_time: fija la hora de inicio sobre el date ya resuelto
+    # arriba. Conserva la duración existente al desplazar started_at (si no
+    # se hiciera, un started_at==ended_at original — el placeholder de 8A —
+    # dejaría ended_at ANTES que el nuevo started_at, una duración negativa)
+    if started_time is not None:
+        old_started = workout.started_at
+        new_started = datetime.combine(workout.date, started_time)
+        if workout.ended_at is not None and old_started is not None:
+            duration = workout.ended_at - old_started
+            workout.ended_at = new_started + duration
+        workout.started_at = new_started
+
+    # 3) duration_minutes: recalcula ended_at desde el started_at YA resuelto
+    # arriba (tras un posible cambio de fecha/hora en los pasos previos), no
+    # el original — para que fecha+hora+duración en el mismo PATCH compongan
+    # coherentemente en vez de pisarse entre sí
+    if duration_minutes is not None:
+        if workout.started_at is None:
+            raise HTTPException(status_code=422, detail="started_at_required")
+        workout.ended_at = workout.started_at + timedelta(minutes=duration_minutes)
+
     for field, value in data.items():
         setattr(workout, field, value)
     db.commit()

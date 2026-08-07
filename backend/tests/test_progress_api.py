@@ -83,6 +83,25 @@ def test_stats(client: TestClient):
     assert result["avg_session_seconds"] == result["total_gym_seconds"] / 2
 
 
+# item 5 (post-0.3.0): 8A crea un entreno retroactivo con started_at==ended_at
+# (duración 0) — antes de corregirla desde el editor, un retroactivo no debe
+# aportar tiempo de gym; tras el patch de duration_minutes, sí
+def test_stats_reflect_a_retro_workout_duration_edited_after_the_fact(client: TestClient):
+    workout = client.post(
+        "/api/v1/workouts", json={"date": "2026-07-20", "finished": True}
+    ).json()
+
+    before = client.get("/api/v1/progress/stats").json()
+    assert before["total_workouts"] == 1
+    assert before["total_gym_seconds"] == 0
+
+    client.patch(f"/api/v1/workouts/{workout['id']}", json={"duration_minutes": 40})
+
+    after = client.get("/api/v1/progress/stats").json()
+    assert after["total_gym_seconds"] == 40 * 60
+    assert after["avg_session_seconds"] == 40 * 60
+
+
 def test_stats_respects_athlete_threading(client: TestClient, app):
     from tests.conftest import login, make_user
 
