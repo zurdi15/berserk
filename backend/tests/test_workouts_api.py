@@ -482,3 +482,57 @@ def test_manual_muscle_tags_endpoint_superseded_by_next_exercise_change(client: 
     client.post(f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": bench_id(client)})
     # el alta de un ejercicio de pecho reemplaza el tag manual de piernas
     assert client.get(f"/api/v1/workouts/{wid}").json()["muscle_tag_ids"] == [chest]
+
+
+# ── v0.5.0 superseries ──────────────────────────────────────────────────────
+
+
+def make_superset_routine(client) -> int:
+    """Rutina con bench+squat enlazados en superserie A (grupo 0)."""
+    rid = client.post("/api/v1/routines", json={"name": "Supers"}).json()["id"]
+    client.put(
+        f"/api/v1/routines/{rid}/exercises",
+        json=[
+            {"exercise_id": bench_id(client), "rest_seconds": 90, "superset_group": 0},
+            {"exercise_id": exercise_id(client, "Squat"), "superset_group": 0},
+        ],
+    )
+    return rid
+
+
+def test_superset_group_copied_from_routine_on_start(client: TestClient):
+    # mismo patrón de propagación que rest_seconds: empezar entreno desde la
+    # rutina copia el grouping al snapshot de WorkoutExercise
+    rid = make_superset_routine(client)
+    workout = client.post("/api/v1/workouts", json={"routine_id": rid}).json()
+    assert [e["superset_group"] for e in workout["exercises"]] == [0, 0]
+    client.post(f"/api/v1/workouts/{workout['id']}/finish")
+
+
+def test_superset_group_copied_on_retro_from_routine(client: TestClient):
+    # el camino retroactivo (finished=True) comparte el composado con el vivo
+    rid = make_superset_routine(client)
+    workout = client.post(
+        "/api/v1/workouts",
+        json={"date": "2026-07-20", "finished": True, "routine_id": rid},
+    ).json()
+    assert [e["superset_group"] for e in workout["exercises"]] == [0, 0]
+
+
+def test_superset_group_null_for_ad_hoc_exercises(client: TestClient):
+    """Un ejercicio añadido a mano SIEMPRE nace suelto — incluso si ese mismo
+    ejercicio estaba agrupado en la rutina de origen (a diferencia de
+    rest_seconds, que SÍ se hereda en ese caso): se añade al final, así que
+    la contigüidad con su grupo original no existe."""
+    rid = make_superset_routine(client)
+    workout = client.post("/api/v1/workouts", json={"routine_id": rid}).json()
+    wid = workout["id"]
+    weid = workout["exercises"][0]["id"]
+    client.delete(f"/api/v1/workouts/{wid}/exercises/{weid}")
+
+    added = client.post(
+        f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": bench_id(client)}
+    ).json()
+    assert added["rest_seconds"] == 90  # la herencia de descanso no cambia
+    assert added["superset_group"] is None
+    client.post(f"/api/v1/workouts/{wid}/finish")

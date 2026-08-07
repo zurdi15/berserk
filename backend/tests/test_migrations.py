@@ -72,3 +72,53 @@ def test_rune_column_downgrade_drops_it(tmp_path, monkeypatch):
     columns = {row[1] for row in conn.execute("PRAGMA table_info(muscle_groups)")}
     conn.close()
     assert "rune" not in columns
+
+
+# ── v0.5.0 superseries: 1162ad243925 añade superset_group (nullable) a
+# routine_exercises Y workout_exercises en una sola migración ──────────────
+
+# head justo antes de superset_group: esquema viejo, sin la columna en
+# ninguna de las dos tablas — igual que una instancia desplegada en v0.4.x
+PRE_SUPERSET_REVISION = "fbf6cb158a4e"
+
+
+def test_superset_group_migration_applies_over_existing_rows(tmp_path, monkeypatch):
+    cfg = backup_service._alembic_config()
+    settings = _migrate_to(cfg, tmp_path, PRE_SUPERSET_REVISION, monkeypatch)
+
+    # filas preexistentes con el esquema viejo (FKs sin enforcement en esta
+    # conexión sqlite3 cruda: solo interesa que la migración no rompa filas)
+    conn = sqlite3.connect(settings.db_path)
+    conn.execute(
+        "INSERT INTO routine_exercises (routine_id, exercise_id, position, target_sets)"
+        " VALUES (1, 1, 1, 3)"
+    )
+    conn.execute(
+        "INSERT INTO workout_exercises (workout_id, exercise_id, position) VALUES (1, 1, 1)"
+    )
+    conn.commit()
+    conn.close()
+
+    command.upgrade(cfg, "head")
+
+    conn = sqlite3.connect(settings.db_path)
+    for table in ("routine_exercises", "workout_exercises"):
+        columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        assert "superset_group" in columns
+    # sin backfill: todo lo preexistente queda suelto (NULL)
+    assert conn.execute("SELECT superset_group FROM routine_exercises").fetchone() == (None,)
+    assert conn.execute("SELECT superset_group FROM workout_exercises").fetchone() == (None,)
+    conn.close()
+
+
+def test_superset_group_downgrade_drops_both_columns(tmp_path, monkeypatch):
+    cfg = backup_service._alembic_config()
+    settings = _migrate_to(cfg, tmp_path, "head", monkeypatch)
+
+    command.downgrade(cfg, PRE_SUPERSET_REVISION)
+
+    conn = sqlite3.connect(settings.db_path)
+    for table in ("routine_exercises", "workout_exercises"):
+        columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        assert "superset_group" not in columns
+    conn.close()

@@ -356,3 +356,72 @@ def test_create_routine_without_is_global_defaults_to_global(client: TestClient,
     make_user(client, "freyja")
     freyja = login(app, "freyja")
     assert any(r["id"] == rid for r in freyja.get("/api/v1/routines/templates").json())
+
+
+# ── v0.5.0 superseries ──────────────────────────────────────────────────────
+# superset_group vive en RoutineExerciseIn/Out: índice de grupo normalizado
+# (0,1,2…) o null = suelto; la CONTIGÜIDAD por position es la que define el
+# grupo (el backend lo persiste tal cual, ver schemas/routines.py)
+
+
+def test_superset_group_roundtrip_and_default_null(client: TestClient):
+    rid = client.post("/api/v1/routines", json={"name": "Supers"}).json()["id"]
+    resp = client.put(
+        f"/api/v1/routines/{rid}/exercises",
+        json=[
+            {"exercise_id": bench_id(client), "superset_group": 0},
+            {"exercise_id": squat_id(client), "superset_group": 0},
+            {"exercise_id": bench_id(client)},  # sin el campo → suelto
+        ],
+    )
+    assert resp.status_code == 200
+    assert [e["superset_group"] for e in resp.json()["exercises"]] == [0, 0, None]
+
+    # GET redondo (no solo el eco del PUT): la columna persiste de verdad
+    fetched = client.get(f"/api/v1/routines/{rid}").json()
+    assert [e["superset_group"] for e in fetched["exercises"]] == [0, 0, None]
+
+
+def test_superset_group_rejects_negative(client: TestClient):
+    rid = client.post("/api/v1/routines", json={"name": "Supers"}).json()["id"]
+    resp = client.put(
+        f"/api/v1/routines/{rid}/exercises",
+        json=[{"exercise_id": bench_id(client), "superset_group": -1}],
+    )
+    assert resp.status_code == 422
+
+
+def test_copy_preserves_superset_groups(client: TestClient, app):
+    # duplicado de una plantilla ajena: el snapshot copia ejercicios EN ORDEN,
+    # así que grouping + contigüidad viajan intactos a la copia
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    rid = freyja.post(
+        "/api/v1/routines", json={"name": "Supers", "is_global": True}
+    ).json()["id"]
+    freyja.put(
+        f"/api/v1/routines/{rid}/exercises",
+        json=[
+            {"exercise_id": bench_id(client), "superset_group": 0},
+            {"exercise_id": squat_id(client), "superset_group": 0},
+            {"exercise_id": bench_id(client)},
+        ],
+    )
+
+    make_user(client, "loki")
+    loki = login(app, "loki")
+    copy = loki.post(f"/api/v1/routines/{rid}/copy").json()
+    assert [e["superset_group"] for e in copy["exercises"]] == [0, 0, None]
+
+
+def test_duplicate_own_routine_preserves_superset_groups(client: TestClient):
+    rid = client.post("/api/v1/routines", json={"name": "Supers"}).json()["id"]
+    client.put(
+        f"/api/v1/routines/{rid}/exercises",
+        json=[
+            {"exercise_id": bench_id(client), "superset_group": 0},
+            {"exercise_id": squat_id(client), "superset_group": 0},
+        ],
+    )
+    copy = client.post(f"/api/v1/routines/{rid}/copy").json()
+    assert [e["superset_group"] for e in copy["exercises"]] == [0, 0]
