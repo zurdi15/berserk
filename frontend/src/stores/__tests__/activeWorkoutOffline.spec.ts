@@ -143,6 +143,28 @@ describe('active workout store — offline branches', () => {
     expect(store.workout!.id).toBe(4)
   })
 
+  // v0.7.0: superseries editables mid-workout también sin red
+  it('setSupersetGroups offline: applies the grouping locally and queues the bulk entry', async () => {
+    const store = useActiveWorkoutStore()
+    const base = baseWorkout()
+    base.exercises.push({ id: 8, exercise_id: 2, position: 2, note: null, rest_seconds: null, superset_group: null, sets: [] })
+    store.workout = base
+
+    await store.setSupersetGroups([0, 0])
+
+    expect(store.workout!.exercises.map((e) => e.superset_group)).toEqual([0, 0])
+    expect(loadQueue()).toEqual([
+      expect.objectContaining({
+        kind: 'setSupersetGroups',
+        workoutId: 4,
+        groups: [
+          { exerciseId: 7, group: 0 },
+          { exerciseId: 8, group: 0 },
+        ],
+      }),
+    ])
+  })
+
   it('mutations keep queueing while the outbox has pending entries even if back online (strict FIFO)', async () => {
     const store = useActiveWorkoutStore()
     store.workout = baseWorkout()

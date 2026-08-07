@@ -4,10 +4,11 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/client'
-import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutOut } from '@/api/domain'
+import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
 import { listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
 import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
-import { isLastOfSuperset, nextSupersetIndex, supersetLabels } from '@/lib/supersets'
+import { isLastOfSuperset, isLinkedAt, nextSupersetIndex, supersetLabels, toggleSupersetLink } from '@/lib/supersets'
+import BkActionBtn from '@/lib/BkActionBtn.vue'
 import { parseUtc } from '@/utils/datetime'
 import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
@@ -89,6 +90,45 @@ const supersetLastByIndex = computed(() =>
 // id del WorkoutExercise marcado como "siguiente" del grupo (chip pequeño)
 // tras registrar una serie en el miembro anterior — ver onLogged
 const supersetNextUpId = ref<number | null>(null)
+
+// v0.7.0 (feedback de zurdi sobre el diseño): los miembros de una superserie
+// se renderizan DENTRO de un contenedor con borde aurora y el chip
+// "Superserie A" como cabecera del bloque (antes: acento y chip por card) —
+// la lista se trocea en bloques contiguos para el template
+type WorkoutBlock = {
+  grouped: boolean
+  label: string | null
+  entries: { we: WorkoutExerciseOut; index: number }[]
+}
+const workoutBlocks = computed<WorkoutBlock[]>(() => {
+  const exercises = activeWorkout.workout?.exercises ?? []
+  const labels = supersetLabelByIndex.value
+  const blocks: WorkoutBlock[] = []
+  exercises.forEach((we, index) => {
+    const label = labels[index]
+    const last = blocks[blocks.length - 1]
+    if (label !== null && last?.grouped && last.label === label) {
+      last.entries.push({ we, index })
+    } else {
+      blocks.push({ grouped: label !== null, label, entries: [{ we, index }] })
+    }
+  })
+  return blocks
+})
+
+// v0.7.0 (zurdi: "no veo cómo añadir una superserie a un entrenamiento"):
+// toggles de frontera entre cards consecutivas, mismo idiom del editor de
+// rutina y MISMA semántica de icono (estado: eslabón cerrado = enlazado).
+// El toggle manda el estado completo normalizado al store, que lo aplica
+// online o lo encola offline (ver activeWorkout.setSupersetGroups).
+const linkedAtBoundary = (index: number) => isLinkedAt(supersetValues.value, index)
+async function toggleBoundary(index: number) {
+  try {
+    await activeWorkout.setSupersetGroups(toggleSupersetLink(supersetValues.value, index))
+  } catch (error) {
+    toastApiError(error)
+  }
+}
 
 // runa del ejercicio que acaba de batir el récord — 'pr' es el comodín cuando
 // el catálogo no resuelve un grupo muscular primario (nunca dejar el prop sin runa)
@@ -338,7 +378,7 @@ onBeforeUnmount(() => {
 // flujo. El header del entreno (crono+fecha) es sticky: el cronómetro sigue
 // visible mientras se scrollea la lista de ejercicios (mismo criterio que
 // las tiras de tabs — es EL chrome de esta vista). El slab del header vive
-// dentro de un wrapper sticky con bg-void y -mt-4 pt-4 (cubre la banda del
+// dentro de un wrapper sticky con bk-chrome-bg (void + grano, ver base.css) y -mt-4 pt-4 (cubre la banda del
 // pt-4 del wrapper del shell al pegarse, ver CalendarView). El wrapper es
 // hijo directo de bk-stagger: su entrada anima transform, pero el fill es
 // backwards — al terminar, el transform computa a none y el sticky funciona
@@ -376,7 +416,7 @@ onBeforeUnmount(() => {
            v0.5.0: wrapper sticky alrededor del slab — ver el comentario del
            script (crono visible mientras se scrollea la lista). -->
       <div
-        class="sticky top-0 z-10 bg-void -mt-4 pt-4 pb-1"
+        class="sticky top-0 z-10 bk-chrome-bg -mt-4 pt-4 pb-1"
         data-testid="workout-header-sticky"
         :style="{ '--bk-stagger-i': 0 }"
       >
@@ -435,28 +475,93 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <WorkoutExerciseCard
-        v-for="(we, i) in activeWorkout.workout.exercises"
-        :key="we.id"
-        :style="{ '--bk-stagger-i': i + 3 }"
-        :workout-exercise="we"
-        :exercise="exerciseMap.get(we.exercise_id)"
-        :muscle-groups="muscleGroups"
-        :routines="routines"
-        :routine-id="activeWorkout.workout.routine_id"
-        :exercise-ids="exerciseIds"
-        :units="units"
-        :locale="locale"
-        :actions="activeWorkout"
-        :rest-enabled="restAutoEnabled"
-        :workout-id="activeWorkout.workout.id"
-        :resumed-countdown="resumedCardioCountdown"
-        :superset-label="supersetLabelByIndex[i]"
-        :superset-last="supersetLastByIndex[i]"
-        :superset-next="we.id === supersetNextUpId"
-        @recorded="onRecorded"
-        @logged="onLogged(i, $event)"
-      />
+      <!-- v0.7.0: bloques de superserie — los miembros van DENTRO de un
+           contenedor con borde aurora y chip de cabecera (feedback de zurdi:
+           "meter en un contenedor los dos ejercicios, con ese borde aurora,
+           para que se vea que pertenecen al mismo bloque"), y ENTRE cards
+           consecutivas vive el toggle de frontera que crea/rompe superseries
+           en el propio entreno (icono de ESTADO: eslabón cerrado = enlazado,
+           mismo criterio que el editor de rutina). El toggle de una frontera
+           interna de un grupo vive dentro del contenedor; el de una frontera
+           entre bloques, fuera. -->
+      <template v-for="block in workoutBlocks" :key="`block-${block.entries[0].we.id}`">
+        <div
+          v-if="block.entries[0].index > 0"
+          class="flex justify-center"
+          :style="{ '--bk-stagger-i': block.entries[0].index + 3 }"
+        >
+          <BkActionBtn
+            icon="unlink"
+            :data-testid="`workout-superset-toggle-${block.entries[0].index}`"
+            :aria-label="$t('routines.linkSuperset')"
+            aria-pressed="false"
+            @click="toggleBoundary(block.entries[0].index)"
+          />
+        </div>
+        <div
+          v-if="block.grouped"
+          class="border border-aurora/50 rounded-sm p-2 space-y-3"
+          :data-testid="`superset-container-${block.label}`"
+          :style="{ '--bk-stagger-i': block.entries[0].index + 3 }"
+        >
+          <div class="flex justify-center">
+            <span class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5">
+              {{ t('workout.superset', { label: block.label }) }}
+            </span>
+          </div>
+          <template v-for="(entry, j) in block.entries" :key="entry.we.id">
+            <div v-if="j > 0" class="flex justify-center">
+              <BkActionBtn
+                icon="link"
+                :data-testid="`workout-superset-toggle-${entry.index}`"
+                :aria-label="$t('routines.unlinkSuperset')"
+                aria-pressed="true"
+                @click="toggleBoundary(entry.index)"
+              />
+            </div>
+            <WorkoutExerciseCard
+              :workout-exercise="entry.we"
+              :exercise="exerciseMap.get(entry.we.exercise_id)"
+              :muscle-groups="muscleGroups"
+              :routines="routines"
+              :routine-id="activeWorkout.workout.routine_id"
+              :exercise-ids="exerciseIds"
+              :units="units"
+              :locale="locale"
+              :actions="activeWorkout"
+              :rest-enabled="restAutoEnabled"
+              :workout-id="activeWorkout.workout.id"
+              :resumed-countdown="resumedCardioCountdown"
+              :superset-label="supersetLabelByIndex[entry.index]"
+              :superset-last="supersetLastByIndex[entry.index]"
+              :superset-next="entry.we.id === supersetNextUpId"
+              @recorded="onRecorded"
+              @logged="onLogged(entry.index, $event)"
+            />
+          </template>
+        </div>
+        <WorkoutExerciseCard
+          v-else
+          :style="{ '--bk-stagger-i': block.entries[0].index + 3 }"
+          :workout-exercise="block.entries[0].we"
+          :exercise="exerciseMap.get(block.entries[0].we.exercise_id)"
+          :muscle-groups="muscleGroups"
+          :routines="routines"
+          :routine-id="activeWorkout.workout.routine_id"
+          :exercise-ids="exerciseIds"
+          :units="units"
+          :locale="locale"
+          :actions="activeWorkout"
+          :rest-enabled="restAutoEnabled"
+          :workout-id="activeWorkout.workout.id"
+          :resumed-countdown="resumedCardioCountdown"
+          :superset-label="null"
+          :superset-last="true"
+          :superset-next="false"
+          @recorded="onRecorded"
+          @logged="onLogged(block.entries[0].index, $event)"
+        />
+      </template>
 
       <BkButton
         variant="ghost"

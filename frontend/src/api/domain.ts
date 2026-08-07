@@ -475,6 +475,14 @@ export const removeWorkoutExercise = (wid: number, weid: number) =>
 export const reorderWorkoutExercises = (wid: number, ids: number[]) =>
   api<WorkoutOut>(`/workouts/${wid}/exercises-order`, { method: 'PUT', body: { workout_exercise_ids: ids } })
 
+// v0.7.0: superseries editables en el entreno — estado completo normalizado,
+// nunca deltas (mismo contrato de completitud que exercises-order)
+export const setWorkoutSupersetGroups = (
+  wid: number,
+  groups: { workout_exercise_id: number; superset_group: number | null }[],
+) =>
+  api<WorkoutOut>(`/workouts/${wid}/superset-groups`, { method: 'PUT', body: { groups } })
+
 export const logSet = (wid: number, weid: number, body: SetIn) =>
   api<SetLogOut>(`/workouts/${wid}/exercises/${weid}/sets`, { method: 'POST', body })
 

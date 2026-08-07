@@ -365,7 +365,7 @@ describe('ProfileView', () => {
       expect(wrapper.classes()).not.toContain('h-full')
 
       const stickyBlock = wrapper.get('[data-testid="profile-tabs-sticky"]')
-      expect(stickyBlock.classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'bg-void']))
+      expect(stickyBlock.classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'bk-chrome-bg']))
 
       // la tira de sección de biblioteca SOLO existe dentro del bloque sticky
       // cuando la pestaña activa es Biblioteca

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useI18n } from 'vue-i18n'
 
@@ -25,6 +25,7 @@ const items: { name: string; label: string; rune: RuneName }[] = [
 ]
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 const timer = useRestTimerStore()
 const activeWorkout = useActiveWorkoutStore()
@@ -51,70 +52,23 @@ watch(() => route.path, () => {
 // ahora que el CTA ya hace de tap-target siempre visible.
 const resting = computed(() => timer.active)
 
-// item 6 (v0.4.3, zurdi): mientras se descansa Y ya se está en /workout, el
-// CTA no tiene a dónde navegar (ya estás ahí) — un tap lo EXPANDE (revela un
-// botón de cancelar descanso junto al countdown) en vez de ser un no-op. Un
-// segundo tap en el propio CTA, tocar fuera, o unos segundos sin tocar nada,
-// lo colapsa de vuelta (sin cancelar el descanso: solo "cierra el cajón").
-// Fuera de /workout, o sin descanso activo, el CTA sigue navegando normal —
-// el intercept solo aplica al ÚNICO caso donde navegar sería un no-op.
-const ctaExpanded = ref(false)
-let ctaCollapseTimer: ReturnType<typeof setTimeout> | null = null
-
-function scheduleCtaAutoCollapse() {
-  if (ctaCollapseTimer) clearTimeout(ctaCollapseTimer)
-  ctaCollapseTimer = setTimeout(() => { ctaExpanded.value = false }, 4000)
+// v0.7.0 (zurdi revoca el expandir-para-cancelar del item 6/v0.4.3: "cuando
+// haces click, la X aparece en otro elemento distinto — mejor una X roja a
+// la derecha del propio timer, sin tener que hacer click para que
+// aparezca"): mientras se descansa, la losa del CTA contiene DOS botones —
+// el countdown (navega a /workout) y la X roja de cancelar, siempre visible.
+// Para poder anidar la X dentro de la losa, el item de entreno deja de ser
+// un RouterLink (un <button> dentro de un <a> es HTML inválido — la
+// restricción que forzó la píldora adyacente del diseño anterior) y pasa a
+// ser una losa <div> con botones que navegan por router.push. El aparato
+// entero de expandir/colapsar (ctaExpanded, auto-colapso, listener de
+// document) muere con esto.
+function goWorkout() {
+  if (route.name !== 'workout') router.push({ name: 'workout' })
 }
 
-function collapseCta() {
-  ctaExpanded.value = false
-  if (ctaCollapseTimer) {
-    clearTimeout(ctaCollapseTimer)
-    ctaCollapseTimer = null
-  }
-}
-
-function onCtaClick(event: MouseEvent, itemName: string) {
-  if (itemName !== 'workout' || route.name !== 'workout' || !resting.value) return
-  // preventDefault: RouterLink respeta defaultPrevented y no navega — este
-  // es el ÚNICO caso (ya en /workout, descansando) donde interceptamos
-  event.preventDefault()
-  if (ctaExpanded.value) collapseCta()
-  else {
-    ctaExpanded.value = true
-    scheduleCtaAutoCollapse()
-  }
-}
-
-function cancelRestFromCta(event: MouseEvent) {
-  // stopPropagation: sin esto, este click burbujea hasta el listener de
-  // document (ver onDocumentPointerDown) DESPUÉS de que collapseCta() ya
-  // corrió aquí — inofensivo en la práctica (collapseCta es idempotente),
-  // pero más claro no depender de ese orden
-  event.stopPropagation()
+function cancelRest() {
   timer.clear()
-  collapseCta()
-}
-
-// se colapsa solo si deja de tener sentido seguir expandido: el descanso
-// termina/se cancela desde OTRO sitio (p.ej. el timer llega a 0 solo), o se
-// navega fuera de /workout (donde el CTA vuelve a ser un link normal)
-watch(resting, (active) => { if (!active) collapseCta() })
-watch(() => route.name, () => collapseCta())
-
-// tap FUERA del CTA (cualquiera de las dos instancias, desktop/móvil según
-// el breakpoint): colapsa sin cancelar — mismo criterio "dismiss sin
-// destruir" que un popover. pointerdown en document (no click): dispara
-// ANTES de que un tap en otro control de la página ejecute su propia acción,
-// para que "tocar fuera" se sienta instantáneo.
-const desktopCtaEl = ref<HTMLElement | null>(null)
-const mobileCtaEl = ref<HTMLElement | null>(null)
-function onDocumentPointerDown(event: PointerEvent) {
-  if (!ctaExpanded.value) return
-  const target = event.target as Node
-  if (desktopCtaEl.value?.contains(target)) return
-  if (mobileCtaEl.value?.contains(target)) return
-  collapseCta()
 }
 
 // item 3 (v0.3.0, addendum zurdi): jerarquía del glow del CTA —
@@ -147,16 +101,6 @@ const activeIndex = computed(() => {
 const desktopItemRefs = ref<(HTMLLIElement | null)[]>([])
 function setDesktopItemRef(el: Element | null, index: number) {
   desktopItemRefs.value[index] = el as HTMLLIElement | null
-  // item 6: mismo <li> que el indicador deslizante ya mide — reutilizado
-  // como raíz de "outside click" del CTA (contiene el link Y, si está
-  // expandido, el botón de cancelar: ver onDocumentPointerDown)
-  if (items[index]?.name === 'workout') desktopCtaEl.value = el as HTMLElement | null
-}
-
-// item 6: equivalente móvil de arriba — el nav de abajo no llevaba ref por
-// item (no lo necesitaba hasta ahora, no hay indicador medido en px ahí)
-function setMobileItemRef(el: Element | null, itemName: string) {
-  if (itemName === 'workout') mobileCtaEl.value = el as HTMLElement | null
 }
 
 const indicatorLeft = ref(0)
@@ -180,7 +124,6 @@ let disposeDrained: (() => void) | null = null
 onMounted(() => {
   updateIndicator()
   window.addEventListener('resize', updateIndicator)
-  document.addEventListener('pointerdown', onDocumentPointerDown)
 
   attachNetListeners()
   outbox.refreshPendingCount()
@@ -201,8 +144,6 @@ onMounted(() => {
 })
 onUnmounted(() => {
   window.removeEventListener('resize', updateIndicator)
-  document.removeEventListener('pointerdown', onDocumentPointerDown)
-  if (ctaCollapseTimer) clearTimeout(ctaCollapseTimer)
   disposeBackOnline?.()
   disposeDrained?.()
 })
@@ -239,86 +180,81 @@ watch(activeIndex, () => nextTick(updateIndicator))
              todos los items normales; la CTA sigue sobresaliendo por debajo vía su propio
              -mb-5 (pintado fuera de su caja de layout, ver más abajo), sin tocar eso. -->
         <ul class="flex items-end justify-center gap-2">
-          <!-- item 6: items-end (además del que ya llevaba el <ul>) cuando el
-               CTA está expandido — RouterLink y el botón de cancelar quedan
-               como dos hijos flex de este <li>, y items-end los asienta por
-               su borde inferior (el mismo que ya usa -mb-5 la losa) en vez de
-               estirarlos verticalmente (default stretch). -->
           <li
             v-for="(item, index) in items"
             :key="item.name"
             :ref="(el) => setDesktopItemRef(el as Element | null, index)"
-            :class="item.name === 'workout' && ctaExpanded && 'flex items-end gap-1'"
           >
-            <RouterLink
-              :to="{ name: item.name }"
-              class="flex flex-col items-center gap-1 px-3 py-2 text-ink-faint hover:text-ink"
-              active-class="text-aurora"
-              @click="onCtaClick($event, item.name)"
+            <!-- v0.7.0: el item de entreno YA NO es un RouterLink — es una
+                 losa <div> con botones dentro (countdown navega, X cancela),
+                 ver el why-comment largo del script. h-12 fijo (item 8): el
+                 alto nunca cambia entre runa/countdown/countdown+X; el ANCHO
+                 sí, y la X anima el suyo al entrar/salir (bk-cta-x). -->
+            <div
+              v-if="item.name === 'workout'"
+              class="flex flex-col items-center gap-1 px-3 py-2"
+              :class="route.name === 'workout' ? 'text-aurora' : 'text-ink-faint hover:text-ink'"
             >
               <span class="text-xs tracking-wide">{{ $t(item.label) }}</span>
-              <!-- item 8: h-12 (fijo, EN LAS 3 estados: runa/countdown/expandido)
-                   + flex items-center justify-center en vez del viejo p-2.5 —
-                   antes el alto salía de content-box + padding, así que un
-                   countdown más alto que la runa (o que envolviera línea)
-                   estiraba la losa entera y con ella el navbar completo. Ahora
-                   el alto es una caja fija y el contenido (runa o texto) se
-                   centra DENTRO, nunca la redimensiona. px-2.5 (solo
-                   horizontal, no vertical): el ancho SÍ puede crecer con el
-                   contenido (countdown más ancho que la runa) — ver
-                   whitespace-nowrap en el span del countdown, más abajo. -->
-              <span :class="item.name === 'workout' && 'bk-slab relative -mb-5 h-12 px-2.5 flex items-center justify-center border-aurora text-aurora'">
+              <div class="bk-slab relative -mb-5 h-12 flex items-stretch border-aurora text-aurora" data-testid="cta-slab">
                 <!-- sin respirar (revertido): una sola capa, apagada por defecto,
-                     que funde a opacity 1 cuando /workout está activo y funde de
-                     vuelta a 0 al salir — transition pura, sin animación infinita
-                     de la que "desenganchar" a mitad de ciclo -->
+                     que funde a opacity 1 cuando /workout está activo -->
                 <span
-                  v-if="item.name === 'workout'"
                   class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
                   :style="{ opacity: workoutGlowOpacity, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
                   aria-hidden="true"
                   data-testid="workout-glow"
                 />
-                <template v-if="item.name === 'workout'">
-                  <!-- swap rune<->countdown con el idioma de entrada de la app
-                       (bk-fade, entry-only): out-in para que la runa termine de
-                       salir antes de que el countdown entre, nunca los dos a
-                       la vez. whitespace-nowrap (item 8): el countdown NUNCA
-                       envuelve línea — con el alto ya fijo (h-12), envolver
-                       recortaría la segunda línea en vez de estirar la losa
-                       (que es justo el bug que h-12 evita), así que el ancho
-                       crece en su lugar. -->
+                <button
+                  type="button"
+                  class="bk-press relative px-2.5 flex items-center justify-center"
+                  :aria-label="$t(item.label)"
+                  @click="goWorkout"
+                >
+                  <!-- swap rune<->countdown: out-in para que la runa entre sola
+                       tras salir el countdown — y como BkRune monta con carve,
+                       la runa se RE-TALLA al volver (la "transición bonita" que
+                       pidió zurdi al acabar/cancelar el descanso).
+                       whitespace-nowrap (item 8): el countdown nunca envuelve
+                       línea; el ancho crece en su lugar. -->
                   <Transition name="bk-fade" mode="out-in">
                     <span
                       v-if="resting"
                       key="timer"
                       data-testid="cta-timer"
-                      class="bk-metric relative text-sm whitespace-nowrap"
+                      class="bk-metric text-sm whitespace-nowrap"
                     >{{ timer.label }}</span>
-                    <BkRune v-else key="rune" :name="item.rune" :size="26" :carve="true" class="relative" />
+                    <BkRune v-else key="rune" :name="item.rune" :size="26" :carve="true" />
                   </Transition>
-                </template>
-                <BkRune v-else :name="item.rune" :size="20" :carve="false" class="relative" />
-              </span>
+                </button>
+                <!-- v0.7.0: X roja SIEMPRE visible mientras se descansa (adiós
+                     expandir-para-revelar) — dentro de la MISMA losa, válido
+                     ahora que la losa no es un anchor. Entra y sale colapsando
+                     su ancho (bk-cta-x): el estrechado de la losa al volver a
+                     la runa es la propia X plegándose, animado. -->
+                <Transition name="bk-cta-x">
+                  <button
+                    v-if="resting"
+                    type="button"
+                    data-testid="cta-cancel-rest"
+                    class="bk-press relative flex items-center text-danger"
+                    :aria-label="$t('timer.cancelRest')"
+                    @click="cancelRest"
+                  >
+                    <span class="pr-2.5 pl-0.5">✕</span>
+                  </button>
+                </Transition>
+              </div>
+            </div>
+            <RouterLink
+              v-else
+              :to="{ name: item.name }"
+              class="flex flex-col items-center gap-1 px-3 py-2 text-ink-faint hover:text-ink"
+              active-class="text-aurora"
+            >
+              <span class="text-xs tracking-wide">{{ $t(item.label) }}</span>
+              <span><BkRune :name="item.rune" :size="20" :carve="false" class="relative" /></span>
             </RouterLink>
-            <!-- item 6: botón de cancelar — SIBLING de RouterLink, nunca
-                 anidado dentro (un <button> dentro de un <a> es HTML
-                 inválido, contenido interactivo dentro de interactivo).
-                 Mismo acabado bk-slab/-mb-5/h-12 que la losa principal: dos
-                 losas cortas y pegadas (gap-1) leen como una sola superficie
-                 que "se abrió", no como un control ajeno pegado al lado. -->
-            <Transition name="bk-pop-soft">
-              <button
-                v-if="item.name === 'workout' && ctaExpanded"
-                type="button"
-                data-testid="cta-cancel-rest"
-                class="bk-press bk-slab -mb-5 h-12 px-2 flex items-center justify-center border-aurora text-aurora"
-                :aria-label="$t('timer.cancelRest')"
-                @click="cancelRestFromCta"
-              >
-                ✕
-              </button>
-            </Transition>
           </li>
         </ul>
       </nav>
@@ -377,71 +313,67 @@ watch(activeIndex, () => nextTick(updateIndicator))
           data-testid="nav-indicator"
         />
         <ul class="flex justify-around">
-          <!-- item 6: flex-1 se conserva SIEMPRE (las 5 columnas del bottom
-               nav siguen midiendo 1/5 cada una — el indicador deslizante
-               depende de esa aritmética, ver translateX arriba); items-start
-               (cuando el CTA está expandido) asienta RouterLink + el botón
-               de cancelar por su borde SUPERIOR, el mismo que ya usa -mt-5
-               la losa (aquí sobresale hacia ARRIBA, al revés que en desktop). -->
-          <li
-            v-for="item in items"
-            :key="item.name"
-            :ref="(el) => setMobileItemRef(el as Element | null, item.name)"
-            class="flex-1"
-            :class="item.name === 'workout' && ctaExpanded && 'flex items-start justify-center gap-1'"
-          >
-            <RouterLink
-              :to="{ name: item.name }"
-              class="flex flex-col items-center gap-1 py-2 text-ink-faint"
-              active-class="text-aurora"
-              @click="onCtaClick($event, item.name)"
+          <!-- flex-1 SIEMPRE: las 5 columnas del bottom nav miden 1/5 cada
+               una — el indicador deslizante depende de esa aritmética -->
+          <li v-for="item in items" :key="item.name" class="flex-1">
+            <!-- v0.7.0: item de entreno como losa de botones, igual que en
+                 desktop (ver why-comment del script y de la versión desktop) -->
+            <div
+              v-if="item.name === 'workout'"
+              class="flex flex-col items-center gap-1 py-2"
+              :class="route.name === 'workout' ? 'text-aurora' : 'text-ink-faint'"
             >
-              <span
-                :class="item.name === 'workout' && 'bk-slab relative -mt-5 h-12 px-2.5 flex items-center justify-center border-aurora text-aurora'"
-              >
+              <div class="bk-slab relative -mt-5 h-12 flex items-stretch border-aurora text-aurora" data-testid="cta-slab-mobile">
                 <!-- mismo criterio que en desktop: una capa, opacity 0/1 -->
                 <span
-                  v-if="item.name === 'workout'"
                   class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
                   :style="{ opacity: workoutGlowOpacity, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
                   aria-hidden="true"
                   data-testid="workout-glow"
                 />
-                <template v-if="item.name === 'workout'">
-                  <!-- swap rune<->countdown, mismo criterio que en desktop
-                       (bk-fade entry-only + whitespace-nowrap, ver el
-                       why-comment largo de la versión desktop de arriba) -->
+                <button
+                  type="button"
+                  class="bk-press relative px-2.5 flex items-center justify-center"
+                  :aria-label="$t(item.label)"
+                  @click="goWorkout"
+                >
                   <Transition name="bk-fade" mode="out-in">
                     <span
                       v-if="resting"
                       key="timer"
                       data-testid="cta-timer"
-                      class="bk-metric relative text-sm whitespace-nowrap"
+                      class="bk-metric text-sm whitespace-nowrap"
                     >{{ timer.label }}</span>
-                    <BkRune v-else key="rune" :name="item.rune" :size="26" :carve="true" class="relative" />
+                    <BkRune v-else key="rune" :name="item.rune" :size="26" :carve="true" />
                   </Transition>
-                </template>
-                <BkRune v-else :name="item.rune" :size="20" :carve="false" class="relative" />
-              </span>
+                </button>
+                <Transition name="bk-cta-x">
+                  <button
+                    v-if="resting"
+                    type="button"
+                    data-testid="cta-cancel-rest-mobile"
+                    class="bk-press relative flex items-center text-danger"
+                    :aria-label="$t('timer.cancelRest')"
+                    @click="cancelRest"
+                  >
+                    <span class="pr-2.5 pl-0.5">✕</span>
+                  </button>
+                </Transition>
+              </div>
+              <span class="text-2xs tracking-wide">{{ $t(item.label) }}</span>
+            </div>
+            <RouterLink
+              v-else
+              :to="{ name: item.name }"
+              class="flex flex-col items-center gap-1 py-2 text-ink-faint"
+              active-class="text-aurora"
+            >
+              <span><BkRune :name="item.rune" :size="20" :carve="false" class="relative" /></span>
               <!-- revertido (round 7, zurdi): se probó ocultar las inactivas
                    (sr-only + fade solo en la activa), pero con el token a
                    0.7rem las 5 etiquetas leen bien tal cual — vuelta al clásico -->
               <span class="text-2xs tracking-wide">{{ $t(item.label) }}</span>
             </RouterLink>
-            <!-- item 6: botón de cancelar, SIBLING de RouterLink (mismo
-                 motivo que en desktop: button dentro de a es HTML inválido) -->
-            <Transition name="bk-pop-soft">
-              <button
-                v-if="item.name === 'workout' && ctaExpanded"
-                type="button"
-                data-testid="cta-cancel-rest-mobile"
-                class="bk-press bk-slab -mt-5 h-12 px-2 flex items-center justify-center border-aurora text-aurora"
-                :aria-label="$t('timer.cancelRest')"
-                @click="cancelRestFromCta"
-              >
-                ✕
-              </button>
-            </Transition>
           </li>
         </ul>
       </div>

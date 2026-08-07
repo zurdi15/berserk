@@ -79,6 +79,9 @@ export const es = {
     // v0.6.0 offline: solo en flujos que EXIGEN red (descartar, arrancar una
     // rutina jamás vista, lecturas sin cache) — el resto encola y sincroniza
     offline: 'Sin conexión. Esto necesita internet — inténtalo al recuperarla.',
+    // v0.7.0: el payload de superseries no cubre los ejercicios del entreno
+    // (solo alcanzable por un replay offline conflictivo o un cliente roto)
+    superset_groups_invalid: 'No se pudo actualizar la superserie. Recarga e inténtalo de nuevo.',
   },
   common: {
     save: 'Guardar',

@@ -35,6 +35,7 @@ export type OutboxEntry =
   | { id: string; kind: 'deleteSet'; workoutId: number; exerciseId: number; setId: number }
   | { id: string; kind: 'setExerciseRest'; workoutId: number; exerciseId: number; restSeconds: number | null }
   | { id: string; kind: 'removeExercise'; workoutId: number; exerciseId: number }
+  | { id: string; kind: 'setSupersetGroups'; workoutId: number; groups: { exerciseId: number; group: number | null }[] }
   | { id: string; kind: 'finishWorkout'; workoutId: number }
 
 const QUEUE_KEY = 'bk:outbox'
@@ -211,6 +212,20 @@ async function replayEntry(entry: OutboxEntry, idMap: Map<number, number>): Prom
       } catch (error) {
         if (!(error instanceof ApiError && error.status === 404)) throw error
       }
+      return
+    }
+    case 'setSupersetGroups': {
+      const workoutId = resolveId(entry.workoutId, idMap)
+      if (workoutId === null) throw new ApiError(410, 'offline_dependency_lost')
+      // ejercicios cuya alta se descartó por conflicto se filtran (el
+      // contrato de completitud del endpoint es sobre los que EXISTEN);
+      // si tras filtrar no queda un payload coherente, el 422 del servidor
+      // descarta esta entrada como conflicto — mejor que bloquear la cola
+      const groups = entry.groups
+        .map((g) => ({ workout_exercise_id: resolveId(g.exerciseId, idMap), superset_group: g.group }))
+        .filter((g): g is { workout_exercise_id: number; superset_group: number | null } => g.workout_exercise_id !== null)
+      if (groups.length === 0) return
+      await domain.setWorkoutSupersetGroups(workoutId, groups)
       return
     }
     case 'finishWorkout': {

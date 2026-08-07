@@ -173,7 +173,7 @@ watch(() => athlete.userId, () => {
 // vista aunque el heatmap del año empuje mucho scroll), sin cadena de
 // alturas. El bloque sticky lleva -mt-4 pt-4 para cubrir también la banda
 // del pt-4 del wrapper del shell cuando está pegado (si no, el contenido
-// scrolleado asomaría por esos 16px por encima de la fila), y bg-void para
+// scrolleado asomaría por esos 16px por encima de la fila), y bk-chrome-bg (fondo void + réplica del grano de niebla, ver base.css) para
 // que el grid pase por debajo sin transparentarse.
 // (comentario aquí y no como primer hijo de <template>: un comentario ahí
 // convierte la raíz en un fragmento de dos nodos y rompe wrapper.classes(), ver ShellView.vue)
@@ -187,7 +187,7 @@ watch(() => athlete.userId, () => {
          rejilla y la actividad del año, como un enlace suelto en vez de un
          icono en esta fila. sticky (v0.5.0): chrome pegado arriba del
          scrollport de <main>, ver comentario del script. -->
-    <div class="sticky top-0 z-10 bg-void -mt-4 pt-4 pb-2 flex items-center gap-2" data-testid="month-nav">
+    <div class="sticky top-0 z-10 bk-chrome-bg -mt-4 pt-4 pb-2 flex items-center gap-2" data-testid="month-nav">
       <BkButton variant="ghost" size="sm" :aria-label="$t('calendar.prevMonth')" @click="prevMonth">
         <span aria-hidden="true">‹</span>
         <span class="hidden sm:inline">{{ $t('calendar.prevMonth') }}</span>

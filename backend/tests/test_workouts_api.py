@@ -568,3 +568,39 @@ def test_add_exercise_with_client_id_is_idempotent(client: TestClient):
     assert replay.json()["id"] == first.json()["id"]
     exercises = client.get(f"/api/v1/workouts/{workout['id']}").json()["exercises"]
     assert len(exercises) == 1
+
+
+# v0.7.0: superseries editables EN el entreno (zurdi vetó el v1 solo-rutina)
+def test_set_superset_groups_bulk(client: TestClient):
+    workout = client.post("/api/v1/workouts", json={}).json()
+    wid = workout["id"]
+    a = client.post(f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": bench_id(client)}).json()
+    b = client.post(f"/api/v1/workouts/{wid}/exercises", json={"exercise_id": exercise_id(client, "Squat")}).json()
+
+    resp = client.put(
+        f"/api/v1/workouts/{wid}/superset-groups",
+        json={"groups": [
+            {"workout_exercise_id": a["id"], "superset_group": 0},
+            {"workout_exercise_id": b["id"], "superset_group": 0},
+        ]},
+    )
+    assert resp.status_code == 200
+    assert [e["superset_group"] for e in resp.json()["exercises"]] == [0, 0]
+
+    # deshacer el grupo: el payload completo con null limpia ambos
+    resp = client.put(
+        f"/api/v1/workouts/{wid}/superset-groups",
+        json={"groups": [
+            {"workout_exercise_id": a["id"], "superset_group": None},
+            {"workout_exercise_id": b["id"], "superset_group": None},
+        ]},
+    )
+    assert resp.status_code == 200
+    assert [e["superset_group"] for e in resp.json()["exercises"]] == [None, None]
+
+    # payload parcial o con ids ajenos: 422 (contrato de completitud)
+    resp = client.put(
+        f"/api/v1/workouts/{wid}/superset-groups",
+        json={"groups": [{"workout_exercise_id": a["id"], "superset_group": 0}]},
+    )
+    assert resp.status_code == 422 and resp.json()["detail"] == "superset_groups_invalid"

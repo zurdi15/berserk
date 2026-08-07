@@ -26,6 +26,7 @@ from ..schemas.workouts import (
     SetIn,
     SetLogOut,
     SetOut,
+    SupersetGroupsIn,
     WorkoutExerciseIn,
     WorkoutExerciseOut,
     WorkoutExercisePatchIn,
@@ -422,6 +423,29 @@ def reorder_exercises(
     by_id = {e.id: e for e in workout.exercises}
     for position, weid in enumerate(payload.workout_exercise_ids, start=1):
         by_id[weid].position = position
+    db.commit()
+    db.refresh(workout)
+    return workout_out(workout)
+
+
+@router.put("/{workout_id}/superset-groups", response_model=WorkoutOut)
+def set_superset_groups(
+    workout_id: int, payload: SupersetGroupsIn, user: CurrentUser, db: Session = Depends(get_db)
+):
+    """v0.7.0: reasignación en bloque del grouping de superseries de un
+    entreno EN VIVO (zurdi vetó el v1 solo-en-rutina). Mismo contrato de
+    completitud que reorder_exercises: el payload debe cubrir EXACTAMENTE los
+    ejercicios del entreno — el cliente siempre manda el estado normalizado
+    entero (ver lib/supersets.ts), así que un payload parcial es un bug, no
+    un caso a medio soportar."""
+    workout = _own_workout(db, user.id, workout_id)
+    current_ids = {e.id for e in workout.exercises}
+    payload_ids = [g.workout_exercise_id for g in payload.groups]
+    if set(payload_ids) != current_ids or len(payload_ids) != len(current_ids):
+        raise HTTPException(status_code=422, detail="superset_groups_invalid")
+    by_id = {e.id: e for e in workout.exercises}
+    for item in payload.groups:
+        by_id[item.workout_exercise_id].superset_group = item.superset_group
     db.commit()
     db.refresh(workout)
     return workout_out(workout)

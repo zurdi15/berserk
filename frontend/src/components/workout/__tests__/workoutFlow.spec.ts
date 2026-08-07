@@ -1004,10 +1004,13 @@ describe('v0.5.0 superseries: rest gating and chips', () => {
     expect(startSpy).toHaveBeenCalledWith(90, 'Press banca')
   })
 
-  it('renders the "Superserie A" chip and the aurora side-frame for a grouped card', () => {
+  // v0.7.0 (feedback de zurdi): chip y acento del grupo suben al CONTENEDOR
+  // del bloque en WorkoutView — la card NO pinta nada de superserie propio
+  // aunque esté agrupada (supersetLabel solo gobierna el gating del descanso)
+  it('v0.7.0: a grouped card renders NO chip nor side-frame of its own (the block container carries them)', () => {
     const wrapper = mountCard({ supersetLabel: 'A' })
-    expect(wrapper.get('[data-testid="superset-chip-20"]').text()).toBe('Superserie A')
-    expect(wrapper.classes()).toEqual(expect.arrayContaining(['border-l-2', 'border-aurora/50']))
+    expect(wrapper.find('[data-testid="superset-chip-20"]').exists()).toBe(false)
+    expect(wrapper.classes()).not.toContain('border-l-2')
   })
 
   it('renders no superset chip nor frame for a loose card', () => {

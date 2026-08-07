@@ -82,7 +82,7 @@ async function handleLogout() {
 // tiras de pestañas viven en UN único bloque sticky arriba — la principal y,
 // solo en Biblioteca, la de sección debajo (agruparlas en un solo bloque
 // evita apilar dos stickies con top calculado a mano, el punto frágil
-// clásico de las tiras dobles). El bloque lleva bg-void y -mt-4 pt-4 (cubre
+// clásico de las tiras dobles). El bloque lleva bk-chrome-bg (void + grano, ver base.css) y -mt-4 pt-4 (cubre
 // la banda del pt-4 del wrapper del shell al pegarse, ver CalendarView) —
 // Admin con una tabla larga scrollea contra <main> con las tiras siempre
 // visibles encima.
@@ -97,7 +97,7 @@ async function handleLogout() {
          la de sección debajo — ver comentario del script. La tira de sección
          vive AQUÍ (no dentro del panel) precisamente para poder pegarse
          junto a la principal sin apilar stickies. -->
-    <div class="sticky top-0 z-10 bg-void -mt-4 pt-4 pb-1 space-y-3" data-testid="profile-tabs-sticky">
+    <div class="sticky top-0 z-10 bk-chrome-bg -mt-4 pt-4 pb-1 space-y-3" data-testid="profile-tabs-sticky">
       <BkTabs v-model="activeTab" :tabs="tabs" />
       <BkTabs
         v-if="activeTab === 'library'"

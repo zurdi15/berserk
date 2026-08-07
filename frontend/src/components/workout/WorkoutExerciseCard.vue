@@ -410,18 +410,16 @@ async function moveDown() {
 </script>
 
 <template>
-  <BkCard :class="(isCardio || supersetLabel) && 'border-l-2 border-aurora/50 pl-3'">
+  <BkCard :class="isCardio && 'border-l-2 border-aurora/50 pl-3'">
+    <!-- v0.7.0 (feedback de zurdi): el chip "Superserie A" y el acento del
+         grupo suben al CONTENEDOR del bloque (ver WorkoutView.vue) — la card
+         ya no pinta nada de superserie salvo el chip "Siguiente"; el acento
+         lateral queda solo para cardio. supersetLabel se conserva como prop
+         porque sigue gobernando el gating del auto-descanso (autoRestFires). -->
     <div class="flex items-center justify-between mb-2">
       <div class="flex items-center gap-2 min-w-0">
         <BkRune v-if="primaryRune" :name="primaryRune" :size="14" />
         <h3 class="font-display font-semibold text-ink truncate">{{ name }}</h3>
-        <span
-          v-if="supersetLabel"
-          :data-testid="`superset-chip-${workoutExercise.id}`"
-          class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5 shrink-0"
-        >
-          {{ t('workout.superset', { label: supersetLabel }) }}
-        </span>
         <span
           v-if="supersetNext"
           :data-testid="`superset-next-${workoutExercise.id}`"

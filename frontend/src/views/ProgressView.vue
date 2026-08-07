@@ -140,14 +140,14 @@ watch(exerciseId, () => {
     <!-- v0.5.0 (modelo de scroll único, ver ShellView.vue): la raíz fluye
          contra <main>; toda la saga de alturas h-full/calc que vivía en este
          comentario (v0.4.0→v0.4.4) quedó obsoleta con ella. La tira de
-         pestañas se pega arriba con sticky (bg-void + -mt-4 pt-4 cubren la
+         pestañas se pega arriba con sticky (bk-chrome-bg + -mt-4 pt-4 cubren la
          banda del pt-4 del wrapper del shell al pegarse, ver CalendarView).
          (comentario DENTRO de la raíz: como primer hijo del template crearía
          un fragmento de dos raíces y rompería el fall-through de atributos)
          Sin h1 de sección (item 3): Hoy nunca tuvo uno, mismo patrón aquí.
          Sin padding lateral propio (item 4): <main> del shell ya pone px-4,
          duplicarlo aquí desalineaba el gutter frente a Hoy. -->
-    <div class="sticky top-0 z-10 bg-void -mt-4 pt-4 pb-1" data-testid="progress-tabs-sticky">
+    <div class="sticky top-0 z-10 bk-chrome-bg -mt-4 pt-4 pb-1" data-testid="progress-tabs-sticky">
       <BkTabs v-model="tab" :tabs="mainTabs" />
     </div>
 

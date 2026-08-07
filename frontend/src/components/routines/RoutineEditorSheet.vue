@@ -379,11 +379,15 @@ watch(
         <div v-if="exercises.length > 0" class="space-y-3 border-t border-line pt-3">
           <template v-for="(exercise, index) in exercises" :key="exercise.id">
             <!-- v0.5.0 superseries: botón de enlazar ENTRE filas consecutivas
-                 — enlaza/desenlaza esta fila con la anterior; el icono cambia
-                 de eslabón a eslabón roto según el estado (BkActionBtn) -->
+                 — enlaza/desenlaza esta fila con la anterior. v0.7.0 (zurdi:
+                 "¿no debería ser la cadena encadenada en vez de rota?"): el
+                 icono muestra el ESTADO, no la acción — eslabón CERRADO
+                 cuando la frontera está enlazada (con aria-pressed
+                 reforzándolo), roto cuando no; el aria-label sí describe la
+                 acción del tap, como cualquier toggle. -->
             <div v-if="index > 0" class="flex justify-center">
               <BkActionBtn
-                :icon="linkedAt(index) ? 'unlink' : 'link'"
+                :icon="linkedAt(index) ? 'link' : 'unlink'"
                 :data-testid="`superset-toggle-${index}`"
                 :aria-label="linkedAt(index) ? $t('routines.unlinkSuperset') : $t('routines.linkSuperset')"
                 :aria-pressed="linkedAt(index) ? 'true' : 'false'"

@@ -229,6 +229,29 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     workout.value = await domain.reorderWorkoutExercises(workout.value!.id, ids)
   }
 
+  // v0.7.0: superseries editables EN el entreno — recibe el estado completo
+  // normalizado por posición (lib/supersets.ts) y lo aplica en bloque
+  async function setSupersetGroups(values: (number | null)[]) {
+    const exercises = workout.value!.exercises
+    if (!offline()) {
+      workout.value = await domain.setWorkoutSupersetGroups(
+        workout.value!.id,
+        exercises.map((e, index) => ({ workout_exercise_id: e.id, superset_group: values[index] ?? null })),
+      )
+      return
+    }
+    workout.value!.exercises = exercises.map((e, index) => ({
+      ...e,
+      superset_group: values[index] ?? null,
+    }))
+    outbox.enqueue({
+      id: outbox.newClientId(),
+      kind: 'setSupersetGroups',
+      workoutId: workout.value!.id,
+      groups: exercises.map((e, index) => ({ exerciseId: e.id, group: values[index] ?? null })),
+    })
+  }
+
   function localExercise(weid: number): WorkoutExerciseOut {
     const wex = workout.value!.exercises.find((e) => e.id === weid)
     if (!wex) throw new Error('unknown workout exercise')
@@ -371,6 +394,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     addExercise,
     removeExercise,
     reorder,
+    setSupersetGroups,
     logSet,
     updateSet,
     deleteSet,

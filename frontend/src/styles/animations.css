@@ -176,6 +176,30 @@
 .bk-pop-enter-active { animation: bk-pop var(--bk-dur-3) var(--bk-ease-spring); }
 .bk-pop-soft-enter-active { animation: bk-pop-soft var(--bk-dur-2) var(--bk-ease-out); }
 
+/* v0.7.0 — X de cancelar descanso del CTA (excepción sancionada a
+   "solo entradas", como la salida de BkSheet): la X pliega su ANCHO al
+   entrar y al salir — el estrechado de la losa del CTA al terminar/cancelar
+   el descanso ES esta salida, y zurdi pidió explícitamente que ese cambio
+   de tamaño fuera animado. max-width y no width: el ancho real lo pone el
+   contenido; 2.5rem es solo un techo holgado que hace la interpolación
+   determinista. overflow hidden para que el glifo se recorte limpio
+   mientras colapsa en vez de desbordar la losa. */
+.bk-cta-x-enter-active,
+.bk-cta-x-leave-active {
+  overflow: hidden;
+  transition: max-width var(--bk-dur-3) var(--bk-ease-out), opacity var(--bk-dur-2) var(--bk-ease-out);
+}
+.bk-cta-x-enter-from,
+.bk-cta-x-leave-to {
+  max-width: 0;
+  opacity: 0;
+}
+.bk-cta-x-enter-to,
+.bk-cta-x-leave-from {
+  max-width: 2.5rem;
+  opacity: 1;
+}
+
 /* stagger: el contenedor asigna --bk-stagger-i por hijo */
 .bk-stagger > * {
   animation: bk-rise var(--bk-dur-3) var(--bk-ease-out) backwards;

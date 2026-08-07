@@ -109,6 +109,19 @@ class ExerciseOrderIn(BaseModel):
     workout_exercise_ids: list[int] = Field(min_length=1)
 
 
+# v0.7.0 (zurdi: "no veo cómo añadir una superserie a un entrenamiento"):
+# reasignación EN BLOQUE del grouping de un entreno en vivo — espejo de
+# ExerciseOrderIn: el cliente manda el estado completo normalizado (lib
+# supersets.ts), nunca deltas por ejercicio
+class SupersetGroupIn(BaseModel):
+    workout_exercise_id: int
+    superset_group: int | None = Field(None, ge=0)
+
+
+class SupersetGroupsIn(BaseModel):
+    groups: list[SupersetGroupIn] = Field(min_length=1)
+
+
 class MuscleTagsIn(BaseModel):
     muscle_group_ids: list[int]
 

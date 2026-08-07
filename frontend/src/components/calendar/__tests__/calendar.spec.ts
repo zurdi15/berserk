@@ -1731,7 +1731,7 @@ describe('CalendarView layout (round 6, items 3/4)', () => {
     expect(wrapper.find('.flex-1.min-h-0.overflow-y-auto').exists()).toBe(false)
 
     const monthNavRow = wrapper.get('[data-testid="month-nav"]')
-    expect(monthNavRow.classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'bg-void']))
+    expect(monthNavRow.classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'bk-chrome-bg']))
   })
 
   it('polish wave item 13: the rune-legend trigger is NOT in the month-navigation row anymore (only prev/next live there)', async () => {

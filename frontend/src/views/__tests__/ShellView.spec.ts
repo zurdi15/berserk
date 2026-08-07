@@ -398,20 +398,26 @@ describe('ShellView CTA rest countdown takeover (item 1, v0.3.0)', () => {
     expect(wrapper.findAllComponents(BkRune)).toHaveLength(10)
   })
 
-  it('the CTA still navigates to /workout while resting (route behavior unchanged)', async () => {
+  // v0.7.0: el CTA ya no es un RouterLink (la losa contiene DOS botones —
+  // countdown que navega por router.push y la X de cancelar) — la navegación
+  // se comprueba clicando el botón del countdown
+  it('v0.7.0: tapping the countdown button navigates to /workout while resting', async () => {
     const wrapper = await mountWithRoute('today')
     useRestTimerStore().start(30)
     await flushPromises()
 
-    const link = wrapper.findAll('a').find((a) => a.attributes('href') === '/workout')
-    expect(link).toBeTruthy()
+    const timer = wrapper.get('[data-testid="cta-timer"]')
+    await timer.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.$route.name).toBe('workout')
   })
 })
 
 // item 8 (v0.4.3, zurdi): la losa del CTA nunca cambia de ALTO — antes el
 // countdown (más alto o que envolvía línea que la runa) estiraba la losa
-// entera y con ella el navbar completo. h-12 fijo en los 3 estados
-// (runa/countdown/expandido); el ancho SÍ puede crecer.
+// entera y con ella el navbar completo. h-12 fijo en runa y countdown+X;
+// el ancho SÍ puede crecer (y la X lo anima al entrar/salir, ver bk-cta-x).
 describe('ShellView CTA fixed height (item 8, v0.4.3)', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
@@ -424,12 +430,10 @@ describe('ShellView CTA fixed height (item 8, v0.4.3)', () => {
     for (const slab of slabs) {
       expect(slab.classList.contains('h-12')).toBe(true)
       expect(slab.classList.contains('flex')).toBe(true)
-      expect(slab.classList.contains('items-center')).toBe(true)
-      expect(slab.classList.contains('justify-center')).toBe(true)
     }
   })
 
-  it('the CTA slab keeps the SAME h-12 class while showing the countdown (resting)', async () => {
+  it('the CTA slab keeps the SAME h-12 class while showing the countdown + X (resting)', async () => {
     const wrapper = await mountWithRoute('today')
     useRestTimerStore().start(90)
     await flushPromises()
@@ -445,120 +449,58 @@ describe('ShellView CTA fixed height (item 8, v0.4.3)', () => {
       expect(timer.classes()).toContain('whitespace-nowrap')
     }
   })
-
-  it('the CTA slab keeps the SAME h-12 class in the expanded (cancel-revealed) state', async () => {
-    const wrapper = await mountWithRoute('workout')
-    useRestTimerStore().start(90)
-    await flushPromises()
-
-    const timer = wrapper.get('[data-testid="cta-timer"]')
-    await timer.trigger('click')
-    await flushPromises()
-
-    const cancelButtons = wrapper.findAll('[data-testid^="cta-cancel-rest"]')
-    expect(cancelButtons).toHaveLength(2) // desktop + móvil
-    for (const btn of cancelButtons) expect(btn.classes()).toContain('h-12')
-    const slab = timer.element.closest('.bk-slab')!
-    expect(slab.classList.contains('h-12')).toBe(true)
-  })
 })
 
-// item 6 (v0.4.3, zurdi): mientras se descansa Y ya se está en /workout (el
-// único caso en que el CTA no tiene a dónde navegar), tocarlo expande un
-// botón de cancelar en vez de ser un no-op.
-describe('ShellView CTA tap-to-cancel-rest (item 6, v0.4.3)', () => {
+// v0.7.0 (zurdi revoca el expandir-para-cancelar del item 6): la X roja de
+// cancelar vive SIEMPRE visible dentro de la losa mientras se descansa —
+// sin tap previo, en cualquier ruta — y el countdown es un botón que navega.
+describe('ShellView CTA always-visible cancel X (v0.7.0)', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('on /workout while resting, tapping the CTA reveals the cancel button (no cta-cancel-rest before the tap)', async () => {
-    const wrapper = await mountWithRoute('workout')
+  it('the red X is visible in both bars whenever resting, on any route, without any prior tap', async () => {
+    const wrapper = await mountWithRoute('today')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
+
     useRestTimerStore().start(90)
     await flushPromises()
 
-    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
-
-    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
-    await links[0].trigger('click')
-    await flushPromises()
-
-    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(2)
+    const cancels = wrapper.findAll('[data-testid^="cta-cancel-rest"]')
+    expect(cancels).toHaveLength(2) // desktop + móvil
+    for (const btn of cancels) {
+      expect(btn.classes()).toContain('text-danger')
+      expect(btn.attributes('aria-label')).toBe('Cancelar descanso')
+      // la X vive DENTRO de la misma losa que el countdown (ya no es una
+      // píldora adyacente): mismo .bk-slab ancestro
+      expect(btn.element.closest('.bk-slab')).not.toBeNull()
+    }
   })
 
-  it('tapping the cancel button clears the rest timer and collapses the expanded state', async () => {
+  it('tapping the X clears the rest timer and the X leaves with it (also when the timer ends on its own)', async () => {
     const wrapper = await mountWithRoute('workout')
     const restTimer = useRestTimerStore()
     restTimer.start(90)
     await flushPromises()
 
-    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
-    await links[0].trigger('click')
+    await wrapper.get('[data-testid="cta-cancel-rest"]').trigger('click')
     await flushPromises()
-
-    const cancelBtn = wrapper.get('[data-testid="cta-cancel-rest"]')
-    expect(cancelBtn.attributes('aria-label')).toBe('Cancelar descanso')
-    await cancelBtn.trigger('click')
-    await flushPromises()
-
     expect(restTimer.active).toBe(false)
     expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
-  })
 
-  it('tapping the CTA a second time (already expanded) collapses it without clearing the timer', async () => {
-    const wrapper = await mountWithRoute('workout')
-    const restTimer = useRestTimerStore()
-    restTimer.start(90)
-    await flushPromises()
-
-    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
-    await links[0].trigger('click')
+    // el timer muriendo solo (llega a 0) también retira la X
+    restTimer.start(30)
     await flushPromises()
     expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(2)
-
-    await links[0].trigger('click')
+    restTimer.clear()
     await flushPromises()
-
-    expect(restTimer.active).toBe(true) // NO se canceló, solo se colapsó
     expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
   })
 
-  it('the rest timer ending on its own (not via the CTA) collapses any expanded state', async () => {
-    const wrapper = await mountWithRoute('workout')
-    const restTimer = useRestTimerStore()
-    restTimer.start(90)
-    await flushPromises()
-
-    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
-    await links[0].trigger('click')
-    await flushPromises()
-    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(2)
-
-    restTimer.clear() // simula el timer llegando a 0 por su cuenta
-    await flushPromises()
-
-    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
-  })
-
-  it('on ANY other route, tapping the CTA while resting still navigates (no expand, no interception)', async () => {
-    const wrapper = await mountWithRoute('today')
-    useRestTimerStore().start(90)
-    await flushPromises()
-
-    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
-    await links[0].trigger('click')
-    await flushPromises()
-
-    expect(wrapper.vm.$route.name).toBe('workout')
-    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
-  })
-
-  it('on /workout while NOT resting, tapping the CTA does nothing special (no expand — nothing to cancel)', async () => {
+  it('while NOT resting there is no X and the slab holds the rune', async () => {
     const wrapper = await mountWithRoute('workout')
     await flushPromises()
-
-    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
-    await links[0].trigger('click')
-    await flushPromises()
-
     expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
+    expect(wrapper.findAll('[data-testid="cta-timer"]')).toHaveLength(0)
   })
 })
 

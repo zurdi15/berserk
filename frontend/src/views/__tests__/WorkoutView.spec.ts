@@ -1111,13 +1111,48 @@ describe('WorkoutView v0.5.0 superseries: render agrupado y encadenado', () => {
     return mount(WorkoutView, { global: { plugins: [createI18nInstance()] }, attachTo: document.body })
   }
 
-  it('labels the contiguous group members "Superserie A" and leaves the loose card unlabeled', async () => {
+  // v0.7.0 (feedback de zurdi): los miembros van DENTRO de un contenedor con
+  // borde aurora y UN chip de cabecera de bloque; las cards ya no llevan chip
+  it('v0.7.0: wraps the contiguous group in ONE aurora-bordered container with a single "Superserie A" header; the loose card stays outside', async () => {
     wrapper = mountGrouped()
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="superset-chip-20"]').text()).toBe('Superserie A')
-    expect(wrapper.get('[data-testid="superset-chip-21"]').text()).toBe('Superserie A')
-    expect(wrapper.find('[data-testid="superset-chip-22"]').exists()).toBe(false)
+    const container = wrapper.get('[data-testid="superset-container-A"]')
+    expect(container.classes()).toEqual(expect.arrayContaining(['border', 'border-aurora/50']))
+    expect(container.text()).toContain('Superserie A')
+    // ambas cards del grupo viven DENTRO del contenedor; la suelta fuera
+    const cards = wrapper.findAllComponents(WorkoutExerciseCard)
+    expect(container.element.contains(cards[0].element)).toBe(true)
+    expect(container.element.contains(cards[1].element)).toBe(true)
+    expect(container.element.contains(cards[2].element)).toBe(false)
+    // sin chips por card (el contenedor lleva la única etiqueta del bloque)
+    expect(wrapper.find('[data-testid="superset-chip-20"]').exists()).toBe(false)
+  })
+
+  // v0.7.0 (zurdi: "no veo cómo añadir una superserie a un entrenamiento"):
+  // toggles de frontera entre cards, con icono de ESTADO (cerrado = enlazado)
+  it('v0.7.0: boundary toggles render between cards (closed chain inside the group, broken between blocks) and send the full normalized state', async () => {
+    wrapper = mountGrouped()
+    await flushPromises()
+
+    // frontera interna del grupo (índice 1): estado enlazado
+    const inner = wrapper.get('[data-testid="workout-superset-toggle-1"]')
+    expect(inner.attributes('aria-pressed')).toBe('true')
+    // frontera entre el grupo y la card suelta (índice 2): sin enlazar
+    const outer = wrapper.get('[data-testid="workout-superset-toggle-2"]')
+    expect(outer.attributes('aria-pressed')).toBe('false')
+
+    // enlazar la suelta con el grupo manda el estado COMPLETO normalizado
+    const store = useActiveWorkoutStore()
+    const spy = vi.spyOn(store, 'setSupersetGroups').mockResolvedValue(undefined)
+    await outer.trigger('click')
+    await flushPromises()
+    expect(spy).toHaveBeenCalledWith([0, 0, 0])
+
+    // romper la frontera interna disuelve el grupo entero (mitades de 1)
+    await inner.trigger('click')
+    await flushPromises()
+    expect(spy).toHaveBeenLastCalledWith([null, null, null])
   })
 
   it('wires the positional rest gating: non-last member gets supersetLast=false, last and loose get true', async () => {

@@ -78,6 +78,8 @@ export const en = {
     generic: 'Something went wrong. Try again.',
     // v0.6.0 offline: only for flows that REQUIRE network (see es.ts)
     offline: 'No connection. This needs internet — try again once it is back.',
+    // v0.7.0: see es.ts
+    superset_groups_invalid: 'Could not update the superset. Reload and try again.',
   },
   common: {
     save: 'Save',
