@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.4.4 - 2026-08-07
+
+- Fixed a mobile regression from 0.4.3: every section's content box ended ~128px above the bottom bar (a leftover flow spacer double-counted the navbar reserve once all views got their own internal scroll). All sections now end with a uniform clean margin above the bar.
+
 ## 0.4.3 - 2026-08-07
 
 - App-wide scroll model: every section pins its chrome (tab strips, headers) and scrolls its own content internally, ending cleanly above the bottom bar — and section changes always start at the top.
