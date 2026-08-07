@@ -777,6 +777,19 @@ describe('WorkoutView', () => {
       expect(document.body.querySelector('[data-testid="rest-cancel-chip"]')).toBeNull()
     })
 
+    // item 5 (v0.4.3, zurdi): la etiqueta SEPARADA ("Descanso automático" a
+    // la izquierda del toggle) se retira — el propio botón ya lo dice, y
+    // llevaba un aria-label explícito propio como ancla de accesibilidad
+    it('item 5: has no separate label sibling next to the toggle, but the toggle itself carries an aria-label', async () => {
+      wrapper = mountLive()
+      await flushPromises()
+
+      const toggle = wrapper.get('[data-testid="rest-auto-toggle"]')
+      // única hija de su fila: nada a su lado que duplique el texto
+      expect(toggle.element.parentElement?.children).toHaveLength(1)
+      expect(toggle.attributes('aria-label')).toBe('Descanso automático')
+    })
+
     it('tapping the auto-rest toggle off, then logging a set, starts NO timer', async () => {
       wrapper = mountLive()
       await flushPromises()

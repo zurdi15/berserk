@@ -365,15 +365,22 @@ onBeforeUnmount(() => {
 
       <!-- item 4 (post-0.3.0): opt-out de descanso automático — mismo idiom
            visual que el toggle de calentamiento de SetForm (borde+aria-pressed,
-           sin cambiar de texto entre estados) -->
-      <div class="flex items-center justify-between" :style="{ '--bk-stagger-i': 1 }">
-        <span class="text-sm text-ink-muted">{{ t('timer.autoRest') }}</span>
+           sin cambiar de texto entre estados).
+           item 5 (v0.4.3, zurdi): se retira el <span> etiqueta que vivía A LA
+           IZQUIERDA del toggle — el propio botón ya dice "Descanso
+           automático" y repetirlo al lado era la misma frase dos veces
+           (control autodescriptivo). aria-label explícito en el botón (en
+           vez de depender solo de su texto visible) como ancla de
+           accesibilidad, por si el texto visible cambia de forma más
+           adelante (p.ej. a un icono). -->
+      <div class="flex items-center justify-end" :style="{ '--bk-stagger-i': 1 }">
         <button
           type="button"
           data-testid="rest-auto-toggle"
           class="bk-press px-3 py-1.5 rounded-sm border text-sm"
           :class="restAutoEnabled ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
           :aria-pressed="restAutoEnabled ? 'true' : 'false'"
+          :aria-label="t('timer.autoRest')"
           @click="toggleRestAuto"
         >
           {{ t('timer.autoRest') }}
