@@ -237,3 +237,36 @@ def test_reorder_and_manual_tags(client: TestClient):
     assert client.put(
         f"/api/v1/workouts/{workout['id']}/muscle-groups", json={"muscle_group_ids": [99999]}
     ).status_code == 422
+
+
+# v0.6.0 offline: replay idempotente de la cola offline — el mismo client_id
+# reproducido dos veces NO duplica la serie; el segundo intento devuelve la
+# fila original (y sin new_records: los PRs ya se detectaron la primera vez)
+def test_log_set_with_client_id_is_idempotent(client: TestClient):
+    workout, wex = start_with_exercise(client)
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+    body = {"reps": 5, "weight_kg": 100, "client_id": "11111111-1111-4111-8111-111111111111"}
+
+    first = client.post(url, json=body)
+    assert first.status_code == 201
+    assert first.json()["new_records"] != []
+
+    replay = client.post(url, json=body)
+    assert replay.status_code == 201
+    assert replay.json()["set"]["id"] == first.json()["set"]["id"]
+    assert replay.json()["new_records"] == []
+
+    sets = client.get(f"/api/v1/workouts/{workout['id']}").json()["exercises"][0]["sets"]
+    assert len(sets) == 1
+
+
+def test_log_set_without_client_id_still_duplicates_freely(client: TestClient):
+    # el flujo online normal (sin client_id) sigue permitiendo series
+    # idénticas consecutivas — dos series iguales son un caso REAL en el gym
+    workout, wex = start_with_exercise(client)
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+    body = {"reps": 5, "weight_kg": 100}
+    assert client.post(url, json=body).status_code == 201
+    assert client.post(url, json=body).status_code == 201
+    sets = client.get(f"/api/v1/workouts/{workout['id']}").json()["exercises"][0]["sets"]
+    assert len(sets) == 2

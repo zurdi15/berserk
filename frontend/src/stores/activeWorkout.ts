@@ -1,10 +1,36 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
-import { ApiError } from '@/api/client'
+import { ApiError, OfflineError } from '@/api/client'
 import * as domain from '@/api/domain'
-import type { ExerciseHistoryOut, PersonalRecordOut, SetIn, SetLogOut, WorkoutOut } from '@/api/domain'
+import type { ExerciseHistoryOut, PersonalRecordOut, SetIn, SetLogOut, SetOut, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
+import { online } from '@/offline/net'
+import * as outbox from '@/offline/outbox'
 import { useRestTimerStore } from '@/stores/restTimer'
+import { todayIso } from '@/utils/dates'
+
+// v0.6.0 offline de gimnasio: este store es la pieza que hace el entreno
+// usable sin red. Cada mutación tiene dos caminos:
+// - online y sin cola pendiente: API + refresh, como siempre.
+// - offline O con cola pendiente: aplicar el cambio al workout local de
+//   forma optimista (ids temporales NEGATIVOS de outbox.nextTempId) y
+//   encolarlo en el outbox para el replay.
+// "Con cola pendiente" cuenta como offline aunque haya vuelto la red: si una
+// serie encolada aún no se ha reproducido, mandar la siguiente en directo la
+// adelantaría (el servidor las numeraría al revés) — la cola es FIFO
+// estricta y TODO pasa por ella hasta drenarla (ShellView dispara syncNow).
+// El workout local se persiste como snapshot en localStorage en cada cambio:
+// recargar la PWA en el gym sin cobertura recupera el entreno tal cual.
+const SNAPSHOT_KEY = 'bk:active-workout'
+
+function loadSnapshot(): WorkoutOut | null {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_KEY)
+    return raw === null ? null : (JSON.parse(raw) as WorkoutOut)
+  } catch {
+    return null
+  }
+}
 
 export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   const workout = ref<WorkoutOut | null>(null)
@@ -16,12 +42,40 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   // depende de qué workout se excluye de la búsqueda (ver exerciseHistory)
   const historyCache = ref(new Map<number, ExerciseHistoryOut | null>())
 
+  // snapshot SIEMPRE al día (flush sync: que una muerte súbita de la pestaña
+  // justo tras registrar una serie no pierda el cambio optimista)
+  watch(
+    workout,
+    (value) => {
+      try {
+        if (value === null) localStorage.removeItem(SNAPSHOT_KEY)
+        else localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(value))
+      } catch {
+        // storage inaccesible: sin snapshot que sobreviva recargas, pero el
+        // entreno en memoria sigue intacto (degradación, no rotura)
+      }
+    },
+    { deep: true, flush: 'sync' },
+  )
+
+  const offline = () => !online.value || outbox.hasPending()
+
   async function resume() {
     loading.value = true
     historyCache.value.clear()
     try {
+      // con cola pendiente el snapshot local ES la verdad más completa: el
+      // servidor aún no tiene las entradas sin reproducir
+      if (outbox.hasPending()) {
+        workout.value = loadSnapshot()
+        return
+      }
       workout.value = await domain.getActiveWorkout()
     } catch (error) {
+      if (error instanceof OfflineError) {
+        workout.value = loadSnapshot()
+        return
+      }
       // sin entreno activo no es un error: es el estado normal
       if (!(error instanceof ApiError && error.slug === 'no_active_workout')) throw error
       workout.value = null
@@ -31,67 +85,268 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   }
 
   async function refresh() {
-    if (workout.value) workout.value = await domain.getWorkout(workout.value.id)
+    // offline/cola pendiente: el estado del servidor está incompleto por
+    // definición — el workout local optimista manda
+    if (offline() || !workout.value) return
+    workout.value = await domain.getWorkout(workout.value.id)
   }
 
   async function start(body: Parameters<typeof domain.startWorkout>[0]) {
     historyCache.value.clear()
-    workout.value = await domain.startWorkout(body)
+    if (!offline()) {
+      try {
+        workout.value = await domain.startWorkout(body)
+        return
+      } catch (error) {
+        if (!(error instanceof OfflineError)) throw error
+        // la red murió justo aquí: cae a la rama offline de abajo
+      }
+    }
+    // arranque offline: la copia de la rutina la hace el cliente con lo
+    // último visto (listRoutines viene de readCache sin red); una rutina
+    // jamás vista offline no se puede arrancar — OfflineError y toast
+    const tempExerciseIds: number[] = []
+    let exercises: WorkoutExerciseOut[] = []
+    if (body.routine_id != null) {
+      const routines = await domain.listRoutines()
+      const routine = routines.find((r) => r.id === body.routine_id)
+      if (!routine) throw new OfflineError()
+      exercises = routine.exercises.map((item, index) => {
+        const tempId = outbox.nextTempId()
+        tempExerciseIds.push(tempId)
+        return {
+          id: tempId,
+          exercise_id: item.exercise_id,
+          position: index + 1,
+          note: null,
+          rest_seconds: item.rest_seconds ?? null,
+          superset_group: item.superset_group ?? null,
+          sets: [],
+        }
+      })
+    }
+    const tempWorkoutId = outbox.nextTempId()
+    workout.value = {
+      id: tempWorkoutId,
+      date: body.date ?? todayIso(),
+      started_at: new Date().toISOString(),
+      ended_at: null,
+      routine_id: body.routine_id ?? null,
+      note: null,
+      feeling: null,
+      stretched: false,
+      exercises,
+      muscle_tag_ids: [],
+    }
+    outbox.enqueue({ id: outbox.newClientId(), kind: 'startWorkout', tempWorkoutId, body, tempExerciseIds })
   }
 
   async function exerciseHistory(exerciseId: number): Promise<ExerciseHistoryOut | null> {
     if (historyCache.value.has(exerciseId)) return historyCache.value.get(exerciseId) ?? null
-    const result = await domain.getExerciseHistory(exerciseId, {
-      exclude_workout_id: workout.value?.id,
-    })
+    let result: ExerciseHistoryOut | null
+    try {
+      result = await domain.getExerciseHistory(exerciseId, {
+        exclude_workout_id: workout.value && workout.value.id > 0 ? workout.value.id : undefined,
+      })
+    } catch (error) {
+      // el hint de "última vez" es prescindible: sin red y sin cache, no hay
+      // historial que enseñar — nunca un error de cara al usuario
+      if (!(error instanceof OfflineError)) throw error
+      result = null
+    }
     historyCache.value.set(exerciseId, result)
     return result
   }
 
   async function finish(): Promise<WorkoutOut> {
-    const finished = await domain.finishWorkout(workout.value!.id)
+    if (!offline()) {
+      const finished = await domain.finishWorkout(workout.value!.id)
+      workout.value = null
+      lastRecords.value = []
+      return finished
+    }
+    // cierre offline: el resumen se construye del estado local; los PRs de
+    // las series encoladas se detectarán en el replay (sin celebración — la
+    // celebración es un evento en vivo, no una notificación diferida)
+    const finished: WorkoutOut = { ...workout.value!, ended_at: new Date().toISOString() }
+    outbox.enqueue({ id: outbox.newClientId(), kind: 'finishWorkout', workoutId: finished.id })
     workout.value = null
     lastRecords.value = []
     return finished
   }
 
   async function addExercise(exercise_id: number) {
-    await domain.addWorkoutExercise(workout.value!.id, { exercise_id })
-    await refresh()
+    if (!offline()) {
+      await domain.addWorkoutExercise(workout.value!.id, { exercise_id })
+      await refresh()
+      return
+    }
+    const tempId = outbox.nextTempId()
+    workout.value!.exercises = [
+      ...workout.value!.exercises,
+      {
+        id: tempId,
+        exercise_id,
+        position: workout.value!.exercises.length + 1,
+        note: null,
+        // ad-hoc: sin override de descanso (mismo default que el backend
+        // aplicaría sin rutina de origen a mano) y siempre suelto
+        rest_seconds: null,
+        superset_group: null,
+        sets: [],
+      },
+    ]
+    outbox.enqueue({
+      id: outbox.newClientId(),
+      kind: 'addExercise',
+      workoutId: workout.value!.id,
+      tempExerciseId: tempId,
+      exerciseId: exercise_id,
+    })
   }
 
   async function removeExercise(weid: number) {
-    await domain.removeWorkoutExercise(workout.value!.id, weid)
-    await refresh()
+    if (!offline()) {
+      await domain.removeWorkoutExercise(workout.value!.id, weid)
+      await refresh()
+      return
+    }
+    workout.value!.exercises = workout.value!.exercises
+      .filter((e) => e.id !== weid)
+      .map((e, index) => ({ ...e, position: index + 1 }))
+    outbox.enqueue({
+      id: outbox.newClientId(),
+      kind: 'removeExercise',
+      workoutId: workout.value!.id,
+      exerciseId: weid,
+    })
   }
 
   async function reorder(ids: number[]) {
+    // reordenar exige red (fuera del alcance offline v1: es raro mid-gym y
+    // su endpoint reescribe posiciones en bloque — encolarlo entre altas
+    // temporales complica el replay sin caso de uso real)
     workout.value = await domain.reorderWorkoutExercises(workout.value!.id, ids)
   }
 
+  function localExercise(weid: number): WorkoutExerciseOut {
+    const wex = workout.value!.exercises.find((e) => e.id === weid)
+    if (!wex) throw new Error('unknown workout exercise')
+    return wex
+  }
+
   async function logSet(weid: number, body: SetIn): Promise<SetLogOut> {
-    const result = await domain.logSet(workout.value!.id, weid, body)
-    if (result.new_records.length) lastRecords.value = result.new_records
-    await refresh()
-    return result
+    if (!offline()) {
+      try {
+        const result = await domain.logSet(workout.value!.id, weid, body)
+        if (result.new_records.length) lastRecords.value = result.new_records
+        await refresh()
+        return result
+      } catch (error) {
+        if (!(error instanceof OfflineError)) throw error
+        // la red murió al registrar: cae a la rama offline — la serie no se
+        // pierde (el dedupe por client_id del replay evita duplicarla si el
+        // servidor sí la recibió antes de morir la conexión... solo cuando
+        // fue el outbox quien la mandó; este primer intento iba SIN
+        // client_id, así que aquí el fallo fue antes de llegar al servidor)
+      }
+    }
+    const wex = localExercise(weid)
+    const tempSetId = outbox.nextTempId()
+    const newSet: SetOut = {
+      id: tempSetId,
+      set_number: wex.sets.length + 1,
+      reps: body.reps ?? null,
+      weight_kg: body.weight_kg ?? null,
+      duration_seconds: body.duration_seconds ?? null,
+      distance_m: body.distance_m ?? null,
+      is_warmup: body.is_warmup ?? false,
+      rpe: body.rpe ?? null,
+      completed_at: new Date().toISOString(),
+    }
+    wex.sets = [...wex.sets, newSet]
+    outbox.enqueue({
+      id: outbox.newClientId(),
+      kind: 'logSet',
+      workoutId: workout.value!.id,
+      exerciseId: weid,
+      tempSetId,
+      body,
+    })
+    // sin new_records: los PRs se detectan en el servidor al sincronizar
+    return { set: newSet, new_records: [] }
   }
 
   async function updateSet(weid: number, sid: number, body: SetIn) {
-    await domain.updateSet(workout.value!.id, weid, sid, body)
-    await refresh()
+    if (!offline()) {
+      await domain.updateSet(workout.value!.id, weid, sid, body)
+      await refresh()
+      return
+    }
+    const wex = localExercise(weid)
+    wex.sets = wex.sets.map((s) =>
+      s.id === sid
+        ? {
+            ...s,
+            reps: body.reps ?? null,
+            weight_kg: body.weight_kg ?? null,
+            duration_seconds: body.duration_seconds ?? null,
+            distance_m: body.distance_m ?? null,
+            is_warmup: body.is_warmup ?? false,
+            rpe: body.rpe ?? null,
+          }
+        : s,
+    )
+    outbox.enqueue({
+      id: outbox.newClientId(),
+      kind: 'updateSet',
+      workoutId: workout.value!.id,
+      exerciseId: weid,
+      setId: sid,
+      body,
+    })
   }
 
   async function deleteSet(weid: number, sid: number) {
-    await domain.deleteSet(workout.value!.id, weid, sid)
-    await refresh()
+    if (!offline()) {
+      await domain.deleteSet(workout.value!.id, weid, sid)
+      await refresh()
+      return
+    }
+    const wex = localExercise(weid)
+    wex.sets = wex.sets
+      .filter((s) => s.id !== sid)
+      .map((s, index) => ({ ...s, set_number: index + 1 }))
+    outbox.enqueue({
+      id: outbox.newClientId(),
+      kind: 'deleteSet',
+      workoutId: workout.value!.id,
+      exerciseId: weid,
+      setId: sid,
+    })
   }
 
   async function setExerciseRest(weid: number, restSeconds: number | null) {
-    await domain.updateWorkoutExercise(workout.value!.id, weid, { rest_seconds: restSeconds })
-    await refresh()
+    if (!offline()) {
+      await domain.updateWorkoutExercise(workout.value!.id, weid, { rest_seconds: restSeconds })
+      await refresh()
+      return
+    }
+    const wex = localExercise(weid)
+    wex.rest_seconds = restSeconds
+    outbox.enqueue({
+      id: outbox.newClientId(),
+      kind: 'setExerciseRest',
+      workoutId: workout.value!.id,
+      exerciseId: weid,
+      restSeconds,
+    })
   }
 
   async function discard() {
+    // descartar exige red (v1): es la acción más destructiva del flujo y
+    // reproducirla en diferido tras una cola de series sería tirar trabajo
+    // registrado sin que el usuario vea qué está tirando
     await domain.deleteWorkout(workout.value!.id)
     workout.value = null
     lastRecords.value = []

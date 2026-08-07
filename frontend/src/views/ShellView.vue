@@ -2,11 +2,16 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
+import { useI18n } from 'vue-i18n'
+
 import BkRune from '@/lib/BkRune.vue'
 import type { RuneName } from '@/lib/runes'
 import AthleteBanner from '@/components/shell/AthleteBanner.vue'
+import { attachNetListeners, onBackOnline, online } from '@/offline/net'
+import * as outbox from '@/offline/outbox'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useRestTimerStore } from '@/stores/restTimer'
+import { useToastStore } from '@/stores/toast'
 
 // item 4 (round 9): correcciones de runas del nav — streak/shoulders SIGUEN
 // existiendo en runes.ts (streak: StreakCard; shoulders: rune de grupo
@@ -20,6 +25,7 @@ const items: { name: string; label: string; rune: RuneName }[] = [
 ]
 
 const route = useRoute()
+const { t } = useI18n()
 const timer = useRestTimerStore()
 const activeWorkout = useActiveWorkoutStore()
 
@@ -163,15 +169,42 @@ function updateIndicator() {
   indicatorWidth.value = el.offsetWidth
 }
 
+// v0.6.0 offline: el shell es quien cablea la sincronización — listeners de
+// red (una vez), replay al recuperar conexión, drenado al arrancar (si la
+// PWA murió en el gym con cola pendiente), y el resultado del drenado como
+// toast + refresh del entreno (los ids temporales del snapshot pasan a ser
+// reales en el servidor; resume() con la cola ya vacía trae el estado final)
+let disposeBackOnline: (() => void) | null = null
+let disposeDrained: (() => void) | null = null
+
 onMounted(() => {
   updateIndicator()
   window.addEventListener('resize', updateIndicator)
   document.addEventListener('pointerdown', onDocumentPointerDown)
+
+  attachNetListeners()
+  outbox.refreshPendingCount()
+  disposeBackOnline = onBackOnline(() => {
+    outbox.syncNow()
+  })
+  disposeDrained = outbox.onDrained(async ({ synced, conflicts }) => {
+    if (conflicts > 0) {
+      useToastStore().push('error', t('offline.syncConflicts', { n: conflicts }))
+    } else if (synced > 0) {
+      useToastStore().push('info', t('offline.synced'))
+    }
+    // el snapshot local puede tener ids temporales: con la cola vacía, el
+    // servidor ya es la verdad completa
+    await activeWorkout.resume()
+  })
+  if (navigator.onLine) outbox.syncNow()
 })
 onUnmounted(() => {
   window.removeEventListener('resize', updateIndicator)
   document.removeEventListener('pointerdown', onDocumentPointerDown)
   if (ctaCollapseTimer) clearTimeout(ctaCollapseTimer)
+  disposeBackOnline?.()
+  disposeDrained?.()
 })
 // activeIndex, no route.name: el ancho de los items es estático (5 fijos),
 // así que solo hace falta remedir cuando cambia CUÁL item está activo
@@ -307,6 +340,20 @@ watch(activeIndex, () => nextTick(updateIndicator))
       />
     </header>
     <AthleteBanner />
+    <!-- v0.6.0 offline: banda de estado — visible sin red o con cola
+         pendiente; desaparece sola al drenar. Informativa, no interactiva:
+         la sincronización es automática (ver onMounted) y un botón de
+         "reintentar" solo duplicaría lo que los triggers ya hacen. -->
+    <div
+      v-if="!online || outbox.pendingCount.value > 0"
+      class="border-b border-line bg-stone px-4 py-1.5 text-center text-xs text-ink-muted"
+      data-testid="offline-chip"
+    >
+      <template v-if="!online">
+        {{ t('offline.badge') }}<template v-if="outbox.pendingCount.value > 0"> · {{ t('offline.pending', { n: outbox.pendingCount.value }) }}</template>
+      </template>
+      <template v-else>{{ t('offline.syncing') }}</template>
+    </div>
     <!-- Mobile bottom nav: barra inferior fija en móvil; oculta en desktop (por ahora sin cabecera de identidad) -->
     <nav
       class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:hidden"

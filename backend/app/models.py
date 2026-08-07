@@ -223,12 +223,20 @@ class Workout(Base):
             unique=True,
             sqlite_where=text("ended_at IS NULL"),
         ),
+        # v0.6.0 offline: replay idempotente — el cliente genera un UUID por
+        # "empezar entreno" encolado sin red; si el replay se corta tras
+        # insertar pero antes de confirmar al cliente, el reintento encuentra
+        # la fila por client_id en vez de duplicarla. Scoped por owner: la
+        # búsqueda de dedupe siempre filtra por dueño, el índice solo lo
+        # respalda. NULLs no colisionan en SQLite (cada NULL es distinto).
+        Index("uq_workouts_owner_client_id", "owner_id", "client_id", unique=True),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
+    client_id: Mapped[str | None] = mapped_column(String(36), default=None)
     date: Mapped[date] = mapped_column(Date, index=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
@@ -255,11 +263,16 @@ class Workout(Base):
 
 class WorkoutExercise(Base):
     __tablename__ = "workout_exercises"
+    # v0.6.0 offline: mismo criterio que Workout.client_id (ver ahí)
+    __table_args__ = (
+        Index("uq_workout_exercises_workout_client_id", "workout_id", "client_id", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     workout_id: Mapped[int] = mapped_column(
         ForeignKey("workouts.id", ondelete="CASCADE"), index=True
     )
+    client_id: Mapped[str | None] = mapped_column(String(36), default=None)
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
     position: Mapped[int] = mapped_column()
     note: Mapped[str | None] = mapped_column(String(300), default=None)
@@ -285,11 +298,16 @@ class WorkoutExercise(Base):
 class WorkoutSet(Base):
     # "workout_sets" y no "sets": evita la palabra reservada en consultas a mano
     __tablename__ = "workout_sets"
+    # v0.6.0 offline: mismo criterio que Workout.client_id (ver ahí)
+    __table_args__ = (
+        Index("uq_workout_sets_wex_client_id", "workout_exercise_id", "client_id", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     workout_exercise_id: Mapped[int] = mapped_column(
         ForeignKey("workout_exercises.id", ondelete="CASCADE"), index=True
     )
+    client_id: Mapped[str | None] = mapped_column(String(36), default=None)
     set_number: Mapped[int] = mapped_column()
     reps: Mapped[int | None] = mapped_column(default=None)
     weight_kg: Mapped[float | None] = mapped_column(Float, default=None)

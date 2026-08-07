@@ -21,6 +21,14 @@ export const es = {
     redeemTitle: 'Únete al clan',
     redeemHint: 'Te han invitado a esta instancia. Crea tu cuenta.',
   },
+  // v0.6.0 offline de gimnasio: banda del shell + toasts de sincronización
+  offline: {
+    badge: 'Sin conexión',
+    pending: '{n} por sincronizar',
+    syncing: 'Sincronizando…',
+    synced: 'Entreno sincronizado.',
+    syncConflicts: '{n} cambios no se pudieron sincronizar (alguien los pisó desde otro sitio).',
+  },
   errors: {
     not_authenticated: 'Tu sesión ha caducado. Entra de nuevo.',
     invalid_credentials: 'Usuario o contraseña incorrectos.',
@@ -68,6 +76,9 @@ export const es = {
     restore_failed: 'No se pudo restaurar la copia; se conservan los datos anteriores.',
     routine_has_private_exercises: 'Esa rutina usa ejercicios privados que no puedes ver, así que no se puede copiar.',
     generic: 'Algo ha fallado. Inténtalo de nuevo.',
+    // v0.6.0 offline: solo en flujos que EXIGEN red (descartar, arrancar una
+    // rutina jamás vista, lecturas sin cache) — el resto encola y sincroniza
+    offline: 'Sin conexión. Esto necesita internet — inténtalo al recuperarla.',
   },
   common: {
     save: 'Guardar',

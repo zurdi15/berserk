@@ -58,6 +58,21 @@ export const useAuthStore = defineStore('auth', () => {
     const { useActiveWorkoutStore } = await import('./activeWorkout')
     useAthleteStore().clear()
     useActiveWorkoutStore().reset()
+    // v0.6.0 offline: TODO lo persistido offline es del usuario saliente —
+    // la cache de lecturas no puede filtrarse al siguiente, y una cola
+    // pendiente jamás debe reproducirse con la sesión de otro (las series
+    // encoladas acabarían en SU historial). El snapshot ya lo borra el
+    // reset() de arriba (workout → null limpia la clave vía el watch).
+    const { clearReadCache } = await import('@/offline/readCache')
+    clearReadCache()
+    try {
+      localStorage.removeItem('bk:outbox')
+      localStorage.removeItem('bk:outbox-idmap')
+    } catch {
+      // storage inaccesible: tampoco había nada persistido que filtrar
+    }
+    const { refreshPendingCount } = await import('@/offline/outbox')
+    refreshPendingCount()
   }
 
   return { user, bootstrapped, ready, isAuthenticated, init, login, bootstrapAccount, redeemAccount, logout }

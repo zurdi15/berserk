@@ -41,10 +41,15 @@ def test_start_empty_and_single_active(client: TestClient):
     active = client.get("/api/v1/workouts/active")
     assert active.status_code == 200 and active.json()["id"] == workout["id"]
 
-    assert client.post(f"/api/v1/workouts/{workout['id']}/finish").status_code == 200
+    finished = client.post(f"/api/v1/workouts/{workout['id']}/finish")
+    assert finished.status_code == 200
     assert client.get("/api/v1/workouts/active").status_code == 404
+    # v0.6.0 offline: terminar es idempotente — un replay de la cola offline
+    # sobre un entreno ya cerrado devuelve el entreno tal cual (mismo
+    # ended_at), no un 409
     resp = client.post(f"/api/v1/workouts/{workout['id']}/finish")
-    assert resp.status_code == 409 and resp.json()["detail"] == "workout_already_finished"
+    assert resp.status_code == 200
+    assert resp.json()["ended_at"] == finished.json()["ended_at"]
 
 
 def test_start_from_routine_copies_exercises(client: TestClient):
@@ -536,3 +541,30 @@ def test_superset_group_null_for_ad_hoc_exercises(client: TestClient):
     assert added["rest_seconds"] == 90  # la herencia de descanso no cambia
     assert added["superset_group"] is None
     client.post(f"/api/v1/workouts/{wid}/finish")
+
+
+# v0.6.0 offline: replay idempotente de la cola offline (ver models.client_id)
+def test_start_workout_with_client_id_is_idempotent(client: TestClient):
+    body = {"client_id": "22222222-2222-4222-8222-222222222222"}
+    first = client.post("/api/v1/workouts", json=body)
+    assert first.status_code == 201
+    # el replay devuelve el MISMO entreno aunque ya haya uno activo (el
+    # dedupe corre antes que el chequeo de "ya hay un entreno activo")
+    replay = client.post("/api/v1/workouts", json=body)
+    assert replay.status_code == 201
+    assert replay.json()["id"] == first.json()["id"]
+
+
+def test_add_exercise_with_client_id_is_idempotent(client: TestClient):
+    workout = client.post("/api/v1/workouts", json={}).json()
+    body = {
+        "exercise_id": bench_id(client),
+        "client_id": "33333333-3333-4333-8333-333333333333",
+    }
+    first = client.post(f"/api/v1/workouts/{workout['id']}/exercises", json=body)
+    assert first.status_code == 201
+    replay = client.post(f"/api/v1/workouts/{workout['id']}/exercises", json=body)
+    assert replay.status_code == 201
+    assert replay.json()["id"] == first.json()["id"]
+    exercises = client.get(f"/api/v1/workouts/{workout['id']}").json()["exercises"]
+    assert len(exercises) == 1

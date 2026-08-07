@@ -69,6 +69,18 @@ def _own_workout(db: Session, user_id: int, workout_id: int) -> Workout:
 
 @router.post("", response_model=WorkoutOut, status_code=201)
 def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depends(get_db)):
+    # v0.6.0 offline: dedupe de replay ANTES de cualquier validación — si el
+    # client_id ya existe, este start YA ocurrió (las validaciones pasaron
+    # entonces); el reintento solo necesita la respuesta que se perdió
+    if payload.client_id is not None:
+        existing = db.scalar(
+            select(Workout).where(
+                Workout.owner_id == user.id, Workout.client_id == payload.client_id
+            )
+        )
+        if existing is not None:
+            return workout_out(existing)
+
     if payload.finished and payload.date is None:
         raise HTTPException(status_code=422, detail="date_required")
 
@@ -116,6 +128,7 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
         started_at=started_at,
         ended_at=ended_at,
         routine_id=routine_id,
+        client_id=payload.client_id,
     )
     db.add(workout)
     db.flush()
@@ -197,8 +210,13 @@ def get_workout(workout_id: int, target: TargetUser, db: Session = Depends(get_d
 @router.post("/{workout_id}/finish", response_model=WorkoutOut)
 def finish_workout(workout_id: int, user: CurrentUser, db: Session = Depends(get_db)):
     workout = _own_workout(db, user.id, workout_id)
+    # v0.6.0 offline: idempotente — un replay de "terminar" sobre un entreno
+    # ya cerrado devuelve el entreno tal cual en vez de 409: el resultado que
+    # el cliente pedía (entreno terminado) ya es verdad. El flujo online no
+    # cambia: la UI nunca ofrece terminar dos veces (el botón vive solo en el
+    # entreno activo), así que el 409 solo protegía contra este mismo replay.
     if workout.ended_at is not None:
-        raise HTTPException(status_code=409, detail="workout_already_finished")
+        return workout_out(workout)
     workout.ended_at = utcnow()
     db.commit()
     return workout_out(workout)
@@ -314,6 +332,13 @@ def add_exercise(
     workout_id: int, payload: WorkoutExerciseIn, user: CurrentUser, db: Session = Depends(get_db)
 ):
     workout = _own_workout(db, user.id, workout_id)
+    # v0.6.0 offline: dedupe de replay (ver start_workout)
+    if payload.client_id is not None:
+        existing = next(
+            (e for e in workout.exercises if e.client_id == payload.client_id), None
+        )
+        if existing is not None:
+            return existing
     if get_visible_exercise(db, user.id, payload.exercise_id) is None:
         raise HTTPException(status_code=422, detail="exercise_invalid")
     position = len(workout.exercises) + 1
@@ -339,6 +364,7 @@ def add_exercise(
         position=position,
         note=payload.note,
         rest_seconds=rest_seconds,
+        client_id=payload.client_id,
     )
     db.add(wex)
     db.flush()
@@ -436,6 +462,12 @@ def log_set(
     db: Session = Depends(get_db),
 ):
     workout, wex = _own_workout_exercise(db, user.id, workout_id, workout_exercise_id)
+    # v0.6.0 offline: dedupe de replay (ver start_workout) — sin new_records:
+    # los PRs de la serie original ya se detectaron en el primer intento
+    if payload.client_id is not None:
+        existing = next((s for s in wex.sets if s.client_id == payload.client_id), None)
+        if existing is not None:
+            return SetLogOut(set=existing, new_records=[])
     exercise = db.get(Exercise, wex.exercise_id)
     try:
         validate_set_fields(exercise.measurement, payload.model_dump())

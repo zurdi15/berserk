@@ -12,6 +12,10 @@ class WorkoutStartIn(BaseModel):
     # entreno retroactivo: ya terminado al crearlo (ver start_workout), así que
     # no compite por el hueco "activo" y exige date (no hay "hoy" implícito)
     finished: bool = False
+    # v0.6.0 offline: UUID generado por el cliente para replay idempotente de
+    # la cola offline (ver Workout.client_id en models.py) — opcional: el
+    # flujo online normal no lo manda
+    client_id: str | None = Field(None, max_length=36)
 
 
 class WorkoutPatchIn(BaseModel):
@@ -88,6 +92,8 @@ class PersonalRecordOut(BaseModel):
 class WorkoutExerciseIn(BaseModel):
     exercise_id: int
     note: str | None = Field(None, max_length=300)
+    # v0.6.0 offline: ver WorkoutStartIn.client_id
+    client_id: str | None = Field(None, max_length=36)
 
 
 class WorkoutExercisePatchIn(BaseModel):
@@ -114,6 +120,10 @@ class SetIn(BaseModel):
     distance_m: float | None = Field(None, gt=0, le=1000000)
     is_warmup: bool = False
     rpe: int | None = Field(None, ge=1, le=10)
+    # v0.6.0 offline: ver WorkoutStartIn.client_id — solo lo usa log_set
+    # (dedupe de replay + se persiste vía **model_dump()); update_set lo
+    # ignora (su setattr itera solo los campos de valor)
+    client_id: str | None = Field(None, max_length=36)
 
 
 class SetLogOut(BaseModel):

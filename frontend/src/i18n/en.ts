@@ -21,6 +21,14 @@ export const en = {
     redeemTitle: 'Join the clan',
     redeemHint: "You've been invited to this instance. Create your account.",
   },
+  // v0.6.0 gym offline: shell band + sync toasts
+  offline: {
+    badge: 'No connection',
+    pending: '{n} to sync',
+    syncing: 'Syncing…',
+    synced: 'Workout synced.',
+    syncConflicts: '{n} changes could not be synced (overwritten from elsewhere).',
+  },
   errors: {
     not_authenticated: 'Your session expired. Sign in again.',
     invalid_credentials: 'Wrong username or password.',
@@ -68,6 +76,8 @@ export const en = {
     restore_failed: 'Could not restore the backup; previous data is kept.',
     routine_has_private_exercises: 'That routine uses private exercises you can\'t see, so it can\'t be copied.',
     generic: 'Something went wrong. Try again.',
+    // v0.6.0 offline: only for flows that REQUIRE network (see es.ts)
+    offline: 'No connection. This needs internet — try again once it is back.',
   },
   common: {
     save: 'Save',

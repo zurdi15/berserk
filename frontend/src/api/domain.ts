@@ -133,6 +133,8 @@ export interface SetIn {
   distance_m?: number | null
   is_warmup?: boolean
   rpe?: number | null
+  // v0.6.0 offline: UUID de replay idempotente (solo lo manda el outbox)
+  client_id?: string
 }
 
 // Routine types
@@ -410,6 +412,8 @@ export const startWorkout = (body: {
   // entreno retroactivo: crea ya cerrado (ver backend WorkoutStartIn) — date
   // pasa a ser obligatorio en ese caso, el backend 422 si falta
   finished?: boolean
+  // v0.6.0 offline: UUID de replay idempotente (solo lo manda el outbox)
+  client_id?: string
 }) =>
   api<WorkoutOut>('/workouts', { method: 'POST', body })
 
@@ -451,6 +455,8 @@ export const deleteWorkout = (id: number) =>
 export const addWorkoutExercise = (id: number, body: {
   exercise_id: number
   note?: string | null
+  // v0.6.0 offline: UUID de replay idempotente (solo lo manda el outbox)
+  client_id?: string
 }) =>
   api<WorkoutExerciseOut>(`/workouts/${id}/exercises`, { method: 'POST', body })
 

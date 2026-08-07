@@ -1,3 +1,6 @@
+import { cacheRead, readCached } from '@/offline/readCache'
+import { markOffline, markOnline } from '@/offline/net'
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -9,6 +12,16 @@ export class ApiError extends Error {
     public field?: string,
   ) {
     super(slug)
+  }
+}
+
+// v0.6.0 offline: un fetch que muere por RED (TypeError — DNS, sin
+// cobertura, servidor caído) es una categoría distinta de un error HTTP del
+// servidor: las mutaciones del entreno lo capturan para encolar en el outbox
+// y los GETs sin cache lo propagan para que la vista muestre su error normal
+export class OfflineError extends Error {
+  constructor() {
+    super('offline')
   }
 }
 
@@ -79,12 +92,28 @@ export async function api<T = unknown>(
   path: string,
   options: { method?: string; body?: unknown } = {},
 ): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, {
-    method: options.method ?? 'GET',
-    credentials: 'same-origin',
-    headers: options.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  })
+  const method = options.method ?? 'GET'
+  let response: Response
+  try {
+    response = await fetch(`${BASE}${path}`, {
+      method,
+      credentials: 'same-origin',
+      headers: options.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    })
+  } catch {
+    // v0.6.0 offline: fetch solo LANZA por fallo de red/CORS, nunca por un
+    // status HTTP — aquí no hubo servidor. Un GET intenta salvarse con la
+    // última lectura buena (readCache); todo lo demás propaga OfflineError.
+    markOffline()
+    if (method === 'GET') {
+      const cached = readCached<T>(path)
+      if (cached.hit) return cached.data
+    }
+    throw new OfflineError()
+  }
+  // cualquier respuesta real (aunque sea un 4xx) prueba que hay servidor
+  markOnline()
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}))
     const { slug, field } = toSlug((payload as { detail?: unknown }).detail)
@@ -96,5 +125,9 @@ export async function api<T = unknown>(
     throw new ApiError(response.status, slug, field)
   }
   if (response.status === 204) return undefined as T
-  return (await response.json()) as T
+  const data = (await response.json()) as T
+  // v0.6.0 offline: toda lectura buena alimenta la cache (solo se sirve
+  // cuando la red falla — ver el catch de arriba y readCache.ts)
+  if (method === 'GET') cacheRead(path, data)
+  return data
 }

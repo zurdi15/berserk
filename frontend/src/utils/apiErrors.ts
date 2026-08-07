@@ -1,4 +1,4 @@
-import { ApiError } from '@/api/client'
+import { ApiError, OfflineError } from '@/api/client'
 import { i18n } from '@/i18n'
 import { useToastStore } from '@/stores/toast'
 
@@ -15,6 +15,11 @@ export function toastApiError(error: unknown) {
 }
 
 export function resolveApiErrorMessage(error: unknown): string {
+  // v0.6.0 offline: sin red no es "algo ha fallado" — es un estado con
+  // nombre y con instrucción implícita (reintenta con cobertura). Solo llega
+  // aquí en los flujos que EXIGEN red (descartar entreno, arrancar una
+  // rutina jamás vista, lecturas sin cache) — el resto encola en el outbox.
+  if (error instanceof OfflineError) return i18n.global.t('errors.offline')
   if (!(error instanceof ApiError)) return i18n.global.t('errors.generic')
 
   // "validation" (el fallback fielded de client.ts) SIEMPRE necesita el
