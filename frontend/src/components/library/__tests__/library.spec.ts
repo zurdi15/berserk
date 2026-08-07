@@ -186,6 +186,7 @@ describe('ExerciseManager', () => {
       measurement: 'strength',
       muscle_groups: [{ muscle_group_id: 1, is_primary: true }],
       is_global: false,
+      is_public: false,
     })
   })
 
@@ -243,6 +244,127 @@ describe('ExerciseManager', () => {
     await flushPromises()
 
     expect(byTestId('exercise-is-global-checkbox').exists()).toBe(false)
+  })
+
+  it('W2 feature 1: is_public checkbox round-trips on create (unchecked by default, sent true when checked)', async () => {
+    const { listExercises, listMuscleGroups, createExercise } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    vi.mocked(createExercise).mockResolvedValue({
+      id: 30, name_es: 'X', name_en: 'X', measurement: 'strength', owner_id: 7,
+      is_public: true, owner_username: null, muscle_groups: [],
+    } as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+    await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
+    await flushPromises()
+
+    // por defecto sin marcar
+    expect((byTestId('exercise-is-public-checkbox').element as HTMLInputElement).checked).toBe(false)
+
+    await byTestId('exercise-name-es-field').find('input').setValue('X')
+    await byTestId('exercise-name-en-field').find('input').setValue('X')
+    await byTestId('exercise-is-public-checkbox').setValue(true)
+    await byTestId('save-exercise-btn').trigger('click')
+    await flushPromises()
+
+    expect(createExercise).toHaveBeenCalledWith(expect.objectContaining({ is_public: true }))
+  })
+
+  it('W2 feature 1: editing a PUBLIC own exercise pre-checks is_public, and unchecking sends false', async () => {
+    const { listExercises, listMuscleGroups, updateExercise } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      {
+        id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7,
+        is_public: true, owner_username: null, muscle_groups: [],
+      },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    vi.mocked(updateExercise).mockResolvedValue({
+      id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7,
+      is_public: false, owner_username: null, muscle_groups: [],
+    } as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+    await wrapper.find('[data-testid="edit-exercise-12"]').trigger('click')
+    await flushPromises()
+
+    expect((byTestId('exercise-is-public-checkbox').element as HTMLInputElement).checked).toBe(true)
+
+    await byTestId('exercise-is-public-checkbox').setValue(false)
+    await byTestId('save-exercise-btn').trigger('click')
+    await flushPromises()
+
+    expect(updateExercise).toHaveBeenCalledWith(12, expect.objectContaining({ is_public: false }))
+  })
+
+  it('W2 feature 1: hides the is_public checkbox when an admin edits a predefined catalog row (owner_id null)', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      {
+        id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null,
+        is_public: false, owner_username: null, muscle_groups: [],
+      },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    setUser({ is_admin: true })
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="edit-exercise-1"]').trigger('click')
+    await flushPromises()
+
+    expect(byTestId('exercise-is-public-checkbox').exists()).toBe(false)
+  })
+
+  it('W2 feature 1: a PUBLIC exercise from another user renders in the catalog-ish section with an attribution hint, unusable for edit/delete even by an admin', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      {
+        id: 40, name_es: 'Zancadas de Loki', name_en: 'Loki lunges', measurement: 'strength', owner_id: 9,
+        is_public: true, owner_username: 'loki', muscle_groups: [],
+      },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    setUser({ id: 7, is_admin: true })
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    // no aparece en "mis ejercicios" (owner_id 9 !== 7)
+    expect(wrapper.find('[data-testid="exercise-row-40"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="catalog-exercise-row-40"]')
+    expect(row.text()).toContain('Zancadas de Loki')
+    expect(row.get('[data-testid="exercise-shared-by-40"]').text()).toContain('loki')
+    // ni siquiera un admin puede editar/borrar lo público de OTRO usuario
+    expect(row.find('[data-testid="edit-exercise-40"]').exists()).toBe(false)
+    expect(row.find('[data-testid="delete-exercise-40"]').exists()).toBe(false)
+  })
+
+  it('W2 feature 1: the predefined catalog (owner_id null) rows carry no attribution hint', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      {
+        id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null,
+        is_public: false, owner_username: null, muscle_groups: [],
+      },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+    await wrapper.get('[data-testid="toggle-catalog"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="exercise-shared-by-1"]').exists()).toBe(false)
   })
 
   it('delete click-through opens the confirm sheet and confirming calls deleteExercise', async () => {

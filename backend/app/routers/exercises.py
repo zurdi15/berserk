@@ -26,6 +26,8 @@ def exercise_out(exercise: Exercise) -> ExerciseOut:
         name_en=exercise.name_en,
         measurement=exercise.measurement,
         owner_id=exercise.owner_id,
+        is_public=exercise.is_public,
+        owner_username=exercise.owner_username,
         muscle_groups=[
             ExerciseMuscleLink(muscle_group_id=l.muscle_group_id, is_primary=l.is_primary)
             for l in exercise.muscle_links
@@ -44,9 +46,14 @@ def visible_muscle_group_ids(db: Session, user_id: int) -> set[int]:
 
 def get_visible_exercise(db: Session, user_id: int, exercise_id: int) -> Exercise | None:
     exercise = db.get(Exercise, exercise_id)
-    if exercise is None or (exercise.owner_id is not None and exercise.owner_id != user_id):
+    if exercise is None:
         return None
-    return exercise
+    # W2 feature 1: catálogo admin (owner_id NULL), lo propio, o lo público
+    # de otro usuario — los tres son USABLES (añadir a rutinas/entrenos);
+    # is_public no da permiso de edición, eso lo sigue decidiendo _can_edit
+    if exercise.owner_id is None or exercise.owner_id == user_id or exercise.is_public:
+        return exercise
+    return None
 
 
 def _can_edit(owner_id: int | None, user: User) -> bool:
@@ -146,8 +153,15 @@ def list_exercises(
     muscle_group_id: int | None = Query(default=None),
     measurement: str | None = Query(default=None),
 ):
+    # W2 feature 1: catálogo admin, lo propio del target, o CUALQUIER
+    # ejercicio público (de cualquier usuario, no solo del target) — is_public
+    # ignora a propósito el scope de TargetUser, es "visible a todo el mundo"
     query = select(Exercise).where(
-        or_(Exercise.owner_id.is_(None), Exercise.owner_id == target.id)
+        or_(
+            Exercise.owner_id.is_(None),
+            Exercise.owner_id == target.id,
+            Exercise.is_public.is_(True),
+        )
     )
     if q:
         pattern = f"%{q}%"
@@ -172,6 +186,7 @@ def create_exercise(payload: ExerciseIn, user: CurrentUser, db: Session = Depend
         name_en=payload.name_en,
         measurement=payload.measurement,
         owner_id=owner_id,
+        is_public=payload.is_public,
     )
     db.add(exercise)
     db.flush()
@@ -191,6 +206,8 @@ def update_exercise(
         exercise.name_es = payload.name_es
     if payload.name_en is not None:
         exercise.name_en = payload.name_en
+    if payload.is_public is not None:
+        exercise.is_public = payload.is_public
     if payload.muscle_groups is not None:
         _apply_links(db, exercise, payload.muscle_groups, user.id)
     db.commit()

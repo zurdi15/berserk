@@ -63,6 +63,27 @@ describe('BkActionBtn', () => {
     expect(svg.find('circle').exists()).toBe(false)
   })
 
+  it('v0.3.2: renders two overlapping rounded rects (no circle, no crossing path) for icon="copy"', () => {
+    const wrapper = mount(BkActionBtn, {
+      props: { icon: 'copy' },
+      attrs: { 'aria-label': 'Copiar' },
+    })
+
+    const svg = wrapper.find('svg')
+    expect(svg.findAll('rect')).toHaveLength(2)
+    expect(svg.find('circle').exists()).toBe(false)
+    expect(svg.find('path').exists()).toBe(false)
+  })
+
+  it('v0.3.2: icon="copy" gets the ink-muted styling, not danger', () => {
+    const wrapper = mount(BkActionBtn, {
+      props: { icon: 'copy' },
+      attrs: { 'aria-label': 'Copiar' },
+    })
+    expect(wrapper.find('button').classes()).toContain('text-ink-muted')
+    expect(wrapper.find('button').classes()).not.toContain('text-danger')
+  })
+
   it('v0.3.0 item 5: skip and replan get the ink-muted styling, same as edit/key (only delete is danger)', () => {
     const skipBtn = mount(BkActionBtn, {
       props: { icon: 'skip' },

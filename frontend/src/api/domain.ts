@@ -36,6 +36,16 @@ export interface ExerciseOut {
   // frontend discrimine por union
   measurement: Measurement
   owner_id: number | null
+  // W2 feature 1: ejercicio PROPIO compartido con todo el mundo (distinto de
+  // owner_id null, el catálogo admin) — opcional en el tipo aunque el
+  // backend siempre manda la clave (mismo criterio que MuscleGroupOut.rune):
+  // así los fixtures de test ya existentes (sin is_public) siguen tipando
+  // sin tocarlos. Resolución efectiva siempre vía `?? false`.
+  is_public?: boolean
+  // atribución para la sección catálogo-ish: null para el catálogo admin y
+  // para las propias filas del usuario que las pide; opcional por el mismo
+  // motivo que is_public arriba
+  owner_username?: string | null
   muscle_groups: ExerciseMuscleLink[]
 }
 
@@ -136,6 +146,17 @@ export interface RoutineOut {
   description: string | null
   rune: string | null
   color: string | null
+  // W2 feature 2: los tres siguientes son opcionales en el tipo aunque el
+  // backend siempre los manda (mismo criterio que ExerciseOut.is_public /
+  // MuscleGroupOut.rune) — evita tener que tocar fixtures de RoutineOut de
+  // otros carriles (RoutineEditorSheet está fuera de este carril) por un
+  // campo que no usan. Resolución efectiva siempre vía `?? false` / `?? null`.
+  // owner_id: null = plantilla GLOBAL (creada por un admin, ver globalizeRoutine)
+  owner_id?: number | null
+  // rutina propia compartida como plantilla de solo lectura con el resto
+  is_public?: boolean
+  // atribución en la sección Plantillas; null para una plantilla GLOBAL
+  owner_username?: string | null
   exercises: RoutineExerciseOut[]
 }
 
@@ -293,6 +314,8 @@ export const createExercise = (body: {
   muscle_groups: ExerciseMuscleLink[]
   // item 3: ejercicio global (owner_id null) — solo un admin puede pedirlo
   is_global?: boolean
+  // W2 feature 1: check "Visible para todos" del propio ejercicio
+  is_public?: boolean
 }) =>
   api<ExerciseOut>('/exercises', { method: 'POST', body })
 
@@ -300,6 +323,7 @@ export const updateExercise = (id: number, body: {
   name_es?: string
   name_en?: string
   muscle_groups?: ExerciseMuscleLink[]
+  is_public?: boolean
 }) =>
   api<ExerciseOut>(`/exercises/${id}`, { method: 'PATCH', body })
 
@@ -309,6 +333,13 @@ export const deleteExercise = (id: number) =>
 // Routine endpoints
 export const listRoutines = (userId?: number) =>
   api<RoutineOut[]>(`/routines${qs({ userId })}`)
+
+// W2 feature 2: plantillas GLOBALES + públicas de otros usuarios (las
+// propias ya vienen en listRoutines) — para la sección "Plantillas" de
+// RoutineList. Ruta fija /routines/templates, registrada en el backend
+// ANTES de /routines/{id} para no colisionar con ese path param.
+export const listRoutineTemplates = () =>
+  api<RoutineOut[]>('/routines/templates')
 
 export const createRoutine = (body: {
   name: string
@@ -323,6 +354,8 @@ export const updateRoutine = (id: number, body: {
   description?: string | null
   rune?: string | null
   color?: string | null
+  // W2 feature 2: toggle "Visible para todos" en la tarjeta de RoutineList
+  is_public?: boolean
 }) =>
   api<RoutineOut>(`/routines/${id}`, { method: 'PATCH', body })
 
@@ -331,6 +364,16 @@ export const deleteRoutine = (id: number) =>
 
 export const replaceRoutineExercises = (id: number, items: RoutineExerciseIn[]) =>
   api<RoutineOut>(`/routines/${id}/exercises`, { method: 'PUT', body: items })
+
+// W2 feature 2: copia una plantilla visible (global o pública) a MIS
+// rutinas — nunca una referencia viva, ver backend routers/routines.py
+export const copyRoutine = (id: number) =>
+  api<RoutineOut>(`/routines/${id}/copy`, { method: 'POST' })
+
+// W2 feature 2: admin-only — convierte una rutina PROPIA en plantilla
+// global (owner_id -> NULL); deja la lista personal del admin
+export const globalizeRoutine = (id: number) =>
+  api<RoutineOut>(`/routines/${id}/globalize`, { method: 'POST' })
 
 // Workout endpoints
 export const startWorkout = (body: {
