@@ -11,11 +11,12 @@ import BkTimeField from '@/lib/BkTimeField.vue'
 import BkDateField from '@/lib/BkDateField.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkRune from '@/lib/BkRune.vue'
+import BkUser from '@/lib/BkUser.vue'
 import WorkoutDayInfo from './WorkoutDayInfo.vue'
 import { statusClasses } from './statusClasses'
 import { isValidRuneName } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
-import type { ExerciseOut, PersonalRecordOut, RoutineOut, ScheduledOut, WorkoutOut } from '@/api/domain'
+import type { ExerciseOut, PersonalRecordOut, RoutineOut, ScheduledOut, SharedUserOut, WorkoutOut } from '@/api/domain'
 import {
   deleteSchedule,
   deleteWorkout,
@@ -38,6 +39,10 @@ import { useAthleteStore } from '@/stores/athlete'
 const props = defineProps<{
   date: string
   scheduled: ScheduledOut[]
+  // item 1b (v0.4.2): el payload `shared` del mes (CalendarMonthOut.shared),
+  // reenviado tal cual desde CalendarView — undefined en modo atleta (el
+  // backend omite la clave, ver api/domain.ts), igual que en MonthGrid
+  shared?: SharedUserOut[]
 }>()
 
 const emit = defineEmits<{
@@ -78,6 +83,81 @@ const infoReady = ref(false)
 const workoutsDetail = ref<WorkoutOut[]>([])
 const exerciseCatalog = ref<ExerciseOut[]>([])
 const dayRecords = ref<PersonalRecordOut[]>([])
+
+// item 1b (v0.4.2): "cuando abro un día, aparte de ver mi entrenamiento
+// molaría que hubiese una pestaña en ese drawer POR USUARIO para poder ver
+// sus entrenamientos también" (zurdi). 'self' es la pestaña por defecto (todo
+// tal cual hoy: programar/retro-log/editar); un número es el user_id de un
+// usuario compartido con entreno ESE día.
+type SharedTab = number
+const activeTab = ref<'self' | SharedTab>('self')
+
+interface SharedDayData {
+  ready: boolean
+  workouts: WorkoutOut[]
+  exercises: ExerciseOut[]
+  records: PersonalRecordOut[]
+}
+
+// cache por usuario, vive mientras el sheet sigue abierto en ESTE día — se
+// vacía en el watch de props.date de más abajo (día distinto = cache stale)
+const sharedDayCache = ref<Record<SharedTab, SharedDayData>>({})
+
+// solo en MI PROPIO calendario (isViewingSelf) y solo usuarios con un
+// entreno ESE día — `dates` ya llega acotado al mes consultado (ver
+// SharedUserOut/getMonth), así que basta con comprobar que el día está en
+// la lista, sin filtrar por mes aquí
+const sharedUsersToday = computed(() =>
+  isViewingSelf.value ? (props.shared ?? []).filter((sharedUser) => sharedUser.dates.includes(props.date)) : [],
+)
+
+const activeSharedData = computed(() =>
+  typeof activeTab.value === 'number' ? (sharedDayCache.value[activeTab.value] ?? null) : null,
+)
+
+function sharedExerciseNameFor(exerciseId: number): string {
+  const catalog = activeSharedData.value?.exercises ?? []
+  return exerciseName(catalog.find((exercise) => exercise.id === exerciseId), locale.value)
+}
+
+async function selectTab(tab: 'self' | SharedTab) {
+  activeTab.value = tab
+  if (tab === 'self') return
+  // cache per usuario per apertura: un segundo flip a una pestaña ya
+  // resuelta NO repite el fetch. El guard va ANTES del await (no solo tras
+  // `ready`) para no disparar dos fetches si se clica dos veces seguidas la
+  // misma pestaña todavía en vuelo. El placeholder ocupa el hueco YA (antes
+  // del await) para que ese guard funcione en el segundo clic.
+  if (sharedDayCache.value[tab]) return
+  sharedDayCache.value[tab] = { ready: false, workouts: [], exercises: [], records: [] }
+  try {
+    // TargetUser-threaded (ya autorizado vía grant, ver permissions.py): el
+    // mismo trío que loadDayInfo usa para mí, pero con userId del compartido.
+    // Deliberadamente NO se pide listRoutines(userId) — fuera del set de
+    // endpoints con los que el sheet ya sabe hablar de otro usuario, así que
+    // sus tarjetas siempre caen al fallback "Entreno libre" (ver
+    // WorkoutDayInfo routineName).
+    const [workoutsResult, recordsResult, exercisesResult] = await Promise.all([
+      listWorkouts({ from_date: props.date, to_date: props.date, userId: tab }),
+      getRecords({ userId: tab }),
+      listExercises({ userId: tab }),
+    ])
+    // reasigna el objeto ENTERO (no muta el placeholder en sitio): una
+    // mutación in-place del objeto crudo saltaría el trap `set` del proxy
+    // reactivo y no dispararía el rerender (gotcha clásico de Vue 3 con
+    // objetos anidados dentro de un ref) — reasignar sobre
+    // sharedDayCache.value[tab] sí pasa por el proxy siempre
+    sharedDayCache.value[tab] = {
+      ready: true,
+      workouts: workoutsResult,
+      records: recordsResult.filter((record) => isoDate(parseUtc(record.achieved_at)) === props.date),
+      exercises: exercisesResult,
+    }
+  } catch (error) {
+    toastApiError(error)
+    sharedDayCache.value[tab] = { ready: true, workouts: [], exercises: [], records: [] }
+  }
+}
 
 // amendment D: ya no hay título genérico de sheet ("Sesiones Programadas");
 // las sesiones planificadas se agrupan bajo un eyebrow ligero solo cuando
@@ -302,8 +382,13 @@ async function createSession() {
 // el sheet no se remonta al cambiar de día con el sheet ya abierto (el
 // v-if="selectedDate" del padre sigue siendo truthy para cualquier fecha):
 // sin este watch, cambiar de día sin cerrar antes dejaría la info del día
-// anterior en pantalla
-watch(() => props.date, () => loadDayInfo())
+// anterior en pantalla. item 1b: un día nuevo también resetea la pestaña a
+// 'self' y vacía la cache de compartidos — la de un día ya no vale para otro.
+watch(() => props.date, () => {
+  activeTab.value = 'self'
+  sharedDayCache.value = {}
+  loadDayInfo()
+})
 
 loadRoutines()
 loadDayInfo()
@@ -316,170 +401,247 @@ loadDayInfo()
       <h3 class="font-semibold text-ink">{{ formatDayLabel(date, $i18n.locale) }}</h3>
     </div>
 
-    <!-- Tarjetas unificadas de entreno (item 2 + amendment A): un entreno es
-         un entreno, con o sin sesión programada detrás. Gateadas en
-         infoReady para no aparecer campo a campo. -->
-    <div v-if="infoReady && workoutsDetail.length" class="space-y-3 bk-stagger">
-      <div v-for="(workout, i) in workoutsDetail" :key="workout.id" :style="{ '--bk-stagger-i': i }">
-        <WorkoutDayInfo
-          :workout="workout"
-          :routine-name="routineNameFor(workout)"
-          :exercise-catalog="exerciseCatalog"
-          :can-edit="isViewingSelf"
-          @edit="editWorkout(workout.id)"
-          @delete="deleteWorkoutEntry(workout.id)"
-        />
-      </div>
-    </div>
-
-    <!-- PRs del día (nivel día, no por entreno) -->
-    <div v-if="infoReady && dayRecords.length" class="space-y-2 border border-line rounded-sm p-3">
-      <h4 class="text-xs uppercase tracking-wide text-ink-faint">{{ $t('calendar.prsOfDay') }}</h4>
-      <div v-for="record in dayRecords" :key="record.id" :data-testid="`pr-of-day-${record.id}`" class="flex items-center gap-2 text-ember text-sm">
-        <BkRune name="pr" :size="18" tone="ember" />
-        <span class="font-medium">
-          {{ $t(`progress.kinds.${record.kind}`) }} — {{ exerciseNameFor(record.exercise_id) }} — {{ formatRecordValue(record) }}
-        </span>
-      </div>
-    </div>
-
-    <!-- Sesiones planificadas/omitidas: las completadas ya se muestran arriba
-         como tarjeta unificada (amendment A), no aquí -->
-    <div v-if="plannedSessions.length" class="space-y-3">
-      <p v-if="showPlannedEyebrow" class="text-xs uppercase tracking-wide text-ink-faint">{{ $t('calendar.plannedEyebrow') }}</p>
-      <div
-        v-for="session in plannedSessions"
-        :key="session.id"
-        class="border border-line rounded-sm p-3 space-y-2"
+    <!-- item 1b (v0.4.2): tira de pestañas por usuario — "Tú" + uno por
+         usuario compartido CON entreno ese día. zurdi: "cuando abro un día,
+         aparte de ver mi entrenamiento molaría que hubiese una pestaña en
+         ese drawer POR USUARIO para poder ver sus entrenamientos también".
+         Segmentado compacto (idiom del chip is_public de RoutineList), no
+         BkTabs completo — BkTabs es para navegación de nivel de vista
+         (tablist con scroll/teclado), esto es un toggle de vista DENTRO de
+         un sheet ya angosto. Solo aparece si hay algo que mostrar (alone =
+         exactamente la UI de siempre, sin tira). -->
+    <div
+      v-if="sharedUsersToday.length > 0"
+      data-testid="day-tabs"
+      class="flex flex-wrap items-center gap-1.5 mb-4"
+    >
+      <button
+        type="button"
+        data-testid="day-tab-self"
+        class="bk-press rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+        :class="activeTab === 'self'
+          ? 'border-aurora bg-aurora/10 text-aurora'
+          : 'border-line text-ink-muted hover:border-line-strong hover:text-ink'"
+        :aria-pressed="activeTab === 'self' ? 'true' : 'false'"
+        @click="selectTab('self')"
       >
-        <div class="flex items-center justify-between">
-          <div class="flex-1">
-            <p class="font-medium text-ink">{{ formatTimeShort(session.time) || '–' }}</p>
-            <p v-if="session.note" class="text-sm text-ink-muted">{{ session.note }}</p>
+        {{ $t('calendar.dayTabs.you') }}
+      </button>
+      <button
+        v-for="sharedUser in sharedUsersToday"
+        :key="sharedUser.user_id"
+        type="button"
+        :data-testid="`day-tab-${sharedUser.user_id}`"
+        class="bk-press rounded-full border px-2.5 py-1 transition-colors"
+        :class="activeTab === sharedUser.user_id
+          ? 'border-aurora bg-aurora/10'
+          : 'border-line hover:border-line-strong'"
+        :aria-pressed="activeTab === sharedUser.user_id ? 'true' : 'false'"
+        @click="selectTab(sharedUser.user_id)"
+      >
+        <BkUser :user="{ username: sharedUser.username, color: sharedUser.color }" size="sm" />
+      </button>
+    </div>
+
+    <template v-if="activeTab === 'self'">
+      <!-- Tarjetas unificadas de entreno (item 2 + amendment A): un entreno es
+           un entreno, con o sin sesión programada detrás. Gateadas en
+           infoReady para no aparecer campo a campo. -->
+      <div v-if="infoReady && workoutsDetail.length" class="space-y-3 bk-stagger">
+        <div v-for="(workout, i) in workoutsDetail" :key="workout.id" :style="{ '--bk-stagger-i': i }">
+          <WorkoutDayInfo
+            :workout="workout"
+            :routine-name="routineNameFor(workout)"
+            :exercise-catalog="exerciseCatalog"
+            :can-edit="isViewingSelf"
+            @edit="editWorkout(workout.id)"
+            @delete="deleteWorkoutEntry(workout.id)"
+          />
+        </div>
+      </div>
+
+      <!-- PRs del día (nivel día, no por entreno) -->
+      <div v-if="infoReady && dayRecords.length" class="space-y-2 border border-line rounded-sm p-3">
+        <h4 class="text-xs uppercase tracking-wide text-ink-faint">{{ $t('calendar.prsOfDay') }}</h4>
+        <div v-for="record in dayRecords" :key="record.id" :data-testid="`pr-of-day-${record.id}`" class="flex items-center gap-2 text-ember text-sm">
+          <BkRune name="pr" :size="18" tone="ember" />
+          <span class="font-medium">
+            {{ $t(`progress.kinds.${record.kind}`) }} — {{ exerciseNameFor(record.exercise_id) }} — {{ formatRecordValue(record) }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Sesiones planificadas/omitidas: las completadas ya se muestran arriba
+           como tarjeta unificada (amendment A), no aquí -->
+      <div v-if="plannedSessions.length" class="space-y-3">
+        <p v-if="showPlannedEyebrow" class="text-xs uppercase tracking-wide text-ink-faint">{{ $t('calendar.plannedEyebrow') }}</p>
+        <div
+          v-for="session in plannedSessions"
+          :key="session.id"
+          class="border border-line rounded-sm p-3 space-y-2"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <p class="font-medium text-ink">{{ formatTimeShort(session.time) || '–' }}</p>
+              <p v-if="session.note" class="text-sm text-ink-muted">{{ session.note }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                :data-status="session.status"
+                :class="['w-2.5 h-2.5', statusClasses(session.status)]"
+              />
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <span
-              :data-status="session.status"
-              :class="['w-2.5 h-2.5', statusClasses(session.status)]"
+
+          <!-- Actions: v0.3.0 item 5 — "Botón en calendario de borrar, omitir y
+               replanificar con iconos", mismo patrón icon-only que las tarjetas
+               de entreno (WorkoutDayInfo) en vez de botones de texto -->
+          <div v-if="isViewingSelf" class="flex items-center gap-1">
+            <BkActionBtn
+              v-if="session.status === 'planned'"
+              icon="replan"
+              :data-testid="`replan-session-${session.id}`"
+              :aria-label="$t('calendar.replan')"
+              @click="startReplan(session)"
+            />
+            <BkActionBtn
+              v-if="session.status === 'planned'"
+              icon="skip"
+              :data-testid="`skip-session-${session.id}`"
+              :aria-label="$t('calendar.skip')"
+              @click="skipSession(session.id)"
+            />
+            <BkActionBtn
+              icon="delete"
+              :data-testid="`delete-session-${session.id}`"
+              :aria-label="$t('common.delete')"
+              @click="deleteSession(session.id)"
             />
           </div>
         </div>
-
-        <!-- Actions: v0.3.0 item 5 — "Botón en calendario de borrar, omitir y
-             replanificar con iconos", mismo patrón icon-only que las tarjetas
-             de entreno (WorkoutDayInfo) en vez de botones de texto -->
-        <div v-if="isViewingSelf" class="flex items-center gap-1">
-          <BkActionBtn
-            v-if="session.status === 'planned'"
-            icon="replan"
-            :data-testid="`replan-session-${session.id}`"
-            :aria-label="$t('calendar.replan')"
-            @click="startReplan(session)"
-          />
-          <BkActionBtn
-            v-if="session.status === 'planned'"
-            icon="skip"
-            :data-testid="`skip-session-${session.id}`"
-            :aria-label="$t('calendar.skip')"
-            @click="skipSession(session.id)"
-          />
-          <BkActionBtn
-            icon="delete"
-            :data-testid="`delete-session-${session.id}`"
-            :aria-label="$t('common.delete')"
-            @click="deleteSession(session.id)"
-          />
-        </div>
       </div>
-    </div>
 
-    <!-- Registrar un entreno pasado: solo hoy/pasado (ver isPastOrToday).
-         amendment B: variant primary, como toda acción de "añadir algo".
-         item 3 (v0.4.0): ya no registra directo — abre el picker de abajo -->
-    <div v-if="isViewingSelf && isPastOrToday" class="border border-line rounded-sm p-3">
-      <BkButton
-        variant="primary"
-        block
-        data-testid="log-past-workout"
-        :disabled="loggingPastWorkout"
-        @click="pastWorkoutPickerOpen = true"
-      >
-        {{ $t('calendar.logPastWorkout') }}
-      </BkButton>
-    </div>
-
-    <!-- item 3 (v0.4.0): picker de "Registrar entreno" — Entreno libre +
-         rutinas propias (rune + nombre), mismo idiom que el idle de
-         WorkoutView.vue. El título dobla como el del botón que lo abre. -->
-    <BkSheet
-      :open="pastWorkoutPickerOpen"
-      :title="$t('calendar.logPastWorkout')"
-      @close="pastWorkoutPickerOpen = false"
-    >
-      <div class="space-y-3 p-4">
+      <!-- Registrar un entreno pasado: solo hoy/pasado (ver isPastOrToday).
+           amendment B: variant primary, como toda acción de "añadir algo".
+           item 3 (v0.4.0): ya no registra directo — abre el picker de abajo -->
+      <div v-if="isViewingSelf && isPastOrToday" class="border border-line rounded-sm p-3">
         <BkButton
           variant="primary"
           block
-          data-testid="log-past-workout-free"
+          data-testid="log-past-workout"
           :disabled="loggingPastWorkout"
-          @click="logPastWorkout()"
+          @click="pastWorkoutPickerOpen = true"
         >
-          {{ $t('calendar.logPastWorkoutFree') }}
+          {{ $t('calendar.logPastWorkout') }}
         </BkButton>
+      </div>
 
-        <div v-if="routines.length" class="space-y-2">
-          <div class="flex items-center gap-3" aria-hidden="true">
-            <span class="h-px flex-1 bg-line" />
-            <span class="text-ink-faint text-sm">{{ $t('calendar.logPastWorkoutOr') }}</span>
-            <span class="h-px flex-1 bg-line" />
-          </div>
+      <!-- item 3 (v0.4.0): picker de "Registrar entreno" — Entreno libre +
+           rutinas propias (rune + nombre), mismo idiom que el idle de
+           WorkoutView.vue. El título dobla como el del botón que lo abre. -->
+      <BkSheet
+        :open="pastWorkoutPickerOpen"
+        :title="$t('calendar.logPastWorkout')"
+        @close="pastWorkoutPickerOpen = false"
+      >
+        <div class="space-y-3 p-4">
           <BkButton
-            v-for="routine in routines"
-            :key="routine.id"
-            variant="ghost"
+            variant="primary"
             block
-            :data-testid="`log-past-workout-routine-${routine.id}`"
+            data-testid="log-past-workout-free"
             :disabled="loggingPastWorkout"
-            @click="logPastWorkout(routine.id)"
+            @click="logPastWorkout()"
           >
-            <BkRune v-if="routineRune(routine)" :name="routineRune(routine) as RuneName" :size="16" />
-            <span>{{ routine.name }}</span>
+            {{ $t('calendar.logPastWorkoutFree') }}
+          </BkButton>
+
+          <div v-if="routines.length" class="space-y-2">
+            <div class="flex items-center gap-3" aria-hidden="true">
+              <span class="h-px flex-1 bg-line" />
+              <span class="text-ink-faint text-sm">{{ $t('calendar.logPastWorkoutOr') }}</span>
+              <span class="h-px flex-1 bg-line" />
+            </div>
+            <BkButton
+              v-for="routine in routines"
+              :key="routine.id"
+              variant="ghost"
+              block
+              :data-testid="`log-past-workout-routine-${routine.id}`"
+              :disabled="loggingPastWorkout"
+              @click="logPastWorkout(routine.id)"
+            >
+              <BkRune v-if="routineRune(routine)" :name="routineRune(routine) as RuneName" :size="16" />
+              <span>{{ routine.name }}</span>
+            </BkButton>
+          </div>
+        </div>
+      </BkSheet>
+
+      <!-- Create new session form: solo hoy/futuro (item 1) -->
+      <div v-if="isViewingSelf && isTodayOrFuture" class="border border-line rounded-sm p-3 space-y-3">
+        <h4 class="font-medium text-ink">{{ $t('calendar.newSession') }}</h4>
+        <div class="space-y-2">
+          <BkTimeField
+            v-model="newTime"
+            :label="$t('calendar.time')"
+            :hint="$t('calendar.optional')"
+            :min="minTimeToday"
+          />
+          <BkSelect
+            v-model="newRoutineId"
+            :options="[{ value: '', label: $t('calendar.selectRoutine'), disabled: true }, ...routines.map(r => ({ value: String(r.id), label: r.name }))]"
+            :label="$t('calendar.routine')"
+          />
+          <BkField
+            v-model="newNote"
+            type="text"
+            :label="$t('calendar.note')"
+            :hint="$t('calendar.optional')"
+          />
+          <BkButton
+            variant="primary"
+            block
+            :disabled="loading"
+            @click="createSession"
+          >
+            {{ $t('calendar.schedule') }}
           </BkButton>
         </div>
       </div>
-    </BkSheet>
+    </template>
 
-    <!-- Create new session form: solo hoy/futuro (item 1) -->
-    <div v-if="isViewingSelf && isTodayOrFuture" class="border border-line rounded-sm p-3 space-y-3">
-      <h4 class="font-medium text-ink">{{ $t('calendar.newSession') }}</h4>
-      <div class="space-y-2">
-        <BkTimeField
-          v-model="newTime"
-          :label="$t('calendar.time')"
-          :hint="$t('calendar.optional')"
-          :min="minTimeToday"
-        />
-        <BkSelect
-          v-model="newRoutineId"
-          :options="[{ value: '', label: $t('calendar.selectRoutine'), disabled: true }, ...routines.map(r => ({ value: String(r.id), label: r.name }))]"
-          :label="$t('calendar.routine')"
-        />
-        <BkField
-          v-model="newNote"
-          type="text"
-          :label="$t('calendar.note')"
-          :hint="$t('calendar.optional')"
-        />
-        <BkButton
-          variant="primary"
-          block
-          :disabled="loading"
-          @click="createSession"
-        >
-          {{ $t('calendar.schedule') }}
-        </BkButton>
+    <!-- item 1b (v0.4.2): pestaña de un usuario compartido — SOLO LECTURA,
+         reusa WorkoutDayInfo con can-edit false (sin editar/borrar/retro-log,
+         nada de lo de arriba encaja: no hay sus sesiones planificadas ni sus
+         rutinas en el hilo de datos, solo el trío TargetUser explícito). Sin
+         routineName (no se pide listRoutines(userId) de otro usuario, ver
+         selectTab): la tarjeta cae al fallback "Entreno libre" siempre. -->
+    <template v-else-if="activeSharedData">
+      <div
+        v-if="activeSharedData.ready && activeSharedData.workouts.length"
+        class="space-y-3 bk-stagger"
+        data-testid="shared-day-workouts"
+      >
+        <div v-for="(workout, i) in activeSharedData.workouts" :key="workout.id" :style="{ '--bk-stagger-i': i }">
+          <WorkoutDayInfo
+            :workout="workout"
+            :routine-name="null"
+            :exercise-catalog="activeSharedData.exercises"
+            :can-edit="false"
+          />
+        </div>
       </div>
-    </div>
+
+      <div v-if="activeSharedData.ready && activeSharedData.records.length" class="space-y-2 border border-line rounded-sm p-3">
+        <h4 class="text-xs uppercase tracking-wide text-ink-faint">{{ $t('calendar.prsOfDay') }}</h4>
+        <div v-for="record in activeSharedData.records" :key="record.id" :data-testid="`pr-of-day-${record.id}`" class="flex items-center gap-2 text-ember text-sm">
+          <BkRune name="pr" :size="18" tone="ember" />
+          <span class="font-medium">
+            {{ $t(`progress.kinds.${record.kind}`) }} — {{ sharedExerciseNameFor(record.exercise_id) }} — {{ formatRecordValue(record) }}
+          </span>
+        </div>
+      </div>
+    </template>
 
     <!-- Replan sheet -->
     <BkSheet :open="editingId !== null" :title="$t('calendar.replan')" @close="cancelReplan">

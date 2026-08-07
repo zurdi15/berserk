@@ -82,6 +82,7 @@ import MonthGrid from '@/components/calendar/MonthGrid.vue'
 import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
 import BkUser from '@/lib/BkUser.vue'
 import * as domain from '@/api/domain'
+import type { SharedUserOut } from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
 import CalendarView from '@/views/CalendarView.vue'
@@ -1350,6 +1351,192 @@ describe('ScheduleSheet', () => {
       expect(wrapper.text()).not.toContain('Planificado')
     })
   })
+
+  // item 1b (v0.4.2): zurdi: "cuando abro un día, aparte de ver mi
+  // entrenamiento molaría que hubiese una pestaña en ese drawer POR USUARIO
+  // para poder ver sus entrenamientos también". Solo en MI PROPIO calendario
+  // (nunca en modo atleta) y solo usuarios con un entreno ESE día.
+  describe('item 1b (v0.4.2): per-user day tabs', () => {
+    const sharedUsers: SharedUserOut[] = [
+      { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
+    ]
+
+    afterEach(() => {
+      // limpia las mockImplementation condicionales por userId de este bloque
+      // para no filtrarse a otros describes del fichero
+      vi.mocked(domain.listWorkouts).mockReset().mockImplementation(async () => [])
+      vi.mocked(domain.getRecords).mockReset().mockImplementation(async () => [])
+      vi.mocked(domain.listExercises).mockReset().mockImplementation(async () => [])
+    })
+
+    it('renders a tab per shared user with a workout that day, alongside "Tú"', async () => {
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="day-tab-self"]').text()).toBe('Tú')
+      const userTab = wrapper.get('[data-testid="day-tab-7"]')
+      expect(userTab.findComponent(BkUser).props('user')).toEqual({ username: 'freyja', color: '#3b82f6' })
+    })
+
+    it('no tab strip when there are no shared users at all', async () => {
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-05', scheduled: [], shared: [] },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="day-tabs"]').exists()).toBe(false)
+    })
+
+    it('no tab strip when a shared user has no workout on THIS day (date absent from their `dates`)', async () => {
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-06', scheduled: [], shared: sharedUsers },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="day-tabs"]').exists()).toBe(false)
+    })
+
+    it('athlete mode: no tab strip even with a `shared` prop present (self-view only, defensive)', async () => {
+      const athlete = useAthleteStore()
+      athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="day-tabs"]').exists()).toBe(false)
+    })
+
+    it('picking a user tab fetches THEIR day detail (threaded with their userId), renders read-only cards and PRs, and hides the self carril entirely', async () => {
+      vi.mocked(domain.listWorkouts).mockImplementation(async (params) => {
+        if ((params as { userId?: number })?.userId === 7) {
+          return [
+            { id: 99, date: '2026-08-05', started_at: null, ended_at: null, routine_id: null, note: null, feeling: null, exercises: [], muscle_tag_ids: [] },
+          ] as never
+        }
+        return [] as never
+      })
+      vi.mocked(domain.getRecords).mockImplementation(async (params) => {
+        if ((params as { userId?: number })?.userId === 7) {
+          return [{ id: 501, exercise_id: 1, kind: 'max_weight', value: 100, achieved_at: '2026-08-05T10:00:00' }] as never
+        }
+        return [] as never
+      })
+      vi.mocked(domain.listExercises).mockImplementation(async (params) => {
+        if ((params as { userId?: number })?.userId === 7) {
+          return [{ id: 1, name_es: 'Sentadilla', name_en: 'Squat', measurement: 'strength', owner_id: null, muscle_groups: [] }] as never
+        }
+        return [] as never
+      })
+
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="day-tab-7"]').trigger('click')
+      await flushPromises()
+
+      expect(domain.listWorkouts).toHaveBeenCalledWith({ from_date: '2026-08-05', to_date: '2026-08-05', userId: 7 })
+      expect(domain.getRecords).toHaveBeenCalledWith({ userId: 7 })
+      expect(domain.listExercises).toHaveBeenCalledWith({ userId: 7 })
+
+      // .get() ya lanza si no existe: no hace falta (ni tipa) .exists() encima
+      wrapper.get('[data-testid="workout-card-99"]')
+      expect(wrapper.text()).toContain('Sentadilla')
+      // read-only: ni editar/borrar en la tarjeta ni ningún control del carril propio
+      expect(wrapper.find('[data-testid="edit-workout-99"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="delete-workout-99"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="log-past-workout"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="pr-of-day-501"]').exists()).toBe(true)
+    })
+
+    it('gates the tab content on the fetch resolving (readiness), no partial render', async () => {
+      let resolveWorkouts!: (value: domain.WorkoutOut[]) => void
+      vi.mocked(domain.listWorkouts).mockImplementation((params) =>
+        (params as { userId?: number })?.userId === 7
+          ? new Promise((resolve) => { resolveWorkouts = resolve })
+          : Promise.resolve([] as never),
+      )
+
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="day-tab-7"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="shared-day-workouts"]').exists()).toBe(false)
+
+      resolveWorkouts([
+        { id: 5, date: '2026-08-05', started_at: null, ended_at: null, routine_id: null, note: null, feeling: null, exercises: [], muscle_tag_ids: [] },
+      ] as never)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="shared-day-workouts"]').exists()).toBe(true)
+    })
+
+    it('flipping back to an already-loaded user tab does not refetch (cache per user per open)', async () => {
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+      const callsAfterMount = vi.mocked(domain.listWorkouts).mock.calls.length
+
+      await wrapper.get('[data-testid="day-tab-7"]').trigger('click')
+      await flushPromises()
+      expect(vi.mocked(domain.listWorkouts).mock.calls.length).toBe(callsAfterMount + 1)
+
+      await wrapper.get('[data-testid="day-tab-self"]').trigger('click')
+      await flushPromises()
+      await wrapper.get('[data-testid="day-tab-7"]').trigger('click')
+      await flushPromises()
+
+      // el segundo flip a la pestaña 7 NO repite el fetch
+      expect(vi.mocked(domain.listWorkouts).mock.calls.length).toBe(callsAfterMount + 1)
+    })
+
+    it('switching to a different day resets the active tab to "Tú" and clears the per-user cache (a fresh day refetches, not the stale cache)', async () => {
+      // dos días con datos del mismo compartido, para poder comparar la
+      // tira en AMBOS días sin depender del reloj real
+      const twoDaysShared: SharedUserOut[] = [
+        { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05', '2026-08-06'] },
+      ]
+      const wrapper = mount(ScheduleSheet, {
+        props: { date: '2026-08-05', scheduled: [], shared: twoDaysShared },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="day-tab-7"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[data-testid="day-tab-self"]').attributes('aria-pressed')).toBe('false')
+
+      await wrapper.setProps({ date: '2026-08-06' })
+      await flushPromises()
+
+      // el nuevo día vuelve a arrancar en 'Tú', no se queda en la pestaña 7
+      expect(wrapper.get('[data-testid="day-tab-self"]').attributes('aria-pressed')).toBe('true')
+      // el cambio de día ya dispara su propio reload de 'self' (loadDayInfo);
+      // lo que importa aquí es lo que pasa DESDE este punto en adelante
+      const callsAfterDayChange = vi.mocked(domain.listWorkouts).mock.calls.length
+
+      await wrapper.get('[data-testid="day-tab-7"]').trigger('click')
+      await flushPromises()
+
+      // la cache del día anterior no vale para el día nuevo: vuelve a pedir datos
+      expect(vi.mocked(domain.listWorkouts).mock.calls.length).toBe(callsAfterDayChange + 1)
+    })
+  })
 })
 
 describe('CalendarView schedule sheet (amendment D, round 10)', () => {
@@ -1524,8 +1711,30 @@ describe('CalendarView layout (round 6, items 3/4)', () => {
     await flushPromises()
 
     const infoButton = wrapper.get('[data-testid="rune-legend-btn"]')
-    expect(infoButton.text()).toBe('Leyenda de runas')
+    // item 7 (v0.4.2): el botón ahora lleva también el span-icono ⓘ, así que
+    // el texto ya no es EXACTAMENTE la etiqueta — pero sigue siendo un botón
+    // de texto (no un círculo), el aserto de forma sigue siendo el mismo
+    expect(infoButton.text()).toContain('Leyenda de runas')
     expect(infoButton.classes()).not.toContain('rounded-full')
+  })
+
+  // item 7 (v0.4.2): "gana un pequeño icono ⓘ" junto al texto del trigger —
+  // recupera el idiom de circulito-i bordeado que existía ANTES de la item 13
+  // (ver git show 60bd285: el botón entero era ese círculo), pero ahora solo
+  // como refuerzo visual DENTRO del botón de texto, no como el trigger entero
+  it('item 7 (v0.4.2): the rune-legend trigger carries a small bordered-i info icon next to its text', async () => {
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    const infoButton = wrapper.get('[data-testid="rune-legend-btn"]')
+    const icon = infoButton.get('[data-testid="rune-legend-info-icon"]')
+    expect(icon.text()).toBe('i')
+    expect(icon.classes()).toContain('rounded-full')
+    expect(icon.classes()).toContain('border')
+    // decorativo: el texto visible del botón ya es su nombre accesible
+    expect(icon.attributes('aria-hidden')).toBe('true')
   })
 })
 
@@ -1693,6 +1902,23 @@ describe('CalendarView shared legend (v0.4.1)', () => {
     expect(users).toHaveLength(2)
     expect(users[0].props('user')).toEqual({ username: 'freyja', color: '#3b82f6' })
     expect(users[1].props('user')).toEqual({ username: 'loki', color: null })
+  })
+
+  // item 1a (v0.4.2): la etiqueta "Compartido contigo:" se quita — la fila
+  // de dots (BkUser ya lleva color+nombre) queda sola, sin muletilla de texto
+  it('item 1a: drops the "shared with you" label text, leaving only the BkUser dots', async () => {
+    vi.mocked(domain.getMonth).mockResolvedValueOnce({
+      scheduled: [],
+      workouts: [],
+      shared: [{ user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] }],
+    })
+
+    const wrapper = mount(CalendarView, { global: { plugins: [createI18nInstance()] } })
+    await flushPromises()
+
+    const legend = wrapper.get('[data-testid="shared-legend"]')
+    // el único texto de la leyenda es el username del BkUser, nada más
+    expect(legend.text()).toBe('freyja')
   })
 
   it('does not render the legend when shared is an empty array (no one has shared with me)', async () => {
