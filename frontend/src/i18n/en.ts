@@ -260,6 +260,11 @@ export const en = {
     confirmDeleteMessage: 'Are you sure you want to delete this session?',
     runeLegend: 'Rune legend',
     logPastWorkout: 'Log workout',
+    // item 3 (v0.4.0): "Registrar entreno" picker — free workout + the
+    // user's routines (rune + name, same idiom as WorkoutView's idle list).
+    // logPastWorkout above doubles as the sheet title.
+    logPastWorkoutFree: 'Free workout',
+    logPastWorkoutOr: 'or',
     prsOfDay: 'PRs of the day',
     plannedEyebrow: 'Planned',
   },

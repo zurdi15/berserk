@@ -231,6 +231,47 @@ def test_retro_workout_creates_finished_with_synthetic_timestamps(client: TestCl
     assert workout["started_at"] == workout["ended_at"] == "2026-07-20T12:00:00"
 
 
+def test_retro_workout_from_routine_preloads_exercises_and_derives_groups(client: TestClient):
+    """item 3 (v0.4.0): "registrar entreno pasado poder elegir rutina" — el
+    picker del frontend llama startWorkout({date, finished:true, routine_id}).
+    El composado de la rutina (copiar WorkoutExercise con su rest_seconds +
+    sync_derived_muscle_groups) NO está condicionado a `payload.finished` en
+    start_workout (vive fuera del if/else que solo decide started_at/ended_at
+    — ver routers/workouts.py), así que el camino retroactivo YA lo hereda
+    gratis del camino en vivo. Este test fija ese comportamiento explícitamente
+    en vez de dejarlo como un efecto colateral no probado."""
+    rid = make_routine(client)
+    resp = client.post(
+        "/api/v1/workouts",
+        json={"date": "2026-07-20", "finished": True, "routine_id": rid},
+    )
+    assert resp.status_code == 201
+    workout = resp.json()
+    assert workout["routine_id"] == rid
+    # ejercicios precargados desde la rutina, con su rest_seconds, sin series
+    assert [e["exercise_id"] for e in workout["exercises"]] == [bench_id(client)]
+    assert workout["exercises"][0]["rest_seconds"] == 90
+    assert workout["exercises"][0]["sets"] == []
+    # grupos musculares derivados desde el instante de creación (item 4 de
+    # la ronda v0.3.0, mismo criterio que el camino en vivo)
+    assert workout["muscle_tag_ids"] == [muscle_group_id(client, "chest")]
+    # ya cerrado: no compite por el índice único parcial de "activo"
+    assert workout["ended_at"] is not None
+
+
+def test_retro_workout_free_has_no_routine_and_no_exercises(client: TestClient):
+    # "Entreno libre" del picker: startWorkout({date, finished:true}), sin
+    # routine_id — mismo camino de siempre, sin nada precargado
+    resp = client.post(
+        "/api/v1/workouts", json={"date": "2026-07-20", "finished": True}
+    )
+    assert resp.status_code == 201
+    workout = resp.json()
+    assert workout["routine_id"] is None
+    assert workout["exercises"] == []
+    assert workout["muscle_tag_ids"] == []
+
+
 def retro_workout(client: TestClient, date: str = "2026-07-20") -> dict:
     return client.post("/api/v1/workouts", json={"date": date, "finished": True}).json()
 
