@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.6.0 - 2026-08-07
+
+- Gym offline: the live workout works without coverage — log, edit and delete sets, add or remove exercises, start from an already-seen routine and finish the workout, all applied instantly on-device and queued for sync. A shell band shows the pending count; when connectivity returns everything replays in order, exactly once (server-side idempotent dedupe), with a toast confirming the sync.
+- Today, calendar, routines and every other read fall back to the last thing you saw when there is no network, and the live workout survives reloading the app offline.
+- Records are still detected on sync (the celebration stays a live-only event), and destructive flows (discard) deliberately require network.
+
 ## 0.5.1 - 2026-08-07
 
 - Your own calendar dots now paint in your user color (aurora stays only for users without a color set); the viewed athlete's color still rules in athlete mode.
