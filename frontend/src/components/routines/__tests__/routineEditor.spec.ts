@@ -607,4 +607,211 @@ describe('RoutineEditorSheet', () => {
       expect(checkbox.disabled).toBe(false)
     })
   })
+
+  // v0.5.0 superseries: enlazado entre filas consecutivas (botón de eslabón),
+  // etiquetas A/B/C presentacionales, normalización y particiones por reorden
+  describe('v0.5.0 superseries', () => {
+    function lastDialog(): HTMLElement {
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      return dialogs[dialogs.length - 1] as HTMLElement
+    }
+
+    function routineWith(
+      exercises: Array<{ id: number; exercise_id: number; superset_group?: number | null }>,
+    ): RoutineOut {
+      return {
+        id: 5,
+        name: 'Test Routine',
+        description: null,
+        rune: null,
+        color: null,
+        exercises: exercises.map((e, i) => ({
+          id: e.id,
+          exercise_id: e.exercise_id,
+          position: i + 1,
+          target_sets: 3,
+          target_reps: null,
+          target_weight_kg: null,
+          rest_seconds: 60,
+          superset_group: e.superset_group ?? null,
+        })),
+      } as RoutineOut
+    }
+
+    async function settle(wrapper: ReturnType<typeof build>) {
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 100))
+      await wrapper.vm.$nextTick()
+    }
+
+    it('linking two rows via the real boundary button labels both "Superserie A" and saves superset_group [0, 0]', async () => {
+      const { replaceRoutineExercises } = await import('@/api/domain')
+      vi.mocked(replaceRoutineExercises).mockClear()
+
+      const wrapper = build(routineWith([
+        { id: 10, exercise_id: 1 },
+        { id: 11, exercise_id: 2 },
+      ]))
+      await settle(wrapper)
+      const dialog = lastDialog()
+
+      const toggle = dialog.querySelector('[data-testid="superset-toggle-1"]') as HTMLButtonElement
+      expect(toggle).not.toBeNull()
+      expect(toggle.getAttribute('aria-pressed')).toBe('false')
+      toggle.click()
+      await wrapper.vm.$nextTick()
+
+      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')?.textContent).toContain('Superserie A')
+      expect(dialog.querySelector('[data-testid="superset-row-chip-1"]')?.textContent).toContain('Superserie A')
+      expect(
+        dialog.querySelector('[data-testid="superset-toggle-1"]')?.getAttribute('aria-pressed'),
+      ).toBe('true')
+
+      const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+      saveButton!.click()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(replaceRoutineExercises).toHaveBeenCalledWith(5, [
+        expect.objectContaining({ exercise_id: 1, superset_group: 0 }),
+        expect.objectContaining({ exercise_id: 2, superset_group: 0 }),
+      ])
+      wrapper.unmount()
+    })
+
+    it('unlinking an existing 2-member group via the same button dissolves it and saves nulls', async () => {
+      const { replaceRoutineExercises } = await import('@/api/domain')
+      vi.mocked(replaceRoutineExercises).mockClear()
+
+      const wrapper = build(routineWith([
+        { id: 10, exercise_id: 1, superset_group: 0 },
+        { id: 11, exercise_id: 2, superset_group: 0 },
+      ]))
+      await settle(wrapper)
+      const dialog = lastDialog()
+
+      // estado inicial: enlazado (viene de la rutina guardada)
+      const toggle = dialog.querySelector('[data-testid="superset-toggle-1"]') as HTMLButtonElement
+      expect(toggle.getAttribute('aria-pressed')).toBe('true')
+      toggle.click()
+      await wrapper.vm.$nextTick()
+
+      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')).toBeNull()
+      expect(dialog.querySelector('[data-testid="superset-row-chip-1"]')).toBeNull()
+
+      const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+      saveButton!.click()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(replaceRoutineExercises).toHaveBeenCalledWith(5, [
+        expect.objectContaining({ exercise_id: 1, superset_group: null }),
+        expect.objectContaining({ exercise_id: 2, superset_group: null }),
+      ])
+      wrapper.unmount()
+    })
+
+    it('labels a SECOND group "Superserie B" (letters follow group order)', async () => {
+      const wrapper = build(routineWith([
+        { id: 10, exercise_id: 1, superset_group: 0 },
+        { id: 11, exercise_id: 2, superset_group: 0 },
+        { id: 12, exercise_id: 1, superset_group: 1 },
+        { id: 13, exercise_id: 2, superset_group: 1 },
+      ]))
+      await settle(wrapper)
+      const dialog = lastDialog()
+
+      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')?.textContent).toContain('Superserie A')
+      expect(dialog.querySelector('[data-testid="superset-row-chip-2"]')?.textContent).toContain('Superserie B')
+      wrapper.unmount()
+    })
+
+    it('a reorder that breaks the group contiguity partitions it (leftover singles dissolve to loose)', async () => {
+      const { replaceRoutineExercises } = await import('@/api/domain')
+      vi.mocked(replaceRoutineExercises).mockClear()
+
+      const wrapper = build(routineWith([
+        { id: 10, exercise_id: 1, superset_group: 0 },
+        { id: 11, exercise_id: 2, superset_group: 0 },
+        { id: 12, exercise_id: 1, superset_group: null },
+      ]))
+      await settle(wrapper)
+      const dialog = lastDialog()
+
+      // sube la TERCERA fila (suelta) al medio del grupo: A1, X, A2 — el
+      // grupo pierde la contigüidad y se disuelve entero (runs de 1)
+      const upButtons = Array.from(dialog.querySelectorAll('button')).filter(
+        (b) => b.getAttribute('aria-label') === 'Arriba',
+      )
+      upButtons[upButtons.length - 1]!.click()
+      await wrapper.vm.$nextTick()
+
+      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')).toBeNull()
+      expect(dialog.querySelector('[data-testid="superset-row-chip-1"]')).toBeNull()
+      expect(dialog.querySelector('[data-testid="superset-row-chip-2"]')).toBeNull()
+
+      const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
+      saveButton!.click()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(replaceRoutineExercises).toHaveBeenCalledWith(5, [
+        expect.objectContaining({ superset_group: null }),
+        expect.objectContaining({ superset_group: null }),
+        expect.objectContaining({ superset_group: null }),
+      ])
+      wrapper.unmount()
+    })
+
+    it('reordering WITHIN the group keeps it intact (contiguity preserved)', async () => {
+      const wrapper = build(routineWith([
+        { id: 10, exercise_id: 1, superset_group: 0 },
+        { id: 11, exercise_id: 2, superset_group: 0 },
+      ]))
+      await settle(wrapper)
+      const dialog = lastDialog()
+
+      const upButton = Array.from(dialog.querySelectorAll('button')).find(
+        (b) => b.getAttribute('aria-label') === 'Arriba',
+      )
+      upButton!.click()
+      await wrapper.vm.$nextTick()
+
+      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')?.textContent).toContain('Superserie A')
+      expect(dialog.querySelector('[data-testid="superset-row-chip-1"]')?.textContent).toContain('Superserie A')
+      wrapper.unmount()
+    })
+
+    it('removing one member of a 2-member group dissolves the leftover single', async () => {
+      const wrapper = build(routineWith([
+        { id: 10, exercise_id: 1, superset_group: 0 },
+        { id: 11, exercise_id: 2, superset_group: 0 },
+      ]))
+      await settle(wrapper)
+      const dialog = lastDialog()
+
+      const removeButton = Array.from(dialog.querySelectorAll('button')).find(
+        (b) => b.textContent === 'Quitar',
+      )
+      removeButton!.click()
+      await wrapper.vm.$nextTick()
+
+      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('a routine loaded with broken (non-contiguous) grouping is normalized on open — no phantom chips', async () => {
+      const wrapper = build(routineWith([
+        { id: 10, exercise_id: 1, superset_group: 0 },
+        { id: 11, exercise_id: 2, superset_group: null },
+        { id: 12, exercise_id: 1, superset_group: 0 },
+      ]))
+      await settle(wrapper)
+      const dialog = lastDialog()
+
+      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')).toBeNull()
+      expect(dialog.querySelector('[data-testid="superset-row-chip-2"]')).toBeNull()
+      wrapper.unmount()
+    })
+  })
 })
