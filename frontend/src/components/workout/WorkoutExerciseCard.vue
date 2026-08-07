@@ -668,36 +668,13 @@ async function moveDown() {
         {{ formatCardioEntry(entry) }}
       </p>
     </div>
-    <div
-      v-if="isCardio && exercise && !resumedActive && historyLoaded"
-      class="flex gap-2"
-      :data-testid="`cardio-actions-${workoutExercise.id}`"
-    >
-      <BkButton
-        variant="ghost"
-        size="sm"
-        class="flex-1"
-        :data-testid="`cardio-log-${workoutExercise.id}`"
-        @click="openNew"
-      >
-        {{ t('workout.cardioLog') }}
-      </BkButton>
-      <BkButton
-        v-if="live"
-        variant="primary"
-        size="sm"
-        class="flex-1"
-        :data-testid="`cardio-start-${workoutExercise.id}`"
-        @click="startCardio"
-      >
-        {{ t('workout.cardioStart', { duration: formatDuration(cardioTargetSeconds) }) }}
-      </BkButton>
-    </div>
-
     <!-- v0.9.4 (zurdi): añadir serie y quitar ejercicio comparten fila —
          quitar pasa de botón "Quitar" a BkActionBtn de eliminar (como el
          resto de sitios), a la derecha; su swap de confirmación (item 7,
-         bk-pop-soft/out-in) queda tal cual -->
+         bk-pop-soft/out-in) queda tal cual. v0.11.2 (zurdi: "quiero lo
+         mismo en cardio, registrar tiempo a la izquierda y el borrar a la
+         derecha en vez de en una fila cada uno"): las acciones de cardio
+         viven en ESTA misma fila, ya no en una propia a ancho completo -->
     <div class="mt-3 flex items-center justify-between gap-2">
       <BkButton
         v-if="exercise && !isCardio"
@@ -708,6 +685,29 @@ async function moveDown() {
       >
         {{ t('workout.addSet') }}
       </BkButton>
+      <div
+        v-else-if="isCardio && exercise && !resumedActive && historyLoaded"
+        class="flex items-center gap-2 min-w-0"
+        :data-testid="`cardio-actions-${workoutExercise.id}`"
+      >
+        <BkButton
+          variant="ghost"
+          size="sm"
+          :data-testid="`cardio-log-${workoutExercise.id}`"
+          @click="openNew"
+        >
+          {{ t('workout.cardioLog') }}
+        </BkButton>
+        <BkButton
+          v-if="live"
+          variant="primary"
+          size="sm"
+          :data-testid="`cardio-start-${workoutExercise.id}`"
+          @click="startCardio"
+        >
+          {{ t('workout.cardioStart', { duration: formatDuration(cardioTargetSeconds) }) }}
+        </BkButton>
+      </div>
       <span v-else />
       <Transition name="bk-pop-soft" mode="out-in">
         <div v-if="!removeConfirming" key="remove" class="shrink-0">
