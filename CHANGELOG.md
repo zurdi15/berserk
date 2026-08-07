@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.8.1 - 2026-08-07
+
+- Progress > Workouts: the exercise list now fills the screen until you pick one — then it shrinks smoothly while the chart block animates in. The pointless "All exercises" option is gone.
+
 ## 0.8.0 - 2026-08-07
 
 - Supersets are now created where exercises are added: tick "Superset" in the add-exercise sheet and pick two — they land already linked in their block. The chain buttons between cards are gone; the block header carries the single dissolve control.
