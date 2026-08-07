@@ -16,8 +16,11 @@
 // v0.3.0 item 5: 'skip' y 'replan' se suman al catálogo — los botones de
 // acción de una sesión programada (borrar/omitir/replanificar) pasan de
 // texto a icon-only, mismo patrón que edit/key/delete de siempre.
+// v0.3.2: 'copy' para el botón de copiar una plantilla de rutina
+// (RoutineList) — dos cuadrados redondeados solapados, mismo trazo que el
+// resto del set (nunca relleno).
 defineProps<{
-  icon: 'edit' | 'key' | 'delete' | 'skip' | 'replan'
+  icon: 'edit' | 'key' | 'delete' | 'skip' | 'replan' | 'copy'
 }>()
 </script>
 
@@ -90,7 +93,7 @@ defineProps<{
       <path d="M6 6 L18 18" />
     </svg>
     <svg
-      v-else
+      v-else-if="icon === 'replan'"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -104,6 +107,22 @@ defineProps<{
            de flecha, no el doble-arco de un "refresh" completo -->
       <path d="M1 4v6h6" />
       <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+    </svg>
+    <svg
+      v-else
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="w-4 h-4"
+      aria-hidden="true"
+    >
+      <!-- copy (v0.3.2): dos cuadrados redondeados solapados — el de detrás
+           (la plantilla original) y el de delante (la copia que se crea) -->
+      <rect x="4" y="4" width="11" height="11" rx="2" />
+      <rect x="9" y="9" width="11" height="11" rx="2" />
     </svg>
   </button>
 </template>

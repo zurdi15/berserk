@@ -104,10 +104,24 @@ class Exercise(Base):
     owner_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), default=None, index=True
     )
+    # W2 feature 1: el dueño sigue siendo el único que edita/borra (_can_edit
+    # sin cambios), pero con is_public=True el ejercicio aparece en el
+    # listado de CUALQUIER usuario (no solo el propio) y es usable en sus
+    # rutinas/entrenos (ver get_visible_exercise) — distinto del catálogo
+    # admin (owner_id NULL), que ya era global desde antes de esta columna
+    is_public: Mapped[bool] = mapped_column(default=False)
 
     muscle_links: Mapped[list["ExerciseMuscleGroup"]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
+    # lazy="select" (default): solo dispara una query extra cuando el
+    # serializer pide owner.username (atribución en el listado), el resto de
+    # consultas existentes no la pagan
+    owner: Mapped[User | None] = relationship(foreign_keys=[owner_id])
+
+    @property
+    def owner_username(self) -> str | None:
+        return self.owner.username if self.owner is not None else None
 
 
 class ExerciseMuscleGroup(Base):
@@ -143,13 +157,22 @@ class Routine(Base):
     __tablename__ = "routines"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    owner_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    # W2 feature 2: nullable ahora — NULL es una plantilla GLOBAL creada por
+    # un admin (mirror de Exercise.owner_id/MuscleGroup.owner_id: catálogo
+    # sin dueño, visible a todos). Un admin llega ahí "globalizando" una
+    # rutina propia existente (POST .../globalize), no creándola ya global
+    # (la UI del editor no expone ese checkbox, ver v0.3.2 report)
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), default=None, index=True
     )
     name: Mapped[str] = mapped_column(String(60))
     description: Mapped[str | None] = mapped_column(String(300), default=None)
     rune: Mapped[str | None] = mapped_column(String(20), default=None)
     color: Mapped[str | None] = mapped_column(String(30), default=None)
+    # W2 feature 2: rutina propia compartida como plantilla de solo lectura
+    # con el resto de usuarios (consumo = copia, nunca referencia viva, ver
+    # POST .../copy) — independiente de owner_id NULL (plantilla global)
+    is_public: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     exercises: Mapped[list["RoutineExercise"]] = relationship(
@@ -157,6 +180,11 @@ class Routine(Base):
         passive_deletes=True,
         order_by="RoutineExercise.position",
     )
+    owner: Mapped[User | None] = relationship(foreign_keys=[owner_id])
+
+    @property
+    def owner_username(self) -> str | None:
+        return self.owner.username if self.owner is not None else None
 
 
 class RoutineExercise(Base):

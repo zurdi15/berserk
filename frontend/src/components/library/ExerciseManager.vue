@@ -26,11 +26,19 @@ const toast = useToastStore()
 const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
 
-const ownExercises = computed(() => exercises.value.filter((e) => e.owner_id !== null))
-// item 4: catálogo predefinido (owner_id null) en su propia sección,
+// W2 feature 1: antes "propio" era simplemente owner_id !== null porque el
+// backend solo devolvía lo mío + el catálogo — ahora también puede haber
+// ejercicios PÚBLICOS de otros usuarios en el listado, así que "propio"
+// exige comparar contra mi id de verdad
+const ownExercises = computed(() => exercises.value.filter((e) => e.owner_id === auth.user?.id))
+// item 4: catálogo predefinido (owner_id null) EN su propia sección,
 // colapsada por defecto — de solo lectura para un usuario normal; item 5
-// añade edición/borrado ahí mismo para un admin
-const catalogExercises = computed(() => exercises.value.filter((e) => e.owner_id === null))
+// añade edición/borrado ahí mismo para un admin. W2 feature 1: la misma
+// sección también acoge los ejercicios PÚBLICOS de otros usuarios (con
+// hint de atribución), de solo lectura para todo el mundo salvo su dueño
+const catalogExercises = computed(() =>
+  exercises.value.filter((e) => e.owner_id !== auth.user?.id),
+)
 const catalogOpen = ref(false)
 
 const measurementValues: Measurement[] = ['strength', 'bodyweight', 'timed', 'cardio']
@@ -58,6 +66,10 @@ function primaryGroupRune(exercise: ExerciseOut): RuneName | null {
 
 const formOpen = ref(false)
 const editingId = ref<number | null>(null)
+// owner_id de la fila que se está editando (null en creación, o si es una
+// fila del catálogo admin) — W2 feature 1: decide si el checkbox is_public
+// tiene sentido (una fila del catálogo admin ya es global, no aplica)
+const editingOwnerId = ref<number | null>(null)
 const nameEs = ref('')
 const nameEn = ref('')
 const measurement = ref<Measurement>('strength')
@@ -66,6 +78,9 @@ const primaryGroupId = ref<number | null>(null)
 // item 3: solo en creación (igual que measurement arriba) — is_global no es
 // patchable en el backend, así que no tiene sentido mostrarlo al editar
 const isGlobal = ref(false)
+// W2 feature 1: check de "globales" de un ejercicio PROPIO — a diferencia
+// de isGlobal, SÍ es patchable (round-trip en create Y edit)
+const isPublic = ref(false)
 const saving = ref(false)
 
 const deleteConfirmOpen = ref(false)
@@ -91,22 +106,26 @@ onMounted(loadAll)
 
 function openCreate() {
   editingId.value = null
+  editingOwnerId.value = null
   nameEs.value = ''
   nameEn.value = ''
   measurement.value = 'strength'
   checkedGroupIds.value = []
   primaryGroupId.value = null
   isGlobal.value = false
+  isPublic.value = false
   formOpen.value = true
 }
 
 function openEdit(exercise: ExerciseOut) {
   editingId.value = exercise.id
+  editingOwnerId.value = exercise.owner_id
   nameEs.value = exercise.name_es
   nameEn.value = exercise.name_en
   measurement.value = exercise.measurement
   checkedGroupIds.value = exercise.muscle_groups.map((l) => l.muscle_group_id)
   primaryGroupId.value = exercise.muscle_groups.find((l) => l.is_primary)?.muscle_group_id ?? null
+  isPublic.value = exercise.is_public ?? false
   formOpen.value = true
 }
 
@@ -136,6 +155,7 @@ async function submitForm() {
         name_es: nameEs.value,
         name_en: nameEn.value,
         muscle_groups,
+        is_public: isPublic.value,
       })
     } else {
       await createExercise({
@@ -144,6 +164,7 @@ async function submitForm() {
         measurement: measurement.value,
         muscle_groups,
         is_global: isGlobal.value,
+        is_public: isPublic.value,
       })
     }
     formOpen.value = false
@@ -284,11 +305,24 @@ async function confirmDelete() {
                   />
                   <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
                 </span>
+                <!-- W2 feature 1: hint de atribución para lo público de OTROS
+                     usuarios — el catálogo admin (owner_username null) no lo lleva -->
+                <span
+                  v-if="exercise.owner_username"
+                  class="text-xs text-ink-faint shrink-0"
+                  :data-testid="`exercise-shared-by-${exercise.id}`"
+                >
+                  {{ $t('common.sharedBy', { username: exercise.owner_username }) }}
+                </span>
               </span>
-              <!-- item 5: un admin puede editar/borrar filas predefinidas —
-                   reutiliza el mismo sheet/flow que los ejercicios propios,
-                   el backend ya lo permite sobre owner_id null -->
-              <div v-if="auth.user?.is_admin" class="flex items-center gap-2 shrink-0">
+              <!-- item 5: un admin puede editar/borrar filas predefinidas
+                   (owner_id null) — reutiliza el mismo sheet/flow que los
+                   ejercicios propios, el backend ya lo permite ahí. W2
+                   feature 1: lo público de OTRO usuario NUNCA es editable
+                   por mí (ni siquiera admin — _can_edit es owner-o-admin-
+                   de-global, no admin-de-lo-ajeno), así que estos controles
+                   solo aparecen para filas del catálogo, no para públicas -->
+              <div v-if="exercise.owner_id === null && auth.user?.is_admin" class="flex items-center gap-2 shrink-0">
                 <BkActionBtn
                   icon="edit"
                   :data-testid="`edit-exercise-${exercise.id}`"
@@ -346,6 +380,23 @@ async function confirmDelete() {
             data-testid="exercise-is-global-checkbox"
           />
           <span class="text-sm text-ink-muted">{{ $t('library.isGlobal') }}</span>
+        </label>
+
+        <!-- W2 feature 1: "Visible para todos" — a diferencia de isGlobal,
+             cualquier usuario lo ve (sigue siendo el dueño), y SÍ es
+             patchable (crear Y editar); no tiene sentido sobre una fila del
+             catálogo admin (owner_id null ya es global de por sí) -->
+        <label
+          v-if="editingOwnerId !== null || editingId === null"
+          class="flex items-center gap-2 cursor-pointer"
+        >
+          <input
+            v-model="isPublic"
+            type="checkbox"
+            class="rounded border border-line"
+            data-testid="exercise-is-public-checkbox"
+          />
+          <span class="text-sm text-ink-muted">{{ $t('library.isPublic') }}</span>
         </label>
 
         <div class="space-y-2">

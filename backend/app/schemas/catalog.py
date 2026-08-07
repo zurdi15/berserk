@@ -59,6 +59,11 @@ class ExerciseIn(BaseModel):
     # item 3: ejercicio global (owner_id null, visible a todo el mundo) —
     # solo un admin puede pedirlo, igual que MuscleGroupIn.is_global
     is_global: bool = False
+    # W2 feature 1: "check de globales" de un ejercicio PROPIO — a diferencia
+    # de is_global (catálogo admin, owner_id NULL) esto no requiere admin: el
+    # dueño se queda dueño/editor, solo se amplía quién lo VE y usa (ver
+    # list_exercises y get_visible_exercise)
+    is_public: bool = False
 
     @field_validator("muscle_groups")
     @classmethod
@@ -70,6 +75,10 @@ class ExercisePatchIn(BaseModel):
     name_es: str | None = Field(None, min_length=1, max_length=80)
     name_en: str | None = Field(None, min_length=1, max_length=80)
     muscle_groups: list[ExerciseMuscleLink] | None = Field(None, min_length=1)
+    # anulable a nivel de tipo por consistencia, pero None = "no lo toques"
+    # (ver update_exercise: solo se aplica si no es None), nunca "vuelve a
+    # privado" — para eso hay que mandar is_public=False explícito
+    is_public: bool | None = None
 
     @field_validator("muscle_groups")
     @classmethod
@@ -83,4 +92,10 @@ class ExerciseOut(BaseModel):
     name_en: str
     measurement: str
     owner_id: int | None
+    is_public: bool
+    # W2 feature 1: atribución para la sección "catálogo-ish" del frontend
+    # (hint "— username" en las públicas de otros) — None para el catálogo
+    # admin (owner_id NULL); siempre poblado si hay owner_id, el frontend
+    # decide si mostrarlo (no lo hace para las propias filas del usuario)
+    owner_username: str | None
     muscle_groups: list[ExerciseMuscleLink]

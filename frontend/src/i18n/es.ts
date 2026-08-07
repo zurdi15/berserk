@@ -59,6 +59,7 @@ export const es = {
     backup_invalid: 'El fichero de copia no es válido.',
     backup_too_large: 'La copia supera el tamaño máximo permitido.',
     restore_failed: 'No se pudo restaurar la copia; se conservan los datos anteriores.',
+    routine_has_private_exercises: 'Esa rutina usa ejercicios privados que no puedes ver, así que no se puede copiar.',
     generic: 'Algo ha fallado. Inténtalo de nuevo.',
   },
   common: {
@@ -77,6 +78,9 @@ export const es = {
     apply: 'Aplicar',
     hours: 'Horas',
     minutes: 'Minutos',
+    // W2: hint de atribución compartido entre el catálogo-ish de
+    // ExerciseManager y la sección Plantillas de RoutineList
+    sharedBy: 'de {username}',
   },
   athlete: {
     viewing: 'Viendo a {name}',
@@ -170,6 +174,19 @@ export const es = {
     noExercisesInRoutine: 'Sin ejercicios en esta rutina aún',
     nameRequired: 'El nombre de la rutina es obligatorio',
     confirm: 'Confirmar',
+    // W2 feature 2: sección Plantillas (globales + públicas de otros)
+    templates: 'Plantillas',
+    noTemplates: 'Sin plantillas disponibles',
+    globalTemplate: 'Global',
+    // toggle en la propia tarjeta (el editor está fuera de este carril)
+    isPublic: 'Visible para todos',
+    copy: 'Copiar',
+    copied: 'Rutina copiada',
+    // segundo control, solo admin, sobre una rutina PROPIA — la convierte
+    // en plantilla global (owner_id -> NULL, deja el listado personal)
+    globalize: 'Convertir en global',
+    confirmGlobalize: 'Convertir en plantilla global',
+    confirmGlobalizeMessage: 'Esta rutina dejará tu lista personal y pasará a ser una plantilla global de solo lectura, visible para todos los usuarios. ¿Continuar?',
   },
   library: {
     exercises: 'Ejercicios',
@@ -189,6 +206,9 @@ export const es = {
     slug: 'Identificador',
     globalGroup: 'Global',
     isGlobal: 'Global (todos los usuarios)',
+    // W2 feature 1: check de "globales" en un ejercicio PROPIO (checkbox de
+    // crear/editar) — distinto de isGlobal (catálogo admin, solo visible ahí)
+    isPublic: 'Visible para todos',
     noExercises: 'Sin ejercicios propios aún',
     noGroups: 'Sin grupos musculares propios aún',
     catalog: 'Catálogo predefinido',

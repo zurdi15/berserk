@@ -59,6 +59,7 @@ export const en = {
     backup_invalid: 'The backup file is not valid.',
     backup_too_large: 'The backup exceeds the maximum allowed size.',
     restore_failed: 'Could not restore the backup; previous data is kept.',
+    routine_has_private_exercises: 'That routine uses private exercises you can\'t see, so it can\'t be copied.',
     generic: 'Something went wrong. Try again.',
   },
   common: {
@@ -77,6 +78,9 @@ export const en = {
     apply: 'Apply',
     hours: 'Hours',
     minutes: 'Minutes',
+    // W2: attribution hint shared between ExerciseManager's catalog-ish
+    // section and RoutineList's Templates section
+    sharedBy: 'by {username}',
   },
   athlete: {
     viewing: 'Viewing {name}',
@@ -170,6 +174,19 @@ export const en = {
     noExercisesInRoutine: 'No exercises in this routine yet',
     nameRequired: 'Routine name is required',
     confirm: 'Confirm',
+    // W2 feature 2: Templates section (global + others' public)
+    templates: 'Templates',
+    noTemplates: 'No templates available',
+    globalTemplate: 'Global',
+    // toggle on the card itself (the editor is out of this lane)
+    isPublic: 'Visible to everyone',
+    copy: 'Copy',
+    copied: 'Routine copied',
+    // second control, admin-only, on an OWN routine — turns it into a
+    // global template (owner_id -> NULL, leaves the personal list)
+    globalize: 'Make global',
+    confirmGlobalize: 'Make global template',
+    confirmGlobalizeMessage: 'This routine will leave your personal list and become a read-only global template, visible to every user. Continue?',
   },
   library: {
     exercises: 'Exercises',
@@ -189,6 +206,9 @@ export const en = {
     slug: 'Slug',
     globalGroup: 'Global',
     isGlobal: 'Global (all users)',
+    // W2 feature 1: "public" check on an OWN exercise (create/edit
+    // checkbox) — distinct from isGlobal (admin catalog, only visible there)
+    isPublic: 'Visible to everyone',
     noExercises: 'No custom exercises yet',
     noGroups: 'No custom muscle groups yet',
     catalog: 'Predefined catalog',

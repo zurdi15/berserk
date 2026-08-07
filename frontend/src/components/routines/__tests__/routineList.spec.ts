@@ -1,6 +1,6 @@
-import { mount } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -10,10 +10,13 @@ vi.mock('@/api/domain', () => ({
   listRoutines: vi.fn(() => Promise.resolve([
     {
       id: 1,
+      owner_id: 1,
       name: 'Push Day',
       description: 'Upper body push',
       rune: 'chest',
       color: null,
+      is_public: false,
+      owner_username: null,
       exercises: [
         { id: 1, exercise_id: 1, position: 0, target_sets: 4, target_reps: 8, target_weight_kg: 80, rest_seconds: 120 },
         { id: 2, exercise_id: 2, position: 1, target_sets: 3, target_reps: 10, target_weight_kg: 60, rest_seconds: 90 },
@@ -21,16 +24,25 @@ vi.mock('@/api/domain', () => ({
     },
     {
       id: 2,
+      owner_id: 1,
       name: 'Pull Day',
       description: 'Upper body pull',
       rune: 'back',
       color: null,
+      is_public: false,
+      owner_username: null,
       exercises: [
         { id: 3, exercise_id: 3, position: 0, target_sets: 4, target_reps: 6, target_weight_kg: 100, rest_seconds: 120 },
       ],
     },
   ])),
   deleteRoutine: vi.fn((id: number) => Promise.resolve(void 0)),
+  // W2 feature 2: nuevos endpoints — resueltos en vacío/no-op por defecto,
+  // los tests que los ejercitan los sobreescriben con mockResolvedValueOnce
+  listRoutineTemplates: vi.fn(() => Promise.resolve([])),
+  updateRoutine: vi.fn((id: number, body: unknown) => Promise.resolve({ id, ...(body as object) })),
+  copyRoutine: vi.fn((id: number) => Promise.resolve({ id: 99 })),
+  globalizeRoutine: vi.fn((id: number) => Promise.resolve({ id, owner_id: null })),
   listExercises: vi.fn(() => Promise.resolve([
     { id: 1, name_es: 'Press de banca', name_en: 'Bench Press', measurement: 'strength', owner_id: null, muscle_groups: [] },
     { id: 2, name_es: 'Aperturas', name_en: 'Flyes', measurement: 'strength', owner_id: null, muscle_groups: [] },
@@ -64,13 +76,46 @@ describe('RoutineList', () => {
     })
   }
 
+  // W2 feature 2: el sheet de confirmación de "globalizar" usa BkSheet de
+  // verdad (no stubeado, a diferencia de RoutineEditorSheet) — su contenido
+  // viaja a <Teleport to="body">, así que hace falta montar sobre
+  // document.body y consultar ahí (mismo patrón que library.spec.ts)
+  let mountedWrappers: VueWrapper[] = []
+
+  function buildAttached() {
+    const wrapper = mount(RoutineList, {
+      global: {
+        plugins: [createI18nInstance()],
+        stubs: {
+          BkRune: true,
+          RoutineEditorSheet: true,
+        },
+      },
+      attachTo: document.body,
+    })
+    mountedWrappers.push(wrapper)
+    return wrapper
+  }
+
+  function byTestId(id: string): DOMWrapper<Element> {
+    return new DOMWrapper(document.body.querySelector(`[data-testid="${id}"]`) as Element | null)
+  }
+
+  afterEach(() => {
+    mountedWrappers.forEach((wrapper) => wrapper.unmount())
+    mountedWrappers = []
+  })
+
   it('item 7: has no "Rutinas" heading, and the new-routine button sits alone at the left edge of its row, opening the editor in create mode', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 50))
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('h2').exists()).toBe(false)
+    // W2 feature 2: la sección "Plantillas" SÍ tiene su propio <h2> (BkCard
+    // title) — lo que sigue sin llevar heading es la lista de rutinas
+    // propias en sí, así que se comprueba que ningún h2 diga "Rutinas"
+    expect(wrapper.findAll('h2').some((h) => h.text() === 'Rutinas')).toBe(false)
     expect(wrapper.text()).not.toContain('Rutinas')
 
     const button = wrapper.get('[data-testid="new-routine-btn"]')
@@ -220,7 +265,11 @@ describe('RoutineList', () => {
     await new Promise(resolve => setTimeout(resolve, 50))
     await wrapper.vm.$nextTick()
 
-    const runes = wrapper.findAllComponents({ name: 'BkRune' })
+    // W2 feature 2: scoped a la lista de rutinas PROPIAS — la sección
+    // Plantillas (vacía en este test) también renderiza un BkRune por
+    // defecto dentro de su BkEmpty, que no es lo que este test comprueba
+    const ownList = wrapper.get('.grid.gap-3')
+    const runes = ownList.findAllComponents({ name: 'BkRune' })
     expect(runes.length).toBe(1)
     expect(runes[0].props('name')).toBe('chest')
   })
@@ -379,5 +428,196 @@ describe('RoutineList', () => {
 
     // resuelto (vacío en este caso): ahora sí aparece el mensaje
     expect(wrapper.text()).toContain('Sin rutinas aún')
+  })
+
+  describe('W2 feature 2: templates section', () => {
+    async function buildReady() {
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await wrapper.vm.$nextTick()
+      return wrapper
+    }
+
+    it('shows the empty-templates message when there are none', async () => {
+      const wrapper = await buildReady()
+
+      const section = wrapper.get('[data-testid="templates-section"]')
+      expect(section.text()).toContain('Sin plantillas disponibles')
+    })
+
+    it('renders a GLOBAL template (owner_username null) with the "Global" attribution badge, and a public template from another user with a username hint', async () => {
+      const { listRoutineTemplates } = await import('@/api/domain')
+      vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
+        {
+          id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
+          is_public: false, owner_username: null, exercises: [],
+        },
+        {
+          id: 11, owner_id: 9, name: 'Rutina de Freyja', description: null, rune: null, color: null,
+          is_public: true, owner_username: 'freyja', exercises: [],
+        },
+      ] as never)
+
+      const wrapper = await buildReady()
+
+      const section = wrapper.get('[data-testid="templates-section"]')
+      expect(section.text()).toContain('Plantilla admin')
+      expect(section.get('[data-testid="template-attribution-10"]').text()).toBe('Global')
+      expect(section.text()).toContain('Rutina de Freyja')
+      expect(section.get('[data-testid="template-attribution-11"]').text()).toContain('freyja')
+    })
+
+    it('clicking the copy button copies the template and reloads the lists', async () => {
+      const { listRoutineTemplates, copyRoutine, listRoutines } = await import('@/api/domain')
+      vi.mocked(listRoutineTemplates).mockResolvedValue([
+        {
+          id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
+          is_public: false, owner_username: null, exercises: [],
+        },
+      ] as never)
+      vi.mocked(copyRoutine).mockClear()
+      vi.mocked(listRoutines).mockClear()
+
+      const wrapper = await buildReady()
+      const callsBeforeCopy = vi.mocked(listRoutines).mock.calls.length
+
+      await wrapper.get('[data-testid="copy-template-10"]').trigger('click')
+      await flushPromises()
+
+      expect(copyRoutine).toHaveBeenCalledWith(10)
+      // recarga tras copiar: mis rutinas se vuelven a pedir para reflejar la copia
+      expect(vi.mocked(listRoutines).mock.calls.length).toBeGreaterThan(callsBeforeCopy)
+    })
+
+    it('the copy action renders an icon-only BkActionBtn with icon="copy"', async () => {
+      const { listRoutineTemplates } = await import('@/api/domain')
+      vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
+        {
+          id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
+          is_public: false, owner_username: null, exercises: [],
+        },
+      ] as never)
+
+      const wrapper = await buildReady()
+
+      const copyBtn = wrapper.get('[data-testid="copy-template-10"]')
+      expect(copyBtn.attributes('aria-label')).toBe('Copiar')
+      expect(copyBtn.find('svg').findAll('rect')).toHaveLength(2)
+    })
+
+    it('a template card expands to reveal its exercises, same as an own routine card', async () => {
+      const { listRoutineTemplates } = await import('@/api/domain')
+      vi.mocked(listRoutineTemplates).mockResolvedValueOnce([
+        {
+          id: 10, owner_id: null, name: 'Plantilla admin', description: null, rune: null, color: null,
+          is_public: false, owner_username: null,
+          exercises: [
+            { id: 1, exercise_id: 1, position: 0, target_sets: 4, target_reps: 8, target_weight_kg: 80, rest_seconds: 120 },
+          ],
+        },
+      ] as never)
+
+      const wrapper = await buildReady()
+
+      expect(wrapper.find('[data-testid="exercise-list-template-10"]').exists()).toBe(false)
+      await wrapper.get('[data-testid="toggle-template-10"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      const list = wrapper.get('[data-testid="exercise-list-template-10"]')
+      expect(list.text()).toContain('Press de banca')
+      expect(list.text()).toContain('4×8')
+    })
+  })
+
+  describe('W2 feature 2: "Visible para todos" toggle on own routine card', () => {
+    async function buildReady() {
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await wrapper.vm.$nextTick()
+      return wrapper
+    }
+
+    it('reflects the routine\'s is_public via aria-pressed, off by default (fixture is_public: false)', async () => {
+      const wrapper = await buildReady()
+
+      const toggle = wrapper.get('[data-testid="toggle-public-routine-1"]')
+      expect(toggle.attributes('aria-pressed')).toBe('false')
+      expect(toggle.attributes('aria-label')).toBe('Visible para todos')
+    })
+
+    it('clicking it PATCHes is_public to true and reloads', async () => {
+      const { updateRoutine, listRoutines } = await import('@/api/domain')
+      vi.mocked(updateRoutine).mockClear()
+      vi.mocked(listRoutines).mockClear()
+
+      const wrapper = await buildReady()
+      const callsBefore = vi.mocked(listRoutines).mock.calls.length
+
+      await wrapper.get('[data-testid="toggle-public-routine-1"]').trigger('click')
+      await flushPromises()
+
+      expect(updateRoutine).toHaveBeenCalledWith(1, { is_public: true })
+      expect(vi.mocked(listRoutines).mock.calls.length).toBeGreaterThan(callsBefore)
+    })
+  })
+
+  describe('W2 feature 2: admin-only "globalize" control', () => {
+    async function buildReadyAsAdmin() {
+      const auth = useAuthStore()
+      auth.user = { id: 1, username: 'admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' }
+      const wrapper = buildAttached()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await wrapper.vm.$nextTick()
+      return wrapper
+    }
+
+    it('is hidden for a non-admin user', async () => {
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="globalize-routine-1"]').exists()).toBe(false)
+    })
+
+    it('opens a confirm sheet for an admin, and confirming calls globalizeRoutine then reloads', async () => {
+      const { globalizeRoutine, listRoutines } = await import('@/api/domain')
+      vi.mocked(globalizeRoutine).mockClear()
+      vi.mocked(listRoutines).mockClear()
+
+      const wrapper = await buildReadyAsAdmin()
+      const callsBefore = vi.mocked(listRoutines).mock.calls.length
+
+      const control = wrapper.get('[data-testid="globalize-routine-1"]')
+      expect(control.attributes('aria-label')).toBe('Convertir en global')
+      await control.trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(byTestId('globalize-confirm-sheet').exists()).toBe(true)
+
+      await byTestId('globalize-confirm-btn').trigger('click')
+      await flushPromises()
+
+      expect(globalizeRoutine).toHaveBeenCalledWith(1)
+      expect(vi.mocked(listRoutines).mock.calls.length).toBeGreaterThan(callsBefore)
+    })
+
+    it('cancelling the confirm sheet does not call globalizeRoutine', async () => {
+      const { globalizeRoutine } = await import('@/api/domain')
+      vi.mocked(globalizeRoutine).mockClear()
+
+      const wrapper = await buildReadyAsAdmin()
+
+      await wrapper.get('[data-testid="globalize-routine-1"]').trigger('click')
+      await wrapper.vm.$nextTick()
+      await byTestId('globalize-cancel-btn').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(byTestId('globalize-confirm-sheet').exists()).toBe(false)
+      expect(globalizeRoutine).not.toHaveBeenCalled()
+    })
   })
 })
