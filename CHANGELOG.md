@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.4.0 - 2026-08-07
+
+- Light theme: a nordic-day palette (pale fog surfaces, WCAG AA-tuned aurora and ember) selectable in Settings as dark, light or system, applied before first paint and re-theming the charts live.
+- Athlete view mode now survives reloads: viewing a shared user's calendar keeps their workouts and their color on the dots, exactly where you left off.
+- Admins can fully edit users: username, color and admin status from a unified sheet, with password reset kept deliberately separate.
+- Validation errors finally speak: invalid passwords are caught inline before submitting, and any remaining validation error names the field instead of "something failed".
+- Personal records can be filtered by kind (max weight, volume, estimated 1RM), a past workout can be logged from a routine with its exercises preloaded, and every user renders with their color dot across sharing and admin.
+- Desktop chrome: the top bar gained the sliding section indicator, items align to its bottom edge, and the scrollbar lives at the window edge instead of hugging the centered content.
+- Public routines referencing private exercises now say so instead of showing blank rows, templates explain themselves, and tab URLs carry anchors that restore the active tab on load.
+
 ## 0.3.2 - 2026-08-07
 
 - Your custom exercises can be made visible to everyone: other users see them with attribution and can train with them, while editing stays yours.
