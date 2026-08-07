@@ -27,13 +27,16 @@ vi.mock('@/api/domain', () => ({
   removeWorkoutExercise: vi.fn(),
   reorderWorkoutExercises: vi.fn(),
   updateWorkoutExercise: vi.fn(),
+  finishWorkout: vi.fn(),
 }))
 
+import { ApiError } from '@/api/client'
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import { useRestTimerStore } from '@/stores/restTimer'
+import { useToastStore } from '@/stores/toast'
 import WorkoutView from '../WorkoutView.vue'
 
 function build() {
@@ -810,6 +813,231 @@ describe('WorkoutView', () => {
       await flushPromises()
 
       expect(wrapper.get('[data-testid="rest-auto-toggle"]').attributes('aria-pressed')).toBe('false')
+    })
+  })
+
+  // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: al montar la vista EN VIVO (nunca en
+  // el editor retroactivo, que ni monta este componente), se decide qué
+  // hacer con un countdown que se dejó corriendo antes de que Android
+  // matara la pestaña — ver WorkoutView.vue::checkPersistedCardioCountdown.
+  describe('v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: resume-check on mount', () => {
+    function mockStorage(): Storage {
+      const store = new Map<string, string>()
+      return {
+        getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+        setItem: (key: string, value: string) => { store.set(key, value) },
+        removeItem: (key: string) => { store.delete(key) },
+        clear: () => { store.clear() },
+        key: (index: number) => Array.from(store.keys())[index] ?? null,
+        get length() { return store.size },
+      } as Storage
+    }
+
+    const cardioExerciseFixture = {
+      id: 6,
+      name_es: 'Cinta',
+      name_en: 'Treadmill',
+      measurement: 'cardio' as const,
+      owner_id: null,
+      muscle_groups: [],
+    }
+    const workoutFixture = {
+      id: 1,
+      date: '2026-08-06',
+      started_at: '2026-08-06T09:00:00Z',
+      ended_at: null,
+      routine_id: null,
+      note: null,
+      feeling: null,
+      exercises: [{ id: 20, exercise_id: 6, position: 0, note: null, rest_seconds: null, sets: [] }],
+      muscle_tag_ids: [],
+    }
+
+    let wrapper: VueWrapper | null = null
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-08-06T10:00:00Z'))
+      vi.mocked(domain.listExercises).mockResolvedValue([cardioExerciseFixture] as never)
+      vi.mocked(domain.getWorkout).mockResolvedValue(workoutFixture as never)
+      vi.mocked(domain.logSet).mockReset()
+      vi.mocked(domain.finishWorkout).mockReset()
+    })
+
+    afterEach(() => {
+      wrapper?.unmount()
+      wrapper = null
+      document.body.innerHTML = ''
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    })
+
+    function mountLiveWithStorage(storage: Storage) {
+      vi.stubGlobal('localStorage', storage)
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = workoutFixture as never
+      })
+      return mount(WorkoutView, { global: { plugins: [createI18nInstance()] }, attachTo: document.body })
+    }
+
+    it('resumes a still-running countdown (endsAt in the future) at the correct remaining time, without logging', async () => {
+      const storage = mockStorage()
+      storage.setItem(
+        'berserk:cardio-countdown',
+        JSON.stringify({ endsAt: Date.now() + 600_000, workoutId: 1, workoutExerciseId: 20, targetSeconds: 1800, distanceM: 5000 }),
+      )
+
+      wrapper = mountLiveWithStorage(storage)
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('10:00')
+      expect(domain.logSet).not.toHaveBeenCalled()
+    })
+
+    it('an already-expired countdown (endsAt in the past) auto-logs the full target duration, toasts the result, and clears storage', async () => {
+      const storage = mockStorage()
+      storage.setItem(
+        'berserk:cardio-countdown',
+        JSON.stringify({ endsAt: Date.now() - 5_000, workoutId: 1, workoutExerciseId: 20, targetSeconds: 1800, distanceM: 5000 }),
+      )
+      vi.mocked(domain.logSet).mockResolvedValue({
+        set: { id: 1, set_number: 1, reps: null, weight_kg: null, duration_seconds: 1800, distance_m: 5000, is_warmup: false, rpe: null, completed_at: 'x' },
+        new_records: [],
+      } as never)
+      const toast = useToastStore()
+
+      wrapper = mountLiveWithStorage(storage)
+      await flushPromises()
+
+      expect(domain.logSet).toHaveBeenCalledWith(1, 20, expect.objectContaining({ duration_seconds: 1800, distance_m: 5000 }))
+      expect(toast.toasts.some((t) => t.message === 'Cardio registrado: 30:00')).toBe(true)
+      expect(storage.getItem('berserk:cardio-countdown')).toBeNull()
+    })
+
+    it('a stale workoutId (no longer the active workout) clears storage WITHOUT logging', async () => {
+      const storage = mockStorage()
+      storage.setItem(
+        'berserk:cardio-countdown',
+        JSON.stringify({ endsAt: Date.now() - 5_000, workoutId: 999, workoutExerciseId: 20, targetSeconds: 1800 }),
+      )
+
+      wrapper = mountLiveWithStorage(storage)
+      await flushPromises()
+
+      expect(domain.logSet).not.toHaveBeenCalled()
+      expect(storage.getItem('berserk:cardio-countdown')).toBeNull()
+    })
+
+    it('no active workout at all clears storage WITHOUT logging (mismatch, same as a stale workoutId)', async () => {
+      const storage = mockStorage()
+      storage.setItem(
+        'berserk:cardio-countdown',
+        JSON.stringify({ endsAt: Date.now() - 5_000, workoutId: 1, workoutExerciseId: 20, targetSeconds: 1800 }),
+      )
+      vi.stubGlobal('localStorage', storage)
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+
+      wrapper = mount(WorkoutView, { global: { plugins: [createI18nInstance()] } })
+      await flushPromises()
+
+      expect(domain.logSet).not.toHaveBeenCalled()
+      expect(storage.getItem('berserk:cardio-countdown')).toBeNull()
+    })
+
+    it('a workoutExerciseId that no longer exists in the workout clears storage WITHOUT logging', async () => {
+      const storage = mockStorage()
+      storage.setItem(
+        'berserk:cardio-countdown',
+        JSON.stringify({ endsAt: Date.now() - 5_000, workoutId: 1, workoutExerciseId: 999, targetSeconds: 1800 }),
+      )
+
+      wrapper = mountLiveWithStorage(storage)
+      await flushPromises()
+
+      expect(domain.logSet).not.toHaveBeenCalled()
+      expect(storage.getItem('berserk:cardio-countdown')).toBeNull()
+    })
+
+    // edge honesty (lane spec): el backend SÍ permite loguear contra un
+    // entreno ya terminado, pero uno DESCARTADO ya no existe y 404 — ese caso
+    // no lo caza el mismatch de arriba si el descarte pasó en otro
+    // dispositivo/pestaña justo entre el resume() de esta y el intento de log
+    it('a discarded workout (the log attempt 404s) clears storage silently — no error toast, no success toast', async () => {
+      const storage = mockStorage()
+      storage.setItem(
+        'berserk:cardio-countdown',
+        JSON.stringify({ endsAt: Date.now() - 5_000, workoutId: 1, workoutExerciseId: 20, targetSeconds: 1800 }),
+      )
+      vi.mocked(domain.logSet).mockRejectedValue(new ApiError(404, 'not_found'))
+      const toast = useToastStore()
+
+      wrapper = mountLiveWithStorage(storage)
+      await flushPromises()
+
+      expect(storage.getItem('berserk:cardio-countdown')).toBeNull()
+      expect(toast.toasts).toHaveLength(0)
+    })
+
+    it('a non-404 error while auto-logging surfaces the usual error toast (not swallowed)', async () => {
+      const storage = mockStorage()
+      storage.setItem(
+        'berserk:cardio-countdown',
+        JSON.stringify({ endsAt: Date.now() - 5_000, workoutId: 1, workoutExerciseId: 20, targetSeconds: 1800 }),
+      )
+      vi.mocked(domain.logSet).mockRejectedValue(new ApiError(500, 'generic'))
+      const toast = useToastStore()
+
+      wrapper = mountLiveWithStorage(storage)
+      await flushPromises()
+
+      expect(toast.toasts.some((t) => t.kind === 'error')).toBe(true)
+      expect(storage.getItem('berserk:cardio-countdown')).toBeNull()
+    })
+
+    it('finishing the workout clears a lingering persisted countdown', async () => {
+      const storage = mockStorage()
+      storage.setItem(
+        'berserk:cardio-countdown',
+        JSON.stringify({ endsAt: Date.now() + 600_000, workoutId: 1, workoutExerciseId: 20, targetSeconds: 1800 }),
+      )
+      vi.mocked(domain.finishWorkout).mockResolvedValue({ ...workoutFixture, ended_at: '2026-08-06T10:00:00Z' } as never)
+
+      wrapper = mountLiveWithStorage(storage)
+      await flushPromises()
+
+      // sin data-testid propio (ver WorkoutView.vue): el botón "Terminar" se
+      // localiza por texto dentro del bloque de acciones, como ya hace el
+      // bloque "item 3" de arriba (`actions.text()).toContain('Terminar')`)
+      const finishBtn = wrapper
+        .get('[data-testid="workout-actions"]')
+        .findAll('button')
+        .find((b) => b.text() === 'Terminar')!
+      await finishBtn.trigger('click')
+      await flushPromises()
+
+      expect(storage.getItem('berserk:cardio-countdown')).toBeNull()
+    })
+
+    it('discarding the workout clears a lingering persisted countdown', async () => {
+      const storage = mockStorage()
+      storage.setItem(
+        'berserk:cardio-countdown',
+        JSON.stringify({ endsAt: Date.now() + 600_000, workoutId: 1, workoutExerciseId: 20, targetSeconds: 1800 }),
+      )
+      vi.mocked(domain.deleteWorkout).mockResolvedValue(undefined as never)
+
+      wrapper = mountLiveWithStorage(storage)
+      await flushPromises()
+
+      await wrapper.find('[data-testid="discard-workout"]').trigger('click')
+      await flushPromises()
+      const confirmBtn = document.body.querySelector('[data-testid="discard-confirm-btn"]') as HTMLElement
+      confirmBtn.click()
+      await flushPromises()
+
+      expect(storage.getItem('berserk:cardio-countdown')).toBeNull()
     })
   })
 })

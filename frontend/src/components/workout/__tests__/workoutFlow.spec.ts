@@ -487,9 +487,25 @@ describe('WorkoutExerciseCard', () => {
   })
 
   describe('item 7: cardio countdown', () => {
+    // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: localStorage real (no el stub roto
+    // de Node, ver uiPrefs.spec.ts) para poder afirmar sobre lo persistido,
+    // no solo sobre la degradación a default
+    function mockStorage(): Storage {
+      const store = new Map<string, string>()
+      return {
+        getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+        setItem: (key: string, value: string) => { store.set(key, value) },
+        removeItem: (key: string) => { store.delete(key) },
+        clear: () => { store.clear() },
+        key: (index: number) => Array.from(store.keys())[index] ?? null,
+        get length() { return store.size },
+      } as Storage
+    }
+
     beforeEach(() => {
       vi.useFakeTimers()
       vi.stubGlobal('navigator', { vibrate: vi.fn() })
+      vi.stubGlobal('localStorage', mockStorage())
     })
     afterEach(() => {
       vi.useRealTimers()
@@ -501,6 +517,7 @@ describe('WorkoutExerciseCard', () => {
         workoutExercise: cardioWorkoutExercise,
         exercise: cardioExercise,
         exerciseIds: [30],
+        workoutId: 1,
         ...overrides,
       })
     }
@@ -537,6 +554,150 @@ describe('WorkoutExerciseCard', () => {
 
       expect(actions.logSet).toHaveBeenCalledWith(30, expect.objectContaining({ duration_seconds: 60, is_warmup: false }))
       expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+    })
+
+    describe('CARDIO-COUNTDOWN PERSISTENCE: persist on start / clear on cancel / clear on complete', () => {
+      it('persists {endsAt, workoutId, workoutExerciseId, targetSeconds, distanceM} to localStorage when the countdown starts', async () => {
+        mountCardio({ workoutId: 7 })
+        await openDrawer(30)
+
+        // sube la distancia antes de arrancar, para afirmar que viaja también
+        const plus = document.body.querySelectorAll('button[aria-label="Aumentar"]')[1] as HTMLElement
+        plus.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }))
+        await flushPromises()
+
+        await byTestId('cardio-start-countdown').trigger('click')
+        await flushPromises()
+
+        const raw = localStorage.getItem('berserk:cardio-countdown')
+        expect(raw).not.toBeNull()
+        const persisted = JSON.parse(raw!)
+        expect(persisted).toMatchObject({ workoutId: 7, workoutExerciseId: 30, targetSeconds: 60, distanceM: 100 })
+        expect(persisted.endsAt).toBeGreaterThan(Date.now())
+      })
+
+      it('does not persist when workoutId is not provided (defensive: no orphaned entry with a bogus workout)', async () => {
+        mountCardio({ workoutId: undefined })
+        await openDrawer(30)
+
+        await byTestId('cardio-start-countdown').trigger('click')
+        await flushPromises()
+
+        expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
+      })
+
+      it('cancelling the countdown clears the persisted state', async () => {
+        mountCardio()
+        await openDrawer(30)
+        await byTestId('cardio-start-countdown').trigger('click')
+        await flushPromises()
+        expect(localStorage.getItem('berserk:cardio-countdown')).not.toBeNull()
+
+        await byTestId('cardio-countdown-cancel').trigger('click')
+        await flushPromises()
+
+        expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
+      })
+
+      it('completing the countdown (reaching zero) clears the persisted state', async () => {
+        const actions = makeActions({
+          logSet: vi.fn(async () => ({
+            set: { id: 1, set_number: 1, reps: null, weight_kg: null, duration_seconds: 60, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+            new_records: [],
+          })),
+        })
+        mountCardio({ actions })
+        await openDrawer(30)
+        await byTestId('cardio-start-countdown').trigger('click')
+        await flushPromises()
+        expect(localStorage.getItem('berserk:cardio-countdown')).not.toBeNull()
+
+        vi.advanceTimersByTime(60_000)
+        await flushPromises()
+
+        expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
+      })
+
+      it('a manual (non-countdown) cardio log also clears a persisted countdown for this exercise (never leaves a zombie entry)', async () => {
+        const actions = makeActions()
+        mountCardio({ actions })
+        await openDrawer(30)
+        await byTestId('cardio-start-countdown').trigger('click')
+        await flushPromises()
+        // el usuario cancela el countdown en marcha... espera, este test
+        // simula en cambio persistencia ya escrita "a mano" (p.ej. sesión
+        // anterior) y comprueba que loguear la limpia igual
+        expect(localStorage.getItem('berserk:cardio-countdown')).not.toBeNull()
+        await byTestId('cardio-countdown-cancel').trigger('click')
+        await flushPromises()
+
+        // se re-persiste como si el countdown siguiera corriendo, y en su
+        // lugar se loguea manualmente vía "Registrar y otra" antes de que
+        // termine — debe limpiarse igual
+        await byTestId('cardio-start-countdown').trigger('click')
+        await flushPromises()
+        expect(localStorage.getItem('berserk:cardio-countdown')).not.toBeNull()
+
+        await byTestId('cardio-countdown-cancel').trigger('click')
+        await flushPromises()
+        await byTestId('log-set-and-another').trigger('click')
+        await flushPromises()
+
+        expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
+      })
+    })
+
+    describe('CARDIO-COUNTDOWN PERSISTENCE: resumed surface (endsAt still in the future)', () => {
+      const resumed = { endsAt: 0, workoutId: 1, workoutExerciseId: 30, targetSeconds: 1800, distanceM: 5000 }
+
+      it('renders the resumed countdown at the correct remaining time, and hides "+ Cardio" while it runs', () => {
+        const wrapper = mountCardio({ resumedCountdown: { ...resumed, endsAt: Date.now() + 600_000 } })
+        expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('10:00')
+        expect(wrapper.find('[data-testid="add-set-30"]').exists()).toBe(false)
+      })
+
+      it('ignores a resumedCountdown for a DIFFERENT workoutExerciseId (no cross-exercise leakage)', () => {
+        const wrapper = mountCardio({
+          resumedCountdown: { ...resumed, workoutExerciseId: 999, endsAt: Date.now() + 600_000 },
+        })
+        expect(wrapper.find('[data-testid="cardio-countdown"]').exists()).toBe(false)
+        expect(wrapper.find('[data-testid="add-set-30"]').exists()).toBe(true)
+      })
+
+      it('letting the resumed countdown reach zero logs the set with the persisted duration/distance, starts the rest timer, and clears storage', async () => {
+        const actions = makeActions({
+          logSet: vi.fn(async () => ({
+            set: { id: 1, set_number: 1, reps: null, weight_kg: null, duration_seconds: 1800, distance_m: 5000, is_warmup: false, rpe: null, completed_at: 'x' },
+            new_records: [],
+          })),
+        })
+        const restTimer = useRestTimerStore()
+        const startSpy = vi.spyOn(restTimer, 'start')
+        localStorage.setItem('berserk:cardio-countdown', JSON.stringify({ ...resumed, endsAt: Date.now() + 5_000 }))
+
+        const wrapper = mountCardio({ actions, resumedCountdown: { ...resumed, endsAt: Date.now() + 5_000 } })
+        vi.advanceTimersByTime(5_000)
+        await flushPromises()
+
+        expect(actions.logSet).toHaveBeenCalledWith(30, expect.objectContaining({ duration_seconds: 1800, distance_m: 5000 }))
+        expect(startSpy).toHaveBeenCalled()
+        expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
+        expect(wrapper.find('[data-testid="cardio-countdown"]').exists()).toBe(false)
+        expect(wrapper.find('[data-testid="add-set-30"]').exists()).toBe(true)
+      })
+
+      it('cancelling the resumed countdown clears storage WITHOUT logging', async () => {
+        const actions = makeActions()
+        localStorage.setItem('berserk:cardio-countdown', JSON.stringify({ ...resumed, endsAt: Date.now() + 600_000 }))
+
+        const wrapper = mountCardio({ actions, resumedCountdown: { ...resumed, endsAt: Date.now() + 600_000 } })
+        await wrapper.get('[data-testid="cardio-countdown-cancel"]').trigger('click')
+        await flushPromises()
+
+        expect(actions.logSet).not.toHaveBeenCalled()
+        expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
+        expect(wrapper.find('[data-testid="add-set-30"]').exists()).toBe(true)
+      })
     })
   })
 

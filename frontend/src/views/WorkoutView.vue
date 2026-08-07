@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { ApiError } from '@/api/client'
 import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutOut } from '@/api/domain'
 import { listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
 import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
@@ -11,7 +12,14 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import { useRestTimerStore } from '@/stores/restTimer'
-import { getRestAutoEnabled, setRestAutoEnabled } from '@/utils/uiPrefs'
+import { useToastStore } from '@/stores/toast'
+import {
+  clearPersistedCardioCountdown,
+  getPersistedCardioCountdown,
+  getRestAutoEnabled,
+  setRestAutoEnabled,
+  type PersistedCardioCountdown,
+} from '@/utils/uiPrefs'
 import AddExerciseSheet from '@/components/workout/AddExerciseSheet.vue'
 import FinishSummary from '@/components/workout/FinishSummary.vue'
 import NeonPulse from '@/components/workout/NeonPulse.vue'
@@ -28,6 +36,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const activeWorkout = useActiveWorkoutStore()
 const restTimer = useRestTimerStore()
+const toast = useToastStore()
 
 // item 4 (post-0.3.0): opt-out de descanso automático, pref de cliente
 // (localStorage, ver uiPrefs.ts) — WorkoutExerciseCard.restEnabled combina
@@ -56,6 +65,13 @@ const neonPulse = ref(false)
 const sessionRecords = ref<PersonalRecordOut[]>([])
 const now = ref(Date.now())
 let ticker: ReturnType<typeof setInterval> | null = null
+// v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: countdown detectado al montar como
+// "todavía corriendo" (endsAt en el futuro) — se pasa a CADA
+// WorkoutExerciseCard, y cada tarjeta filtra por su propio
+// workoutExerciseId (ver ese componente); null si no había nada persistido
+// o si lo que había ya se resolvió (mismatch limpiado, o ya expiró y se
+// auto-logueó — ver checkPersistedCardioCountdown)
+const resumedCardioCountdown = ref<PersistedCardioCountdown | null>(null)
 
 const units = computed(() => ((auth.user?.units as 'kg' | 'lb') || 'kg'))
 const exerciseMap = computed(() => new Map(exercises.value.map((e) => [e.id, e])))
@@ -132,6 +148,11 @@ async function startFromRoutine(routineId: number) {
 async function onFinish() {
   try {
     finishedWorkout.value = await activeWorkout.finish()
+    // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: para cuando esto se ejecuta, lo
+    // que hubiera persistido ya pasó por checkPersistedCardioCountdown al
+    // montar (mismatches se limpian ahí), así que si queda algo es
+    // literalmente de este entreno — limpiar sin condicionar es seguro
+    clearPersistedCardioCountdown()
   } catch (error) {
     toastApiError(error)
   }
@@ -145,9 +166,71 @@ async function confirmDiscard() {
   discardConfirmOpen.value = false
   try {
     await activeWorkout.discard()
+    clearPersistedCardioCountdown()
     router.push({ name: 'today' })
   } catch (error) {
     toastApiError(error)
+  }
+}
+
+// v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: h:mm:ss / m:ss, duplicado local a
+// propósito — mismo criterio que WorkoutExerciseCard.vue/
+// setHistoryFormat.ts, que ya tienen cada uno su propia copia en vez de un
+// util compartido para una función de 5 líneas
+function formatCardioDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = String(seconds % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
+}
+
+// item 7 (v0.3.2 CARDIO-COUNTDOWN PERSISTENCE): única vez, al montar la
+// vista EN VIVO (el editor retroactivo ni monta este componente) — decide
+// qué hacer con un countdown que se dejó corriendo antes de que el sistema
+// matara la pestaña.
+async function checkPersistedCardioCountdown() {
+  const persisted = getPersistedCardioCountdown()
+  if (!persisted) return
+
+  const workout = activeWorkout.workout
+  const exerciseStillExists = workout?.exercises.some((we) => we.id === persisted.workoutExerciseId) ?? false
+  if (!workout || workout.id !== persisted.workoutId || !exerciseStillExists) {
+    // el entreno activo (si hay alguno) ya no es el mismo, o el ejercicio se
+    // quitó mientras tanto: countdown huérfano, se limpia sin loguear nada —
+    // nunca se registra a ciegas contra un entreno que no es literalmente el
+    // que sigue activo aquí y ahora
+    clearPersistedCardioCountdown()
+    return
+  }
+
+  if (persisted.endsAt > Date.now()) {
+    // sigue corriendo: se reabre (superficie compacta en la propia tarjeta,
+    // ver WorkoutExerciseCard.vue) en el remaining correcto en vez de
+    // perderlo y forzar a empezar de cero
+    resumedCardioCountdown.value = persisted
+    return
+  }
+
+  // terminó mientras la app no estaba: la promesa del item 7 — la carrera
+  // contó aunque el sistema matara la pestaña. Se loguea con la duración
+  // OBJETIVO completa: no hay forma de saber cuánto corrió de verdad tras el
+  // cierre, y es exactamente eso lo que se promete
+  try {
+    const body: { duration_seconds: number; distance_m?: number } = { duration_seconds: persisted.targetSeconds }
+    if (persisted.distanceM) body.distance_m = persisted.distanceM
+    await activeWorkout.logSet(persisted.workoutExerciseId, body)
+    toast.push('info', t('workout.cardio.loggedWhileAway', { duration: formatCardioDuration(persisted.targetSeconds) }))
+  } catch (error) {
+    // el backend SÍ permite loguear contra un entreno ya terminado (mismo
+    // workout_id, solo ended_at relleno) — pero uno DESCARTADO ya no existe
+    // y esto 404: si el mismatch de arriba no lo cazó (carrera entre
+    // dispositivos/pestañas), no hay dónde loguear, así que se limpia en
+    // silencio en vez de mostrar un error sobre un entreno que el usuario ya
+    // ni ve. Cualquier OTRO error sí se avisa como siempre — esto no debe
+    // esconder un fallo real (p.ej. de red) tras la máscara de "descartado"
+    if (!(error instanceof ApiError && error.status === 404)) toastApiError(error)
+  } finally {
+    clearPersistedCardioCountdown()
   }
 }
 
@@ -213,6 +296,11 @@ onMounted(async () => {
       }
     }
   }
+  // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: después de que activeWorkout.workout
+  // ya refleje su estado final para este montaje (resume, y el auto-start
+  // desde ?session si aplicaba) — antes de esto, un countdown "todavía
+  // corriendo" no tendría con qué workout compararse
+  await checkPersistedCardioCountdown()
   ticker = setInterval(() => {
     now.value = Date.now()
   }, 1000)
@@ -320,6 +408,8 @@ onBeforeUnmount(() => {
         :locale="locale"
         :actions="activeWorkout"
         :rest-enabled="restAutoEnabled"
+        :workout-id="activeWorkout.workout.id"
+        :resumed-countdown="resumedCardioCountdown"
         @recorded="onRecorded"
         @logged="onLogged"
       />

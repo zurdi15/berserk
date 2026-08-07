@@ -16,6 +16,12 @@ import { primaryRune as resolvePrimaryRune } from '@/lib/runeResolve'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { useRestTimerStore } from '@/stores/restTimer'
+import {
+  clearPersistedCardioCountdown,
+  getPersistedCardioCountdown,
+  setPersistedCardioCountdown,
+  type PersistedCardioCountdown,
+} from '@/utils/uiPrefs'
 import { formatWeight } from '@/utils/units'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
@@ -23,6 +29,7 @@ import BkCard from '@/lib/BkCard.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import type { RuneName } from '@/lib/runes'
+import CardioCountdown from './CardioCountdown.vue'
 import { REST_PRESETS, restFor } from './rest'
 import { resolveNewSetDefaults } from './setDefaults'
 import { formatHistoryLine, formatHistorySetLines } from './setHistoryFormat'
@@ -50,6 +57,18 @@ const props = withDefaults(
     // lo que "descansar" editando historial, ni countdown de cardio con
     // sentido — ver SetForm's `live` prop)
     restEnabled?: boolean
+    // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: id del entreno activo — hace
+    // falta para poder persistir {workoutId, workoutExerciseId, ...} al
+    // arrancar un countdown de cardio (ver uiPrefs.ts). Opcional (null en
+    // vez de requerido) para no romper otros consumidores/tests de esta
+    // tarjeta que no tienen ni necesitan cardio-countdown; sin él, sencillamente
+    // no se persiste nada (ver onCountdownStart).
+    workoutId?: number | null
+    // countdown de cardio que WorkoutView detectó al montar como "todavía
+    // corriendo" (endsAt en el futuro) tras volver de una pestaña evictada —
+    // null si no hay ninguno, o si el que hay no es de ESTE ejercicio (el
+    // filtro por workoutExerciseId vive en el watch de abajo)
+    resumedCountdown?: PersistedCardioCountdown | null
   }>(),
   {
     muscleGroups: () => [],
@@ -58,6 +77,8 @@ const props = withDefaults(
     units: 'kg',
     locale: 'es',
     restEnabled: true,
+    workoutId: null,
+    resumedCountdown: null,
   },
 )
 
@@ -77,6 +98,22 @@ const drawerOpen = ref(false)
 const editingSet = ref<SetOut | null>(null)
 const restPickerOpen = ref(false)
 const history = ref<ExerciseHistoryOut | null>(null)
+
+// v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: countdown "resucitado" que esta
+// tarjeta (y no el cajón/SetForm) muestra directamente en el cuerpo de la
+// tarjeta — ver la nota de diseño en CardioCountdown más abajo. `watch` en
+// vez de una lectura de una sola vez en el setup: el prop puede llegar tras
+// el primer render (WorkoutView decide qué reabrir de forma asíncrona, ver
+// WorkoutView.vue::checkPersistedCardioCountdown), así que hace falta
+// reaccionar cuando aparece, no solo leerlo al crear el componente.
+const resumedActive = ref<PersistedCardioCountdown | null>(null)
+watch(
+  () => props.resumedCountdown,
+  (value) => {
+    if (value && value.workoutExerciseId === props.workoutExercise.id) resumedActive.value = value
+  },
+  { immediate: true },
+)
 
 const name = computed(() => exerciseName(props.exercise, props.locale))
 
@@ -204,6 +241,13 @@ async function onDrawerSubmit(value: SetIn, keepOpen: boolean) {
       return
     }
     const result = await props.actions.logSet(props.workoutExercise.id, value)
+    // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: cualquier serie logueada para
+    // este ejercicio limpia un countdown persistido para él — venga del
+    // countdown recién terminado solo (onCountdownDone → submit) o de un
+    // registro MANUAL mientras corría (el usuario no esperó, logueó a
+    // mano): nunca debe quedar una entrada "zombie" en localStorage tras un
+    // logueo real de este mismo ejercicio
+    clearPersistedCardioCountdownForThisExercise()
     if (props.restEnabled) {
       // nombre del ejercicio → cuerpo de la notificación de fin de descanso
       restTimer.start(effectiveRestSeconds.value, name.value)
@@ -214,6 +258,62 @@ async function onDrawerSubmit(value: SetIn, keepOpen: boolean) {
   } catch (error) {
     toastApiError(error)
   }
+}
+
+// v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: solo limpia si lo persistido es
+// literalmente de ESTE ejercicio — defensivo aunque solo pueda existir un
+// countdown a la vez app-wide (una única clave global, ver uiPrefs.ts), para
+// no depender de esa invariante desde cada punto de limpieza
+function clearPersistedCardioCountdownForThisExercise() {
+  const persisted = getPersistedCardioCountdown()
+  if (persisted?.workoutExerciseId === props.workoutExercise.id) clearPersistedCardioCountdown()
+}
+
+// SetForm emite esto al pulsar "Empezar" (ver SetForm.vue) — SetForm conoce
+// duration_seconds/distance_m en ese instante, esta tarjeta conoce
+// workoutId/workoutExerciseId: entre los dos arman el registro persistido
+function onCountdownStart(payload: { targetSeconds: number; distanceM?: number }) {
+  if (props.workoutId == null) return
+  setPersistedCardioCountdown({
+    endsAt: Date.now() + Math.max(0, payload.targetSeconds) * 1000,
+    workoutId: props.workoutId,
+    workoutExerciseId: props.workoutExercise.id,
+    targetSeconds: payload.targetSeconds,
+    distanceM: payload.distanceM,
+  })
+}
+
+function onCountdownCancel() {
+  clearPersistedCardioCountdownForThisExercise()
+}
+
+// countdown RESUMIDO (superficie compacta en el cuerpo de la tarjeta, no en
+// el cajón — ver la nota de diseño junto al <CardioCountdown> del template):
+// llegó a 0 mientras la app seguía abierta y el usuario lo vio terminar
+async function onResumedDone() {
+  const persisted = resumedActive.value
+  if (!persisted) return
+  try {
+    const body: SetIn = { duration_seconds: persisted.targetSeconds }
+    if (persisted.distanceM) body.distance_m = persisted.distanceM
+    const result = await props.actions.logSet(persisted.workoutExerciseId, body)
+    clearPersistedCardioCountdown()
+    resumedActive.value = null
+    if (props.restEnabled) restTimer.start(effectiveRestSeconds.value, name.value)
+    if (result.new_records.length) emit('recorded', result.new_records)
+    emit('logged', result.new_records.length > 0)
+  } catch (error) {
+    // NO se limpia aquí: si fue un fallo transitorio (red caída al volver),
+    // el countdown ya terminado (mostrando 0:00) se queda con su botón de
+    // cancelar como vía de escape en vez de perder en silencio una serie que
+    // de verdad se corrió
+    toastApiError(error)
+  }
+}
+
+function onResumedCancel() {
+  clearPersistedCardioCountdown()
+  resumedActive.value = null
 }
 
 async function onDeleteSet(setId: number) {
@@ -395,8 +495,27 @@ async function moveDown() {
       {{ t('workout.lastTimeHint', { line: historyLine }) }}
     </p>
 
+    <!-- v0.3.2 CARDIO-COUNTDOWN PERSISTENCE — superficie de RESUME: se
+         reutiliza CardioCountdown.vue directo aquí en el CUERPO de la
+         tarjeta, no dentro del cajón/SetForm. Reabrir vía el cajón habría
+         significado enseñarle a SetForm un modo "arrancar ya activo con un
+         endsAt sembrado", metiéndose más hondo en un archivo fuera del
+         alcance de este lane; además el cajón representa "estoy rellenando
+         una serie nueva ahora", mientras que un countdown resucitado es un
+         proceso de fondo que debería verse aunque el usuario no haya tocado
+         nada todavía — visible de inmediato en la tarjeta es mejor UX que
+         escondido tras un toque en "+ Cardio". -->
+    <div v-if="resumedActive" class="mb-3" :data-testid="`resumed-cardio-countdown-${workoutExercise.id}`">
+      <CardioCountdown
+        :target-seconds="resumedActive.targetSeconds"
+        :ends-at="resumedActive.endsAt"
+        @done="onResumedDone"
+        @cancel="onResumedCancel"
+      />
+    </div>
+
     <BkButton
-      v-if="exercise"
+      v-if="exercise && !resumedActive"
       variant="ghost"
       size="sm"
       :data-testid="`add-set-${workoutExercise.id}`"
@@ -443,6 +562,8 @@ async function moveDown() {
           :editing="editingSet !== null"
           :live="restEnabled"
           @submit="onDrawerSubmit"
+          @countdown-start="onCountdownStart"
+          @countdown-cancel="onCountdownCancel"
         />
         <!-- item 4d: bloque multilínea en vez de una línea cramped — fecha en
              su propia línea, cada serie efectiva en la suya (Sn · reps × peso).

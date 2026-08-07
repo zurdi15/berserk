@@ -19,9 +19,9 @@ describe('CardioCountdown (item 7)', () => {
     vi.unstubAllGlobals()
   })
 
-  function build(targetSeconds = 90) {
+  function build(targetSeconds = 90, endsAt?: number) {
     return mount(CardioCountdown, {
-      props: { targetSeconds },
+      props: endsAt === undefined ? { targetSeconds } : { targetSeconds, endsAt },
       global: { plugins: [createI18nInstance()] },
     })
   }
@@ -68,5 +68,44 @@ describe('CardioCountdown (item 7)', () => {
     await wrapper.get('[data-testid="cardio-countdown-cancel"]').trigger('click')
     expect(wrapper.emitted('cancel')).toHaveLength(1)
     expect(wrapper.emitted('done')).toBeFalsy()
+  })
+
+  // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: `endsAt` deja SEMBRAR el timestamp
+  // real de fin en vez de recalcularlo desde targetSeconds — así un
+  // countdown RESUMIDO tras volver de una pestaña evictada arranca en el
+  // remaining correcto, no en el target completo otra vez (ver
+  // WorkoutExerciseCard.vue / uiPrefs.ts::PersistedCardioCountdown)
+  describe('resuming with an explicit endsAt', () => {
+    it('renders the REMAINING time (not targetSeconds) when endsAt is partway through', () => {
+      // targetSeconds sigue siendo 1800 (el original de 30 min), pero solo
+      // quedan 600s reales según endsAt — como si la pestaña hubiera vuelto
+      // a los 20 minutos de que Android la evictara
+      const endsAt = Date.now() + 600_000
+      const wrapper = build(1800, endsAt)
+      expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('10:00')
+    })
+
+    it('keeps ticking down from that seeded endsAt as time advances', async () => {
+      const endsAt = Date.now() + 600_000
+      const wrapper = build(1800, endsAt)
+      vi.advanceTimersByTime(60_000)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('9:00')
+    })
+
+    it('without endsAt, falls back to the existing behavior of targetSeconds from now (backward compatible)', () => {
+      const wrapper = build(90)
+      expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('1:30')
+    })
+
+    it('an endsAt already in the past auto-completes immediately: vibrates and emits done on the very first tick', () => {
+      const vibrate = vi.fn()
+      vi.stubGlobal('navigator', { vibrate })
+      const endsAt = Date.now() - 5_000
+      const wrapper = build(1800, endsAt)
+      expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('0:00')
+      expect(wrapper.emitted('done')).toHaveLength(1)
+      expect(vibrate).toHaveBeenCalledTimes(1)
+    })
   })
 })

@@ -206,6 +206,41 @@ describe('SetForm', () => {
     warnSpy.mockRestore()
   })
 
+  // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: SetForm es quien conoce
+  // duration_seconds/distance_m en el instante justo de arrancar el
+  // countdown — emite la señal mínima para que WorkoutExerciseCard (quien
+  // conoce workoutId/workoutExerciseId) pueda persistirlo (ver uiPrefs.ts)
+  describe('item 7 / CARDIO-COUNTDOWN PERSISTENCE: countdown start/cancel signals', () => {
+    it('emits countdownStart with the current targetSeconds when "Empezar" is clicked (distanceM omitted, still at 0)', async () => {
+      wrapper = build('cardio')
+      await wrapper.get('[data-testid="cardio-start-countdown"]').trigger('click')
+
+      expect(wrapper.emitted('countdownStart')).toHaveLength(1)
+      const payload = wrapper.emitted('countdownStart')![0][0] as Record<string, unknown>
+      expect(payload.targetSeconds).toBeGreaterThan(0)
+      expect(payload.distanceM).toBeUndefined()
+    })
+
+    it('emits countdownStart with distanceM once bumped above zero', async () => {
+      wrapper = build('cardio')
+      const plus = wrapper.findAll('button[aria-label="Aumentar"]')[1]
+      await plus.trigger('click', { detail: 0 })
+      await wrapper.get('[data-testid="cardio-start-countdown"]').trigger('click')
+
+      const payload = wrapper.emitted('countdownStart')![0][0] as Record<string, unknown>
+      expect(payload.distanceM).toBeGreaterThan(0)
+    })
+
+    it('emits countdownCancel (without countdownStart again) when the running countdown is cancelled', async () => {
+      wrapper = build('cardio')
+      await wrapper.get('[data-testid="cardio-start-countdown"]').trigger('click')
+      await wrapper.get('[data-testid="cardio-countdown-cancel"]').trigger('click')
+
+      expect(wrapper.emitted('countdownCancel')).toHaveLength(1)
+      expect(wrapper.emitted('countdownStart')).toHaveLength(1)
+    })
+  })
+
   describe('item 4: drawer layout', () => {
     it('item 4a: the form content is centered (flex-col items-center)', () => {
       wrapper = build('strength')
