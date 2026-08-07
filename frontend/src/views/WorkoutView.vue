@@ -462,46 +462,41 @@ onBeforeUnmount(() => {
                propio que tenían más abajo a ESTE header, bajo el cronómetro —
                chips más compactos que los de antes (esto es chrome sticky, no
                una card de contenido), sin el título "Grupos musculares": los
-               nombres se explican solos -->
-          <div
-            v-if="derivedMuscleGroups.length"
-            class="flex flex-wrap gap-1.5"
-            data-testid="workout-header-muscle-tags"
-          >
-            <span
-              v-for="group in derivedMuscleGroups"
-              :key="group.id"
-              :data-testid="`muscle-tag-${group.id}`"
-              class="px-2 py-0.5 rounded-sm border border-line text-xs text-ink-muted"
+               nombres se explican solos.
+               v0.9.5 (zurdi: "el check de descanso automático debería estar
+               en el header, quizá debajo de la fecha"): el toggle (item 4
+               post-0.3.0, mismo idiom que el de calentamiento de SetForm;
+               item 5 v0.4.3: autodescriptivo, sin etiqueta al lado) comparte
+               esta segunda fila con los chips — ml-auto lo pinna a la
+               derecha, bajo la fecha, haya chips o no. -->
+          <div class="flex flex-wrap items-center gap-3">
+            <div
+              v-if="derivedMuscleGroups.length"
+              class="flex flex-wrap gap-1.5"
+              data-testid="workout-header-muscle-tags"
             >
-              {{ muscleTagLabel(group) }}
-            </span>
+              <span
+                v-for="group in derivedMuscleGroups"
+                :key="group.id"
+                :data-testid="`muscle-tag-${group.id}`"
+                class="px-2 py-0.5 rounded-sm border border-line text-xs text-ink-muted"
+              >
+                {{ muscleTagLabel(group) }}
+              </span>
+            </div>
+            <button
+              type="button"
+              data-testid="rest-auto-toggle"
+              class="bk-press ml-auto px-3 py-1.5 rounded-sm border text-sm shrink-0"
+              :class="restAutoEnabled ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+              :aria-pressed="restAutoEnabled ? 'true' : 'false'"
+              :aria-label="t('timer.autoRest')"
+              @click="toggleRestAuto"
+            >
+              {{ t('timer.autoRest') }}
+            </button>
           </div>
         </div>
-      </div>
-
-      <!-- item 4 (post-0.3.0): opt-out de descanso automático — mismo idiom
-           visual que el toggle de calentamiento de SetForm (borde+aria-pressed,
-           sin cambiar de texto entre estados).
-           item 5 (v0.4.3, zurdi): se retira el <span> etiqueta que vivía A LA
-           IZQUIERDA del toggle — el propio botón ya dice "Descanso
-           automático" y repetirlo al lado era la misma frase dos veces
-           (control autodescriptivo). aria-label explícito en el botón (en
-           vez de depender solo de su texto visible) como ancla de
-           accesibilidad, por si el texto visible cambia de forma más
-           adelante (p.ej. a un icono). -->
-      <div class="flex items-center justify-end" :style="{ '--bk-stagger-i': 1 }">
-        <button
-          type="button"
-          data-testid="rest-auto-toggle"
-          class="bk-press px-3 py-1.5 rounded-sm border text-sm"
-          :class="restAutoEnabled ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
-          :aria-pressed="restAutoEnabled ? 'true' : 'false'"
-          :aria-label="t('timer.autoRest')"
-          @click="toggleRestAuto"
-        >
-          {{ t('timer.autoRest') }}
-        </button>
       </div>
 
       <!-- v0.8.0: bloques de superserie — los miembros van DENTRO de un
@@ -516,7 +511,7 @@ onBeforeUnmount(() => {
           v-if="block.grouped"
           class="border border-aurora/50 rounded-sm p-2 space-y-3"
           :data-testid="`superset-container-${block.label}`"
-          :style="{ '--bk-stagger-i': block.entries[0].index + 2 }"
+          :style="{ '--bk-stagger-i': block.entries[0].index + 1 }"
         >
           <div class="flex items-center justify-center gap-2">
             <span class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5">
@@ -553,7 +548,7 @@ onBeforeUnmount(() => {
         </div>
         <WorkoutExerciseCard
           v-else
-          :style="{ '--bk-stagger-i': block.entries[0].index + 2 }"
+          :style="{ '--bk-stagger-i': block.entries[0].index + 1 }"
           :workout-exercise="block.entries[0].we"
           :exercise="exerciseMap.get(block.entries[0].we.exercise_id)"
           :muscle-groups="muscleGroups"
@@ -577,7 +572,7 @@ onBeforeUnmount(() => {
       <BkButton
         variant="ghost"
         block
-        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 2 }"
+        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 1 }"
         @click="addSheetOpen = true"
       >
         {{ t('workout.addExercise') }}
@@ -602,7 +597,7 @@ onBeforeUnmount(() => {
       <div
         class="border-t border-line pt-4 flex flex-wrap items-center gap-2"
         data-testid="workout-actions"
-        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 3 }"
+        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 2 }"
       >
         <BkButton
           variant="danger"

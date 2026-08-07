@@ -454,6 +454,16 @@ describe('WorkoutView', () => {
       expect(tags.find('[data-testid="muscle-tag-1"]').text()).toBe('Pecho')
     })
 
+    // v0.9.5 (zurdi): el toggle de descanso automático también vive en el
+    // header, bajo la fila cronómetro+fecha — ya no en una fila propia fuera
+    it('v0.9.5: the auto-rest toggle renders inside the header slab', async () => {
+      wrapper = mountLive()
+      await flushPromises()
+
+      const header = wrapper.get('[data-testid="workout-header"]')
+      expect(header.find('[data-testid="rest-auto-toggle"]').exists()).toBe(true)
+    })
+
     it('the header shows only the elapsed timer and the date — no discard/finish buttons in it', async () => {
       wrapper = mountLive()
       await flushPromises()
