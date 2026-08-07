@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.3.1 - 2026-08-07
+
+- Retroactive workouts can now record their real start time and duration, and editing a workout's date moves its timestamps along with it — gym-time stats reflect reality.
+- Rest timer on your terms: cancel it early from the workout header, or switch off automatic rest entirely (the preference sticks).
+- The aurora set signature was refined: streaks stay invisible until fired, turn the top corners at constant speed, and the side trails fade out as the light crosses the top.
+- The set drawer's steppers were compacted so weight and reps always sit side by side without overlapping on narrow phones.
+- The body-tracking tab gained the unified empty state, and the login screen no longer scrolls.
+
 ## 0.3.0 - 2026-08-07
 
 - Workout flow redesigned around compact exercise cards and a bottom logging drawer: new sets prefill from your last effective set, the previous session's sets are shown line by line, "log and another" chains fast consecutive sets, and rest between sets is configurable per exercise (workout → routine → default).
