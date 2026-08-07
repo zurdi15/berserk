@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.11.1 - 2026-08-08
+
+### Added
+- Las búsquedas ya no distinguen acentos: "eliptica" encuentra "Elíptica" (y al revés) en la biblioteca, al añadir ejercicio, en el picker de progresión y en los selectores filtrables.
+
+### Changed
+- El panel de hora apila sus botones en vertical — Aplicar arriba y Cancelar abajo, a todo el ancho — y el botón Limpiar desaparece.
+- En el editor de rutinas, los ejercicios de cardio ya no muestran reps, peso ni descanso (solo series objetivo); al guardar se purgan esos campos de rutinas antiguas.
+- En admin, el botón "Generar invitación" pasa a estar debajo de la lista de invitaciones (o del mensaje de vacío).
+
 ## 0.11.0 - 2026-08-07
 
 ### Added
