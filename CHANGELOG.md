@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.11.2 - 2026-08-08
+
+### Changed
+- En la card de un ejercicio de cardio del entreno, "Registrar tiempo" y "Empezar" comparten fila con la X de borrar (acciones a la izquierda, borrar a la derecha), igual que "Añadir serie" en los ejercicios de fuerza.
+
 ## 0.11.1 - 2026-08-08
 
 ### Added
