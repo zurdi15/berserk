@@ -276,9 +276,12 @@ export const es = {
     plannedEyebrow: 'Planificado',
     // item 1b (v0.4.2): pestaña "yo" del sheet del día, siempre primera y
     // por defecto — solo aparece la tira si hay usuarios compartidos con
-    // entreno ese día (ver ScheduleSheet.vue sharedUsersToday)
+    // entreno ese día (ver ScheduleSheet.vue sharedUsersToday). item 9
+    // (v0.4.3): la chip ya no lleva texto "Tú" (BkUser con mi propio
+    // username+color, mismo formato que las demás) — selfAria es solo el
+    // nombre accesible del botón, para lectores de pantalla.
     dayTabs: {
-      you: 'Tú',
+      selfAria: 'Tu pestaña ({name})',
     },
   },
   progress: {

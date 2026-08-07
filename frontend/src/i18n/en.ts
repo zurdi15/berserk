@@ -276,9 +276,12 @@ export const en = {
     plannedEyebrow: 'Planned',
     // item 1b (v0.4.2): the day sheet's "self" tab label, always first and
     // the default — the strip only shows up when shared users have a
-    // workout that day (see ScheduleSheet.vue sharedUsersToday)
+    // workout that day (see ScheduleSheet.vue sharedUsersToday). item 9
+    // (v0.4.3): the chip no longer carries "You" text (BkUser with my own
+    // username+color, same shape as the others) — selfAria is just the
+    // button's accessible name, for screen readers.
     dayTabs: {
-      you: 'You',
+      selfAria: 'Your tab ({name})',
     },
   },
   progress: {

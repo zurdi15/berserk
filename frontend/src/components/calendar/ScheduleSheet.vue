@@ -16,6 +16,7 @@ import WorkoutDayInfo from './WorkoutDayInfo.vue'
 import { statusClasses } from './statusClasses'
 import { isValidRuneName } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
+import { useAuthStore } from '@/stores/auth'
 import type { ExerciseOut, PersonalRecordOut, RoutineOut, ScheduledOut, SharedUserOut, WorkoutOut } from '@/api/domain'
 import {
   deleteSchedule,
@@ -51,6 +52,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const athlete = useAthleteStore()
+const auth = useAuthStore()
 const { locale } = useI18n()
 const units = useDisplayUnits()
 
@@ -415,17 +417,27 @@ loadDayInfo()
       data-testid="day-tabs"
       class="flex flex-wrap items-center gap-1.5 mb-4"
     >
+      <!-- item 9 (v0.4.3): misma forma que las pestañas de compartidos de
+           abajo (mismo padding/tamaño/BkUser) — antes "Tú" era texto suelto
+           en una chip más ancha (px-3, text-xs propio), visualmente
+           distinta a las de los demás usuarios. aria-label propio (en vez
+           de dejar que el nombre de BkUser sea el nombre accesible por
+           defecto): distingue "esta es TU pestaña" para lectores de
+           pantalla, donde el color+nombre por sí solos no lo dejan claro
+           (a diferencia de lo visual, donde el usuario ya sabe cuál es el suyo) -->
       <button
+        v-if="auth.user"
         type="button"
         data-testid="day-tab-self"
-        class="bk-press rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+        class="bk-press rounded-full border px-2.5 py-1 transition-colors"
         :class="activeTab === 'self'
-          ? 'border-aurora bg-aurora/10 text-aurora'
-          : 'border-line text-ink-muted hover:border-line-strong hover:text-ink'"
+          ? 'border-aurora bg-aurora/10'
+          : 'border-line hover:border-line-strong'"
         :aria-pressed="activeTab === 'self' ? 'true' : 'false'"
+        :aria-label="$t('calendar.dayTabs.selfAria', { name: auth.user.username })"
         @click="selectTab('self')"
       >
-        {{ $t('calendar.dayTabs.you') }}
+        <BkUser :user="{ username: auth.user.username, color: auth.user.color }" size="sm" />
       </button>
       <button
         v-for="sharedUser in sharedUsersToday"

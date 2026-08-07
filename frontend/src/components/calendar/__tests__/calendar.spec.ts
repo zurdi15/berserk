@@ -85,6 +85,7 @@ import * as domain from '@/api/domain'
 import type { SharedUserOut } from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
+import { useAuthStore } from '@/stores/auth'
 import CalendarView from '@/views/CalendarView.vue'
 
 describe('isValidRuneName', () => {
@@ -1361,6 +1362,14 @@ describe('ScheduleSheet', () => {
       { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
     ]
 
+    // item 9 (v0.4.3): la chip propia ahora renderiza vía BkUser (mi propio
+    // username+color) — hace falta un auth.user para que el botón exista en
+    // absoluto (v-if="auth.user" en ScheduleSheet.vue)
+    beforeEach(() => {
+      const auth = useAuthStore()
+      auth.user = { id: 1, username: 'romm', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC', color: '#ff6600' }
+    })
+
     afterEach(() => {
       // limpia las mockImplementation condicionales por userId de este bloque
       // para no filtrarse a otros describes del fichero
@@ -1369,16 +1378,32 @@ describe('ScheduleSheet', () => {
       vi.mocked(domain.listExercises).mockReset().mockImplementation(async () => [])
     })
 
-    it('renders a tab per shared user with a workout that day, alongside "Tú"', async () => {
+    it('item 9: renders a tab per shared user alongside a uniform, same-shaped self tab (own username+color via BkUser)', async () => {
       const wrapper = mount(ScheduleSheet, {
         props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
         global: { plugins: [createI18nInstance()] },
       })
       await flushPromises()
 
-      expect(wrapper.get('[data-testid="day-tab-self"]').text()).toBe('Tú')
+      const selfTab = wrapper.get('[data-testid="day-tab-self"]')
       const userTab = wrapper.get('[data-testid="day-tab-7"]')
-      expect(userTab.findComponent(BkUser).props('user')).toEqual({ username: 'freyja', color: '#3b82f6' })
+      // misma forma: idénticas clases de padding/tamaño en ambas chips (las
+      // clases de estado activo/inactivo difieren a propósito — 'self' es
+      // la pestaña activa por defecto, freyja no lo es — así que se compara
+      // solo el subconjunto ESTÁTICO de forma, no la lista completa)
+      const shapeClasses = ['rounded-full', 'border', 'px-2.5', 'py-1', 'transition-colors']
+      for (const cls of shapeClasses) {
+        expect(selfTab.classes()).toContain(cls)
+        expect(userTab.classes()).toContain(cls)
+      }
+      // el propio username+color, no el literal "Tú"
+      expect(selfTab.text()).not.toBe('Tú')
+      expect(selfTab.findComponent(BkUser).props('user')).toEqual({ username: 'romm', color: '#ff6600' })
+      // aria-label distingue "tu pestaña" para lectores de pantalla
+      expect(selfTab.attributes('aria-label')).toContain('romm')
+      const userBkUser = userTab.findComponent(BkUser)
+      expect(userBkUser.props('user')).toEqual({ username: 'freyja', color: '#3b82f6' })
+      expect(userBkUser.props('size')).toBe(selfTab.findComponent(BkUser).props('size'))
     })
 
     it('no tab strip when there are no shared users at all', async () => {
