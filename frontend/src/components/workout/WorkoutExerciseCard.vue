@@ -361,6 +361,42 @@ function onResumedCancel() {
   resumedActive.value = null
 }
 
+// v0.10.0 (zurdi: "o una entrada con el tiempo hecho y ya, o empezar timer y
+// que se añada solo — no inline controls y formulario"): la card de cardio
+// pasa de formulario inline permanente (v0.9.4) a DOS acciones limpias —
+// "Registrar tiempo" abre el cajón (entrada directa del tiempo hecho) y
+// "Empezar" arranca el countdown con el objetivo por defecto (última vez /
+// rutina) REUTILIZANDO la superficie de resume tal cual: se siembra el mismo
+// estado persistido y CardioCountdown + onResumedDone (auto-log al llegar a
+// 0) hacen el resto. Ajustar el objetivo fino se hace desde el cajón, que
+// también sabe arrancar countdown.
+const cardioTargetSeconds = computed(() => drawerDefaults.value?.duration_seconds ?? 20 * 60)
+
+function startCardio() {
+  if (props.workoutId == null) return
+  const persisted: PersistedCardioCountdown = {
+    endsAt: Date.now() + Math.max(1, cardioTargetSeconds.value) * 1000,
+    workoutId: props.workoutId,
+    workoutExerciseId: props.workoutExercise.id,
+    targetSeconds: cardioTargetSeconds.value,
+    distanceM: drawerDefaults.value?.distance_m ?? undefined,
+  }
+  setPersistedCardioCountdown(persisted)
+  resumedActive.value = persisted
+}
+
+// v0.10.0 (zurdi): "cuánto se hizo las últimas 4 veces" — llega con el
+// historial (recent_cardio, solo para cardio; ver backend progress.py)
+const recentCardio = computed(() => history.value?.recent_cardio ?? [])
+
+function formatCardioEntry(entry: { date: string; duration_seconds: number | null; distance_m: number | null }): string {
+  const day = new Intl.DateTimeFormat(props.locale, { day: 'numeric', month: 'short' }).format(
+    new Date(`${entry.date}T00:00:00`),
+  )
+  const base = `${day} · ${formatDuration(entry.duration_seconds ?? 0)}`
+  return entry.distance_m ? `${base} · ${entry.distance_m} m` : base
+}
+
 async function onDeleteSet(setId: number) {
   deleteConfirming.value = null
   try {
@@ -614,27 +650,48 @@ async function moveDown() {
       </div>
     </Transition>
 
-    <!-- v0.9.4 (zurdi: "en cardio no debería haber un 'añadir cardio'"): el
-         formulario de cardio vive PERMANENTE en el cuerpo de la tarjeta —
-         sin botón ni cajón de por medio (el cajón queda solo para editar una
-         entrada ya registrada). Gateado por historyLoaded para que SetForm
-         monte ya con los defaults correctos (ver el ref arriba); el countdown
-         en marcha lo dibuja el propio SetForm aquí mismo, igual que la
-         superficie de resume de arriba. -->
+    <!-- v0.10.0 (zurdi: "no inline controls y formulario"): el formulario
+         inline permanente de la v0.9.4 muere — la card de cardio son las
+         últimas 4 veces + DOS acciones: registrar el tiempo hecho (cajón) o
+         empezar el countdown con el objetivo por defecto (auto-registra al
+         llegar a 0, reutilizando la superficie de resume de arriba). -->
+    <div
+      v-if="isCardio && recentCardio.length"
+      class="mb-3 space-y-0.5"
+      :data-testid="`cardio-recent-${workoutExercise.id}`"
+    >
+      <p
+        v-for="(entry, i) in recentCardio"
+        :key="i"
+        class="bk-metric text-xs text-ink-faint"
+      >
+        {{ formatCardioEntry(entry) }}
+      </p>
+    </div>
     <div
       v-if="isCardio && exercise && !resumedActive && historyLoaded"
-      :data-testid="`cardio-inline-form-${workoutExercise.id}`"
+      class="flex gap-2"
+      :data-testid="`cardio-actions-${workoutExercise.id}`"
     >
-      <SetForm
-        :measurement="exercise.measurement"
-        :units="units"
-        :initial-set="drawerDefaults"
-        :live="live"
-        inline
-        @submit="onDrawerSubmit"
-        @countdown-start="onCountdownStart"
-        @countdown-cancel="onCountdownCancel"
-      />
+      <BkButton
+        variant="ghost"
+        size="sm"
+        class="flex-1"
+        :data-testid="`cardio-log-${workoutExercise.id}`"
+        @click="openNew"
+      >
+        {{ t('workout.cardioLog') }}
+      </BkButton>
+      <BkButton
+        v-if="live"
+        variant="primary"
+        size="sm"
+        class="flex-1"
+        :data-testid="`cardio-start-${workoutExercise.id}`"
+        @click="startCardio"
+      >
+        {{ t('workout.cardioStart', { duration: formatDuration(cardioTargetSeconds) }) }}
+      </BkButton>
     </div>
 
     <!-- v0.9.4 (zurdi): añadir serie y quitar ejercicio comparten fila —

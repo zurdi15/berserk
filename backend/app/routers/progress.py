@@ -22,6 +22,7 @@ from ..services.progress import (
     annual_heatmap,
     exercise_series,
     latest_exercise_session,
+    recent_cardio_entries,
     lifetime_stats,
     muscle_distribution,
     trained_exercise_ids,
@@ -46,10 +47,20 @@ def exercise_history(
     db: Session = Depends(get_db),
     exclude_workout_id: int | None = Query(default=None),
 ):
-    if get_visible_exercise(db, target.id, exercise_id) is None:
+    exercise = get_visible_exercise(db, target.id, exercise_id)
+    if exercise is None:
         raise HTTPException(status_code=404, detail="not_found")
     result = latest_exercise_session(db, target.id, exercise_id, exclude_workout_id)
-    return ExerciseHistoryOut(**result) if result is not None else None
+    if result is None:
+        return None
+    # v0.10.0 (zurdi): las últimas 4 veces de cardio viajan con el historial
+    # — solo para ejercicios de cardio, el resto no las necesita
+    recent = (
+        recent_cardio_entries(db, target.id, exercise_id, exclude_workout_id)
+        if exercise.measurement == "cardio"
+        else []
+    )
+    return ExerciseHistoryOut(**result, recent_cardio=recent)
 
 
 @router.get("/records", response_model=list[PersonalRecordOut])

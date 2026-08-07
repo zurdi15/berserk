@@ -24,6 +24,12 @@ export const useRestTimerStore = defineStore('restTimer', () => {
   )
   const progress = computed(() => (total.value ? remaining.value / total.value : 0))
   const active = computed(() => endsAt.value !== null)
+  // v0.10.0 (zurdi: "más feedback de que el timer ha terminado + transición
+  // más smooth a la runa"): fase FINISHED — el countdown llegó a 0 solo y
+  // vive sus ~3s de gracia (ver tick) antes de que clear() devuelva la runa.
+  // El CTA la usa para mostrar el "¡hecho!" con pulso en vez de un 0:00 que
+  // se esfuma de golpe; la vibración+notificación de tick() siguen igual.
+  const finished = computed(() => active.value && remaining.value === 0)
   // m:ss compartido por el CTA del shell (item 1) y quien más lo necesite —
   // antes vivía duplicado en TimerPill, retirado en este mismo cambio
   const label = computed(() => {
@@ -113,5 +119,5 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     graceTimeout = null
   }
 
-  return { endsAt, total, remaining, progress, active, label, start, clear }
+  return { endsAt, total, remaining, progress, active, finished, label, start, clear }
 })

@@ -111,6 +111,37 @@ def latest_exercise_session(
     return {"workout_id": workout_id, "date": workout_date, "sets": sets}
 
 
+def recent_cardio_entries(
+    db: Session,
+    owner_id: int,
+    exercise_id: int,
+    exclude_workout_id: int | None = None,
+    limit: int = 4,
+) -> list[dict]:
+    """v0.10.0 (zurdi): las últimas `limit` veces que se hizo este cardio —
+    una entrada por serie registrada en entrenos TERMINADOS, la más reciente
+    primero. Mismo criterio de exclusión que latest_exercise_session (el
+    entreno vivo/en edición no cuenta como historia)."""
+    query = (
+        select(Workout.date, WorkoutSet.duration_seconds, WorkoutSet.distance_m)
+        .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .join(Workout, WorkoutExercise.workout_id == Workout.id)
+        .where(
+            Workout.owner_id == owner_id,
+            Workout.ended_at.is_not(None),
+            WorkoutExercise.exercise_id == exercise_id,
+        )
+    )
+    if exclude_workout_id is not None:
+        query = query.where(Workout.id != exclude_workout_id)
+    rows = db.execute(
+        query.order_by(Workout.date.desc(), WorkoutSet.completed_at.desc(), WorkoutSet.id.desc()).limit(limit)
+    ).all()
+    return [
+        {"date": row[0], "duration_seconds": row[1], "distance_m": row[2]} for row in rows
+    ]
+
+
 def _prev_week(week: tuple[int, int]) -> tuple[int, int]:
     """Calcula la semana ISO anterior."""
     year, number = week

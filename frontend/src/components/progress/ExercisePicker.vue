@@ -9,6 +9,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useAthleteStore } from '@/stores/athlete'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
+import BkSelect from '@/lib/BkSelect.vue'
 import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 
@@ -51,10 +52,24 @@ async function load() {
   }
 }
 
+// v0.10.0 (zurdi: "mismos filtros y barra de búsqueda que en la biblioteca"):
+// mismo pajar (nombre ES+EN + etiqueta del tipo — "cardio" encuentra la
+// cinta) y mismo filtro de grupo muscular que ExerciseManager
+const filterGroupId = ref('')
+const groupFilterOptions = computed(() => [
+  { value: '', label: t('library.allGroups') },
+  ...muscleGroups.value.map((g) => ({ value: String(g.id), label: groupLabel(g) })),
+])
+
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
-  if (!q) return allExercises.value
-  return allExercises.value.filter((e) => exerciseName(e, locale.value).toLowerCase().includes(q))
+  const groupId = filterGroupId.value ? Number(filterGroupId.value) : null
+  return allExercises.value.filter((e) => {
+    if (groupId !== null && !e.muscle_groups.some((l) => l.muscle_group_id === groupId)) return false
+    if (!q) return true
+    const haystack = `${e.name_es} ${e.name_en} ${t(`library.measurements.${e.measurement}`)}`.toLowerCase()
+    return haystack.includes(q)
+  })
 })
 
 function select(id: number | null) {
@@ -88,6 +103,14 @@ watch(() => athlete.userId, load)
          (comentario dentro de la raíz para no crear un fragmento de dos
          raíces que rompa el fall-through de atributos) -->
     <BkField v-model="query" :label="t('progress.searchExercise')" class="shrink-0" />
+    <!-- v0.10.0: mismo filtro de grupo que la biblioteca -->
+    <BkSelect
+      v-model="filterGroupId"
+      :label="t('library.muscleGroups')"
+      :options="groupFilterOptions"
+      class="shrink-0"
+      data-testid="picker-group-filter"
+    />
 
     <!-- esqueleto mientras carga: mismo hueco que la lista real -->
     <div v-if="!ready" class="flex-1 min-h-0 overflow-y-auto space-y-1" data-testid="exercise-list-skeleton">

@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -384,27 +384,31 @@ describe('RoutineEditorSheet', () => {
     expect((wrapper.vm as any).exercises).toHaveLength(1)
   })
 
-  it('fetches exercises on search with debounce', async () => {
-    const { listExercises } = await import('@/api/domain')
-    vi.mocked(listExercises).mockClear()
-
+  // v0.10.0 (zurdi: "el flow de rutina, exactamente el mismo que el de
+  // entrenamiento"): el buscador inline con debounce murió — añadir pasa por
+  // el MISMO AddExerciseSheet del entreno, con su catálogo completo cargado
+  // una vez y filtrado en cliente
+  it('v0.10.0: no inline search field; the add button opens AddExerciseSheet', async () => {
+    document.body.innerHTML = ''
     const wrapper = build()
-    await wrapper.vm.$nextTick()
+    await flushPromises()
 
-    const vm = wrapper.vm as any
+    const dialogs = document.querySelectorAll('[role="dialog"]')
+    const dialog = dialogs[dialogs.length - 1] as HTMLElement
+    expect(dialog.querySelector('[data-testid="exercise-search"]')).toBeNull()
 
-    // Trigger search input
-    vm.searchQuery = 'bench'
+    const addBtn = dialog.querySelector('[data-testid="routine-add-exercise-btn"]') as HTMLElement
+    expect(addBtn).not.toBeNull()
+    addBtn.click()
+    await flushPromises()
 
-    // Wait for debounce (300ms + nextTick)
-    await new Promise(resolve => setTimeout(resolve, 350))
-    await wrapper.vm.$nextTick()
-
-    // Assert listExercises called with {q: 'bench'}
-    expect(listExercises).toHaveBeenCalledWith({ q: 'bench' })
+    // el sheet de añadir del ENTRENO, con su check de superserie incluido
+    expect(document.querySelector('[data-testid="superset-mode-checkbox"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="search-list-input"]')).not.toBeNull()
   })
 
-  it('keeps row exercise names visible after search', async () => {
+  it('v0.10.0: picking an exercise in the add sheet appends a row (names keep rendering)', async () => {
+    document.body.innerHTML = ''
     const routine = {
       id: 5,
       name: 'Test Routine',
@@ -417,63 +421,24 @@ describe('RoutineEditorSheet', () => {
     }
 
     const wrapper = build(routine)
-    await wrapper.vm.$nextTick()
-    await new Promise(resolve => setTimeout(resolve, 100))
-    await wrapper.vm.$nextTick()
+    await flushPromises()
 
     const vm = wrapper.vm as any
-    const exerciseName1 = vm.allExercises[0]?.name_es || ''
-
-    // Perform a search
-    vm.searchQuery = 'sentadilla'
-    await new Promise(resolve => setTimeout(resolve, 350))
-    await wrapper.vm.$nextTick()
-
-    // Verify allExercises still contains the catalog (row names still render)
-    expect(vm.allExercises).toHaveLength(2)
-    expect(vm.allExercises[0].name_es).toBe(exerciseName1)
-  })
-
-  it('keeps row exercise names visible after adding exercise', async () => {
-    const routine = {
-      id: 5,
-      name: 'Test Routine',
-      description: null,
-      rune: null,
-      color: null,
-      exercises: [
-        { id: 10, exercise_id: 1, position: 0, target_sets: 3, target_reps: null, target_weight_kg: null, rest_seconds: 60 },
-      ],
-    }
-
-    const wrapper = build(routine)
-    await wrapper.vm.$nextTick()
-    await new Promise(resolve => setTimeout(resolve, 100))
-    await wrapper.vm.$nextTick()
-
-    const vm = wrapper.vm as any
-    const allExercisesBefore = vm.allExercises.length
     const newExerciseName = exerciseName(vm.allExercises[1], 'es')
 
     const dialogs = document.querySelectorAll('[role="dialog"]')
     const dialog = dialogs[dialogs.length - 1] as HTMLElement
+    ;(dialog.querySelector('[data-testid="routine-add-exercise-btn"]') as HTMLElement).click()
+    await flushPromises()
 
-    // Escribe en el buscador real para revelar el picker agrupado
-    const searchInput = dialog.querySelector('[data-testid="exercise-search"] input') as HTMLInputElement
-    searchInput.value = 'sentadilla'
-    searchInput.dispatchEvent(new Event('input'))
-    await new Promise(resolve => setTimeout(resolve, 350))
-    await wrapper.vm.$nextTick()
-
-    // Añade el ejercicio vía el botón real del picker
-    const optionButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === newExerciseName)
+    const optionButton = [...document.querySelectorAll('[data-testid^="exercise-result-"]')]
+      .find((b) => b.textContent?.includes(newExerciseName)) as HTMLElement
     expect(optionButton).not.toBeUndefined()
-    optionButton!.click()
-    await wrapper.vm.$nextTick()
+    optionButton.click()
+    await flushPromises()
 
-    // Verify allExercises unchanged (row names still render)
-    expect(vm.allExercises).toHaveLength(allExercisesBefore)
     expect(vm.exercises).toHaveLength(2)
+    expect(vm.exercises[1].exercise_id).toBe(vm.allExercises[1].id)
   })
 
   // ROUTINES-OPEN (course correction, v0.4.2): el check "Global" vive en el
@@ -644,28 +609,32 @@ describe('RoutineEditorSheet', () => {
       await wrapper.vm.$nextTick()
     }
 
-    it('linking two rows via the real boundary button labels both "Superserie A" and saves superset_group [0, 0]', async () => {
+    // v0.10.0: los toggles de frontera murieron también aquí — las
+    // superseries se CREAN con el check del AddExerciseSheet (par) y se
+    // gestionan desde el contenedor del bloque, igual que en el entreno
+    it('v0.10.0: adding a pair via the add sheet superset check saves superset_group [0, 0]', async () => {
+      document.body.innerHTML = ''
       const { replaceRoutineExercises } = await import('@/api/domain')
       vi.mocked(replaceRoutineExercises).mockClear()
 
-      const wrapper = build(routineWith([
-        { id: 10, exercise_id: 1 },
-        { id: 11, exercise_id: 2 },
-      ]))
+      const wrapper = build(routineWith([]))
       await settle(wrapper)
       const dialog = lastDialog()
 
-      const toggle = dialog.querySelector('[data-testid="superset-toggle-1"]') as HTMLButtonElement
-      expect(toggle).not.toBeNull()
-      expect(toggle.getAttribute('aria-pressed')).toBe('false')
-      toggle.click()
-      await wrapper.vm.$nextTick()
+      expect(dialog.querySelector('[data-testid^="superset-toggle-"]')).toBeNull()
 
-      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')?.textContent).toContain('Superserie A')
-      expect(dialog.querySelector('[data-testid="superset-row-chip-1"]')?.textContent).toContain('Superserie A')
-      expect(
-        dialog.querySelector('[data-testid="superset-toggle-1"]')?.getAttribute('aria-pressed'),
-      ).toBe('true')
+      ;(dialog.querySelector('[data-testid="routine-add-exercise-btn"]') as HTMLElement).click()
+      await flushPromises()
+      ;(document.querySelector('[data-testid="superset-mode-checkbox"]') as HTMLInputElement).click()
+      await flushPromises()
+      const options = [...document.querySelectorAll('[data-testid^="exercise-result-"]')] as HTMLElement[]
+      options[0].click()
+      await flushPromises()
+      options[1].click()
+      await flushPromises()
+
+      // contenedor del bloque con su chip único de cabecera
+      expect(dialog.querySelector('[data-testid="editor-superset-container-A"]')).not.toBeNull()
 
       const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
       saveButton!.click()
@@ -673,13 +642,14 @@ describe('RoutineEditorSheet', () => {
       await new Promise(resolve => setTimeout(resolve, 0))
 
       expect(replaceRoutineExercises).toHaveBeenCalledWith(5, [
-        expect.objectContaining({ exercise_id: 1, superset_group: 0 }),
-        expect.objectContaining({ exercise_id: 2, superset_group: 0 }),
+        expect.objectContaining({ superset_group: 0 }),
+        expect.objectContaining({ superset_group: 0 }),
       ])
       wrapper.unmount()
     })
 
-    it('unlinking an existing 2-member group via the same button dissolves it and saves nulls', async () => {
+    it('v0.10.0: dissolving from the block edit sheet clears the group and saves nulls', async () => {
+      document.body.innerHTML = ''
       const { replaceRoutineExercises } = await import('@/api/domain')
       vi.mocked(replaceRoutineExercises).mockClear()
 
@@ -690,14 +660,13 @@ describe('RoutineEditorSheet', () => {
       await settle(wrapper)
       const dialog = lastDialog()
 
-      // estado inicial: enlazado (viene de la rutina guardada)
-      const toggle = dialog.querySelector('[data-testid="superset-toggle-1"]') as HTMLButtonElement
-      expect(toggle.getAttribute('aria-pressed')).toBe('true')
-      toggle.click()
-      await wrapper.vm.$nextTick()
+      expect(dialog.querySelector('[data-testid="editor-superset-container-A"]')).not.toBeNull()
+      ;(dialog.querySelector('[data-testid="editor-superset-edit-A"]') as HTMLElement).click()
+      await flushPromises()
+      ;(document.querySelector('[data-testid="superset-dissolve-btn"]') as HTMLElement).click()
+      await flushPromises()
 
-      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')).toBeNull()
-      expect(dialog.querySelector('[data-testid="superset-row-chip-1"]')).toBeNull()
+      expect(dialog.querySelector('[data-testid="editor-superset-container-A"]')).toBeNull()
 
       const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
       saveButton!.click()
@@ -721,8 +690,8 @@ describe('RoutineEditorSheet', () => {
       await settle(wrapper)
       const dialog = lastDialog()
 
-      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')?.textContent).toContain('Superserie A')
-      expect(dialog.querySelector('[data-testid="superset-row-chip-2"]')?.textContent).toContain('Superserie B')
+      expect(dialog.querySelector('[data-testid="editor-superset-container-A"]')).not.toBeNull()
+      expect(dialog.querySelector('[data-testid="editor-superset-container-B"]')).not.toBeNull()
       wrapper.unmount()
     })
 
@@ -746,9 +715,7 @@ describe('RoutineEditorSheet', () => {
       upButtons[upButtons.length - 1]!.click()
       await wrapper.vm.$nextTick()
 
-      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')).toBeNull()
-      expect(dialog.querySelector('[data-testid="superset-row-chip-1"]')).toBeNull()
-      expect(dialog.querySelector('[data-testid="superset-row-chip-2"]')).toBeNull()
+      expect(dialog.querySelector('[data-testid="editor-superset-container-A"]')).toBeNull()
 
       const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
       saveButton!.click()
@@ -777,8 +744,7 @@ describe('RoutineEditorSheet', () => {
       upButton!.click()
       await wrapper.vm.$nextTick()
 
-      expect(dialog.querySelector('[data-testid="superset-row-chip-0"]')?.textContent).toContain('Superserie A')
-      expect(dialog.querySelector('[data-testid="superset-row-chip-1"]')?.textContent).toContain('Superserie A')
+      expect(dialog.querySelector('[data-testid="editor-superset-container-A"]')).not.toBeNull()
       wrapper.unmount()
     })
 

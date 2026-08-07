@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut, MuscleGroupOut } from '@/api/domain'
@@ -9,6 +9,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useAuthStore } from '@/stores/auth'
 import BkRune from '@/lib/BkRune.vue'
 import BkSearchList from '@/lib/BkSearchList.vue'
+import BkSelect from '@/lib/BkSelect.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
@@ -63,6 +64,19 @@ function searchTextFor(exercise: ExerciseOut): string {
   return `${exercise.name_es} ${exercise.name_en} ${t(`library.measurements.${exercise.measurement}`)}`
 }
 
+// v0.10.0 (zurdi: "mismos filtros que en la biblioteca"): filtro de grupo
+// muscular sobre la lista, idéntico a ExerciseManager
+const filterGroupId = ref('')
+const groupFilterOptions = computed(() => [
+  { value: '', label: t('library.allGroups') },
+  ...muscleGroups.value.map((g) => ({ value: String(g.id), label: groupLabel(g) })),
+])
+const groupFiltered = computed(() => {
+  const groupId = filterGroupId.value ? Number(filterGroupId.value) : null
+  if (groupId === null) return exercises.value
+  return exercises.value.filter((e) => e.muscle_groups.some((l) => l.muscle_group_id === groupId))
+})
+
 onMounted(async () => {
   try {
     const [exercisesList, muscleGroupsList] = await Promise.all([
@@ -104,6 +118,7 @@ function resetState() {
   query.value = ''
   firstPick.value = null
   supersetMode.value = false
+  filterGroupId.value = ''
 }
 
 // desmarcar el check a mitad de selección descarta la primera elección
@@ -140,15 +155,24 @@ watch(
     <!-- v0.8.0 (zurdi: "la lista debería ocupar más pantalla"): de la
          max-h-64 por defecto de BkSearchList a media pantalla larga — dvh
          para que la UI del navegador móvil no la empuje bajo el borde -->
+    <!-- v0.10.0: filtro de grupo idéntico al de la biblioteca -->
+    <div v-if="catalogReady" class="pb-2">
+      <BkSelect
+        v-model="filterGroupId"
+        :label="t('library.muscleGroups')"
+        :options="groupFilterOptions"
+        data-testid="add-exercise-group-filter"
+      />
+    </div>
     <BkSearchList
       v-if="catalogReady"
       v-model="query"
-      :items="exercises"
+      :items="groupFiltered"
       :label-fn="labelFor"
       :search-fn="searchTextFor"
       :key-fn="(exercise: ExerciseOut) => exercise.id"
       :label="t('workout.searchExercise')"
-      max-height-class="max-h-[60dvh]"
+      max-height-class="max-h-[55dvh]"
       @select="pick"
     >
       <template #item="{ item: exercise }">

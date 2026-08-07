@@ -12,18 +12,14 @@ import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
-import BkSelect from '@/lib/BkSelect.vue'
-import BkStepper from '@/lib/BkStepper.vue'
 import BkRune from '@/lib/BkRune.vue'
 import { FUTHARK_RUNE_NAMES, type RuneName } from '@/lib/runes'
-import {
-  isLinkedAt,
-  normalizeSupersets,
-  supersetLabels,
-  toggleSupersetLink,
-  type SupersetValue,
-} from '@/lib/supersets'
+import { normalizeSupersets, supersetLabels, type SupersetValue } from '@/lib/supersets'
+import { primaryRune } from '@/lib/runeResolve'
 import { exerciseName } from './exerciseName'
+import RoutineExerciseRow, { type EditorRow } from './RoutineExerciseRow.vue'
+import AddExerciseSheet from '@/components/workout/AddExerciseSheet.vue'
+import SupersetEditSheet from '@/components/workout/SupersetEditSheet.vue'
 
 const props = defineProps<{ open: boolean; routine?: RoutineOut }>()
 const emit = defineEmits<{ close: [] }>()
@@ -45,59 +41,20 @@ const selectedRune = ref<string | null>(null)
 // marcable al crear (a diferencia del viejo flujo globalize, admin-only y
 // que cedía la propiedad)
 const isGlobal = ref(false)
-const exercises = ref<Array<{
-  id: string
-  exercise_id: number
-  target_sets: number
-  target_reps: number | null
-  target_weight_kg: number | null
-  rest_seconds: string | null
-  // v0.5.0 superseries: índice de grupo normalizado (0,1,2…) o null =
-  // suelto — SIEMPRE se mantiene normalizado tras cada mutación (enlazar,
-  // reordenar, quitar), ver renormalizeSupersets
-  superset_group: number | null
-}>>([])
+// v0.10.0: filas tipadas por el componente de fila (misma anatomía que la
+// card del entreno) — superset_group SIEMPRE normalizado tras cada mutación
+const exercises = ref<EditorRow[]>([])
 // Immutable full catalog (loaded once, used for row-name resolution)
 const allExercises = ref<ExerciseOut[]>([])
-// Search results buffer (used only for picker display)
-const searchResults = ref<ExerciseOut[]>([])
 const muscleGroups = ref<Array<{ id: number; slug: string; name_es: string; name_en: string; owner_id: number | null }>>([])
-const searchQuery = ref('')
 const loading = ref(false)
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
-// Computed
 // v0.3.0: el picker ya no cura runas de grupo muscular (esas quedan
 // reservadas a los propios grupos, ver WeekSummaryCard) — ofrece el futhark
 // antiguo completo, para que la runa de la rutina sea una elección libre y
 // no se confunda visualmente con "esta rutina trabaja este músculo"
 const runes: RuneName[] = FUTHARK_RUNE_NAMES
 const berserkerRune: RuneName = 'berserk'
-
-const groupedExercises = computed(() => {
-  if (!searchQuery.value) return []
-
-  // Use searchResults for picker display
-  const groups = new Map<number, ExerciseOut[]>()
-  searchResults.value.forEach(exercise => {
-    const primaryMuscle = exercise.muscle_groups.find(m => m.is_primary)
-    if (primaryMuscle) {
-      if (!groups.has(primaryMuscle.muscle_group_id)) {
-        groups.set(primaryMuscle.muscle_group_id, [])
-      }
-      groups.get(primaryMuscle.muscle_group_id)!.push(exercise)
-    }
-  })
-  return groups
-})
-
-const restOptions = computed(() => [
-  { value: '30', label: '30 s' },
-  { value: '60', label: '60 s' },
-  { value: '90', label: '90 s' },
-  { value: '120', label: '120 s' },
-  { value: '180', label: '180 s' },
-])
 
 // Methods
 async function loadData() {
@@ -111,24 +68,6 @@ async function loadData() {
   } catch (error) {
     toastApiError(error)
   }
-}
-
-async function searchExercises() {
-  if (searchTimeout) clearTimeout(searchTimeout)
-
-  searchTimeout = setTimeout(async () => {
-    try {
-      const query = searchQuery.value.trim()
-      if (!query) {
-        searchResults.value = []
-        return
-      }
-      const results = await listExercises({ q: query })
-      searchResults.value = results
-    } catch (error) {
-      toastApiError(error)
-    }
-  }, 300)
 }
 
 async function initializeForm() {
@@ -165,20 +104,38 @@ async function initializeForm() {
   await loadData()
 }
 
-function addExercise(exercise: ExerciseOut) {
+// v0.10.0 (zurdi: "el flow de rutina, exactamente el mismo que el de
+// entrenamiento"): añadir pasa por el MISMO AddExerciseSheet del entreno
+// (buscador con pajar ES+EN+tipo, filtro de grupo y check de superserie) —
+// este adaptador satisface su contrato WorkoutActions con mutaciones locales
+let rowSeq = 0
+function pushRow(exerciseId: number) {
   exercises.value.push({
-    id: String(Date.now()),
-    exercise_id: exercise.id,
+    id: `row-${++rowSeq}-${exercises.value.length}`,
+    exercise_id: exerciseId,
     target_sets: 3,
     target_reps: 0,
     target_weight_kg: null,
     rest_seconds: '60',
-    // un ejercicio recién añadido nace suelto: se enlaza a mano después
+    // un ejercicio recién añadido nace suelto (o enlazado vía addSupersetPair)
     superset_group: null,
   })
-  // Only clear search query and results, keep allExercises immutable
-  searchQuery.value = ''
-  searchResults.value = []
+}
+
+const addSheetOpen = ref(false)
+const editorActions = {
+  addExercise: async (exerciseId: number) => {
+    pushRow(exerciseId)
+  },
+  addSupersetPair: async (exerciseA: number, exerciseB: number) => {
+    pushRow(exerciseA)
+    pushRow(exerciseB)
+    const values = currentSupersetValues()
+    const marker = values.length
+    values[values.length - 2] = marker
+    values[values.length - 1] = marker
+    applySupersetValues(normalizeSupersets(values))
+  },
 }
 
 function removeExercise(id: string) {
@@ -226,17 +183,61 @@ function renormalizeSupersets() {
   applySupersetValues(normalizeSupersets(currentSupersetValues()))
 }
 
-// frontera entre la fila index-1 y la fila index (el botón vive entre ambas)
-function toggleLink(index: number) {
-  applySupersetValues(toggleSupersetLink(currentSupersetValues(), index))
-}
-
-function linkedAt(index: number): boolean {
-  return isLinkedAt(currentSupersetValues(), index)
-}
-
 // etiqueta presentacional A/B/C… por fila (null = suelto)
 const rowSupersetLabels = computed(() => supersetLabels(exercises.value.map(e => e.superset_group)))
+
+// v0.10.0: bloques como en WorkoutView — miembros de superserie DENTRO de un
+// contenedor con chip de cabecera + botón de editar (SupersetEditSheet
+// reutilizado tal cual: cambiar un miembro aquí es una mutación local de la
+// fila, sin baile de servidor); los toggles de frontera de la v0.5.0 mueren
+// también aquí, igual que murieron en el entreno en la v0.8.0.
+type EditorBlock = {
+  grouped: boolean
+  label: string | null
+  entries: { row: EditorRow; index: number }[]
+}
+const editorBlocks = computed<EditorBlock[]>(() => {
+  const labels = rowSupersetLabels.value
+  const blocks: EditorBlock[] = []
+  exercises.value.forEach((row, index) => {
+    const label = labels[index]
+    const last = blocks[blocks.length - 1]
+    if (label !== null && last?.grouped && last.label === label) {
+      last.entries.push({ row, index })
+    } else {
+      blocks.push({ grouped: label !== null, label, entries: [{ row, index }] })
+    }
+  })
+  return blocks
+})
+
+const editingBlock = ref<EditorBlock | null>(null)
+const editingMembers = computed(() =>
+  (editingBlock.value?.entries ?? []).map((entry) => {
+    const exercise = allExercises.value.find((e) => e.id === entry.row.exercise_id)
+    return {
+      weid: entry.index,
+      name: exerciseName(exercise, auth.user?.locale || 'es'),
+      rune: primaryRune(exercise, muscleGroups.value) ?? null,
+      // en el editor no hay series que perder al cambiar
+      hasSets: false,
+    }
+  }),
+)
+
+function dissolveEditingBlock() {
+  const block = editingBlock.value
+  if (!block) return
+  const values = currentSupersetValues()
+  for (const entry of block.entries) values[entry.index] = null
+  applySupersetValues(normalizeSupersets(values))
+}
+
+function swapEditingMember(index: number, newExerciseId: number) {
+  exercises.value = exercises.value.map((row, i) =>
+    i === index ? { ...row, exercise_id: newExerciseId } : row,
+  )
+}
 
 async function saveRoutine() {
   if (!name.value.trim()) {
@@ -288,17 +289,12 @@ watch(
   async (open) => {
     if (open) {
       await initializeForm()
+    } else {
+      addSheetOpen.value = false
+      editingBlock.value = null
     }
   },
   { immediate: true }
-)
-
-watch(
-  () => searchQuery.value,
-  () => {
-    searchExercises()
-  },
-  { flush: 'post' }
 )
 </script>
 
@@ -375,154 +371,80 @@ watch(
       <div class="space-y-3">
         <h3 class="text-sm font-semibold text-ink">{{ $t('routines.exercises') }}</h3>
 
-        <!-- Exercise Rows -->
+        <!-- v0.10.0 (zurdi: "el flow de rutina, exactamente el mismo que el
+             de entrenamiento"): bloques de superserie con contenedor aurora
+             + chip + editar (SupersetEditSheet), filas como cards
+             (RoutineExerciseRow) y añadir vía el MISMO AddExerciseSheet del
+             entreno (buscador+filtros+check de superserie). Los toggles de
+             frontera y el buscador inline con debounce murieron. -->
         <div v-if="exercises.length > 0" class="space-y-3 border-t border-line pt-3">
-          <template v-for="(exercise, index) in exercises" :key="exercise.id">
-            <!-- v0.5.0 superseries: botón de enlazar ENTRE filas consecutivas
-                 — enlaza/desenlaza esta fila con la anterior. v0.7.0 (zurdi:
-                 "¿no debería ser la cadena encadenada en vez de rota?"): el
-                 icono muestra el ESTADO, no la acción — eslabón CERRADO
-                 cuando la frontera está enlazada (con aria-pressed
-                 reforzándolo), roto cuando no; el aria-label sí describe la
-                 acción del tap, como cualquier toggle. -->
-            <div v-if="index > 0" class="flex justify-center">
-              <BkActionBtn
-                :icon="linkedAt(index) ? 'link' : 'unlink'"
-                :data-testid="`superset-toggle-${index}`"
-                :aria-label="linkedAt(index) ? $t('routines.unlinkSuperset') : $t('routines.linkSuperset')"
-                :aria-pressed="linkedAt(index) ? 'true' : 'false'"
-                @click="toggleLink(index)"
-              />
-            </div>
+          <template v-for="block in editorBlocks" :key="`block-${block.entries[0].row.id}`">
             <div
-              class="space-y-2 p-3 bg-stone rounded-sm border"
-              :class="rowSupersetLabels[index] ? 'border-aurora/40' : 'border-line'"
+              v-if="block.grouped"
+              class="border border-aurora/50 rounded-sm p-2 space-y-3"
+              :data-testid="`editor-superset-container-${block.label}`"
             >
-            <!-- Exercise name (read-only) + chip de superserie (A/B/C…) -->
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-ink">
-                {{ exerciseName(allExercises.find(e => e.id === exercise.exercise_id), auth.user?.locale || 'es') }}
-              </span>
-              <span
-                v-if="rowSupersetLabels[index]"
-                :data-testid="`superset-row-chip-${index}`"
-                class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5 shrink-0"
-              >
-                {{ $t('routines.supersetLabel', { label: rowSupersetLabels[index] }) }}
-              </span>
-            </div>
-
-            <!-- Target Sets -->
-            <div>
-              <label class="block text-xs text-ink-muted mb-2">{{ $t('routines.targetSets') }}</label>
-              <BkStepper
-                :model-value="exercise.target_sets"
-                :min="1"
-                :max="10"
-                @update:model-value="exercise.target_sets = $event"
+              <div class="flex items-center justify-center gap-2">
+                <span class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5">
+                  {{ $t('routines.supersetLabel', { label: block.label }) }}
+                </span>
+                <BkActionBtn
+                  icon="edit"
+                  :data-testid="`editor-superset-edit-${block.label}`"
+                  :aria-label="$t('workout.supersetEdit')"
+                  @click="editingBlock = block"
+                />
+              </div>
+              <RoutineExerciseRow
+                v-for="entry in block.entries"
+                :key="entry.row.id"
+                :row="entry.row"
+                :index="entry.index"
+                :count="exercises.length"
+                :all-exercises="allExercises"
+                :muscle-groups="muscleGroups"
+                :units="units"
+                :locale="auth.user?.locale || 'es'"
+                @move-up="moveExerciseUp"
+                @move-down="moveExerciseDown"
+                @remove="removeExercise"
               />
             </div>
-
-            <!-- Target Reps (optional) -->
-            <div>
-              <label class="block text-xs text-ink-muted mb-2">{{ $t('routines.targetReps') }}</label>
-              <BkStepper
-                :model-value="exercise.target_reps || 0"
-                :min="0"
-                :max="100"
-                @update:model-value="exercise.target_reps = $event"
-              />
-            </div>
-
-            <!-- Target Weight -->
-            <div>
-              <label class="block text-xs text-ink-muted mb-2">{{ $t('routines.targetWeight') }}</label>
-              <BkStepper
-                :model-value="kgToDisplay(exercise.target_weight_kg || 0, units)"
-                :min="0"
-                :max="kgToDisplay(300, units)"
-                :step="2.5"
-                :suffix="`${auth.user?.units || 'kg'}`"
-                @update:model-value="exercise.target_weight_kg = $event > 0 ? displayToKg($event, units) : null"
-              />
-            </div>
-
-            <!-- Rest Seconds -->
-            <BkSelect
-              :model-value="exercise.rest_seconds || '60'"
-              :label="$t('routines.restSeconds')"
-              :options="restOptions"
-              @update:model-value="exercise.rest_seconds = $event"
+            <RoutineExerciseRow
+              v-else
+              :row="block.entries[0].row"
+              :index="block.entries[0].index"
+              :count="exercises.length"
+              :all-exercises="allExercises"
+              :muscle-groups="muscleGroups"
+              :units="units"
+              :locale="auth.user?.locale || 'es'"
+              @move-up="moveExerciseUp"
+              @move-down="moveExerciseDown"
+              @remove="removeExercise"
             />
-
-            <!-- Action buttons — item 6 (ola de pulido v0.3.0): flechas
-                 icon-only en vez de los botones "Arriba"/"Abajo" de texto,
-                 mismo affordance compacto que WorkoutExerciseCard.vue (↑/↓,
-                 aria-label conservado en vez del texto visible) -->
-            <div class="flex items-center gap-1">
-              <button
-                v-if="index > 0"
-                type="button"
-                class="bk-press w-8 h-8 text-ink-muted hover:text-ink"
-                :aria-label="$t('routines.moveUp')"
-                @click="moveExerciseUp(index)"
-              >
-                ↑
-              </button>
-              <button
-                v-if="index < exercises.length - 1"
-                type="button"
-                class="bk-press w-8 h-8 text-ink-muted hover:text-ink"
-                :aria-label="$t('routines.moveDown')"
-                @click="moveExerciseDown(index)"
-              >
-                ↓
-              </button>
-              <BkButton
-                variant="danger"
-                size="sm"
-                class="ml-auto"
-                @click="removeExercise(exercise.id)"
-              >
-                {{ $t('routines.remove') }}
-              </BkButton>
-            </div>
-            </div>
           </template>
         </div>
 
-        <!-- Add Exercise -->
-        <div class="space-y-2 border-t border-line pt-3">
-          <BkField
-            v-model="searchQuery"
-            data-testid="exercise-search"
-            :label="$t('routines.addExercise')"
-            type="text"
-          />
+        <BkButton
+          variant="ghost"
+          block
+          data-testid="routine-add-exercise-btn"
+          @click="addSheetOpen = true"
+        >
+          {{ $t('routines.addExercise') }}
+        </BkButton>
 
-          <!-- Grouped exercises by muscle -->
-          <div v-if="searchQuery && allExercises.length > 0" class="max-h-40 overflow-y-auto space-y-2">
-            <div v-for="[muscleId, groupExercises] in groupedExercises" :key="muscleId" class="space-y-1">
-              <div class="flex items-center gap-2 px-2 text-xs text-ink-muted font-semibold">
-                <BkRune
-                  v-if="muscleGroups.find(m => m.id === muscleId)"
-                  :name="(muscleGroups.find(m => m.id === muscleId)!.slug as RuneName)"
-                  :size="16"
-                />
-                <span>{{ muscleGroups.find(m => m.id === muscleId)?.[auth.user?.locale === 'es' ? 'name_es' : 'name_en'] }}</span>
-              </div>
-              <button
-                v-for="exercise in groupExercises"
-                :key="exercise.id"
-                type="button"
-                class="w-full text-left p-2 pl-6 rounded-sm hover:bg-stone transition-colors text-sm text-ink border border-transparent hover:border-line"
-                @click="addExercise(exercise)"
-              >
-                {{ exerciseName(exercise, auth.user?.locale || 'es') }}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AddExerciseSheet :open="addSheetOpen" :actions="editorActions" @close="addSheetOpen = false" />
+
+        <SupersetEditSheet
+          :open="editingBlock !== null"
+          :label="editingBlock?.label ?? null"
+          :members="editingMembers"
+          @close="editingBlock = null"
+          @dissolve="dissolveEditingBlock"
+          @swap="swapEditingMember"
+        />
       </div>
 
       <!-- Action Buttons -->

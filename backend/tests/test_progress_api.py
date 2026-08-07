@@ -193,3 +193,38 @@ def test_series_of_invisible_exercise_404(client: TestClient, app):
         },
     ).json()["id"]
     assert client.get(f"/api/v1/progress/exercises/{custom}").status_code == 404
+
+
+# v0.10.0 (zurdi): las últimas 4 veces de cardio viajan con el historial
+def test_exercise_history_carries_recent_cardio(client):
+    treadmill = next(
+        e["id"] for e in client.get("/api/v1/exercises").json() if e["measurement"] == "cardio"
+    )
+    for day, minutes in [("2026-08-01", 20), ("2026-08-02", 18), ("2026-08-03", 25), ("2026-08-04", 22), ("2026-08-05", 30)]:
+        w = client.post("/api/v1/workouts", json={"date": day, "finished": True}).json()
+        wex = client.post(
+            f"/api/v1/workouts/{w['id']}/exercises", json={"exercise_id": treadmill}
+        ).json()
+        client.post(
+            f"/api/v1/workouts/{w['id']}/exercises/{wex['id']}/sets",
+            json={"duration_seconds": minutes * 60},
+        )
+
+    history = client.get(f"/api/v1/progress/exercise-history/{treadmill}").json()
+    recent = history["recent_cardio"]
+    # las 4 más recientes, la última primero — la de 20min (5ª) se cae
+    assert [r["duration_seconds"] for r in recent] == [30 * 60, 22 * 60, 25 * 60, 18 * 60]
+    assert recent[0]["date"] == "2026-08-05"
+
+    # un ejercicio de fuerza no arrastra la lista
+    bench = next(
+        e["id"] for e in client.get("/api/v1/exercises").json() if e["name_en"] == "Bench press"
+    )
+    w = client.post("/api/v1/workouts", json={"date": "2026-08-05", "finished": True}).json()
+    wex = client.post(f"/api/v1/workouts/{w['id']}/exercises", json={"exercise_id": bench}).json()
+    client.post(
+        f"/api/v1/workouts/{w['id']}/exercises/{wex['id']}/sets",
+        json={"reps": 5, "weight_kg": 60},
+    )
+    strength_history = client.get(f"/api/v1/progress/exercise-history/{bench}").json()
+    assert strength_history["recent_cardio"] == []

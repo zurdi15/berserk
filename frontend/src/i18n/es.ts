@@ -418,6 +418,9 @@ export const es = {
     backToCalendar: 'Volver al calendario',
     retroPrs: 'Récords recalculados: {n}',
     addSet: 'Añadir serie',
+    // v0.10.0: card de cardio con dos acciones (registrar hecho / countdown)
+    cardioLog: 'Registrar tiempo',
+    cardioStart: 'Empezar {duration}',
     logSetAndAnother: 'Registrar y otra',
     startCountdown: 'Empezar',
     lastTime: 'Última vez ({date})',

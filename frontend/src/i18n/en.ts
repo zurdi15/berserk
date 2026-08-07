@@ -406,6 +406,9 @@ export const en = {
     backToCalendar: 'Back to calendar',
     retroPrs: 'Records recalculated: {n}',
     addSet: 'Add set',
+    // v0.10.0: cardio card with two actions (see es.ts)
+    cardioLog: 'Log time',
+    cardioStart: 'Start {duration}',
     logSetAndAnother: 'Log and another',
     startCountdown: 'Start',
     lastTime: 'Last time ({date})',

@@ -51,6 +51,12 @@ watch(() => route.path, () => {
 // las rutas (la nav es chrome persistente, no solo /workout), puro ruido
 // ahora que el CTA ya hace de tap-target siempre visible.
 const resting = computed(() => timer.active)
+// v0.10.0 (zurdi): al llegar el countdown a 0 solo, el CTA muestra una fase
+// de "¡hecho!" (✓ con pulso y glow a tope) durante la gracia del store antes
+// de fundir a la runa — en vez de un 0:00 que se esfumaba de golpe. La X de
+// cancelar se pliega YA en esta fase (no queda nada que cancelar), así el
+// estrechado animado ocurre mientras el ✓ celebra, no a la vez que la runa.
+const timerFinished = computed(() => timer.finished)
 
 // v0.7.0 (zurdi revoca el expandir-para-cancelar del item 6/v0.4.3: "cuando
 // haces click, la X aparece en otro elemento distinto — mejor una X roja a
@@ -123,6 +129,9 @@ function onMainTouchEnd(event: TouchEvent) {
 // arriba ya es la señal; mantener ADEMÁS el glow de "en curso" ahí compite
 // con el propio countdown, así que ese nivel se apaga durante el descanso.
 const workoutGlowOpacity = computed(() => {
+  // v0.10.0: el glow sube a tope durante la fase de "descanso terminado" —
+  // parte del feedback de fin que pidió zurdi, en cualquier ruta
+  if (timerFinished.value) return 1
   if (route.name === 'workout') return 1
   return activeWorkout.workout && !resting.value ? 0.4 : 0
 })
@@ -263,9 +272,18 @@ watch(activeIndex, () => nextTick(updateIndicator))
                        pidió zurdi al acabar/cancelar el descanso).
                        whitespace-nowrap (item 8): el countdown nunca envuelve
                        línea; el ancho crece en su lugar. -->
+                  <!-- v0.10.0: tercer estado FINISHED entre countdown y runa —
+                       ✓ con bk-pop + glow a tope durante la gracia del store,
+                       y de ahí funde a la runa que se re-talla (carve) -->
                   <Transition name="bk-fade" mode="out-in">
                     <span
-                      v-if="resting"
+                      v-if="timerFinished"
+                      key="finished"
+                      data-testid="cta-timer-finished"
+                      class="text-aurora text-lg leading-none"
+                    >✓</span>
+                    <span
+                      v-else-if="resting"
                       key="timer"
                       data-testid="cta-timer"
                       class="bk-metric text-sm whitespace-nowrap"
@@ -273,14 +291,11 @@ watch(activeIndex, () => nextTick(updateIndicator))
                     <BkRune v-else key="rune" :name="item.rune" :size="26" :carve="true" />
                   </Transition>
                 </button>
-                <!-- v0.7.0: X roja SIEMPRE visible mientras se descansa (adiós
-                     expandir-para-revelar) — dentro de la MISMA losa, válido
-                     ahora que la losa no es un anchor. Entra y sale colapsando
-                     su ancho (bk-cta-x): el estrechado de la losa al volver a
-                     la runa es la propia X plegándose, animado. -->
+                <!-- v0.7.0: X roja SIEMPRE visible mientras se descansa; se
+                     pliega YA en la fase finished (nada que cancelar) -->
                 <Transition name="bk-cta-x">
                   <button
-                    v-if="resting"
+                    v-if="resting && !timerFinished"
                     type="button"
                     data-testid="cta-cancel-rest"
                     class="bk-press relative flex items-center text-danger"
@@ -383,9 +398,16 @@ watch(activeIndex, () => nextTick(updateIndicator))
                   :aria-label="$t(item.label)"
                   @click="goWorkout"
                 >
+                  <!-- v0.10.0: estado finished intermedio, ver desktop -->
                   <Transition name="bk-fade" mode="out-in">
                     <span
-                      v-if="resting"
+                      v-if="timerFinished"
+                      key="finished"
+                      data-testid="cta-timer-finished"
+                      class="text-aurora text-lg leading-none"
+                    >✓</span>
+                    <span
+                      v-else-if="resting"
                       key="timer"
                       data-testid="cta-timer"
                       class="bk-metric text-sm whitespace-nowrap"
@@ -395,7 +417,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
                 </button>
                 <Transition name="bk-cta-x">
                   <button
-                    v-if="resting"
+                    v-if="resting && !timerFinished"
                     type="button"
                     data-testid="cta-cancel-rest-mobile"
                     class="bk-press relative flex items-center text-danger"

@@ -1,0 +1,131 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+import type { ExerciseOut, MuscleGroupOut } from '@/api/domain'
+import { displayToKg, kgToDisplay } from '@/utils/units'
+import BkButton from '@/lib/BkButton.vue'
+import BkRune from '@/lib/BkRune.vue'
+import BkSelect from '@/lib/BkSelect.vue'
+import BkStepper from '@/lib/BkStepper.vue'
+import { primaryRune } from '@/lib/runeResolve'
+import type { RuneName } from '@/lib/runes'
+import { exerciseName } from './exerciseName'
+
+// v0.10.0 (zurdi: "el flow de rutina debería ser exactamente el mismo que el
+// de entrenamiento"): la fila del editor extraída a componente — misma
+// anatomía que WorkoutExerciseCard (runa+nombre en cabecera, mover/quitar,
+// campos debajo) para poder renderizarla dentro y fuera de los contenedores
+// de superserie sin duplicar 90 líneas. La fila MUTA el objeto row
+// directamente (proxy reactivo del array del editor) — los objetivos no
+// pasan por emits.
+export interface EditorRow {
+  id: string
+  exercise_id: number
+  target_sets: number
+  target_reps: number | null
+  target_weight_kg: number | null
+  rest_seconds: string | null
+  superset_group: number | null
+}
+
+const props = defineProps<{
+  row: EditorRow
+  index: number
+  count: number
+  allExercises: ExerciseOut[]
+  muscleGroups: MuscleGroupOut[]
+  units: 'kg' | 'lb'
+  locale: string
+}>()
+
+const emit = defineEmits<{ moveUp: [index: number]; moveDown: [index: number]; remove: [id: string] }>()
+
+const { t } = useI18n()
+
+const exercise = computed(() => props.allExercises.find((e) => e.id === props.row.exercise_id))
+const rune = computed<RuneName | null>(() => primaryRune(exercise.value, props.muscleGroups))
+
+const restOptions = [
+  { value: '30', label: '30 s' },
+  { value: '60', label: '60 s' },
+  { value: '90', label: '90 s' },
+  { value: '120', label: '120 s' },
+  { value: '180', label: '180 s' },
+]
+</script>
+
+<template>
+  <div class="space-y-2 p-3 bg-stone rounded-sm border border-line" :data-testid="`routine-row-${index}`">
+    <!-- cabecera: runa + nombre + mover/quitar — misma anatomía que la card
+         del entreno (el chip de superserie vive en el contenedor del bloque) -->
+    <div class="flex items-center gap-2">
+      <BkRune v-if="rune" :name="rune" :size="14" />
+      <span class="text-sm font-medium text-ink truncate">
+        {{ exerciseName(exercise, locale) }}
+      </span>
+      <div class="ml-auto flex items-center gap-1 shrink-0">
+        <button
+          v-if="index > 0"
+          type="button"
+          class="bk-press w-8 h-8 text-ink-muted hover:text-ink"
+          :aria-label="t('routines.moveUp')"
+          @click="emit('moveUp', index)"
+        >
+          ↑
+        </button>
+        <button
+          v-if="index < count - 1"
+          type="button"
+          class="bk-press w-8 h-8 text-ink-muted hover:text-ink"
+          :aria-label="t('routines.moveDown')"
+          @click="emit('moveDown', index)"
+        >
+          ↓
+        </button>
+        <BkButton variant="danger" size="sm" @click="emit('remove', row.id)">
+          {{ t('routines.remove') }}
+        </BkButton>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetSets') }}</label>
+      <BkStepper
+        :model-value="row.target_sets"
+        :min="1"
+        :max="10"
+        @update:model-value="row.target_sets = $event"
+      />
+    </div>
+
+    <div>
+      <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetReps') }}</label>
+      <BkStepper
+        :model-value="row.target_reps || 0"
+        :min="0"
+        :max="100"
+        @update:model-value="row.target_reps = $event"
+      />
+    </div>
+
+    <div>
+      <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetWeight') }}</label>
+      <BkStepper
+        :model-value="kgToDisplay(row.target_weight_kg || 0, units)"
+        :min="0"
+        :max="kgToDisplay(300, units)"
+        :step="2.5"
+        :suffix="units"
+        @update:model-value="row.target_weight_kg = $event > 0 ? displayToKg($event, units) : null"
+      />
+    </div>
+
+    <BkSelect
+      :model-value="row.rest_seconds || '60'"
+      :label="t('routines.restSeconds')"
+      :options="restOptions"
+      @update:model-value="row.rest_seconds = $event"
+    />
+  </div>
+</template>

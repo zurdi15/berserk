@@ -120,10 +120,19 @@ export interface ExerciseHistorySetOut {
   is_warmup: boolean
 }
 
+// v0.10.0 (zurdi): últimas 4 veces de cardio — solo se puebla para
+// ejercicios de cardio (ver backend routers/progress.py)
+export interface CardioEntryOut {
+  date: string
+  duration_seconds: number | null
+  distance_m: number | null
+}
+
 export interface ExerciseHistoryOut {
   workout_id: number
   date: string
   sets: ExerciseHistorySetOut[]
+  recent_cardio?: CardioEntryOut[]
 }
 
 export interface SetIn {

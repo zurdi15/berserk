@@ -46,10 +46,20 @@ class ExerciseHistorySetOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# v0.10.0 (zurdi: "en cardio, cuánto se hizo las últimas 4 veces"): una
+# entrada por serie de cardio en entrenos TERMINADOS, la más reciente primero
+class CardioEntryOut(BaseModel):
+    date: date_type
+    duration_seconds: int | None
+    distance_m: float | None
+
+
 class ExerciseHistoryOut(BaseModel):
     workout_id: int
     date: date_type
     sets: list[ExerciseHistorySetOut]
+    # solo se puebla para ejercicios de cardio (ver routers/progress.py)
+    recent_cardio: list[CardioEntryOut] = []
 
 
 class StatsOut(BaseModel):
