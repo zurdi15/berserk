@@ -324,6 +324,73 @@ describe('PrList', () => {
     const wrapper = mount(PrList, { props: { records: [], exercises: [] }, ...withI18n() })
     expect(wrapper.text()).toContain('Sin récords aún')
   })
+
+  // item 7 (v0.4.0): selector de kind (Todos/Peso Máx/Volumen Máx/Est. 1RM)
+  // — mismos 3 kinds que fixtures.records más un est_1rm, para cubrir los 4
+  // botones con al menos una fila de cada uno
+  const mixedKindRecords = [
+    { id: 30, exercise_id: 1, kind: 'max_weight', value: 100, achieved_at: '2026-08-01T00:00:00Z' },
+    { id: 31, exercise_id: 1, kind: 'max_volume', value: 1200, achieved_at: '2026-08-01T00:00:00Z' },
+    { id: 32, exercise_id: 1, kind: 'est_1rm', value: 110, achieved_at: '2026-08-01T00:00:00Z' },
+  ]
+
+  it('item 7: renders a kind filter with 4 options, defaulting to Todos with every row visible', () => {
+    const wrapper = mount(PrList, {
+      props: { records: mixedKindRecords as never, exercises: fixtures.exercises as never },
+      ...withI18n(),
+    })
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs.map((tab) => tab.text())).toEqual(['Todos', 'Peso Máx', 'Volumen Máx', 'Est. 1RM'])
+    expect(tabs[0].attributes('aria-selected')).toBe('true')
+    expect(wrapper.findAll('[data-testid^="pr-row-"]')).toHaveLength(3)
+  })
+
+  it('item 7: picking Peso Máx shows only max_weight rows; Todos restores the full list', async () => {
+    const wrapper = mount(PrList, {
+      props: { records: mixedKindRecords as never, exercises: fixtures.exercises as never },
+      ...withI18n(),
+    })
+    const tabs = wrapper.findAll('[role="tab"]')
+
+    await tabs[1].trigger('click') // Peso Máx
+    let rows = wrapper.findAll('[data-testid^="pr-row-"]')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].attributes('data-testid')).toBe('pr-row-30')
+
+    await tabs[0].trigger('click') // Todos
+    rows = wrapper.findAll('[data-testid^="pr-row-"]')
+    expect(rows).toHaveLength(3)
+  })
+
+  it('item 7: filtering to a kind with no matches shows the empty state but keeps the selector', async () => {
+    // fixtures.records solo tiene max_weight/max_volume, ningún est_1rm
+    const wrapper = mount(PrList, {
+      props: { records: fixtures.records as never, exercises: fixtures.exercises as never },
+      ...withI18n(),
+    })
+    const tabs = wrapper.findAll('[role="tab"]')
+
+    await tabs[3].trigger('click') // Est. 1RM
+    expect(wrapper.text()).toContain('Sin récords aún')
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(4)
+  })
+
+  it('item 7: toggling the kind filter does NOT remount the list container — same DOM node, no re-animation', async () => {
+    const wrapper = mount(PrList, {
+      props: { records: mixedKindRecords as never, exercises: fixtures.exercises as never },
+      ...withI18n(),
+    })
+    const listBefore = wrapper.find('[data-testid="pr-list"]').element
+
+    const tabs = wrapper.findAll('[role="tab"]')
+    await tabs[1].trigger('click') // Peso Máx — sigue habiendo 1 fila, la rama v-else no cambia
+
+    const listAfter = wrapper.find('[data-testid="pr-list"]').element
+    // el filtro de kind es un cambio de dato, no de sección: mismo nodo
+    // contenedor antes y después (misma idea que el metric switch del chart,
+    // ver progress.spec.ts:971)
+    expect(listAfter).toBe(listBefore)
+  })
 })
 
 describe('StatsGrid', () => {
@@ -1072,12 +1139,20 @@ describe('ProgressView', () => {
     const distributionArea = recordsPanel.findAll('[style*="--bk-stagger-i: 1"]')[0]
     expect(distributionArea.classes()).toContain('shrink-0')
 
-    // PrList: sin tope max-h-72, se lleva el resto del alto con scroll interno
+    // PrList: su root se lleva el resto del alto (flex-1 min-h-0) y apila el
+    // selector de kind (item 7, shrink-0) sobre el área que scrollea de
+    // verdad — el overflow-y-auto ahora vive en esa área interna, no en el
+    // root, para que el selector quede siempre visible
     const prList = wrapper.findComponent({ name: 'PrList' })
     expect(prList.classes()).toContain('flex-1')
     expect(prList.classes()).toContain('min-h-0')
-    expect(prList.classes()).toContain('overflow-y-auto')
     expect(prList.classes()).not.toContain('max-h-72')
+
+    const prScrollArea = wrapper.find('[data-testid="pr-list"]')
+    expect(prScrollArea.classes()).toContain('flex-1')
+    expect(prScrollArea.classes()).toContain('min-h-0')
+    expect(prScrollArea.classes()).toContain('overflow-y-auto')
+    expect(prScrollArea.classes()).not.toContain('max-h-72')
   })
 
   it('item 3c: training panel is a bounded flex column with the exercise-list area taking the remaining space', async () => {

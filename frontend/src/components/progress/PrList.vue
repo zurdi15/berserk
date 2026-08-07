@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut, PersonalRecordOut } from '@/api/domain'
@@ -8,6 +8,7 @@ import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import BkAnimatedNumber from '@/lib/BkAnimatedNumber.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkRune from '@/lib/BkRune.vue'
+import BkTabs from '@/lib/BkTabs.vue'
 import { parseUtc } from '@/utils/datetime'
 import { formatWeight, formatWeightInt } from '@/utils/units'
 
@@ -19,6 +20,25 @@ const props = withDefaults(
 const { t, locale } = useI18n()
 const units = useDisplayUnits()
 const exerciseMap = computed(() => new Map(props.exercises.map((e) => [e.id, e])))
+
+// item 7 (v0.4.0): selector Todos/Peso Máx/Volumen Máx/Est. 1RM sobre los
+// records YA cargados — mismo idioma que el selector de métrica de Entrenos
+// (mini BkTabs, ver ProgressView metricTabs): un toggle de DATO, no una
+// sección nueva, así que filtra en cliente (sin refetch) y NO debe remontar
+// la lista al cambiar (ver test de identidad de nodo en progress.spec.ts)
+type KindFilter = 'all' | 'max_weight' | 'max_volume' | 'est_1rm'
+const kindFilter = ref<KindFilter>('all')
+
+const kindTabs = computed(() => [
+  { value: 'all', label: t('progress.kinds.all') },
+  { value: 'max_weight', label: t('progress.kinds.max_weight') },
+  { value: 'max_volume', label: t('progress.kinds.max_volume') },
+  { value: 'est_1rm', label: t('progress.kinds.est_1rm') },
+])
+
+const filteredRecords = computed(() =>
+  kindFilter.value === 'all' ? props.records : props.records.filter((record) => record.kind === kindFilter.value),
+)
 
 function getExerciseName(exerciseId: number): string {
   return exerciseName(exerciseMap.value.get(exerciseId), locale.value) || ''
@@ -41,34 +61,47 @@ function formatAchievedDate(dateStr: string): string {
 </script>
 
 <template>
-  <BkEmpty v-if="!records.length" :message="t('progress.noRecords')" />
-  <div v-else class="space-y-2 flex-1 min-h-0 overflow-y-auto">
-    <!-- item 8: sin tope propio (max-h-72) — el padre (ProgressView, pestaña
-         Récords) le da el hueco vía flex-1 min-h-0, mismo patrón que la lista
-         de ExercisePicker en la pestaña Entrenos (item 3c). (comentario
-         DENTRO de la raíz condicional: como hermano de nivel superior sería
-         un nodo extra en el fragmento y rompería la resolución de root del
-         componente, ver el comentario equivalente en ProgressView.vue) -->
-    <div
-      v-for="record in records"
-      :key="record.id"
-      :data-testid="`pr-row-${record.id}`"
-      class="flex items-center justify-between py-2 px-3 bg-stone rounded-sm"
-    >
-      <div class="flex items-center gap-2 min-w-0">
-        <BkRune name="pr" :size="20" tone="ember" />
-        <div class="min-w-0">
-          <p class="text-sm font-medium text-ink-muted">{{ t(`progress.kinds.${record.kind}`) }}</p>
-          <p class="text-sm text-ink truncate">{{ getExerciseName(record.exercise_id) }}</p>
+  <div class="flex-1 min-h-0 flex flex-col gap-2">
+    <!-- item 7: root SIEMPRE presente (ya no alterna BkEmpty/lista como
+         root), flex-col propio para apilar el selector (shrink-0, fuera del
+         scroll) sobre el área con scroll de abajo — mismo patrón que
+         ExercisePicker en la pestaña Entrenos (item 3c): toolbar fija +
+         lista que se lleva el resto del alto. El padre (ProgressView,
+         pestaña Récords) sigue dando el hueco vía flex-1 min-h-0 sobre ESTE
+         root. (comentario DENTRO de la raíz: como hermano de nivel superior
+         del <div> sería un nodo extra en el fragmento y rompería tanto el
+         fall-through de atributos como la resolución de root del componente)
+         Todos/Peso Máx/Volumen Máx/Est. 1RM: reusa las mismas etiquetas que
+         cada fila (progress.kinds.*) — redundante-pero-inofensivo cuando ya
+         está filtrado (fila y selector dicen lo mismo), da contexto cuando
+         está en Todos (kinds mezclados) -->
+    <BkTabs class="shrink-0" v-model="kindFilter" :tabs="kindTabs" />
+
+    <BkEmpty v-if="!filteredRecords.length" :message="t('progress.noRecords')" class="flex-1 min-h-0" />
+    <!-- item 8: sin tope propio (max-h-72) — este div es el que scrollea de
+         verdad; el selector de arriba queda shrink-0, fuera del scroll -->
+    <div v-else class="space-y-2 flex-1 min-h-0 overflow-y-auto" data-testid="pr-list">
+      <div
+        v-for="record in filteredRecords"
+        :key="record.id"
+        :data-testid="`pr-row-${record.id}`"
+        class="flex items-center justify-between py-2 px-3 bg-stone rounded-sm"
+      >
+        <div class="flex items-center gap-2 min-w-0">
+          <BkRune name="pr" :size="20" tone="ember" />
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-ink-muted">{{ t(`progress.kinds.${record.kind}`) }}</p>
+            <p class="text-sm text-ink truncate">{{ getExerciseName(record.exercise_id) }}</p>
+          </div>
         </div>
-      </div>
-      <div class="text-right shrink-0">
-        <!-- decimals: max_weight es peso real (1 decimal, formatWeight no
-             redondea en kg); est_1rm/max_volume son derivados y van a entero -->
-        <BkAnimatedNumber :value="record.value" :decimals="record.kind === 'max_weight' ? 1 : 0" v-slot="{ value }">
-          <p class="text-ember font-semibold tabular-nums" data-testid="pr-value">{{ formatRecordValue(value ?? 0, record.kind) }}</p>
-        </BkAnimatedNumber>
-        <p class="text-xs text-ink-faint">{{ formatAchievedDate(record.achieved_at) }}</p>
+        <div class="text-right shrink-0">
+          <!-- decimals: max_weight es peso real (1 decimal, formatWeight no
+               redondea en kg); est_1rm/max_volume son derivados y van a entero -->
+          <BkAnimatedNumber :value="record.value" :decimals="record.kind === 'max_weight' ? 1 : 0" v-slot="{ value }">
+            <p class="text-ember font-semibold tabular-nums" data-testid="pr-value">{{ formatRecordValue(value ?? 0, record.kind) }}</p>
+          </BkAnimatedNumber>
+          <p class="text-xs text-ink-faint">{{ formatAchievedDate(record.achieved_at) }}</p>
+        </div>
       </div>
     </div>
   </div>

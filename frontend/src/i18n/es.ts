@@ -256,6 +256,10 @@ export const es = {
   },
   progress: {
     kinds: {
+      // item 7 (v0.4.0): 'all' es el valor comodín del selector de récords
+      // (Todos/Peso Máx/Volumen Máx/Est. 1RM) — vive en este mismo grupo
+      // porque las otras 3 etiquetas se reusan tal cual (ver PrList.vue)
+      all: 'Todos',
       max_weight: 'Peso Máx',
       est_1rm: 'Est. 1RM',
       max_volume: 'Volumen Máx',

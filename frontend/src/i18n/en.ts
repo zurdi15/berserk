@@ -256,6 +256,10 @@ export const en = {
   },
   progress: {
     kinds: {
+      // item 7 (v0.4.0): wildcard value for the records filter
+      // (All/Max Weight/Max Volume/Est. 1RM) — lives in this group because
+      // the other 3 labels are reused as-is (see PrList.vue)
+      all: 'All',
       max_weight: 'Max Weight',
       est_1rm: 'Est. 1RM',
       max_volume: 'Max Volume',
