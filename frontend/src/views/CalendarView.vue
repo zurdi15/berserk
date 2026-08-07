@@ -202,13 +202,14 @@ watch(() => athlete.userId, () => {
          trae usuarios compartidos (nunca en modo atleta, ahí monthData.shared
          llega undefined — ver api/domain.ts) — reutiliza BkUser tal cual
          (punto de color + username), mismo idiom que el resto de listados de
-         usuario de la app -->
+         usuario de la app. item 1a (v0.4.2): la etiqueta "Compartido
+         contigo:" se quita — los dots ya llevan color+nombre vía BkUser, la
+         fila de puntos habla por sí sola sin la muletilla de texto delante. -->
     <div
       v-if="monthData.shared && monthData.shared.length > 0"
       class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
       data-testid="shared-legend"
     >
-      <span class="text-xs text-ink-faint">{{ $t('calendar.sharedLegend') }}</span>
       <BkUser
         v-for="sharedUser in monthData.shared"
         :key="sharedUser.user_id"
@@ -220,14 +221,24 @@ watch(() => athlete.userId, () => {
     <!-- Rune legend trigger (item 13): las runas de los squares no se
          autoexplican, pero ya no es un botón-icono junto a los chevrons —
          un texto pequeño y subtle, mismo idiom que otros enlaces menores de
-         la app (ver el toggle de descanso en WorkoutExerciseCard.vue) -->
+         la app (ver el toggle de descanso en WorkoutExerciseCard.vue).
+         item 7 (v0.4.2): recupera el idiom de circulito-i bordeado que tenía
+         el botón ANTES de la item 13 (ver git show 60bd285), pero ahora como
+         span decorativo DENTRO del texto en vez de ser el botón entero — el
+         texto sigue siendo lo clicable y lo accesible, el icono es puro
+         refuerzo visual (aria-hidden). -->
     <div class="flex justify-center">
       <button
         type="button"
-        class="bk-press text-xs text-ink-faint underline decoration-dotted"
+        class="bk-press inline-flex items-center gap-1.5 text-xs text-ink-faint underline decoration-dotted"
         data-testid="rune-legend-btn"
         @click="runeLegendOpen = true"
       >
+        <span
+          class="flex items-center justify-center w-3.5 h-3.5 rounded-full border border-line-strong text-2xs leading-none not-italic no-underline"
+          aria-hidden="true"
+          data-testid="rune-legend-info-icon"
+        >i</span>
         {{ $t('calendar.runeLegend') }}
       </button>
     </div>
@@ -248,6 +259,7 @@ watch(() => athlete.userId, () => {
         v-if="selectedDate"
         :date="selectedDate"
         :scheduled="monthData.scheduled.filter(s => s.date === selectedDate)"
+        :shared="monthData.shared"
         @updated="reloadCalendar"
       />
     </BkSheet>

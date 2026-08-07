@@ -276,9 +276,12 @@ export const es = {
     logPastWorkoutOr: 'o',
     prsOfDay: 'Récords del día',
     plannedEyebrow: 'Planificado',
-    // SHARED-DOTS OVERLAY (v0.4.1): leyenda bajo la rejilla, solo con datos
-    // compartidos no vacíos (ver CalendarView.vue)
-    sharedLegend: 'Compartido contigo:',
+    // item 1b (v0.4.2): pestaña "yo" del sheet del día, siempre primera y
+    // por defecto — solo aparece la tira si hay usuarios compartidos con
+    // entreno ese día (ver ScheduleSheet.vue sharedUsersToday)
+    dayTabs: {
+      you: 'Tú',
+    },
   },
   progress: {
     kinds: {

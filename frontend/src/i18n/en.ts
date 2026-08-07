@@ -276,9 +276,12 @@ export const en = {
     logPastWorkoutOr: 'or',
     prsOfDay: 'PRs of the day',
     plannedEyebrow: 'Planned',
-    // SHARED-DOTS OVERLAY (v0.4.1): legend under the grid, only with
-    // non-empty shared data (see CalendarView.vue)
-    sharedLegend: 'Shared with you:',
+    // item 1b (v0.4.2): the day sheet's "self" tab label, always first and
+    // the default — the strip only shows up when shared users have a
+    // workout that day (see ScheduleSheet.vue sharedUsersToday)
+    dayTabs: {
+      you: 'You',
+    },
   },
   progress: {
     kinds: {
