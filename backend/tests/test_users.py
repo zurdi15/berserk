@@ -57,6 +57,89 @@ def test_admin_password_reset_revokes_sessions(client: TestClient, app):
     assert login(app, "freyja", "brandnew1").get("/api/v1/auth/me").status_code == 200
 
 
+# item (v0.4.0): el admin también puede editar nombre y color, no solo
+# password/is_admin — mismas reglas que el propio /users/me para color,
+# reglas de Credentials.username para el nombre
+def test_admin_updates_username(client: TestClient, app):
+    created = make_user(client, "freyja")
+    resp = client.patch(
+        f"/api/v1/admin/users/{created['id']}", json={"username": "freyja2"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["username"] == "freyja2"
+
+    # el cambio es real: el login con el nombre nuevo funciona
+    freyja = login(app, "freyja2")
+    assert freyja.get("/api/v1/auth/me").json()["username"] == "freyja2"
+
+
+def test_admin_username_change_collision(client: TestClient):
+    make_user(client, "freyja")
+    loki = make_user(client, "loki")
+    resp = client.patch(f"/api/v1/admin/users/{loki['id']}", json={"username": "freyja"})
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "username_taken"
+
+
+def test_admin_username_unchanged_is_a_noop_not_a_self_collision(client: TestClient):
+    # renombrar a SU PROPIO nombre actual no debe chocar contra sí mismo
+    created = make_user(client, "freyja")
+    resp = client.patch(
+        f"/api/v1/admin/users/{created['id']}", json={"username": "freyja"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["username"] == "freyja"
+
+
+def test_admin_username_explicit_null_is_ignored(client: TestClient):
+    created = make_user(client, "freyja")
+    resp = client.patch(f"/api/v1/admin/users/{created['id']}", json={"username": None})
+    assert resp.status_code == 200
+    assert resp.json()["username"] == "freyja"
+
+
+def test_admin_rejects_short_username(client: TestClient):
+    created = make_user(client, "freyja")
+    resp = client.patch(f"/api/v1/admin/users/{created['id']}", json={"username": "fr"})
+    assert resp.status_code == 422
+
+
+def test_admin_updates_color(client: TestClient):
+    created = make_user(client, "freyja")
+    resp = client.patch(
+        f"/api/v1/admin/users/{created['id']}", json={"color": "#7C8FFF"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["color"] == "#7C8FFF"
+
+
+def test_admin_rejects_invalid_color(client: TestClient):
+    created = make_user(client, "freyja")
+    resp = client.patch(f"/api/v1/admin/users/{created['id']}", json={"color": "blue"})
+    assert resp.status_code == 422
+
+
+def test_admin_color_explicit_null_clears_it(client: TestClient):
+    created = make_user(client, "freyja")
+    client.patch(f"/api/v1/admin/users/{created['id']}", json={"color": "#7C8FFF"})
+    resp = client.patch(f"/api/v1/admin/users/{created['id']}", json={"color": None})
+    assert resp.status_code == 200
+    assert resp.json()["color"] is None
+
+
+def test_admin_can_edit_username_and_color_in_the_same_request_as_password(client: TestClient):
+    # las tres cosas conviven en el mismo payload sin pisarse entre sí
+    created = make_user(client, "freyja")
+    resp = client.patch(
+        f"/api/v1/admin/users/{created['id']}",
+        json={"username": "freyja2", "color": "#7C8FFF", "password": "brandnew1"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["username"] == "freyja2"
+    assert body["color"] == "#7C8FFF"
+
+
 def test_admin_cannot_delete_self(client: TestClient):
     me = client.get("/api/v1/auth/me").json()
     resp = client.delete(f"/api/v1/admin/users/{me['id']}")
