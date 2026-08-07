@@ -451,13 +451,31 @@ watch(activeIndex, () => nextTick(updateIndicator))
               ESO completo, ajeno a que el spacer se va a comer 96px después.
               Fix de ESTA parte: h-[calc(100%-6rem)] en vez de h-full — el wrapper declara
               explícitamente que su propio 100% (la referencia que ProgressView hereda) es
-              el alto de <main> MENOS la reserva del spacer, no el alto completo. Esto NO
-              afecta a vistas sin altura propia (Hoy: su tamaño lo pone su contenido, no el
-              wrapper, así que desbordar un wrapper de 748px o de 844px da exactamente el
-              mismo resultado — el spacer sigue el final real del contenido igual).
+              el alto de <main> MENOS la reserva del spacer, no el alto completo.
               Verificado en Chromium real (390×844, dev build): con h-[calc(100%-6rem)], el
               chart de Entrenos vuelve a la MISMA posición exacta que en v0.4.0 (wrapper
               748px, idéntico al viejo main con pb-24), en vez de quedar 80px más abajo.
+
+           3) TERCER BUG (v0.4.4, regresión del item 14 — zurdi en móvil: "el content de
+              Hoy se corta mucho antes de llegar al bottom nav bar"): mientras convivían
+              vistas de FLUJO (Hoy: altura auto, desbordaban el wrapper y el spacer seguía
+              a su contenido) y vistas ACOTADAS (h-full), la doble expresión de la reserva
+              —calc arriba + spacer en flujo abajo— era necesaria: cada tipo de vista usaba
+              solo UNA de las dos. El item 14 acotó TODAS las vistas, y eso cambió la
+              aritmética flex del wrapper: una raíz de vista con h-full es flex-basis 732px
+              (100% del content-box), el spacer suma 96px, total 828 > 732 — y como la raíz
+              lleva overflow-y-auto, su min-height automático es 0 (overflow != visible
+              anula el mínimo por contenido), así que flex-shrink le quitaba los 96px
+              ENTEROS a la vista: la caja de Hoy acababa en y=652 con el navbar en y≈781,
+              128px de hueco muerto (la reserva contada DOS veces). Medido en Chromium real
+              390×844 antes del fix. Fix: el spacer MUERE — con todas las vistas acotadas
+              ya nadie desborda el wrapper en flujo, y la reserva del navbar queda
+              expresada UNA sola vez, en el calc de arriba. Tras el fix, toda vista acaba
+              en y=748, ~33px limpios sobre el navbar (mismo margen que tenía Admin).
+              Red de seguridad para una vista futura sin acotar: sigue desbordando hacia el
+              scroll de <main> (ver comentario de <main>), solo que sus últimos px quedan
+              tras el navbar — peor que con spacer, pero visible con scroll, y el modelo
+              actual es que esa vista está MAL y se arregla en la vista.
 
            Por qué sigue siendo una caja DEFINIDA (nunca min-h-full, aunque "crecer con el
            contenido" suene tentador para el bug 1): min-h-full aquí se probó y ROMPE la
@@ -477,18 +495,10 @@ watch(activeIndex, () => nextTick(updateIndicator))
              única animación de entrada ahora (bk-stagger/bk-rise propio, o
              ninguna si no hace falta) — ver auditoría por vista en el informe. -->
         <RouterView />
-        <!-- v0.4.1: spacer real (no padding) que reserva el hueco del navbar móvil fijo —
-             ver la historia completa (punto 1) en el comentario de arriba. h-24 = 6rem,
-             MISMO valor que el calc(100%-6rem) de arriba: si este cambia, el de arriba tiene
-             que cambiar con él (es la misma reserva, expresada dos veces por necesidad —
-             una como tamaño propio del spacer, otra como descuento en el techo del
-             wrapper). Verificado en Chromium real (390×844, dev build): el último elemento
-             de Hoy pasa de -38px (tapado) a +58px (58px de margen limpio) sobre el navbar;
-             Progresión/Entrenos con contenido corto sigue con el chart anclado abajo y la
-             lista ocupando el resto en la MISMA posición que en v0.4.0 (ver punto 2 arriba);
-             scrollbar sigue en el borde real de la ventana sin gutter shift entre vistas
-             cortas y largas. -->
-        <div class="shrink-0 h-24" aria-hidden="true" data-testid="mobile-nav-clearance" />
+        <!-- v0.4.4: aquí vivió el spacer h-24 de la v0.4.1 (reserva del navbar como hijo
+             de flujo). Murió con el item 14: al acotarse TODAS las vistas, restaba sus
+             96px OTRA vez encima del calc(100%-6rem) del wrapper vía flex-shrink (ver
+             punto 3 de la historia de arriba). La reserva vive solo en el calc ahora. -->
       </div>
     </main>
   </div>

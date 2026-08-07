@@ -133,7 +133,8 @@ watch(exerciseId, () => {
          tiene contra qué medirse.
          v0.4.1 (fix de scroll móvil, ver el comentario largo en ShellView.vue): esa caja
          fija de <main> pasó de h-full a h-[calc(100%-6rem)] — 100% MENOS la reserva del
-         navbar móvil, que ahora vive en un spacer de flujo en vez de en padding. Esta raíz
+         navbar móvil (desde v0.4.4 el calc es la ÚNICA expresión de esa reserva: el spacer
+         de flujo que la duplicaba murió al acotarse todas las vistas). Esta raíz
          no necesita ningún cambio de CLASE: sigue siendo h-full de SU padre, que es
          justamente la caja que cambió — el 100% que hereda ahora YA EXCLUYE la reserva,
          así que el chart anclado abajo de Entrenos queda en la MISMA posición exacta que
