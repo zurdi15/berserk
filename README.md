@@ -13,9 +13,9 @@ Self-hosted workout tracker. Plan it, log it, watch the runes light up.
 
 <table>
   <tr>
-    <td><img src="docs/screenshots/desktop-calendar.png" width="100%" alt="Calendar view with scheduled sessions and the yearly activity heatmap"></td>
-    <td><img src="docs/screenshots/desktop-workout.png" width="100%" alt="Live workout logging with muscle tags and set entry"></td>
-    <td><img src="docs/screenshots/desktop-progress.png" width="100%" alt="Progress view with a per-exercise trend chart, PR list and muscle distribution"></td>
+    <td><img src="docs/screenshots/desktop-calendar.png" width="100%" alt="Calendar view with scheduled sessions, rune-tagged training days and the yearly activity heatmap"></td>
+    <td><img src="docs/screenshots/desktop-workout.png" width="100%" alt="Live workout logging with compact exercise cards, muscle tags and set entry"></td>
+    <td><img src="docs/screenshots/desktop-progress.png" width="100%" alt="Progress view's lifetime stats tab: workouts, hours, volume, PR count and longest streak"></td>
   </tr>
 </table>
 
@@ -29,9 +29,12 @@ Self-hosted workout tracker. Plan it, log it, watch the runes light up.
 ## Features
 
 - **Planning calendar** — schedule sessions ahead of time and see them alongside what you actually trained.
-- **Per-muscle-group logging with runes** — every muscle group gets its own rune glyph, tagged live as you log a session.
+- **Retroactive workouts** — log a past session straight from the calendar, or edit any past workout's sets, exercises, tags, feeling, note and even its date and time, with personal records dated correctly.
+- **Per-muscle-group logging with runes** — every muscle group and routine carries its own glyph from a full Elder Futhark set, tagged live as you log a session.
 - **Live PR detection** — top weight, volume and estimated 1RM records are flagged the moment you beat them, mid-set.
-- **Progress analytics** — trend charts per exercise, a full PR history, muscle-group distribution and body-metric tracking.
+- **Progress analytics** — a lifetime stats tab (hours, volume, streaks and more), trend charts per exercise, a full PR history, muscle-group distribution and body-metric tracking.
+- **Custom, accessible form pickers** — a filterable select, a time field and a mini-calendar date field replace every native input, all fully keyboard-operable.
+- **Admin backup and restore** — export a consistent snapshot of the database as a zip with an integrity manifest, and restore it atomically with a safety fallback.
 - **Multi-user read sharing** — grant another account read access to your training so a coach or training partner can follow along.
 - **Invite-only signup** — no public registration; new accounts are created from single-use invite links issued by an admin.
 - **PWA** — installable, works offline for the shell, no app store required.
