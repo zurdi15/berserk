@@ -4,6 +4,7 @@ import { ref, watch } from 'vue'
 import { ApiError, OfflineError } from '@/api/client'
 import * as domain from '@/api/domain'
 import type { ExerciseHistoryOut, PersonalRecordOut, SetIn, SetLogOut, SetOut, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
+import { normalizeSupersets } from '@/lib/supersets'
 import { online } from '@/offline/net'
 import * as outbox from '@/offline/outbox'
 import { useRestTimerStore } from '@/stores/restTimer'
@@ -229,6 +230,21 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     workout.value = await domain.reorderWorkoutExercises(workout.value!.id, ids)
   }
 
+  // v0.8.0 (zurdi rediseña la creación): añade DOS ejercicios ya enlazados —
+  // composición de acciones existentes, así que hereda el soporte offline
+  // entero gratis (dos altas + el bulk de grupos, cada una por su rama)
+  async function addSupersetPair(exerciseA: number, exerciseB: number) {
+    await addExercise(exerciseA)
+    await addExercise(exerciseB)
+    const values = workout.value!.exercises.map((e) => e.superset_group ?? null)
+    // valor marcador libre de colisiones (normalize renumera): length nunca
+    // coincide con un grupo normalizado existente (siempre < length/2)
+    const marker = values.length
+    values[values.length - 2] = marker
+    values[values.length - 1] = marker
+    await setSupersetGroups(normalizeSupersets(values))
+  }
+
   // v0.7.0: superseries editables EN el entreno — recibe el estado completo
   // normalizado por posición (lib/supersets.ts) y lo aplica en bloque
   async function setSupersetGroups(values: (number | null)[]) {
@@ -392,6 +408,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     start,
     finish,
     addExercise,
+    addSupersetPair,
     removeExercise,
     reorder,
     setSupersetGroups,

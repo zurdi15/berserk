@@ -143,6 +143,27 @@ describe('active workout store — offline branches', () => {
     expect(store.workout!.id).toBe(4)
   })
 
+  // v0.8.0: añadir un par enlazado compone altas + bulk — offline entero
+  it('addSupersetPair offline: two temp exercises linked as one group, three outbox entries in order', async () => {
+    const store = useActiveWorkoutStore()
+    store.workout = baseWorkout()
+
+    await store.addSupersetPair(11, 12)
+
+    const exercises = store.workout!.exercises
+    expect(exercises).toHaveLength(3)
+    expect(exercises.map((e) => e.superset_group)).toEqual([null, 0, 0])
+    expect(exercises[1].id).toBeLessThan(0)
+    expect(exercises[2].id).toBeLessThan(0)
+
+    const queue = loadQueue()
+    expect(queue.map((entry: { kind: string }) => entry.kind)).toEqual([
+      'addExercise',
+      'addExercise',
+      'setSupersetGroups',
+    ])
+  })
+
   // v0.7.0: superseries editables mid-workout también sin red
   it('setSupersetGroups offline: applies the grouping locally and queues the bulk entry', async () => {
     const store = useActiveWorkoutStore()

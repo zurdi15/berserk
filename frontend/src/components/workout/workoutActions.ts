@@ -8,6 +8,11 @@ import type { ExerciseHistoryOut, SetIn, SetLogOut } from '@/api/domain'
 // WorkoutView.vue / WorkoutEditView.vue).
 export interface WorkoutActions {
   addExercise(exerciseId: number): Promise<void>
+  // v0.8.0 (zurdi rediseña la creación de superseries): añade DOS ejercicios
+  // ya enlazados como superserie — opcional a propósito: solo el entreno en
+  // vivo (activeWorkout) la implementa; el editor retroactivo no agrupa (v1)
+  // y AddExerciseSheet oculta el check cuando la acción no existe
+  addSupersetPair?(exerciseA: number, exerciseB: number): Promise<void>
   removeExercise(weid: number): Promise<void>
   reorder(ids: number[]): Promise<void>
   logSet(weid: number, body: SetIn): Promise<SetLogOut>

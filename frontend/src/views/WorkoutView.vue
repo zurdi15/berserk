@@ -7,7 +7,7 @@ import { ApiError } from '@/api/client'
 import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
 import { listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
 import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
-import { isLastOfSuperset, isLinkedAt, nextSupersetIndex, supersetLabels, toggleSupersetLink } from '@/lib/supersets'
+import { isLastOfSuperset, nextSupersetIndex, normalizeSupersets, supersetLabels } from '@/lib/supersets'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import { parseUtc } from '@/utils/datetime'
 import { toastApiError } from '@/utils/apiErrors'
@@ -116,15 +116,17 @@ const workoutBlocks = computed<WorkoutBlock[]>(() => {
   return blocks
 })
 
-// v0.7.0 (zurdi: "no veo cómo añadir una superserie a un entrenamiento"):
-// toggles de frontera entre cards consecutivas, mismo idiom del editor de
-// rutina y MISMA semántica de icono (estado: eslabón cerrado = enlazado).
-// El toggle manda el estado completo normalizado al store, que lo aplica
-// online o lo encola offline (ver activeWorkout.setSupersetGroups).
-const linkedAtBoundary = (index: number) => isLinkedAt(supersetValues.value, index)
-async function toggleBoundary(index: number) {
+// v0.8.0 (zurdi revoca los toggles de frontera de la v0.7.0: "un botón entre
+// cada ejercicio es ruido visual"): las superseries se CREAN desde el sheet
+// de añadir ejercicio (check de superserie → eliges dos, ver
+// AddExerciseSheet + activeWorkout.addSupersetPair) y se DESHACEN desde un
+// único botón en la cabecera del contenedor del bloque — la única superficie
+// de gestión que queda entre las cards.
+async function dissolveBlock(block: WorkoutBlock) {
+  const values = [...supersetValues.value]
+  for (const entry of block.entries) values[entry.index] = null
   try {
-    await activeWorkout.setSupersetGroups(toggleSupersetLink(supersetValues.value, index))
+    await activeWorkout.setSupersetGroups(normalizeSupersets(values))
   } catch (error) {
     toastApiError(error)
   }
@@ -475,50 +477,31 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- v0.7.0: bloques de superserie — los miembros van DENTRO de un
-           contenedor con borde aurora y chip de cabecera (feedback de zurdi:
-           "meter en un contenedor los dos ejercicios, con ese borde aurora,
-           para que se vea que pertenecen al mismo bloque"), y ENTRE cards
-           consecutivas vive el toggle de frontera que crea/rompe superseries
-           en el propio entreno (icono de ESTADO: eslabón cerrado = enlazado,
-           mismo criterio que el editor de rutina). El toggle de una frontera
-           interna de un grupo vive dentro del contenedor; el de una frontera
-           entre bloques, fuera. -->
+      <!-- v0.8.0: bloques de superserie — los miembros van DENTRO de un
+           contenedor con borde aurora ("los dos ejercicios en una card más
+           grande me gusta, déjalo así" — zurdi), con el chip de cabecera y
+           el ÚNICO control de gestión: deshacer el bloque (los toggles de
+           frontera entre cards de la v0.7.0 murieron por ruido visual; las
+           superseries se crean desde el sheet de añadir ejercicio). -->
       <template v-for="block in workoutBlocks" :key="`block-${block.entries[0].we.id}`">
-        <div
-          v-if="block.entries[0].index > 0"
-          class="flex justify-center"
-          :style="{ '--bk-stagger-i': block.entries[0].index + 3 }"
-        >
-          <BkActionBtn
-            icon="unlink"
-            :data-testid="`workout-superset-toggle-${block.entries[0].index}`"
-            :aria-label="$t('routines.linkSuperset')"
-            aria-pressed="false"
-            @click="toggleBoundary(block.entries[0].index)"
-          />
-        </div>
         <div
           v-if="block.grouped"
           class="border border-aurora/50 rounded-sm p-2 space-y-3"
           :data-testid="`superset-container-${block.label}`"
           :style="{ '--bk-stagger-i': block.entries[0].index + 3 }"
         >
-          <div class="flex justify-center">
+          <div class="flex items-center justify-center gap-2">
             <span class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5">
               {{ t('workout.superset', { label: block.label }) }}
             </span>
+            <BkActionBtn
+              icon="unlink"
+              :data-testid="`superset-dissolve-${block.label}`"
+              :aria-label="t('workout.supersetDissolve')"
+              @click="dissolveBlock(block)"
+            />
           </div>
-          <template v-for="(entry, j) in block.entries" :key="entry.we.id">
-            <div v-if="j > 0" class="flex justify-center">
-              <BkActionBtn
-                icon="link"
-                :data-testid="`workout-superset-toggle-${entry.index}`"
-                :aria-label="$t('routines.unlinkSuperset')"
-                aria-pressed="true"
-                @click="toggleBoundary(entry.index)"
-              />
-            </div>
+          <template v-for="entry in block.entries" :key="entry.we.id">
             <WorkoutExerciseCard
               :workout-exercise="entry.we"
               :exercise="exerciseMap.get(entry.we.exercise_id)"

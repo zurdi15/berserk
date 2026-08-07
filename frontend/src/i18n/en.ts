@@ -414,6 +414,11 @@ export const en = {
     // next" marker (auto-rest only fires after the group's LAST member)
     superset: 'Superset {label}',
     supersetNext: 'Next up',
+    // v0.8.0: superset creation from the add-exercise sheet (see es.ts)
+    supersetMode: 'Superset',
+    supersetPickFirst: 'Pick the first exercise of the superset',
+    supersetPickSecond: '{name} picked — now pick the second one',
+    supersetDissolve: 'Dissolve the superset',
     cardio: {
       loggedWhileAway: 'Cardio logged: {duration}',
     },

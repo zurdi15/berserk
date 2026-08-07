@@ -131,4 +131,83 @@ describe('AddExerciseSheet (item 5: consume BkSearchList, catálogo completo)', 
     expect(input.value).toBe('')
     expect(document.querySelector('[data-testid="exercise-result-6"]')).not.toBeNull()
   })
+
+  // v0.8.0 (zurdi rediseña la creación de superseries): check en el sheet —
+  // activo, el primer tap selecciona y el segundo añade AMBOS enlazados
+  describe('v0.8.0: superset mode', () => {
+    it('shows the check only when the surface provides addSupersetPair (the retro editor does not)', async () => {
+      mount(AddExerciseSheet, {
+        props: { open: true, actions: { addExercise: vi.fn() } },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+      expect(document.querySelector('[data-testid="superset-mode-checkbox"]')).toBeNull()
+      document.body.innerHTML = ''
+
+      mount(AddExerciseSheet, {
+        props: { open: true, actions: { addExercise: vi.fn(), addSupersetPair: vi.fn() } },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+      expect(document.querySelector('[data-testid="superset-mode-checkbox"]')).not.toBeNull()
+    })
+
+    it('with the check on: first pick highlights and keeps the sheet open, second pick adds the linked pair and closes', async () => {
+      const pairSpy = vi.fn().mockResolvedValue(undefined)
+      const addSpy = vi.fn()
+      const wrapper = mount(AddExerciseSheet, {
+        props: { open: true, actions: { addExercise: addSpy, addSupersetPair: pairSpy } },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      const check = document.querySelector('[data-testid="superset-mode-checkbox"]') as HTMLInputElement
+      check.click()
+      await flushPromises()
+      expect(document.querySelector('[data-testid="superset-pick-hint"]')).not.toBeNull()
+
+      ;(document.querySelector('[data-testid="exercise-result-6"]') as HTMLElement).click()
+      await flushPromises()
+      // seleccionado, no anadido: sin cierre, sin llamadas, hint con nombre
+      expect(pairSpy).not.toHaveBeenCalled()
+      expect(addSpy).not.toHaveBeenCalled()
+      expect(wrapper.emitted('close')).toBeUndefined()
+
+      ;(document.querySelector('[data-testid="exercise-result-5"]') as HTMLElement).click()
+      await flushPromises()
+      expect(pairSpy).toHaveBeenCalledWith(6, 5)
+      expect(addSpy).not.toHaveBeenCalled()
+      expect(wrapper.emitted('close')).toHaveLength(1)
+    })
+
+    it('tapping the selected exercise again deselects it; unchecking mid-selection discards the first pick', async () => {
+      const pairSpy = vi.fn().mockResolvedValue(undefined)
+      mount(AddExerciseSheet, {
+        props: { open: true, actions: { addExercise: vi.fn(), addSupersetPair: pairSpy } },
+        global: { plugins: [createI18nInstance()] },
+      })
+      await flushPromises()
+
+      const check = document.querySelector('[data-testid="superset-mode-checkbox"]') as HTMLInputElement
+      check.click()
+      await flushPromises()
+
+      const first = document.querySelector('[data-testid="exercise-result-6"]') as HTMLElement
+      first.click()
+      await flushPromises()
+      first.click() // deseleccionar
+      await flushPromises()
+      first.click() // volver a seleccionar
+      await flushPromises()
+
+      check.click() // desmarcar el check descarta la seleccion
+      await flushPromises()
+      check.click()
+      await flushPromises()
+      // tras re-marcar, el siguiente tap vuelve a ser PRIMERA seleccion
+      first.click()
+      await flushPromises()
+      expect(pairSpy).not.toHaveBeenCalled()
+    })
+  })
 })

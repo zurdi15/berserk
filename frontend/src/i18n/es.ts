@@ -423,6 +423,12 @@ export const es = {
     // siguiente es este" (el auto-descanso solo salta tras el ÚLTIMO miembro)
     superset: 'Superserie {label}',
     supersetNext: 'Siguiente',
+    // v0.8.0: creación de superseries desde el sheet de añadir ejercicio
+    // (check → eliges dos) y deshacer desde la cabecera del bloque
+    supersetMode: 'Superserie',
+    supersetPickFirst: 'Elige el primer ejercicio de la superserie',
+    supersetPickSecond: '{name} elegido — ahora elige el segundo',
+    supersetDissolve: 'Deshacer la superserie',
     cardio: {
       loggedWhileAway: 'Cardio registrado: {duration}',
     },

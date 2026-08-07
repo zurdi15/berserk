@@ -1129,30 +1129,20 @@ describe('WorkoutView v0.5.0 superseries: render agrupado y encadenado', () => {
     expect(wrapper.find('[data-testid="superset-chip-20"]').exists()).toBe(false)
   })
 
-  // v0.7.0 (zurdi: "no veo cómo añadir una superserie a un entrenamiento"):
-  // toggles de frontera entre cards, con icono de ESTADO (cerrado = enlazado)
-  it('v0.7.0: boundary toggles render between cards (closed chain inside the group, broken between blocks) and send the full normalized state', async () => {
+  // v0.8.0 (zurdi revoca los toggles de frontera: "ruido visual") — la única
+  // gestión entre cards es DESHACER el bloque desde su cabecera; crear vive
+  // en AddExerciseSheet (check superserie → eliges dos)
+  it('v0.8.0: no boundary toggles remain; the container header carries the single dissolve control that clears the group', async () => {
     wrapper = mountGrouped()
     await flushPromises()
 
-    // frontera interna del grupo (índice 1): estado enlazado
-    const inner = wrapper.get('[data-testid="workout-superset-toggle-1"]')
-    expect(inner.attributes('aria-pressed')).toBe('true')
-    // frontera entre el grupo y la card suelta (índice 2): sin enlazar
-    const outer = wrapper.get('[data-testid="workout-superset-toggle-2"]')
-    expect(outer.attributes('aria-pressed')).toBe('false')
+    expect(wrapper.findAll('[data-testid^="workout-superset-toggle-"]')).toHaveLength(0)
 
-    // enlazar la suelta con el grupo manda el estado COMPLETO normalizado
     const store = useActiveWorkoutStore()
     const spy = vi.spyOn(store, 'setSupersetGroups').mockResolvedValue(undefined)
-    await outer.trigger('click')
+    await wrapper.get('[data-testid="superset-dissolve-A"]').trigger('click')
     await flushPromises()
-    expect(spy).toHaveBeenCalledWith([0, 0, 0])
-
-    // romper la frontera interna disuelve el grupo entero (mitades de 1)
-    await inner.trigger('click')
-    await flushPromises()
-    expect(spy).toHaveBeenLastCalledWith([null, null, null])
+    expect(spy).toHaveBeenCalledWith([null, null, null])
   })
 
   it('wires the positional rest gating: non-last member gets supersetLast=false, last and loose get true', async () => {
