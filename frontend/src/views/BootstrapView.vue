@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/client'
+import { isPasswordValid, passwordErrorKey } from '@/utils/passwordValidation'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -19,7 +20,17 @@ const password = ref('')
 const error = ref('')
 const loading = ref(false)
 
+// item (v0.4.0): validación de cliente ANTES de someter — la primera cuenta
+// de la instancia no debería descubrir una contraseña inválida vía un 422
+// mudo (ver PasswordCard.vue / apiErrors.ts para el mismo arreglo en el resto de la app)
+const clientPasswordError = computed(() => passwordErrorKey(password.value))
+// el error del servidor (ver submit) tiene prioridad si YA se sometió y
+// falló por otra razón (username_taken, etc.) — el de cliente solo cubre la
+// propia contraseña, y se recalcula en vivo mientras se teclea
+const fieldError = computed(() => clientPasswordError.value ?? (error.value || null))
+
 async function submit() {
+  if (!isPasswordValid(password.value)) return
   loading.value = true
   error.value = ''
   try {
@@ -52,9 +63,9 @@ async function submit() {
           :label="$t('auth.password')"
           type="password"
           autocomplete="new-password"
-          :error="error ? $t(error) : undefined"
+          :error="fieldError ? $t(fieldError) : undefined"
         />
-        <BkButton type="submit" variant="primary" :loading="loading" block>
+        <BkButton type="submit" variant="primary" :loading="loading" :disabled="!isPasswordValid(password)" block>
           {{ $t('auth.create') }}
         </BkButton>
       </form>

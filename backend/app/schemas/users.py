@@ -40,13 +40,30 @@ class UserCreateIn(Credentials):
 
 
 class UserUpdateIn(BaseModel):
+    # item (v0.4.0): el admin ahora también puede editar nombre y color, no
+    # solo password/is_admin — mismas reglas de longitud que Credentials.username
+    # (registro/bootstrap/redeem), reutilizadas aquí en vez de duplicadas sueltas.
+    # No anulable: un null explícito se ignora (siempre hace falta un nombre) —
+    # ver update_user, que lo distingue de "campo ausente" vía exclude_unset.
+    username: str | None = Field(None, min_length=3, max_length=50)
     password: str | None = Field(None, min_length=8, max_length=100)
     is_admin: bool | None = None
+    # anulable a propósito, igual que SettingsIn.color: un null explícito
+    # vuelve al aurora del tema por defecto — mismo regex, reutilizado en vez
+    # de duplicado (ver _COLOR_RE arriba)
+    color: str | None = None
 
     @field_validator("password")
     @classmethod
     def _password_byte_limit(cls, value: str | None) -> str | None:
         return _validate_password_bytes(value) if value is not None else value
+
+    @field_validator("color")
+    @classmethod
+    def _color_is_hex(cls, value: str | None) -> str | None:
+        if value is not None and not _COLOR_RE.fullmatch(value):
+            raise ValueError("color_invalid")
+        return value
 
 
 class InviteTokenOut(BaseModel):

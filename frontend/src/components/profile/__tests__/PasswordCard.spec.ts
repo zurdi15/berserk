@@ -35,7 +35,7 @@ describe('PasswordCard', () => {
     const newField = wrapper.find('[data-testid="new-password-field"] input')
 
     await currentField.setValue('oldpass')
-    await newField.setValue('newpass')
+    await newField.setValue('newpass1')
     await wrapper.vm.$nextTick()
 
     // Click submit button
@@ -47,7 +47,7 @@ describe('PasswordCard', () => {
     await wrapper.vm.$nextTick()
 
     // Verify changePassword was called
-    expect(changePassword).toHaveBeenCalledWith('oldpass', 'newpass')
+    expect(changePassword).toHaveBeenCalledWith('oldpass', 'newpass1')
 
     // Verify toast was pushed
     const toast = useToastStore()
@@ -69,7 +69,7 @@ describe('PasswordCard', () => {
     const newField = wrapper.find('[data-testid="new-password-field"] input')
 
     await currentField.setValue('oldpass')
-    await newField.setValue('newpass')
+    await newField.setValue('newpass1')
     await wrapper.vm.$nextTick()
 
     // Submit
@@ -90,5 +90,45 @@ describe('PasswordCard', () => {
 
     const text = wrapper.text()
     expect(text).toContain('Guardar') // Spanish for 'save'
+  })
+
+  // item (v0.4.0): validación de cliente ANTES de someter — zurdi: una
+  // contraseña inválida solo mostraba "Algo ha fallado"
+  describe('client-side password validation', () => {
+    it('typing a too-short new password shows an inline error and blocks the API call', async () => {
+      const { changePassword } = await import('@/api/auth')
+
+      const wrapper = build()
+      const newField = wrapper.find('[data-testid="new-password-field"] input')
+      await newField.setValue('short')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="new-password-field"]').text()).toContain(
+        'La contraseña debe tener al menos 8 caracteres.',
+      )
+
+      await wrapper.find('[data-testid="change-password-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(changePassword).not.toHaveBeenCalled()
+    })
+
+    it('a valid new password shows no inline error and the submit button is enabled', async () => {
+      const wrapper = build()
+      const newField = wrapper.find('[data-testid="new-password-field"] input')
+      await newField.setValue('brandnew1')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="new-password-field"]').text()).not.toContain('debe tener al menos')
+      expect(wrapper.find('[data-testid="change-password-btn"]').attributes('disabled')).toBeUndefined()
+    })
+
+    it('an empty new password disables the submit button without showing an inline error yet', async () => {
+      const wrapper = build()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="new-password-field"]').text()).not.toContain('La contraseña')
+      expect(wrapper.find('[data-testid="change-password-btn"]').attributes('disabled')).toBeDefined()
+    })
   })
 })

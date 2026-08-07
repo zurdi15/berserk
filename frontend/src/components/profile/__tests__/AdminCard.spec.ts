@@ -29,11 +29,12 @@ vi.mock('@/api/domain', () => ({
   })),
   adminUpdateUser: vi.fn((id, body) => Promise.resolve({
     id,
-    username: id === 1 ? 'admin' : 'user2',
+    username: body.username ?? (id === 1 ? 'admin' : 'user2'),
     is_admin: body.is_admin || false,
     locale: 'es',
     units: 'kg',
     timezone: 'UTC',
+    color: body.color ?? null,
   })),
   adminDeleteUser: vi.fn(() => Promise.resolve()),
   adminCreateInvite: vi.fn(() => Promise.resolve({
@@ -193,7 +194,7 @@ describe('AdminCard', () => {
     expect(resetBtn.attributes('aria-label')).toBe('Restablecer contraseña')
   })
 
-  it('hides delete and reset buttons on own row (id=1)', async () => {
+  it('hides delete and reset buttons on own row (id=1), but keeps the edit pencil available for self too', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
@@ -202,6 +203,9 @@ describe('AdminCard', () => {
     const ownRow = wrapper.find('[data-testid="user-row-1"]')
     const deleteInOwnRow = ownRow.find('[data-testid="delete-user-btn"]')
     expect(deleteInOwnRow.exists()).toBe(false)
+    // item (v0.4.0): editar el propio nombre/color SÍ sigue disponible —
+    // solo el checkbox de admin se oculta DENTRO del sheet (ver más abajo)
+    expect(ownRow.find('[data-testid="edit-user-btn"]').exists()).toBe(true)
 
     // Other row (id=2) should have delete button
     const otherRow = wrapper.find('[data-testid="user-row-2"]')
@@ -461,6 +465,125 @@ describe('AdminCard', () => {
     // tras el éxito, el dialog se cierra y el form ya no está en el DOM
     await wrapper.vm.$nextTick()
     expect(document.querySelector('[data-testid="create-username-field"] input')).toBeNull()
+  })
+
+  // item (v0.4.0): "desde el admin no se puede editar un user, solo cambiar
+  // la contraseña" — nombre/color/admin ahora se editan en un sheet unificado
+  describe('edit user sheet', () => {
+    it('the pencil pre-fills the sheet from the row (username, color, admin checkbox), then submit calls adminUpdateUser with the full payload', async () => {
+      const { adminUpdateUser } = await import('@/api/domain')
+      wrapper = mount(AdminCard, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await wrapper.vm.$nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const otherRow = wrapper.get('[data-testid="user-row-2"]')
+      await otherRow.get('[data-testid="edit-user-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      const usernameInput = document.querySelector('[data-testid="edit-username-field"] input') as HTMLInputElement
+      expect(usernameInput).not.toBeNull()
+      expect(usernameInput.value).toBe('user2') // pre-fill desde la fila
+
+      const adminCheckbox = document.querySelector('[data-testid="edit-is-admin-checkbox"]') as HTMLInputElement
+      expect(adminCheckbox).not.toBeNull()
+      expect(adminCheckbox.checked).toBe(false) // user2 no es admin
+
+      usernameInput.value = 'user2renamed'
+      usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
+
+      // color: el segundo swatch de la paleta (el primero es el botón "default")
+      const swatchButtons = document.querySelectorAll('[data-testid="color-swatch"]')
+      expect(swatchButtons.length).toBeGreaterThan(0)
+      const pickedSwatch = (swatchButtons[0] as HTMLElement).getAttribute('aria-label')
+      swatchButtons[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+      adminCheckbox.click()
+      await wrapper.vm.$nextTick()
+
+      const submitBtn = document.querySelector('[data-testid="save-edit-user-btn"]') as HTMLElement
+      expect(submitBtn).not.toBeNull()
+      submitBtn.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(adminUpdateUser).toHaveBeenCalledWith(2, {
+        username: 'user2renamed',
+        color: pickedSwatch,
+        is_admin: true,
+      })
+
+      // tras el éxito, el sheet se cierra
+      await wrapper.vm.$nextTick()
+      expect(document.querySelector('[data-testid="edit-username-field"] input')).toBeNull()
+    })
+
+    it('a username collision shows the inline error, the same as the create-user flow, instead of a generic toast', async () => {
+      const { adminUpdateUser } = await import('@/api/domain')
+      vi.mocked(adminUpdateUser).mockRejectedValueOnce(new ApiError(409, 'username_taken'))
+
+      wrapper = mount(AdminCard, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await wrapper.vm.$nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const otherRow = wrapper.get('[data-testid="user-row-2"]')
+      await otherRow.get('[data-testid="edit-user-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      const usernameInput = document.querySelector('[data-testid="edit-username-field"] input') as HTMLInputElement
+      usernameInput.value = 'admin'
+      usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
+
+      const submitBtn = document.querySelector('[data-testid="save-edit-user-btn"]') as HTMLElement
+      submitBtn.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await wrapper.vm.$nextTick()
+
+      const fieldEl = document.querySelector('[data-testid="edit-username-field"]') as HTMLElement
+      expect(fieldEl.textContent).toContain('Ese usuario ya existe.')
+      // el sheet se queda abierto (no se cierra en error)
+      expect(document.querySelector('[data-testid="edit-username-field"] input')).not.toBeNull()
+    })
+
+    it("self-row protection: editing your OWN row hides the admin checkbox entirely (can't self-demote from the sheet)", async () => {
+      wrapper = mount(AdminCard, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await wrapper.vm.$nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const ownRow = wrapper.get('[data-testid="user-row-1"]')
+      await ownRow.get('[data-testid="edit-user-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(document.querySelector('[data-testid="edit-username-field"] input')).not.toBeNull()
+      expect(document.querySelector('[data-testid="edit-is-admin-checkbox"]')).toBeNull()
+    })
+
+    it('the password-reset action stays as its own row icon and sheet, untouched by the edit sheet', async () => {
+      const { adminUpdateUser } = await import('@/api/domain')
+      wrapper = mount(AdminCard, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await wrapper.vm.$nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const otherRow = wrapper.get('[data-testid="user-row-2"]')
+      // el sheet de editar no trae ningún campo de contraseña
+      await otherRow.get('[data-testid="edit-user-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(document.querySelector('[data-testid="edit-username-field"]')).not.toBeNull()
+      expect(document.querySelector('input[type="password"]')).toBeNull()
+      document.querySelector<HTMLElement>('[data-testid="save-edit-user-btn"]')?.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(adminUpdateUser).not.toHaveBeenCalledWith(2, expect.objectContaining({ password: expect.anything() }))
+    })
   })
 
   describe('backup', () => {

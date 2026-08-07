@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/client'
+import { isPasswordValid, passwordErrorKey } from '@/utils/passwordValidation'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -21,7 +22,13 @@ const password = ref('')
 const error = ref('')
 const loading = ref(false)
 
+// item (v0.4.0): validación de cliente ANTES de someter — mismo arreglo que
+// BootstrapView.vue/PasswordCard.vue (ver apiErrors.ts para la parte servidor)
+const clientPasswordError = computed(() => passwordErrorKey(password.value))
+const fieldError = computed(() => clientPasswordError.value ?? (error.value || null))
+
 async function submit() {
+  if (!isPasswordValid(password.value)) return
   loading.value = true
   error.value = ''
   try {
@@ -54,9 +61,9 @@ async function submit() {
           :label="$t('auth.password')"
           type="password"
           autocomplete="new-password"
-          :error="error ? $t(error) : undefined"
+          :error="fieldError ? $t(fieldError) : undefined"
         />
-        <BkButton type="submit" variant="primary" :loading="loading" block>
+        <BkButton type="submit" variant="primary" :loading="loading" :disabled="!isPasswordValid(password)" block>
           {{ $t('auth.create') }}
         </BkButton>
       </form>

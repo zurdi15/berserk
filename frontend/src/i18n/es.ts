@@ -37,6 +37,13 @@ export const es = {
     timezone_invalid: 'Zona horaria no válida.',
     color_invalid: 'Color no válido.',
     password_too_long: 'La contraseña es demasiado larga (máx. 72 bytes).',
+    password_too_short: 'La contraseña debe tener al menos 8 caracteres.',
+    username_too_short: 'El usuario debe tener al menos 3 caracteres.',
+    username_too_long: 'El usuario es demasiado largo (máx. 50 caracteres).',
+    // item (v0.4.0): mapeo genérico de un 422 de validación sin slug propio —
+    // ver client.ts::fromValidationList. {field} es el nombre del campo tal
+    // cual lo reporta pydantic (snake_case) cuando no hay una etiqueta legible.
+    validation: 'Valor no válido en {field}.',
     workout_already_active: 'Ya tienes un entreno activo.',
     session_already_done: 'Esta sesión ya está completada.',
     workout_already_finished: 'Este entreno ya ha terminado.',
@@ -128,6 +135,7 @@ export const es = {
   admin: {
     users: 'Usuarios',
     createUser: 'Crear usuario',
+    editUser: 'Editar usuario',
     username: 'Usuario',
     password: 'Contraseña',
     isAdmin: 'Administrador',

@@ -37,6 +37,13 @@ export const en = {
     timezone_invalid: 'Invalid timezone.',
     color_invalid: 'Invalid color.',
     password_too_long: 'Password is too long (max 72 bytes).',
+    password_too_short: 'Password must be at least 8 characters.',
+    username_too_short: 'Username must be at least 3 characters.',
+    username_too_long: 'Username is too long (max 50 characters).',
+    // item (v0.4.0): generic mapping for a validation 422 with no slug of its
+    // own — see client.ts::fromValidationList. {field} is the field name as
+    // pydantic reports it (snake_case) when there's no readable label.
+    validation: 'Invalid value in {field}.',
     workout_already_active: 'You already have an active workout.',
     session_already_done: 'This session is already done.',
     workout_already_finished: 'This workout has already finished.',
@@ -128,6 +135,7 @@ export const en = {
   admin: {
     users: 'Users',
     createUser: 'Create user',
+    editUser: 'Edit user',
     username: 'Username',
     password: 'Password',
     isAdmin: 'Admin',

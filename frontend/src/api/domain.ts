@@ -543,8 +543,14 @@ export const adminCreateUser = (body: {
   api<UserOut>('/admin/users', { method: 'POST', body })
 
 export const adminUpdateUser = (id: number, body: {
+  // item (v0.4.0): el admin ya puede editar nombre y color, no solo
+  // password/is_admin — color es anulable a propósito (null limpia al
+  // aurora del tema, mismo criterio que /users/me), username no (un null
+  // explícito lo ignora, ver backend routers/admin.py::update_user)
+  username?: string
   password?: string
   is_admin?: boolean
+  color?: string | null
 }) =>
   api<UserOut>(`/admin/users/${id}`, { method: 'PATCH', body })
 

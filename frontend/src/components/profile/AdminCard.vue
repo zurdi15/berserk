@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import {
@@ -16,6 +16,7 @@ import {
 import { restoreBackup, BACKUP_EXPORT_URL } from '@/api/backup'
 import { toastApiError } from '@/utils/apiErrors'
 import { parseUtc } from '@/utils/datetime'
+import { isPasswordValid, passwordErrorKey } from '@/utils/passwordValidation'
 import { ApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
@@ -25,6 +26,7 @@ import BkButton from '@/lib/BkButton.vue'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkUser from '@/lib/BkUser.vue'
+import ColorSwatchPicker from '@/lib/ColorSwatchPicker.vue'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -43,6 +45,31 @@ const resetUserId = ref<number | null>(null)
 const resetNewPassword = ref('')
 const resetError = ref('')
 const isResettingPassword = ref(false)
+
+// item (v0.4.0): validación de cliente ANTES de someter, en los DOS
+// formularios que piden una contraseña aquí — mismo arreglo que
+// PasswordCard.vue/BootstrapView.vue/RedeemView.vue (ver apiErrors.ts para
+// la parte servidor, defensa en profundidad)
+const createPasswordError = computed(() => {
+  const key = passwordErrorKey(createPassword.value)
+  return key ? t(key) : ''
+})
+const resetPasswordFieldError = computed(() => {
+  const key = passwordErrorKey(resetNewPassword.value)
+  return key ? t(key) : resetError.value
+})
+
+// Edit user sheet (item, v0.4.0): username/color/is_admin en un único sheet
+// — el reseteo de contraseña se queda como su propio icono/sheet aparte a
+// propósito (ver el why-comment junto al icono "key" más abajo, en el
+// template)
+const editUserOpen = ref(false)
+const editUserId = ref<number | null>(null)
+const editUsername = ref('')
+const editColor = ref<string | null>(null)
+const editIsAdmin = ref(false)
+const editError = ref('')
+const isSavingEdit = ref(false)
 
 // Delete user confirmation
 const deleteUserConfirmOpen = ref(false)
@@ -101,6 +128,8 @@ function openCreateUser() {
 }
 
 async function handleCreateUser() {
+  if (!isPasswordValid(createPassword.value)) return
+
   createError.value = ''
   isCreatingUser.value = true
 
@@ -136,6 +165,7 @@ function handleResetPassword(userId: number) {
 
 async function confirmResetPassword() {
   if (resetUserId.value === null) return
+  if (!isPasswordValid(resetNewPassword.value)) return
 
   resetError.value = ''
   isResettingPassword.value = true
@@ -151,6 +181,45 @@ async function confirmResetPassword() {
     toastApiError(error)
   } finally {
     isResettingPassword.value = false
+  }
+}
+
+function openEditUser(user: UserOut) {
+  editUserId.value = user.id
+  editUsername.value = user.username
+  editColor.value = user.color ?? null
+  editIsAdmin.value = user.is_admin
+  editError.value = ''
+  editUserOpen.value = true
+}
+
+async function confirmEditUser() {
+  if (editUserId.value === null) return
+
+  editError.value = ''
+  isSavingEdit.value = true
+
+  try {
+    await adminUpdateUser(editUserId.value, {
+      username: editUsername.value,
+      color: editColor.value,
+      // el propio usuario no puede auto-degradarse (ver el checkbox oculto
+      // en su propia fila más abajo): editIsAdmin se queda en su valor
+      // inicial (true) cuando es la fila propia, así que reenviarlo tal
+      // cual es siempre un no-op seguro, nunca un intento de demote
+      is_admin: editIsAdmin.value,
+    })
+    editUserOpen.value = false
+    await loadUsers()
+    toast.push('info', t('common.saved'))
+  } catch (error) {
+    if (error instanceof ApiError && error.slug === 'username_taken') {
+      editError.value = t(`errors.${error.slug}`)
+    } else {
+      toastApiError(error)
+    }
+  } finally {
+    isSavingEdit.value = false
   }
 }
 
@@ -312,6 +381,22 @@ function redeemUrl(token: string): string {
                     <!-- icon-only en todos los tamaños ahora (BkActionBtn,
                          item 7): el "hidden sm:inline" de antes ya no hace
                          falta, ese era justo el punto de unificar -->
+                    <!-- item (v0.4.0): editar (nombre/color/admin) SÍ está
+                         disponible en la propia fila — un admin puede
+                         cambiarse su propio nombre/color, el sheet solo
+                         oculta el checkbox de admin para uno mismo (ver
+                         template del sheet más abajo) -->
+                    <BkActionBtn
+                      icon="edit"
+                      :aria-label="$t('common.edit')"
+                      data-testid="edit-user-btn"
+                      @click="openEditUser(user)"
+                    />
+                    <!-- resetear contraseña se queda como su propio icono/
+                         sheet, no dentro del de editar: es una acción de
+                         seguridad deliberada (echa al usuario de todos sus
+                         dispositivos) — mezclarla con "corregir el nombre"
+                         invitaría a tocarla sin querer al editar otra cosa -->
                     <BkActionBtn
                       v-if="!isOwnUser(user.id)"
                       icon="key"
@@ -477,6 +562,7 @@ function redeemUrl(token: string): string {
           v-model="createPassword"
           type="password"
           :label="$t('admin.password')"
+          :error="createPasswordError"
           data-testid="create-password-field"
         />
         <label class="flex items-center gap-2 cursor-pointer">
@@ -497,6 +583,7 @@ function redeemUrl(token: string): string {
           </BkButton>
           <BkButton
             :loading="isCreatingUser"
+            :disabled="!isPasswordValid(createPassword)"
             data-testid="create-user-btn"
             @click="handleCreateUser"
           >
@@ -517,7 +604,7 @@ function redeemUrl(token: string): string {
           v-model="resetNewPassword"
           type="password"
           :label="$t('admin.newPassword')"
-          :error="resetError"
+          :error="resetPasswordFieldError"
           data-testid="reset-password-field"
         />
         <div class="flex gap-2">
@@ -529,8 +616,59 @@ function redeemUrl(token: string): string {
           </BkButton>
           <BkButton
             :loading="isResettingPassword"
+            :disabled="!isPasswordValid(resetNewPassword)"
             data-testid="confirm-reset-password-btn"
             @click="confirmResetPassword"
+          >
+            {{ $t('common.save') }}
+          </BkButton>
+        </div>
+      </div>
+    </BkSheet>
+
+    <!-- Edit user sheet (item, v0.4.0): username/color/is_admin — el
+         reseteo de contraseña se queda fuera a propósito (ver el
+         why-comment junto al icono "key" arriba, en la fila de la tabla) -->
+    <BkSheet
+      :open="editUserOpen"
+      :title="$t('admin.editUser')"
+      @close="editUserOpen = false"
+    >
+      <div class="space-y-4 p-4">
+        <BkField
+          v-model="editUsername"
+          :label="$t('admin.username')"
+          :error="editError"
+          data-testid="edit-username-field"
+        />
+        <ColorSwatchPicker v-model="editColor" :label="$t('profile.color')" />
+        <!-- item: el checkbox de admin se OCULTA (no solo se deshabilita)
+             en la propia fila — mismo criterio visual que resetear/borrar,
+             que ya desaparecen del todo para uno mismo en vez de quedar
+             ahí sin poder tocarse -->
+        <label
+          v-if="editUserId !== null && !isOwnUser(editUserId)"
+          class="flex items-center gap-2 cursor-pointer"
+        >
+          <input
+            v-model="editIsAdmin"
+            type="checkbox"
+            class="rounded border border-line"
+            data-testid="edit-is-admin-checkbox"
+          />
+          <span class="text-sm text-ink-muted">{{ $t('admin.isAdmin') }}</span>
+        </label>
+        <div class="flex gap-2">
+          <BkButton
+            variant="ghost"
+            @click="editUserOpen = false"
+          >
+            {{ $t('common.cancel') }}
+          </BkButton>
+          <BkButton
+            :loading="isSavingEdit"
+            data-testid="save-edit-user-btn"
+            @click="confirmEditUser"
           >
             {{ $t('common.save') }}
           </BkButton>

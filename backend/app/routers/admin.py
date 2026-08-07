@@ -39,6 +39,20 @@ def update_user(
         raise HTTPException(status_code=404, detail="user_not_found")
     if payload.is_admin is False and user.id == admin.id:
         raise HTTPException(status_code=409, detail="cannot_demote_self")
+
+    # exclude_unset: distingue "no vino en el body" de "vino como null
+    # explícito" — hace falta para el null-clears de color (username, en
+    # cambio, ignora el null explícito: siempre hace falta un nombre)
+    data = payload.model_dump(exclude_unset=True)
+    if data.get("username") is None:
+        data.pop("username", None)
+    if "username" in data and data["username"] != user.username:
+        if db.scalar(select(User).where(User.username == data["username"])):
+            raise HTTPException(status_code=409, detail="username_taken")
+        user.username = data["username"]
+
+    if "color" in data:
+        user.color = data["color"]
     if payload.is_admin is not None:
         user.is_admin = payload.is_admin
     if payload.password is not None:
