@@ -11,7 +11,6 @@ import { parseUtc } from '@/utils/datetime'
 import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
-import { useRestTimerStore } from '@/stores/restTimer'
 import { useToastStore } from '@/stores/toast'
 import {
   clearPersistedCardioCountdown,
@@ -35,7 +34,6 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const activeWorkout = useActiveWorkoutStore()
-const restTimer = useRestTimerStore()
 const toast = useToastStore()
 
 // item 4 (post-0.3.0): opt-out de descanso automático, pref de cliente
@@ -344,22 +342,14 @@ onBeforeUnmount(() => {
         :style="{ '--bk-stagger-i': 0 }"
       >
         <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
-        <!-- item 4 (post-0.3.0): chip compacto de cancelar descanso — zurdi a
-             veces cronometra con su reloj y quiere poder cortar el countdown
-             sin esperar. Vive AQUÍ (solo /workout), no en el CTA del shell
-             (ese sigue navegando al tocarlo, nunca cancela) -->
-        <div v-if="restTimer.active" class="flex items-center gap-2" data-testid="rest-cancel-chip">
-          <span class="bk-metric text-sm text-aurora">{{ restTimer.label }}</span>
-          <button
-            type="button"
-            data-testid="cancel-rest"
-            :aria-label="t('timer.cancelRest')"
-            class="bk-press w-6 h-6 flex items-center justify-center rounded-full border border-aurora text-aurora text-xs"
-            @click="restTimer.clear()"
-          >
-            ✕
-          </button>
-        </div>
+        <!-- item 6 (v0.4.3, zurdi): el chip "M:SS ✕" que vivía AQUÍ se retira
+             — cancelar el descanso se mueve DENTRO del propio CTA del shell
+             (tocar el CTA mientras se descansa en /workout lo expande y
+             revela el botón ✕, ver ShellView.vue). El countdown en sí (el
+             timer.label del header/nav) ya era visible desde ahí; este chip
+             era la única superficie de CANCELAR fuera del CTA, y con el CTA
+             ya haciendo de tap-target siempre visible, mantenerla aquí
+             además duplicaba la acción en dos sitios. -->
         <p class="text-sm text-ink-muted capitalize" data-testid="workout-date">{{ dateLabel }}</p>
       </div>
 

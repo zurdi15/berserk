@@ -427,6 +427,160 @@ describe('ShellView CTA rest countdown takeover (item 1, v0.3.0)', () => {
   })
 })
 
+// item 8 (v0.4.3, zurdi): la losa del CTA nunca cambia de ALTO — antes el
+// countdown (más alto o que envolvía línea que la runa) estiraba la losa
+// entera y con ella el navbar completo. h-12 fijo en los 3 estados
+// (runa/countdown/expandido); el ancho SÍ puede crecer.
+describe('ShellView CTA fixed height (item 8, v0.4.3)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('the CTA slab carries the fixed h-12 height class in the rune state (idle, no rest active)', async () => {
+    const wrapper = await mountWithRoute('today')
+    await flushPromises()
+
+    const slabs = wrapper.findAll('[data-testid="workout-glow"]').map((glow) => glow.element.parentElement!)
+    expect(slabs).toHaveLength(2)
+    for (const slab of slabs) {
+      expect(slab.classList.contains('h-12')).toBe(true)
+      expect(slab.classList.contains('flex')).toBe(true)
+      expect(slab.classList.contains('items-center')).toBe(true)
+      expect(slab.classList.contains('justify-center')).toBe(true)
+    }
+  })
+
+  it('the CTA slab keeps the SAME h-12 class while showing the countdown (resting)', async () => {
+    const wrapper = await mountWithRoute('today')
+    useRestTimerStore().start(90)
+    await flushPromises()
+
+    const timers = wrapper.findAll('[data-testid="cta-timer"]')
+    expect(timers).toHaveLength(2)
+    for (const timer of timers) {
+      const slab = timer.element.closest('.bk-slab')!
+      expect(slab.classList.contains('h-12')).toBe(true)
+      // whitespace-nowrap: el countdown nunca envuelve línea (envolver
+      // recortaría la 2ª línea dentro del h-12 fijo en vez de estirar la
+      // losa, que es justo el bug que h-12 evita)
+      expect(timer.classes()).toContain('whitespace-nowrap')
+    }
+  })
+
+  it('the CTA slab keeps the SAME h-12 class in the expanded (cancel-revealed) state', async () => {
+    const wrapper = await mountWithRoute('workout')
+    useRestTimerStore().start(90)
+    await flushPromises()
+
+    const timer = wrapper.get('[data-testid="cta-timer"]')
+    await timer.trigger('click')
+    await flushPromises()
+
+    const cancelButtons = wrapper.findAll('[data-testid^="cta-cancel-rest"]')
+    expect(cancelButtons).toHaveLength(2) // desktop + móvil
+    for (const btn of cancelButtons) expect(btn.classes()).toContain('h-12')
+    const slab = timer.element.closest('.bk-slab')!
+    expect(slab.classList.contains('h-12')).toBe(true)
+  })
+})
+
+// item 6 (v0.4.3, zurdi): mientras se descansa Y ya se está en /workout (el
+// único caso en que el CTA no tiene a dónde navegar), tocarlo expande un
+// botón de cancelar en vez de ser un no-op.
+describe('ShellView CTA tap-to-cancel-rest (item 6, v0.4.3)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('on /workout while resting, tapping the CTA reveals the cancel button (no cta-cancel-rest before the tap)', async () => {
+    const wrapper = await mountWithRoute('workout')
+    useRestTimerStore().start(90)
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
+
+    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
+    await links[0].trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(2)
+  })
+
+  it('tapping the cancel button clears the rest timer and collapses the expanded state', async () => {
+    const wrapper = await mountWithRoute('workout')
+    const restTimer = useRestTimerStore()
+    restTimer.start(90)
+    await flushPromises()
+
+    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
+    await links[0].trigger('click')
+    await flushPromises()
+
+    const cancelBtn = wrapper.get('[data-testid="cta-cancel-rest"]')
+    expect(cancelBtn.attributes('aria-label')).toBe('Cancelar descanso')
+    await cancelBtn.trigger('click')
+    await flushPromises()
+
+    expect(restTimer.active).toBe(false)
+    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
+  })
+
+  it('tapping the CTA a second time (already expanded) collapses it without clearing the timer', async () => {
+    const wrapper = await mountWithRoute('workout')
+    const restTimer = useRestTimerStore()
+    restTimer.start(90)
+    await flushPromises()
+
+    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
+    await links[0].trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(2)
+
+    await links[0].trigger('click')
+    await flushPromises()
+
+    expect(restTimer.active).toBe(true) // NO se canceló, solo se colapsó
+    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
+  })
+
+  it('the rest timer ending on its own (not via the CTA) collapses any expanded state', async () => {
+    const wrapper = await mountWithRoute('workout')
+    const restTimer = useRestTimerStore()
+    restTimer.start(90)
+    await flushPromises()
+
+    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
+    await links[0].trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(2)
+
+    restTimer.clear() // simula el timer llegando a 0 por su cuenta
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
+  })
+
+  it('on ANY other route, tapping the CTA while resting still navigates (no expand, no interception)', async () => {
+    const wrapper = await mountWithRoute('today')
+    useRestTimerStore().start(90)
+    await flushPromises()
+
+    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
+    await links[0].trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.$route.name).toBe('workout')
+    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
+  })
+
+  it('on /workout while NOT resting, tapping the CTA does nothing special (no expand — nothing to cancel)', async () => {
+    const wrapper = await mountWithRoute('workout')
+    await flushPromises()
+
+    const links = wrapper.findAll('a').filter((a) => a.attributes('href') === '/workout')
+    await links[0].trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid^="cta-cancel-rest"]')).toHaveLength(0)
+  })
+})
+
 describe('ShellView CTA workout-in-progress glow (item 3, v0.3.0 addendum)', () => {
   beforeEach(() => setActivePinia(createPinia()))
 

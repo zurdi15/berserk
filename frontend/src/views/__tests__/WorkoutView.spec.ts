@@ -758,7 +758,12 @@ describe('WorkoutView', () => {
       await flushPromises()
     }
 
-    it('logging a set with auto-rest ON shows the cancel chip, and tapping ✕ clears the timer (DOM-real, not a direct store poke)', async () => {
+    // item 6 (v0.4.3, zurdi): el chip "M:SS ✕" del header se retira —
+    // cancelar el descanso se mueve DENTRO del CTA del shell (ver
+    // ShellView.spec.ts, describe "CTA tap-to-cancel-rest"). Este test
+    // confirma que el header YA NO lleva esa superficie, ni siquiera
+    // descansando — WorkoutView solo arranca el timer, nunca lo cancela.
+    it('item 6: logging a set with auto-rest ON starts the timer, but the header carries no cancel-rest chip anymore (moved into the shell CTA)', async () => {
       wrapper = mountLive()
       await flushPromises()
       const restTimer = useRestTimerStore()
@@ -766,15 +771,8 @@ describe('WorkoutView', () => {
       await logASet(wrapper)
 
       expect(restTimer.active).toBe(true)
-      const chip = document.body.querySelector('[data-testid="rest-cancel-chip"]')
-      expect(chip).not.toBeNull()
-
-      const cancelBtn = document.body.querySelector('[data-testid="cancel-rest"]') as HTMLElement
-      cancelBtn.click()
-      await flushPromises()
-
-      expect(restTimer.active).toBe(false)
       expect(document.body.querySelector('[data-testid="rest-cancel-chip"]')).toBeNull()
+      expect(document.body.querySelector('[data-testid="cancel-rest"]')).toBeNull()
     })
 
     // item 5 (v0.4.3, zurdi): la etiqueta SEPARADA ("Descanso automático" a
