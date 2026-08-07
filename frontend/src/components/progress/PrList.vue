@@ -61,16 +61,15 @@ function formatAchievedDate(dateStr: string): string {
 </script>
 
 <template>
-  <div class="flex-1 min-h-0 flex flex-col gap-2">
+  <div class="flex flex-col gap-2">
     <!-- item 7: root SIEMPRE presente (ya no alterna BkEmpty/lista como
-         root), flex-col propio para apilar el selector (shrink-0, fuera del
-         scroll) sobre el área con scroll de abajo — mismo patrón que
-         ExercisePicker en la pestaña Entrenos (item 3c): toolbar fija +
-         lista que se lleva el resto del alto. El padre (ProgressView,
-         pestaña Récords) sigue dando el hueco vía flex-1 min-h-0 sobre ESTE
-         root. (comentario DENTRO de la raíz: como hermano de nivel superior
-         del <div> sería un nodo extra en el fragmento y rompería tanto el
-         fall-through de atributos como la resolución de root del componente)
+         root). v0.5.0 (modelo de scroll único): la lista FLUYE — sin scroll
+         propio ni cadena flex con el padre, los récords crecen con su
+         contenido y scrollean contra <main> con la tira de pestañas de
+         ProgressView pegada arriba. (comentario DENTRO de la raíz: como
+         hermano de nivel superior del <div> sería un nodo extra en el
+         fragmento y rompería tanto el fall-through de atributos como la
+         resolución de root del componente)
          Todos/Peso Máx/Volumen Máx/Est. 1RM: reusa las mismas etiquetas que
          cada fila (progress.kinds.*) — da contexto cuando está en Todos
          (kinds mezclados). item 3 (v0.4.2): con un kind concreto activo el
@@ -78,10 +77,8 @@ function formatAchievedDate(dateStr: string): string {
          se oculta para no repetirlo; solo en Todos se muestra -->
     <BkTabs class="shrink-0" v-model="kindFilter" :tabs="kindTabs" />
 
-    <BkEmpty v-if="!filteredRecords.length" :message="t('progress.noRecords')" class="flex-1 min-h-0" />
-    <!-- item 8: sin tope propio (max-h-72) — este div es el que scrollea de
-         verdad; el selector de arriba queda shrink-0, fuera del scroll -->
-    <div v-else class="space-y-2 flex-1 min-h-0 overflow-y-auto" data-testid="pr-list">
+    <BkEmpty v-if="!filteredRecords.length" :message="t('progress.noRecords')" />
+    <div v-else class="space-y-2" data-testid="pr-list">
       <div
         v-for="record in filteredRecords"
         :key="record.id"

@@ -68,12 +68,13 @@ describe('TodayView', () => {
 
   // item 14 (v0.4.3, zurdi): el modelo de scroll interno (antes solo
   // Perfil/Progresión) se generaliza a TODAS las vistas — Hoy scrollea
-  // dentro de su propia caja (h-full + overflow-y-auto), no empuja a <main>
-  it('item 14: the root is a bounded internal scroller (h-full overflow-y-auto)', async () => {
+  // v0.5.0 (modelo de scroll único): la raíz FLUYE contra <main>
+  it('v0.5.0: the root flows against <main> (no bounded-scroll classes)', async () => {
     const wrapper = mount(TodayView, { global: { plugins: [createI18nInstance()] } })
     await flushPromises()
-    expect(wrapper.classes()).toContain('h-full')
-    expect(wrapper.classes()).toContain('overflow-y-auto')
+    expect(wrapper.classes()).not.toContain('h-full')
+    expect(wrapper.classes()).not.toContain('overflow-y-auto')
+    expect(wrapper.classes()).toContain('bk-stagger')
   })
 
   it('renders the streak in ember when alive', async () => {

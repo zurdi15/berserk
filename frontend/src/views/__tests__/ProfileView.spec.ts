@@ -352,97 +352,80 @@ describe('ProfileView', () => {
     })
   })
 
-  // item 14 (v0.4.3, zurdi generaliza el modelo de scroll interno a TODAS
-  // las vistas): raíz h-full flex-col, tira de pestañas shrink-0, CADA
-  // panel scrollea dentro de su propio flex-1 min-h-0 overflow-y-auto
-  describe('item 14: internal scroll model (every tab, tab strip always visible)', () => {
-    it('root carries the bounded h-full flex-col chain, and the tab strip is shrink-0', async () => {
-      wrapper = build()
-      await wrapper.vm.$nextTick()
-
-      expect(wrapper.classes()).toEqual(expect.arrayContaining(['h-full', 'flex', 'flex-col']))
-      const tabStrip = wrapper.get('[role="tablist"]')
-      expect(tabStrip.classes()).toContain('shrink-0')
-    })
-
-    it('the profile panel scrolls internally (flex-1 min-h-0 overflow-y-auto)', async () => {
-      wrapper = build()
-      await wrapper.vm.$nextTick()
-
-      const panel = wrapper.get('[data-testid="logout-btn"]').element.closest('.bk-stagger')!
-      expect(panel.classList.contains('flex-1')).toBe(true)
-      expect(panel.classList.contains('min-h-0')).toBe(true)
-      expect(panel.classList.contains('overflow-y-auto')).toBe(true)
-    })
-
-    it('the routines panel (RoutineList) scrolls internally', async () => {
+  // v0.5.0 (modelo de scroll único, ver ShellView.vue): la raíz FLUYE contra
+  // <main>, las tiras (principal + sección de biblioteca) viven en UN bloque
+  // sticky con fondo sólido, y los cambios de pestaña/sección resetean el
+  // scroll de <main> explícitamente (el hash no cambia el path, así que el
+  // reset de ShellView no aplica)
+  describe('v0.5.0: single-scroll model (sticky strips, flowing panels)', () => {
+    it('root flows (no bounded chain) and both strips live in ONE sticky block with a solid background', async () => {
       wrapper = build()
       await flushPromises()
 
-      const routinesTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Rutinas')!
-      await routinesTab.trigger('click')
-      await flushPromises()
+      expect(wrapper.classes()).not.toContain('h-full')
 
-      const routineList = wrapper.findComponent({ name: 'RoutineList' })
-      expect(routineList.classes()).toEqual(expect.arrayContaining(['flex-1', 'min-h-0', 'overflow-y-auto']))
+      const stickyBlock = wrapper.get('[data-testid="profile-tabs-sticky"]')
+      expect(stickyBlock.classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'bg-void']))
+
+      // la tira de sección de biblioteca SOLO existe dentro del bloque sticky
+      // cuando la pestaña activa es Biblioteca
+      expect(stickyBlock.find('[data-testid="library-section-tabs"]').exists()).toBe(false)
+      const libraryTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')!
+      await libraryTab.trigger('click')
+      await flushPromises()
+      expect(stickyBlock.find('[data-testid="library-section-tabs"]').exists()).toBe(true)
     })
 
-    it('the admin panel (AdminCard) scrolls internally', async () => {
+    it('panels flow: no internal scroll containers left in profile, routines, library or admin', async () => {
       const auth = useAuthStore()
       auth.user = { id: 1, username: 'root-admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' }
       wrapper = build()
+      const w = wrapper
       await flushPromises()
 
-      const adminTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Admin')!
-      await adminTab.trigger('click')
-      await flushPromises()
+      const panel = w.get('[data-testid="logout-btn"]').element.closest('.bk-stagger')!
+      expect(panel.classList.contains('overflow-y-auto')).toBe(false)
 
-      const adminCard = wrapper.findComponent({ name: 'AdminCard' })
-      expect(adminCard.classes()).toEqual(expect.arrayContaining(['flex-1', 'min-h-0', 'overflow-y-auto']))
+      const clickTab = async (name: string) => {
+        const tab = w.findAll('[role="tab"]').find((t) => t.text() === name)!
+        await tab.trigger('click')
+        await flushPromises()
+      }
+
+      await clickTab('Rutinas')
+      expect(w.findComponent({ name: 'RoutineList' }).classes()).not.toContain('overflow-y-auto')
+
+      await clickTab('Biblioteca')
+      const exerciseManager = w.findComponent({ name: 'ExerciseManager' })
+      expect(exerciseManager.element.closest('.overflow-y-auto')).toBeNull()
+
+      await clickTab('Admin')
+      expect(w.findComponent({ name: 'AdminCard' }).classes()).not.toContain('overflow-y-auto')
     })
 
-    it('the library panel is a flex-col chain: the segmented selector is shrink-0, the manager area is the ONE scroll container (not double-nested)', async () => {
+    // v0.5.0: el scroll vive en <main> — cambiar de pestaña o de sección de
+    // biblioteca lo resetea vía resetMainScroll (los paneles ya no remontan
+    // un scroller propio que nazca en 0)
+    it('switching the profile tab or the library sub-selector resets <main> scrollTop', async () => {
+      const mainEl = document.createElement('main')
+      document.body.appendChild(mainEl)
+
       wrapper = build()
       await flushPromises()
 
+      mainEl.scrollTop = 400
       const libraryTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')!
       await libraryTab.trigger('click')
       await flushPromises()
+      expect(mainEl.scrollTop).toBe(0)
 
-      const selector = wrapper.get('[data-testid="library-section-tabs"]')
-      expect(selector.element.parentElement!.classList.contains('shrink-0')).toBe(true)
-
-      const exerciseManager = wrapper.findComponent({ name: 'ExerciseManager' })
-      const scrollRegion = exerciseManager.element.closest('.overflow-y-auto')!
-      expect(scrollRegion.classList.contains('flex-1')).toBe(true)
-      expect(scrollRegion.classList.contains('min-h-0')).toBe(true)
-      // NO hay un segundo .overflow-y-auto anidado dentro de ese mismo panel
-      // (item 14: "simplifica a UN scroll container por panel")
-      expect(scrollRegion.querySelectorAll('.overflow-y-auto')).toHaveLength(0)
-    })
-
-    // item 4 (reconciliado con item 14): exercises/muscleGroups comparten el
-    // MISMO contenedor de scroll (v-show) — un remount de v-if no lo
-    // resetea gratis aquí, así que hace falta el watch dedicado
-    it('item 4: switching the library sub-selector (exercises <-> muscleGroups) resets the SHARED scroll container to top', async () => {
-      wrapper = build()
-      await flushPromises()
-
-      const libraryTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')!
-      await libraryTab.trigger('click')
-      await flushPromises()
-
-      const exerciseManager = wrapper.findComponent({ name: 'ExerciseManager' })
-      const scrollRegion = exerciseManager.element.closest('.overflow-y-auto') as HTMLElement
-      // simula haber bajado viendo Ejercicios
-      Object.defineProperty(scrollRegion, 'scrollTop', { configurable: true, value: 400, writable: true })
-      expect(scrollRegion.scrollTop).toBe(400)
-
+      mainEl.scrollTop = 250
       const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
       await sectionTabs[1].trigger('click')
       await flushPromises()
+      expect(mainEl.scrollTop).toBe(0)
 
-      expect(scrollRegion.scrollTop).toBe(0)
+      mainEl.remove()
     })
   })
 

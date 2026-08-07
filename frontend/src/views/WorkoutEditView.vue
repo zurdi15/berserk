@@ -211,18 +211,17 @@ onMounted(() => {
   loadWorkout()
 })
 
-// item 14 (v0.4.3, zurdi generaliza el modelo de scroll interno a TODAS las
-// vistas): h-full overflow-y-auto en la propia raíz — sin cabecera de
-// navegación que fijar arriba (el back-button/título son parte del
-// contenido normal, no una tab strip persistente), así que la raíz entera
-// ES el único contenedor de scroll, mismo criterio que TodayView.vue.
+// v0.5.0 (modelo de scroll único, ver ShellView.vue): la raíz FLUYE contra
+// <main> — sin cabecera de navegación que fijar arriba (el back-button/
+// título son parte del contenido normal, no una tab strip persistente),
+// mismo criterio que TodayView.vue.
 // (comentario aquí y no como primer hijo de <template>: un comentario ahí
 // convierte la raíz en un fragmento de dos nodos y rompe wrapper.classes(),
 // ver BkStepper.vue/TodayView.vue.)
 </script>
 
 <template>
-  <div v-if="workoutEditor.workout" class="h-full overflow-y-auto space-y-4 bk-stagger">
+  <div v-if="workoutEditor.workout" class="space-y-4 bk-stagger">
     <NeonPulse :show="neonPulse" @done="neonPulse = false" />
 
     <div class="flex items-center justify-between gap-2" :style="{ '--bk-stagger-i': 0 }">

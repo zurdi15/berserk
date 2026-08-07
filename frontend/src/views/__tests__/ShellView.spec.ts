@@ -143,41 +143,29 @@ describe('ShellView nav', () => {
     expect(main.classes()).not.toContain('max-w-3xl')
     expect(main.classes()).not.toContain('mx-auto')
     expect(main.classes()).toContain('w-full')
-    // pb-24 ya NO vive en <main> (v0.4.1: ver el spacer de abajo) — sigue
-    // siendo w-full puro, sin padding-bottom propio
-    expect(main.classes()).not.toContain('pb-24')
 
+    // v0.5.0 (modelo de scroll único): el wrapper es FLUJO puro — columna
+    // centrada con pb-24 como reserva del navbar (correcto con altura auto:
+    // el padding queda siempre tras el contenido real, ver ShellView.vue).
+    // Toda la saga calc/spacer/flex-col (v0.4.1→v0.4.4) queda fijada aquí en
+    // negativo para que ninguna de sus piezas vuelva "por simetría".
     const innerWrapper = main.get('div')
     expect(innerWrapper.classes()).toContain('max-w-3xl')
     expect(innerWrapper.classes()).toContain('mx-auto')
     expect(innerWrapper.classes()).toContain('w-full')
-    // h-[calc(100%-6rem)] (v0.4.1, NO h-full puro y NO min-h-full — ambos
-    // descartados, ver comentario largo en ShellView.vue): sigue siendo una
-    // altura DEFINIDA (100% de <main>) — lo que le da a ProgressView (y a
-    // cualquier vista con su propio h-full/flex-1 interno) una referencia
-    // resoluble para sus porcentajes — pero MENOS los 6rem del navbar móvil
-    // fijo. Desde v0.4.4 el calc es la ÚNICA expresión de esa reserva: el
-    // spacer de flujo de la v0.4.1 murió con el item 14 (ver test de abajo)
-    expect(innerWrapper.classes()).toContain('h-[calc(100%-6rem)]')
+    expect(innerWrapper.classes()).toContain('pb-24')
+    expect(innerWrapper.classes()).not.toContain('h-[calc(100%-6rem)]')
     expect(innerWrapper.classes()).not.toContain('h-full')
     expect(innerWrapper.classes()).not.toContain('min-h-full')
-    expect(innerWrapper.classes()).toContain('flex')
-    expect(innerWrapper.classes()).toContain('flex-col')
+    expect(innerWrapper.classes()).not.toContain('flex')
+    expect(innerWrapper.find('[data-testid="mobile-nav-clearance"]').exists()).toBe(false)
   })
 
-  // v0.4.4 (regresión del item 14, bug real de zurdi en móvil: "el content de
-  // Hoy se corta mucho antes de llegar al bottom nav bar"): el spacer h-24 de
-  // la v0.4.1 (reserva del navbar como hijo de flujo tras RouterView) tenía
-  // sentido mientras había vistas de FLUJO que desbordaban el wrapper — el
-  // spacer seguía a su contenido. Con TODAS las vistas acotadas (item 14,
-  // raíces h-full/flex-1 con overflow propio), su min-height automático es 0
-  // (overflow != visible anula el mínimo por contenido) y flex-shrink les
-  // restaba los 96px del spacer ENCIMA del calc(100%-6rem) del wrapper: la
-  // reserva contada dos veces, 128px de hueco muerto medidos en Chromium real
-  // (390×844: caja de Hoy en y=652, navbar en y≈781). El spacer se elimina —
-  // la reserva vive SOLO en el calc del wrapper (test de arriba). Este test
-  // fija su ausencia para que no vuelva "por simetría" con el comentario viejo.
-  it('v0.4.4: no flow spacer inside the wrapper — the navbar reserve lives only in the wrapper calc', async () => {
+  // v0.5.0: <main> persiste entre rutas (ya no hay scrollers por vista que
+  // nazcan en 0 al remontar) — ShellView resetea su scrollTop observando
+  // route.path. El hash queda fuera: las pestañas ancladas en URL
+  // (useTabHash) no deben resetear la página al cambiar de tab.
+  it('v0.5.0: navigating to another section resets <main> scrollTop; a hash-only change does not', async () => {
     const router = buildRouter('today')
     await router.isReady()
     const wrapper = mount(ShellView, {
@@ -186,8 +174,17 @@ describe('ShellView nav', () => {
         stubs: { RouterView: true, RouterLink: true, AthleteBanner: true },
       },
     })
-    const innerWrapper = wrapper.get('main').get('div')
-    expect(innerWrapper.find('[data-testid="mobile-nav-clearance"]').exists()).toBe(false)
+    const main = wrapper.get('main').element
+
+    main.scrollTop = 240
+    router.push({ name: 'calendar' })
+    await flushPromises()
+    expect(main.scrollTop).toBe(0)
+
+    main.scrollTop = 180
+    router.push({ hash: '#records' })
+    await flushPromises()
+    expect(main.scrollTop).toBe(180)
   })
 })
 

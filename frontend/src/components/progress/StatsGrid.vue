@@ -44,16 +44,13 @@ function formatMinutes(totalMinutes: number): string {
 </script>
 
 <template>
-  <div class="grid grid-cols-2 gap-3 flex-1 min-h-0 overflow-y-auto content-start" data-testid="stats-grid">
-    <!-- grid + flex-1 min-h-0 overflow-y-auto en la MISMA raíz: es una utilidad
-         de grid como contenido propio (2 columnas) que a la vez se comporta
-         como hijo flexible del panel de la pestaña (item de round 8: "respeta
-         el modelo h-full, scrollea si hace falta") — mismo patrón que PrList,
-         que también lleva su propio flex-1/min-h-0/overflow-y-auto en la raíz
-         en vez de depender de que el padre se lo imponga. (comentario DENTRO
-         de la raíz: como primer hijo del template crearía un fragmento de dos
-         raíces y rompería wrapper.classes() en los tests, ver el comentario
-         equivalente en ProgressView.vue) -->
+  <div class="grid grid-cols-2 gap-3" data-testid="stats-grid">
+    <!-- v0.5.0 (modelo de scroll único): grid puro que fluye contra <main> —
+         el flex-1/min-h-0/overflow del modelo viejo se retiró con la cadena
+         de alturas. (comentario DENTRO de la raíz: como primer hijo del
+         template crearía un fragmento de dos raíces y rompería
+         wrapper.classes() en los tests, ver el comentario equivalente en
+         ProgressView.vue) -->
     <BkCard>
       <p class="text-ink-muted text-sm">{{ t('progress.stats.workouts') }}</p>
       <BkAnimatedNumber :value="stats?.total_workouts ?? 0" v-slot="{ value }">

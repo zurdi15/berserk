@@ -74,19 +74,23 @@ watch(() => athlete.userId, load)
 </script>
 
 <template>
-  <div class="h-full flex flex-col gap-2">
-    <!-- columna flexible: el campo de búsqueda no crece, la lista se lleva
-         todo el resto del alto disponible (item 3c — el padre le da el hueco
-         vía flex-1 min-h-0). (comentario dentro de la raíz para no crear un
-         fragmento de dos raíces que rompa el fall-through de atributos) -->
+  <div class="flex flex-col gap-2">
+    <!-- v0.5.0 (modelo de scroll único): este picker es una de las pocas
+         cajas HOJA con scroll interno que sobreviven — la lista lleva su
+         propia altura tope (max-h-[50dvh]: media pantalla, deja sitio al
+         chart que la sigue en flujo en ProgressView) en vez de recibir el
+         hueco por cadena flex del padre. dvh y no vh: en móvil el viewport
+         dinámico descuenta la UI del navegador. (comentario dentro de la
+         raíz para no crear un fragmento de dos raíces que rompa el
+         fall-through de atributos) -->
     <BkField v-model="query" :label="t('progress.searchExercise')" class="shrink-0" />
 
     <!-- esqueleto mientras carga: mismo hueco que la lista real -->
-    <div v-if="!ready" class="flex-1 min-h-0 overflow-y-auto space-y-1" data-testid="exercise-list-skeleton">
+    <div v-if="!ready" class="max-h-[50dvh] overflow-y-auto space-y-1" data-testid="exercise-list-skeleton">
       <div v-for="n in 6" :key="n" class="h-9 rounded-sm bg-stone bk-shimmer" aria-hidden="true" />
     </div>
 
-    <div v-else class="flex-1 min-h-0 overflow-y-auto space-y-1">
+    <div v-else class="max-h-[50dvh] overflow-y-auto space-y-1" data-testid="exercise-picker-list">
       <button
         type="button"
         data-testid="exercise-option-all"

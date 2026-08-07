@@ -53,22 +53,20 @@ describe('WorkoutView', () => {
     for (const key of Object.keys(routeQuery)) delete routeQuery[key]
   })
 
-  // item 14 (v0.4.3, zurdi): modelo de scroll interno — la raíz es un
-  // h-full flex-col, y CUALQUIERA de las ramas visibles (idle/en curso) es
-  // el único hijo real de layout con flex-1 min-h-0 overflow-y-auto propio
-  it('item 14: root is h-full flex-col and the visible branch (idle, here) carries flex-1 min-h-0 overflow-y-auto', async () => {
+  // v0.5.0 (modelo de scroll único, ver ShellView.vue): las ramas FLUYEN
+  // contra <main> — sin h-full/flex-1/overflow propio en raíz ni ramas
+  it('v0.5.0: root and visible branch flow against <main> (no bounded-scroll classes)', async () => {
     const activeWorkout = useActiveWorkoutStore()
     vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
 
     const wrapper = build()
     await flushPromises()
 
-    expect(wrapper.classes()).toEqual(expect.arrayContaining(['h-full', 'flex', 'flex-col']))
+    expect(wrapper.classes()).not.toContain('h-full')
     const startFree = wrapper.get('[data-testid="start-free"]')
     const idleBranch = startFree.element.parentElement!
-    expect(idleBranch.classList.contains('flex-1')).toBe(true)
-    expect(idleBranch.classList.contains('min-h-0')).toBe(true)
-    expect(idleBranch.classList.contains('overflow-y-auto')).toBe(true)
+    expect(idleBranch.classList.contains('flex-1')).toBe(false)
+    expect(idleBranch.classList.contains('overflow-y-auto')).toBe(false)
   })
 
   it('calls activeWorkout.resume on mount to survive reloads', async () => {

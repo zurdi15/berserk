@@ -12,6 +12,7 @@ import { seriesFor } from '@/components/progress/series'
 import StatsGrid from '@/components/progress/StatsGrid.vue'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import { useTabHash } from '@/composables/useTabHash'
+import { resetMainScroll } from '@/composables/useMainScroll'
 import BkCard from '@/lib/BkCard.vue'
 import BkChart from '@/lib/BkChart.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
@@ -31,6 +32,14 @@ const PROGRESS_TABS: readonly ProgressTab[] = ['stats', 'body', 'training', 'rec
 // de métrica (metric, debajo) es un toggle de DATO dentro de la pestaña
 // Entrenos, no una sección propia, y queda fuera de esto a propósito
 const tab = useTabHash<ProgressTab>('stats', () => PROGRESS_TABS)
+
+// v0.5.0 (modelo de scroll único): cambiar de pestaña cambia el hash, no el
+// path — el reset de ShellView no aplica y los paneles ya no remontan un
+// scroller propio; sin esto el panel nuevo aparecería ya desplazado
+watch(tab, () => {
+  resetMainScroll()
+})
+
 const metric = ref<MetricKey>('top_weight')
 const exerciseId = ref<number | null>(null)
 
@@ -127,39 +136,33 @@ watch(exerciseId, () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col gap-4">
-    <!-- h-full (SIN CAMBIOS de clase desde v0.4.0): <main> del shell ya acota la altura
-         real con una caja de height FIJO — sin ese tope, "ocupa el resto del viewport" no
-         tiene contra qué medirse.
-         v0.4.1 (fix de scroll móvil, ver el comentario largo en ShellView.vue): esa caja
-         fija de <main> pasó de h-full a h-[calc(100%-6rem)] — 100% MENOS la reserva del
-         navbar móvil (desde v0.4.4 el calc es la ÚNICA expresión de esa reserva: el spacer
-         de flujo que la duplicaba murió al acotarse todas las vistas). Esta raíz
-         no necesita ningún cambio de CLASE: sigue siendo h-full de SU padre, que es
-         justamente la caja que cambió — el 100% que hereda ahora YA EXCLUYE la reserva,
-         así que el chart anclado abajo de Entrenos queda en la MISMA posición exacta que
-         antes de v0.4.1 (verificado en Chromium real). Se probó primero cambiar esto a
-         flex-1 min-h-0 (acompañando un wrapper min-h-full en vez de h-[calc(...)]) —
-         DESCARTADO: min-height no da una referencia de altura DEFINIDA a un hijo con
-         height:100%, y tampoco deja que flex-grow reparta espacio de forma fiable cuando
-         el propio wrapper está en modo auto-size; en Chromium real, ExercisePicker perdía
-         su scroll interno y arrastraba a <main> entero a desbordar miles de px.
-         (comentario DENTRO de la raíz: como primer hijo del template crearía un
-         fragmento de dos raíces y rompería el fall-through de atributos)
+  <div class="space-y-4">
+    <!-- v0.5.0 (modelo de scroll único, ver ShellView.vue): la raíz fluye
+         contra <main>; toda la saga de alturas h-full/calc que vivía en este
+         comentario (v0.4.0→v0.4.4) quedó obsoleta con ella. La tira de
+         pestañas se pega arriba con sticky (bg-void + -mt-4 pt-4 cubren la
+         banda del pt-4 del wrapper del shell al pegarse, ver CalendarView).
+         (comentario DENTRO de la raíz: como primer hijo del template crearía
+         un fragmento de dos raíces y rompería el fall-through de atributos)
          Sin h1 de sección (item 3): Hoy nunca tuvo uno, mismo patrón aquí.
          Sin padding lateral propio (item 4): <main> del shell ya pone px-4,
          duplicarlo aquí desalineaba el gutter frente a Hoy. -->
-    <BkTabs class="shrink-0" v-model="tab" :tabs="mainTabs" />
+    <div class="sticky top-0 z-10 bg-void -mt-4 pt-4 pb-1" data-testid="progress-tabs-sticky">
+      <BkTabs v-model="tab" :tabs="mainTabs" />
+    </div>
 
-    <!-- Entrenos: la lista de ejercicios ocupa TODO el resto del alto (scroll
-         interno); el chart + selector de métrica quedan anclados abajo, justo
-         encima de la nav — nunca se meten debajo de ella (item 3c) -->
-    <div v-if="tab === 'training'" class="flex-1 min-h-0 flex flex-col gap-4 bk-stagger">
-      <div class="flex-1 min-h-0" :style="{ '--bk-stagger-i': 0 }">
+    <!-- Entrenos (v0.5.0): la lista del picker es una caja HOJA con su propia
+         altura y scroll interno (ver ExercisePicker.vue — max-h-[50dvh]), y
+         el chart + selector de métrica la siguen en flujo: en un móvil
+         normal ambos caben en pantalla (que era el punto del viejo diseño
+         "anclado abajo"), y si no caben, el scroll de página con la tira
+         sticky sigue siendo coherente — sin cadena de alturas. -->
+    <div v-if="tab === 'training'" class="space-y-4 bk-stagger">
+      <div :style="{ '--bk-stagger-i': 0 }">
         <ExercisePicker v-model="exerciseId" />
       </div>
 
-      <div v-if="exerciseId !== null" class="shrink-0 space-y-3" :style="{ '--bk-stagger-i': 1 }">
+      <div v-if="exerciseId !== null" class="space-y-3" :style="{ '--bk-stagger-i': 1 }">
         <BkTabs v-model="metric" :tabs="metricTabs" />
         <!-- :key="exerciseId" (item 2): remonta el chart al cambiar de
              ejercicio para repetir el revelado progresivo de la serie — el
@@ -171,24 +174,21 @@ watch(exerciseId, () => {
     </div>
 
     <!-- Récords: solo PrList (item 4, v0.4.2 — antes también DistributionBars,
-         ver comentario largo en TodayView.vue sobre por qué se mudó). Sin el
-         split que anclaba Distribución abajo (shrink-0), el panel se
-         simplifica a un único hijo que se lleva TODO el alto (flex-1 min-h-0,
-         scroll interno vía PrList — ver PrList.vue, ya sin su tope max-h-72) -->
-    <div v-else-if="tab === 'records'" class="flex-1 min-h-0 flex flex-col bk-stagger">
-      <div class="flex-1 min-h-0" :style="{ '--bk-stagger-i': 0 }">
-        <BkCard :title="t('progress.records')" class="h-full flex flex-col">
+         ver comentario largo en TodayView.vue sobre por qué se mudó).
+         v0.5.0: la lista fluye entera contra <main> (PrList ya sin scroll
+         propio), la card crece con su contenido -->
+    <div v-else-if="tab === 'records'" class="bk-stagger">
+      <div :style="{ '--bk-stagger-i': 0 }">
+        <BkCard :title="t('progress.records')">
           <PrList :records="records" :exercises="exercises" />
         </BkCard>
       </div>
     </div>
 
     <!-- Estadísticas (round 8): totales de por vida, gateados a statsReady
-         igual que TodayView — StatsGrid ya lleva su propio flex-1/min-h-0/
-         overflow-y-auto en la raíz (mismo patrón que PrList), así que el
-         wrapper del stagger solo necesita el hueco (flex-1 min-h-0) -->
-    <div v-else-if="tab === 'stats'" class="flex-1 min-h-0 flex flex-col bk-stagger">
-      <div class="flex-1 min-h-0 flex flex-col" :style="{ '--bk-stagger-i': 0 }">
+         igual que TodayView — v0.5.0: el grid fluye, sin hueco que repartir -->
+    <div v-else-if="tab === 'stats'" class="bk-stagger">
+      <div :style="{ '--bk-stagger-i': 0 }">
         <StatsGrid v-if="statsReady" :stats="stats" />
       </div>
     </div>
@@ -197,7 +197,7 @@ watch(exerciseId, () => {
          hermanos que escalonar) — mismo mecanismo de reproducción al
          cambiar de pestaña (item 7) -->
     <Transition v-else name="bk-rise" appear>
-      <BodySection class="flex-1 min-h-0 overflow-y-auto" />
+      <BodySection />
     </Transition>
   </div>
 </template>

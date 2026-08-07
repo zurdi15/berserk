@@ -332,19 +332,22 @@ onBeforeUnmount(() => {
   if (ticker) clearInterval(ticker)
 })
 
-// item 14 (v0.4.3, zurdi generaliza el modelo de scroll interno a TODAS las
-// vistas): raíz h-full flex flex-col (referencia de altura ya provista por
-// el wrapper del shell) — BkCelebration/NeonPulse son <Teleport to="body">
-// (no ocupan hueco de flujo aquí, ver esos componentes), así que el ÚNICO
-// hijo real de layout en cada momento es UNA de las tres ramas del
-// v-if/else-if/else de abajo (FinishSummary / entreno en curso / idle).
-// Las TRES llevan flex-1 min-h-0 overflow-y-auto (a FinishSummary, un
-// componente hijo con una única raíz, le llega vía fallthrough de clase) —
-// sin esto, esta vista scrolleaba contra <main> entero.
+// v0.5.0 (modelo de scroll único, ver ShellView.vue): las tres ramas del
+// v-if/else-if/else (FinishSummary / entreno en curso / idle) FLUYEN contra
+// <main> — BkCelebration/NeonPulse son <Teleport to="body"> y no ocupan
+// flujo. El header del entreno (crono+fecha) es sticky: el cronómetro sigue
+// visible mientras se scrollea la lista de ejercicios (mismo criterio que
+// las tiras de tabs — es EL chrome de esta vista). El slab del header vive
+// dentro de un wrapper sticky con bg-void y -mt-4 pt-4 (cubre la banda del
+// pt-4 del wrapper del shell al pegarse, ver CalendarView). El wrapper es
+// hijo directo de bk-stagger: su entrada anima transform, pero el fill es
+// backwards — al terminar, el transform computa a none y el sticky funciona
+// (verificado en Chromium; si algún día una animación retiene transform,
+// el sticky de dentro muere con ella — no cambiar el fill alegremente).
 </script>
 
 <template>
-  <div class="h-full flex flex-col">
+  <div>
     <BkCelebration
       v-if="activeWorkout.lastRecords.length"
       :records="activeWorkout.lastRecords"
@@ -357,35 +360,41 @@ onBeforeUnmount(() => {
 
     <FinishSummary
       v-if="finishedWorkout"
-      class="flex-1 min-h-0 overflow-y-auto"
       :workout="finishedWorkout"
       :records="sessionRecords"
       @close="closeSummary"
     />
 
-    <div v-else-if="activeWorkout.workout" class="flex-1 min-h-0 overflow-y-auto space-y-4 bk-stagger">
+    <div v-else-if="activeWorkout.workout" class="space-y-4 bk-stagger">
       <!-- item 3 (ola de pulido v0.3.0): la fecha pasa a la MISMA fila que el
            cronómetro, a su derecha (antes iba apilada arriba) — flex-wrap se
            conserva como red de seguridad: una fecha larga (locale EN con
            weekday+month largos) más el cronómetro en formato h:mm:ss podría
            no caber en los ~328px de contenido de un viewport de 360px, y
            aquí es preferible que la fecha baje a su propia línea a que se
-           corte o se solape con el cronómetro -->
+           corte o se solape con el cronómetro.
+           v0.5.0: wrapper sticky alrededor del slab — ver el comentario del
+           script (crono visible mientras se scrollea la lista). -->
       <div
-        class="bk-slab p-4 flex flex-wrap items-center justify-between gap-3"
-        data-testid="workout-header"
+        class="sticky top-0 z-10 bg-void -mt-4 pt-4 pb-1"
+        data-testid="workout-header-sticky"
         :style="{ '--bk-stagger-i': 0 }"
       >
-        <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
-        <!-- item 6 (v0.4.3, zurdi): el chip "M:SS ✕" que vivía AQUÍ se retira
-             — cancelar el descanso se mueve DENTRO del propio CTA del shell
-             (tocar el CTA mientras se descansa en /workout lo expande y
-             revela el botón ✕, ver ShellView.vue). El countdown en sí (el
-             timer.label del header/nav) ya era visible desde ahí; este chip
-             era la única superficie de CANCELAR fuera del CTA, y con el CTA
-             ya haciendo de tap-target siempre visible, mantenerla aquí
-             además duplicaba la acción en dos sitios. -->
-        <p class="text-sm text-ink-muted capitalize" data-testid="workout-date">{{ dateLabel }}</p>
+        <div
+          class="bk-slab p-4 flex flex-wrap items-center justify-between gap-3"
+          data-testid="workout-header"
+        >
+          <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
+          <!-- item 6 (v0.4.3, zurdi): el chip "M:SS ✕" que vivía AQUÍ se retira
+               — cancelar el descanso se mueve DENTRO del propio CTA del shell
+               (tocar el CTA mientras se descansa en /workout lo expande y
+               revela el botón ✕, ver ShellView.vue). El countdown en sí (el
+               timer.label del header/nav) ya era visible desde ahí; este chip
+               era la única superficie de CANCELAR fuera del CTA, y con el CTA
+               ya haciendo de tap-target siempre visible, mantenerla aquí
+               además duplicaba la acción en dos sitios. -->
+          <p class="text-sm text-ink-muted capitalize" data-testid="workout-date">{{ dateLabel }}</p>
+        </div>
       </div>
 
       <!-- item 4 (post-0.3.0): opt-out de descanso automático — mismo idiom
@@ -509,7 +518,7 @@ onBeforeUnmount(() => {
 
     <!-- item 4: sin bk-stagger propio, esta rama entraba desnuda (nunca tuvo
          entrada propia — dependía del ahora-eliminado Transition de ShellView) -->
-    <div v-else class="flex-1 min-h-0 overflow-y-auto space-y-4 bk-stagger">
+    <div v-else class="space-y-4 bk-stagger">
       <BkButton variant="primary" block data-testid="start-free" :style="{ '--bk-stagger-i': 0 }" @click="startFree">
         {{ t('workout.freeWorkout') }}
       </BkButton>

@@ -352,11 +352,10 @@ describe('StatsGrid', () => {
     expect(wrapper.find('[data-testid="stat-streak"]').text()).toBe('0 semanas')
   })
 
-  it('respects the h-full flex scroll model: flex-1/min-h-0/overflow-y-auto on its own root', () => {
+  it('v0.5.0: the grid flows against <main> — no bounded-scroll classes on its root', () => {
     const wrapper = mount(StatsGrid, { props: { stats: fixtures.stats as never }, ...withI18n() })
-    expect(wrapper.classes()).toContain('flex-1')
-    expect(wrapper.classes()).toContain('min-h-0')
-    expect(wrapper.classes()).toContain('overflow-y-auto')
+    expect(wrapper.classes()).not.toContain('flex-1')
+    expect(wrapper.classes()).not.toContain('overflow-y-auto')
     expect(wrapper.classes()).toContain('grid-cols-2')
   })
 })
@@ -1015,37 +1014,27 @@ describe('ProgressView', () => {
     await mainTablist.findAll('[role="tab"]')[3].trigger('click') // Récords
     await flushPromises()
 
-    // mismo patrón flex que la pestaña Entrenos (item 3c más abajo)
+    // v0.5.0: el panel de récords FLUYE — sin cadena flex acotada
     const recordsPanel = wrapper.find('.bk-stagger')
-    expect(recordsPanel.classes()).toContain('flex-1')
-    expect(recordsPanel.classes()).toContain('min-h-0')
-    expect(recordsPanel.classes()).toContain('flex-col')
-
-    const recordsArea = recordsPanel.findAll('[style*="--bk-stagger-i: 0"]')[0]
-    expect(recordsArea.classes()).toContain('flex-1')
-    expect(recordsArea.classes()).toContain('min-h-0')
+    expect(recordsPanel.classes()).not.toContain('flex-1')
+    expect(recordsPanel.classes()).not.toContain('overflow-y-auto')
 
     // item 4: ya no hay un segundo hijo shrink-0 anclado abajo (antes,
     // DistributionBars) — el panel de récords se simplificó a un único hijo
     expect(recordsPanel.findAll('[style*="--bk-stagger-i: 1"]')).toHaveLength(0)
 
-    // PrList: su root se lleva el resto del alto (flex-1 min-h-0) y apila el
-    // selector de kind (item 7, shrink-0) sobre el área que scrollea de
-    // verdad — el overflow-y-auto ahora vive en esa área interna, no en el
-    // root, para que el selector quede siempre visible
+    // PrList (v0.5.0): lista de flujo — el selector de kind queda visible
+    // vía la tira sticky de la vista, no por un scroller interno
     const prList = wrapper.findComponent({ name: 'PrList' })
-    expect(prList.classes()).toContain('flex-1')
-    expect(prList.classes()).toContain('min-h-0')
+    expect(prList.classes()).not.toContain('flex-1')
     expect(prList.classes()).not.toContain('max-h-72')
 
     const prScrollArea = wrapper.find('[data-testid="pr-list"]')
-    expect(prScrollArea.classes()).toContain('flex-1')
-    expect(prScrollArea.classes()).toContain('min-h-0')
-    expect(prScrollArea.classes()).toContain('overflow-y-auto')
+    expect(prScrollArea.classes()).not.toContain('overflow-y-auto')
     expect(prScrollArea.classes()).not.toContain('max-h-72')
   })
 
-  it('item 3c: training panel is a bounded flex column with the exercise-list area taking the remaining space', async () => {
+  it('v0.5.0: training panel flows; the exercise-picker list is the one bounded leaf (max-h + overflow of its own)', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
@@ -1056,13 +1045,12 @@ describe('ProgressView', () => {
     await flushPromises()
 
     const trainingPanel = wrapper.find('.bk-stagger')
-    expect(trainingPanel.classes()).toContain('flex-1')
-    expect(trainingPanel.classes()).toContain('min-h-0')
-    expect(trainingPanel.classes()).toContain('flex-col')
+    expect(trainingPanel.classes()).not.toContain('flex-1')
+    expect(trainingPanel.classes()).not.toContain('overflow-y-auto')
 
-    const listArea = trainingPanel.findAll('[style*="--bk-stagger-i: 0"]')[0]
-    expect(listArea.classes()).toContain('flex-1')
-    expect(listArea.classes()).toContain('min-h-0')
+    const pickerList = wrapper.find('[data-testid="exercise-picker-list"]')
+    expect(pickerList.classes()).toContain('max-h-[50dvh]')
+    expect(pickerList.classes()).toContain('overflow-y-auto')
   })
 
   it('round 6 items 3/4: has no view-level h1 (Hoy never had one) and no horizontal padding of its own on the root', async () => {
@@ -1072,11 +1060,12 @@ describe('ProgressView', () => {
     expect(wrapper.find('h1').exists()).toBe(false)
     // <main> del shell ya pone px-4: la raíz de la vista no debe duplicarlo
     expect(wrapper.classes().some((c) => c === 'p-4' || c.startsWith('px-'))).toBe(false)
-    // el chain h-full/flex-col (item 3 del round 3) sigue intacto sin el h1 — v0.4.1
-    // probó cambiar esto a flex-1 min-h-0 y lo descartó (ver comentario largo en
-    // ShellView.vue: rompía la cadena flex/% de ExercisePicker en Chromium real)
-    expect(wrapper.classes()).toContain('h-full')
-    expect(wrapper.classes()).toContain('flex-col')
+    // v0.5.0: raíz de flujo — la cadena h-full/flex-col murió con el modelo
+    // de scroll único (ver ShellView.vue); la tira de pestañas es sticky
+    expect(wrapper.classes()).not.toContain('h-full')
+    expect(wrapper.get('[data-testid="progress-tabs-sticky"]').classes()).toEqual(
+      expect.arrayContaining(['sticky', 'top-0', 'bg-void']),
+    )
   })
 
   it('item 7/item 8: switching tabs replays the entry animation (bk-stagger present per panel; body panel uses bk-rise)', async () => {
@@ -1098,7 +1087,7 @@ describe('ProgressView', () => {
     // que escalonar), ver comentario en ProgressView.vue
     await mainTablist.findAll('[role="tab"]')[1].trigger('click') // Cuerpo
     await flushPromises()
-    expect(wrapper.findComponent({ name: 'BodySection' }).classes()).toContain('flex-1')
+    expect(wrapper.findComponent({ name: 'BodySection' }).exists()).toBe(true)
   })
 
   describe('item 1 (v0.3.2): tab anchored to the URL hash', () => {

@@ -165,28 +165,27 @@ watch(() => athlete.userId, () => {
 
 // sin padding lateral propio en la raíz (item 4): <main> del shell ya pone
 // px-4/py-4, tenerlo también aquí duplicaba el gutter frente a Hoy.
-// item 14 (v0.4.3, zurdi generaliza el modelo de scroll interno a TODAS las
-// vistas): la raíz pasa a h-full flex flex-col — la fila de navegación de
-// mes queda shrink-0 (chrome fijo, siempre visible), y TODO lo demás (grid +
-// leyenda de compartidos + enlace de leyenda de runas + heatmap) vive en un
-// único flex-1 min-h-0 overflow-y-auto — antes esta vista entera scrolleaba
-// contra <main> (borde real de la ventana); el heatmap del año, el elemento
-// más alto, podía empujar mucho scroll con el selector de mes desapareciendo
-// de la vista. Reset de scroll (item 4): gratis vía remount de RouterView al
-// cambiar de ruta — un contenedor de scroll recién creado arranca en 0.
+// v0.5.0 (modelo de scroll único, ver ShellView.vue): la raíz FLUYE contra
+// <main> y la fila de navegación de mes pasa de shrink-0-en-columna-acotada
+// a sticky top-0 — mismo resultado (el selector de mes nunca se va de la
+// vista aunque el heatmap del año empuje mucho scroll), sin cadena de
+// alturas. El bloque sticky lleva -mt-4 pt-4 para cubrir también la banda
+// del pt-4 del wrapper del shell cuando está pegado (si no, el contenido
+// scrolleado asomaría por esos 16px por encima de la fila), y bg-void para
+// que el grid pase por debajo sin transparentarse.
 // (comentario aquí y no como primer hijo de <template>: un comentario ahí
 // convierte la raíz en un fragmento de dos nodos y rompe wrapper.classes(), ver ShellView.vue)
 </script>
 
 <template>
-  <div class="h-full flex flex-col gap-6">
+  <div class="space-y-6">
     <!-- Month navigation: icon-only en móvil (el texto largo con flecha
          desbordaba y aplastaba el label en 390px), texto de vuelta desde sm.
          La leyenda de runas ya no vive aquí (item 13): se baja entre la
          rejilla y la actividad del año, como un enlace suelto en vez de un
-         icono en esta fila. shrink-0 (item 14): chrome fijo, no scrollea con
-         el resto. -->
-    <div class="shrink-0 flex items-center gap-2">
+         icono en esta fila. sticky (v0.5.0): chrome pegado arriba del
+         scrollport de <main>, ver comentario del script. -->
+    <div class="sticky top-0 z-10 bg-void -mt-4 pt-4 pb-2 flex items-center gap-2" data-testid="month-nav">
       <BkButton variant="ghost" size="sm" :aria-label="$t('calendar.prevMonth')" @click="prevMonth">
         <span aria-hidden="true">‹</span>
         <span class="hidden sm:inline">{{ $t('calendar.prevMonth') }}</span>
@@ -198,9 +197,10 @@ watch(() => athlete.userId, () => {
       </BkButton>
     </div>
 
-    <!-- item 14: región de scroll ÚNICA para todo lo que no es la cabecera
-         de mes — grid, leyenda de compartidos, enlace de runas y heatmap -->
-    <div class="flex-1 min-h-0 overflow-y-auto space-y-6">
+    <!-- v0.5.0: sin región de scroll propia — grid, leyenda de compartidos,
+         enlace de runas y heatmap fluyen contra <main>; el div solo agrupa
+         el espaciado -->
+    <div class="space-y-6">
       <!-- Month grid -->
       <MonthGrid
         :month="monthData"

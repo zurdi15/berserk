@@ -23,6 +23,20 @@ const route = useRoute()
 const timer = useRestTimerStore()
 const activeWorkout = useActiveWorkoutStore()
 
+// v0.5.0 (zurdi revoca el scroll interno por vista del item 14): <main>
+// vuelve a ser el ÚNICO contenedor de scroll de la app y las vistas fluyen.
+// El reset de scroll al cambiar de sección ya no llega gratis (antes cada
+// vista remontaba su propio scroller a 0 vía RouterView) — se hace aquí,
+// explícito, sobre el PATH: el hash queda fuera a propósito, las pestañas
+// ancladas en URL (useTabHash) cambian hash sin cambiar de sección y cada
+// vista con pestañas resetea lo suyo (ver resetMainScroll en las vistas).
+// Asignación directa a scrollTop (no scrollTo()): mismo efecto y los
+// entornos de test (happy-dom) la soportan sin mock.
+const mainEl = ref<HTMLElement | null>(null)
+watch(() => route.path, () => {
+  if (mainEl.value) mainEl.value.scrollTop = 0
+})
+
 // item 1 (v0.3.0, feedback de gym de zurdi): mientras hay un descanso activo,
 // el hueco de la runa del CTA pasa a mostrar el countdown en su lugar — el
 // slab/glow y la navegación a /workout no cambian, solo lo que hay dentro.
@@ -385,108 +399,37 @@ watch(activeIndex, () => nextTick(updateIndicator))
         </ul>
       </div>
     </nav>
-    <!-- item 3 (v0.4.0, scrollbar): <main> es el scroll container A ANCHO COMPLETO (sin
-         max-w-3xl/mx-auto) — así su scrollbar pinta en el borde real de la ventana, no
-         pegada al canto de la columna de contenido. La columna centrada vive en el <div>
-         de abajo. bk-scroll-stable se queda en <main> (es donde el scroll ocurre de
-         verdad).
-         v0.4.1: <main> ya NO lleva pb-24/padding — ver el comentario del spacer, más abajo,
-         para el porqué completo (el hueco del navbar fijo se mudó a un elemento de flujo
-         real, DENTRO del wrapper, no a un padding de <main>).
-         item 14 (v0.4.3, zurdi): el modelo de scroll interno se generaliza a TODAS las
-         vistas (antes solo Perfil/Progresión) — cada vista ahora se acota a sí misma
-         (h-full/flex-1 min-h-0/overflow-y-auto en su propia raíz, ver TodayView/
-         CalendarView/WorkoutView/WorkoutEditView/ProfileView/ProgressView) y nunca
-         debería desbordar el wrapper de abajo. overflow-y-auto se queda AQUÍ de todos
-         modos, sin quitarlo ni "simplificarlo": (1) sigue siendo la caja cuyo tamaño
-         resuelto necesita el wrapper de abajo (h-[calc(100%-6rem)]) como referencia de
-         altura — esa cadena no cambia, la usan TODAS las vistas ahora, no solo las que
-         antes tenían su propio h-full; (2) queda como red de seguridad silenciosa: si
-         alguna vista futura olvida acotarse a sí misma, su contenido desborda hacia AQUÍ
-         en vez de recortarse sin más — overflow visible sería peor (contenido tapado por
-         el navbar fijo, el bug original que motivó todo este modelo). En el uso normal,
-         con cada vista ya acotada, <main> mismo no llega a necesitar scrollear. -->
-    <main class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable w-full">
-      <!-- v0.4.1 — HISTORIA COMPLETA DEL MODELO DE ALTURA (bug real de zurdi en móvil: "se
-           ha roto el scroll — parte del content de abajo se esconde detrás de la bottom
-           navbar"). Este wrapper sigue siendo una caja de altura DEFINIDA (nunca min-height,
-           ver por qué al final), pero YA NO es exactamente h-full de <main> — es
-           h-[calc(100%-6rem)]: 100% de <main> MENOS los 6rem (96px, el mismo valor que el
-           pb-24 histórico) que reserva el spacer de abajo. Dos problemas distintos, dos
-           partes de este mismo fix:
-
-           1) EL BUG ORIGINAL (contenido tapado): con h-full puro + pb-24 como padding
-              —fuera en <main>, fuera en este wrapper, da igual dónde— el padding-bottom de
-              una caja se reserva SIEMPRE justo tras la altura RESUELTA de esa caja, nunca
-              tras lo que sus hijos desborden. Una vista más alta que el viewport (Hoy con
-              mucho registro) se pinta más allá del borde de la caja (overflow visible,
-              default) — y como el padding vivía DENTRO de esa misma caja de altura fija, su
-              hueco quedaba a mitad del contenido desbordado, no al final: main.scrollHeight
-              SÍ crecía con el desborde (el overflow de un descendiente cuenta para el scroll
-              del ancestro real aunque el padre intermedio tenga overflow visible), pero el
-              scroll llegaba hasta el ÚLTIMO píxel de contenido sin ningún hueco reservado ahí
-              — tapado por el navbar fijo. Verificado en Chromium real (headless, 390×844):
-              con pb-24 en <main> (v0.4.0), el último elemento de Hoy quedaba a -38px del
-              navbar (38px POR DEBAJO de su borde superior, tapado).
-              Fix de ESTA parte: pb-24 pasa de padding a un <div> SPACER real (ver más abajo)
-              — un hijo de flujo, hermano de RouterView, no una propiedad de caja. Un hijo
-              flex NO se recorta a la altura resuelta de su padre: el algoritmo de flex apila
-              cada item por su tamaño real (auto/contenido para RouterView, fijo para el
-              spacer) uno tras otro, así que el spacer siempre queda inmediatamente DESPUÉS
-              del contenido real de RouterView, se desborde la caja padre o no.
-
-           2) SEGUNDO BUG, encontrado verificando el primer intento en Chromium real: mover
-              el spacer DENTRO de un wrapper que se quedaba en h-full (100% COMPLETO de
-              <main>, sin descontar los 6rem del spacer) le daba a las vistas con su propio
-              h-full interno (ProgressView) una referencia de altura MAYOR que antes — la
-              vista entera crecía ~80px de más y el contenido "anclado abajo" (el chart de
-              Entrenos) se plantaba a ras del viewport, bajo el navbar, en vez de quedar
-              claro por encima como siempre. Contraintuitivo: el spacer vive DESPUÉS de
-              RouterView como hermano de flujo, así que en teoría "no debería" afectar el
-              100% que ve RouterView — pero SÍ afecta, porque ProgressView no usa flex-grow
-              para ocupar hueco (eso solo sirve para repartir espacio libre), usa
-              height:100% (percentage) directamente contra la altura RESUELTA de este
-              wrapper — un valor que no sabe nada de sus hermanos de flujo (el spacer), solo
-              del padre. Si el wrapper reporta 100% de <main> completo, ProgressView ocupa
-              ESO completo, ajeno a que el spacer se va a comer 96px después.
-              Fix de ESTA parte: h-[calc(100%-6rem)] en vez de h-full — el wrapper declara
-              explícitamente que su propio 100% (la referencia que ProgressView hereda) es
-              el alto de <main> MENOS la reserva del spacer, no el alto completo.
-              Verificado en Chromium real (390×844, dev build): con h-[calc(100%-6rem)], el
-              chart de Entrenos vuelve a la MISMA posición exacta que en v0.4.0 (wrapper
-              748px, idéntico al viejo main con pb-24), en vez de quedar 80px más abajo.
-
-           3) TERCER BUG (v0.4.4, regresión del item 14 — zurdi en móvil: "el content de
-              Hoy se corta mucho antes de llegar al bottom nav bar"): mientras convivían
-              vistas de FLUJO (Hoy: altura auto, desbordaban el wrapper y el spacer seguía
-              a su contenido) y vistas ACOTADAS (h-full), la doble expresión de la reserva
-              —calc arriba + spacer en flujo abajo— era necesaria: cada tipo de vista usaba
-              solo UNA de las dos. El item 14 acotó TODAS las vistas, y eso cambió la
-              aritmética flex del wrapper: una raíz de vista con h-full es flex-basis 732px
-              (100% del content-box), el spacer suma 96px, total 828 > 732 — y como la raíz
-              lleva overflow-y-auto, su min-height automático es 0 (overflow != visible
-              anula el mínimo por contenido), así que flex-shrink le quitaba los 96px
-              ENTEROS a la vista: la caja de Hoy acababa en y=652 con el navbar en y≈781,
-              128px de hueco muerto (la reserva contada DOS veces). Medido en Chromium real
-              390×844 antes del fix. Fix: el spacer MUERE — con todas las vistas acotadas
-              ya nadie desborda el wrapper en flujo, y la reserva del navbar queda
-              expresada UNA sola vez, en el calc de arriba. Tras el fix, toda vista acaba
-              en y=748, ~33px limpios sobre el navbar (mismo margen que tenía Admin).
-              Red de seguridad para una vista futura sin acotar: sigue desbordando hacia el
-              scroll de <main> (ver comentario de <main>), solo que sus últimos px quedan
-              tras el navbar — peor que con spacer, pero visible con scroll, y el modelo
-              actual es que esa vista está MAL y se arregla en la vista.
-
-           Por qué sigue siendo una caja DEFINIDA (nunca min-h-full, aunque "crecer con el
-           contenido" suene tentador para el bug 1): min-h-full aquí se probó y ROMPE la
-           cadena flex/% de ProgressView — un hijo flex-1/h-full varios niveles más adentro
-           (ExercisePicker, ver su comentario) deja de recibir una referencia DEFINIDA en
-           cuanto el ancestro de arriba pasa de height fijo a min-height (min-height no
-           cuenta como "definido" para % de descendientes, y tampoco deja que flex-grow
-           reparta espacio de forma fiable cuando el propio contenedor está en modo
-           auto-size). Chromium real lo confirmó: el listado de ejercicios dejaba de tener su
-           propio scroll interno y arrastraba a <main> entero a desbordar miles de px. -->
-      <div class="max-w-3xl mx-auto w-full h-[calc(100%-6rem)] flex flex-col px-4 pt-4">
+    <!-- v0.5.0 — EL MODELO DE SCROLL, tercera y (esperemos) última iteración.
+         Historia comprimida: v0.4.0-0.4.2 = <main> scrollea y las vistas fluyen,
+         con un spacer/calc reservando el hueco del navbar (dos expresiones de la
+         misma reserva, cada tipo de vista usaba una); v0.4.3 (item 14) = zurdi
+         pide tabs siempre visibles y se generaliza el scroll INTERNO por vista
+         (cadena h-[calc]/h-full/flex-1) — 3 regresiones en 4 releases (0.4.1,
+         0.4.3, 0.4.4: padding tras altura fija, referencias de % y doble
+         reserva vía flex-shrink); v0.5.0 = zurdi lo revoca ("scroll normal de
+         página, las tabs visibles se consiguen con position fija o algo así").
+         Modelo actual: <main> es el ÚNICO scroller de la app, A ANCHO COMPLETO
+         (la columna centrada vive en el wrapper de abajo) — su scrollbar pinta
+         en el borde real de la ventana en desktop (requisito v0.4.0) y en móvil
+         es overlay nativo (base.css confina el estilo aurora a punteros finos).
+         Las vistas FLUYEN (altura por contenido, sin acotarse) y su chrome
+         (tiras de tabs, nav de mes, header de entreno) se pega arriba con
+         sticky top-0 contra este scrollport — sticky exige que ningún ancestro
+         intermedio tenga overflow propio ni transform retenido (las entradas
+         bk-stagger usan fill backwards: el transform se limpia al terminar).
+         El scroll interno sobrevive SOLO en cajas hoja con su propia altura
+         (lista del picker de Entrenos, overlays/sheets) — nunca como cadena
+         de referencias de altura entre niveles. -->
+    <main ref="mainEl" class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable w-full">
+      <!-- v0.5.0: wrapper de FLUJO puro — columna centrada, altura por
+           contenido, sin calc ni flex-col ni spacer (toda la saga de alturas
+           0.4.1→0.4.4 está resumida en el comentario de <main>). pb-24 como
+           padding vuelve a ser CORRECTO aquí: el bug histórico del padding
+           ("se reserva tras la altura resuelta, no tras el desborde") solo
+           mordía porque la caja tenía altura FIJA — con altura auto la caja
+           TERMINA donde termina el contenido y el padding queda siempre
+           después de él, reservando el hueco del navbar móvil fijo. -->
+      <div class="max-w-3xl mx-auto w-full px-4 pt-4 pb-24">
         <!-- sin Transition aquí a propósito (item 4): esto envolvía la vista
              ENTERA en un fade bk-rise MIENTRAS su propio bk-stagger interno
              corría con su propio delay — dos sistemas de animación a la vez,
@@ -495,10 +438,6 @@ watch(activeIndex, () => nextTick(updateIndicator))
              única animación de entrada ahora (bk-stagger/bk-rise propio, o
              ninguna si no hace falta) — ver auditoría por vista en el informe. -->
         <RouterView />
-        <!-- v0.4.4: aquí vivió el spacer h-24 de la v0.4.1 (reserva del navbar como hijo
-             de flujo). Murió con el item 14: al acotarse TODAS las vistas, restaba sus
-             96px OTRA vez encima del calc(100%-6rem) del wrapper vía flex-shrink (ver
-             punto 3 de la historia de arriba). La reserva vive solo en el calc ahora. -->
       </div>
     </main>
   </div>
