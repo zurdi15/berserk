@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.4.1 - 2026-08-07
+
+- Fixed mobile scrolling: content no longer hides behind the bottom navigation bar.
+- Your own calendar now shows ambient dots for every user who shares their log with you, each in their color, with a small legend — no need to enter their profile.
+- Routines, exercises and muscle groups each render as a single unified list with creator attribution (you, global catalog, or another user), instead of split sections.
+- Text buttons are one visual step more compact on phones.
+
 ## 0.4.0 - 2026-08-07
 
 - Light theme: a nordic-day palette (pale fog surfaces, WCAG AA-tuned aurora and ember) selectable in Settings as dark, light or system, applied before first paint and re-theming the charts live.
