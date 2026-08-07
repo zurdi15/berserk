@@ -398,6 +398,25 @@ describe('MonthGrid', () => {
     expect(grid.attributes('style')).toContain('--bk-day-dot: var(--color-aurora)')
   })
 
+  // v0.5.1 (bug real de zurdi): "el dot propio lo veo siempre aurora, pero
+  // debería ser del color de usuario independientemente de quién esté
+  // logeado" — en el calendario PROPIO, --bk-day-dot cae al color del
+  // usuario autenticado; en modo atleta sigue mandando el color del
+  // observado (precedencia athlete.viewing.color ?? auth.user.color)
+  it('v0.5.1: own calendar wires --bk-day-dot to the logged-in user color; the viewed athlete color still wins in athlete mode', async () => {
+    const auth = useAuthStore()
+    auth.user = { id: 1, username: 'romm', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC', color: '#ff6600' }
+
+    const wrapper = mount(CalendarView, { global: { plugins: [createI18nInstance()] } })
+    await flushPromises()
+    const grid = wrapper.get('[data-testid="month-grid"]')
+    expect(grid.attributes('style')).toContain('--bk-day-dot: #ff6600')
+
+    useAthleteStore().view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC', color: '#3b82f6' })
+    await flushPromises()
+    expect(grid.attributes('style')).toContain('--bk-day-dot: #3b82f6')
+  })
+
   it('polish wave item 1: today\'s cell glows on the BORDER only — the day number stays in normal ink', async () => {
     vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
     const wrapper = mount(MonthGrid, {

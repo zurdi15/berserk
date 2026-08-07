@@ -15,9 +15,11 @@ import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
 import { isValidRuneName } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 import { useAthleteStore } from '@/stores/athlete'
+import { useAuthStore } from '@/stores/auth'
 import type { CalendarMonthOut, MuscleGroupOut } from '@/api/domain'
 
 const athlete = useAthleteStore()
+const auth = useAuthStore()
 const { locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
@@ -201,13 +203,19 @@ watch(() => athlete.userId, () => {
          enlace de runas y heatmap fluyen contra <main>; el div solo agrupa
          el espaciado -->
     <div class="space-y-6">
-      <!-- Month grid -->
+      <!-- Month grid. dot-color (v0.5.1, bug real de zurdi): "el dot propio
+           lo veo siempre aurora, pero debería ser del color de usuario
+           independientemente de quién esté logeado" — en modo atleta manda
+           el color del observado (como siempre), y en el calendario PROPIO
+           cae al color del usuario logeado en vez de directamente al aurora;
+           el aurora queda como último fallback (usuario sin color) dentro de
+           MonthGrid. -->
       <MonthGrid
         :month="monthData"
         :year="year"
         :month-num="month"
         :group-map="groupMap"
-        :dot-color="athlete.viewing?.color"
+        :dot-color="athlete.viewing?.color ?? auth.user?.color"
         @select="selectDay"
       />
 
