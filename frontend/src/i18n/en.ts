@@ -199,6 +199,11 @@ export const en = {
     // visible to whoever's looking (its owner made the ROUTINE global but
     // not THAT exercise) — used to render as a blank name, with no explanation
     privateExercise: 'Private exercise',
+    // v0.5.0 supersets: link button between consecutive editor rows (A1/A2
+    // grouping) + presentational chip per grouped row
+    linkSuperset: 'Link into a superset with the previous exercise',
+    unlinkSuperset: 'Unlink from the superset',
+    supersetLabel: 'Superset {label}',
   },
   library: {
     exercises: 'Exercises',
@@ -393,6 +398,10 @@ export const en = {
     routineNameDefault: 'Workout {date}',
     savedAsRoutine: 'Routine saved',
     restLabel: 'Rest: {seconds}s',
+    // v0.5.0 supersets: grouped-card chip + "you're chaining into this one
+    // next" marker (auto-rest only fires after the group's LAST member)
+    superset: 'Superset {label}',
+    supersetNext: 'Next up',
     cardio: {
       loggedWhileAway: 'Cardio logged: {duration}',
     },

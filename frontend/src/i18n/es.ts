@@ -199,6 +199,11 @@ export const es = {
     // es visible para quien la mira (el dueño hizo global la RUTINA pero no
     // ESE ejercicio) — antes el nombre quedaba en blanco, sin explicación
     privateExercise: 'Ejercicio privado',
+    // v0.5.0 superseries: botón de enlazar entre filas consecutivas del
+    // editor (agrupado A1/A2) + chip presentacional por fila agrupada
+    linkSuperset: 'Enlazar en superserie con el ejercicio anterior',
+    unlinkSuperset: 'Separar de la superserie',
+    supersetLabel: 'Superserie {label}',
   },
   library: {
     exercises: 'Ejercicios',
@@ -400,6 +405,10 @@ export const es = {
     routineNameDefault: 'Entreno {date}',
     savedAsRoutine: 'Rutina guardada',
     restLabel: 'Descanso: {seconds}s',
+    // v0.5.0 superseries: chip de la card agrupada + marcador de "el
+    // siguiente es este" (el auto-descanso solo salta tras el ÚLTIMO miembro)
+    superset: 'Superserie {label}',
+    supersetNext: 'Siguiente',
     cardio: {
       loggedWhileAway: 'Cardio registrado: {duration}',
     },

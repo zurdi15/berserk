@@ -83,6 +83,12 @@ export interface WorkoutExerciseOut {
   // item 11: override de descanso de ESTE ejercicio en ESTE entreno; null
   // cae al target de la rutina de origen o al default general (ver rest.ts)
   rest_seconds: number | null
+  // v0.5.0 superseries: copiado de la rutina al empezar (null = suelto /
+  // ad-hoc). Opcional en el tipo aunque el backend siempre manda la clave
+  // (mismo criterio que RoutineOut.is_global): los fixtures existentes
+  // siguen tipando. Resolución efectiva siempre vía `?? null` y SIEMPRE a
+  // través de lib/supersets.ts (contigüidad manda, nunca el valor a pelo).
+  superset_group?: number | null
   sets: SetOut[]
 }
 
@@ -138,6 +144,10 @@ export interface RoutineExerciseOut {
   target_reps: number | null
   target_weight_kg: number | null
   rest_seconds: number | null
+  // v0.5.0 superseries: índice de grupo (contiguos con el mismo valor =
+  // grupo, null = suelto) — opcional por el mismo criterio que
+  // WorkoutExerciseOut.superset_group; leer siempre vía lib/supersets.ts
+  superset_group?: number | null
 }
 
 export interface RoutineOut {
@@ -167,6 +177,9 @@ export interface RoutineExerciseIn {
   target_reps?: number | null
   target_weight_kg?: number | null
   rest_seconds?: number | null
+  // v0.5.0 superseries: el editor manda valores YA normalizados (0,1,2…, ver
+  // lib/supersets.ts); el backend los persiste tal cual
+  superset_group?: number | null
 }
 
 // Calendar types

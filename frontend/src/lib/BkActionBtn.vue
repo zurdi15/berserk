@@ -22,8 +22,12 @@
 // v0.4.0: 'view' para "ver a este atleta" (SharingCard, antes texto "Ver")
 // — ojo de trazo: elipse (párpados) + círculo (pupila), sin relleno, mismo
 // stroke-width que el resto del set.
+// v0.5.0: 'link'/'unlink' para el enlazado de superseries entre filas del
+// editor de rutina (RoutineEditorSheet) — eslabón de cadena de trazo; la
+// variante unlink separa los dos medios eslabones y añade las marcas de
+// "chispa" de rotura, para que el estado se lea por la forma del icono.
 defineProps<{
-  icon: 'edit' | 'key' | 'delete' | 'skip' | 'replan' | 'copy' | 'view'
+  icon: 'edit' | 'key' | 'delete' | 'skip' | 'replan' | 'copy' | 'view' | 'link' | 'unlink'
 }>()
 </script>
 
@@ -126,6 +130,42 @@ defineProps<{
            centrado (pupila), ambos de trazo, nunca relleno -->
       <ellipse cx="12" cy="12" rx="9" ry="6" />
       <circle cx="12" cy="12" r="2.5" />
+    </svg>
+    <svg
+      v-else-if="icon === 'link'"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="w-4 h-4"
+      aria-hidden="true"
+    >
+      <!-- link (v0.5.0): eslabón de cadena — dos arcos entrelazados, solo
+           trazo, mismo idiom que el resto del set -->
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+    <svg
+      v-else-if="icon === 'unlink'"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="w-4 h-4"
+      aria-hidden="true"
+    >
+      <!-- unlink (v0.5.0): los dos medios eslabones separados + marcas de
+           rotura — "esto está enlazado, tócalo para separarlo" -->
+      <path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M5.17 11.75l-1.71 1.71a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+      <path d="M8 2v3" />
+      <path d="M2 8h3" />
+      <path d="M16 19v3" />
+      <path d="M19 16h3" />
     </svg>
     <svg
       v-else

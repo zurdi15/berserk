@@ -8,6 +8,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { displayToKg, kgToDisplay } from '@/utils/units'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
+import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
@@ -15,6 +16,13 @@ import BkSelect from '@/lib/BkSelect.vue'
 import BkStepper from '@/lib/BkStepper.vue'
 import BkRune from '@/lib/BkRune.vue'
 import { FUTHARK_RUNE_NAMES, type RuneName } from '@/lib/runes'
+import {
+  isLinkedAt,
+  normalizeSupersets,
+  supersetLabels,
+  toggleSupersetLink,
+  type SupersetValue,
+} from '@/lib/supersets'
 import { exerciseName } from './exerciseName'
 
 const props = defineProps<{ open: boolean; routine?: RoutineOut }>()
@@ -44,6 +52,10 @@ const exercises = ref<Array<{
   target_reps: number | null
   target_weight_kg: number | null
   rest_seconds: string | null
+  // v0.5.0 superseries: índice de grupo normalizado (0,1,2…) o null =
+  // suelto — SIEMPRE se mantiene normalizado tras cada mutación (enlazar,
+  // reordenar, quitar), ver renormalizeSupersets
+  superset_group: number | null
 }>>([])
 // Immutable full catalog (loaded once, used for row-name resolution)
 const allExercises = ref<ExerciseOut[]>([])
@@ -132,7 +144,12 @@ async function initializeForm() {
       target_reps: e.target_reps || 0,
       target_weight_kg: e.target_weight_kg || null,
       rest_seconds: e.rest_seconds ? String(e.rest_seconds) : '60',
+      superset_group: e.superset_group ?? null,
     }))
+    // defensivo: lo guardado puede venir sin normalizar (p.ej. un
+    // save-as-routine con contigüidad rota por un reorden mid-workout) —
+    // el editor trabaja siempre sobre la forma canónica
+    renormalizeSupersets()
   } else {
     name.value = ''
     description.value = ''
@@ -156,6 +173,8 @@ function addExercise(exercise: ExerciseOut) {
     target_reps: 0,
     target_weight_kg: null,
     rest_seconds: '60',
+    // un ejercicio recién añadido nace suelto: se enlaza a mano después
+    superset_group: null,
   })
   // Only clear search query and results, keep allExercises immutable
   searchQuery.value = ''
@@ -164,6 +183,9 @@ function addExercise(exercise: ExerciseOut) {
 
 function removeExercise(id: string) {
   exercises.value = exercises.value.filter(e => e.id !== id)
+  // quitar un miembro puede dejar su grupo en 1 (se disuelve) o unir dos
+  // runs del mismo valor que ahora quedan contiguos (siguen siendo un grupo)
+  renormalizeSupersets()
 }
 
 function moveExerciseUp(index: number) {
@@ -171,6 +193,9 @@ function moveExerciseUp(index: number) {
     const temp = exercises.value[index]
     exercises.value[index] = exercises.value[index - 1]
     exercises.value[index - 1] = temp
+    // reordenar recomputa la contigüidad: un grupo roto por el movimiento se
+    // parte (los runs de 1 que queden se disuelven a sueltos)
+    renormalizeSupersets()
   }
 }
 
@@ -179,8 +204,39 @@ function moveExerciseDown(index: number) {
     const temp = exercises.value[index]
     exercises.value[index] = exercises.value[index + 1]
     exercises.value[index + 1] = temp
+    renormalizeSupersets()
   }
 }
+
+// ── v0.5.0 superseries ─────────────────────────────────────────────────────
+
+function currentSupersetValues(): SupersetValue[] {
+  return exercises.value.map(e => e.superset_group)
+}
+
+// referencia NUEVA de array y de cada fila cambiada — mutar el cache
+// reactivo in-place esquiva el proxy de Vue (gotcha del repo)
+function applySupersetValues(values: SupersetValue[]) {
+  exercises.value = exercises.value.map((e, i) =>
+    e.superset_group === (values[i] ?? null) ? e : { ...e, superset_group: values[i] ?? null },
+  )
+}
+
+function renormalizeSupersets() {
+  applySupersetValues(normalizeSupersets(currentSupersetValues()))
+}
+
+// frontera entre la fila index-1 y la fila index (el botón vive entre ambas)
+function toggleLink(index: number) {
+  applySupersetValues(toggleSupersetLink(currentSupersetValues(), index))
+}
+
+function linkedAt(index: number): boolean {
+  return isLinkedAt(currentSupersetValues(), index)
+}
+
+// etiqueta presentacional A/B/C… por fila (null = suelto)
+const rowSupersetLabels = computed(() => supersetLabels(exercises.value.map(e => e.superset_group)))
 
 async function saveRoutine() {
   if (!name.value.trim()) {
@@ -215,6 +271,8 @@ async function saveRoutine() {
       target_reps: e.target_reps || null,
       target_weight_kg: e.target_weight_kg || null,
       rest_seconds: e.rest_seconds ? parseInt(e.rest_seconds, 10) : null,
+      // ya normalizado (0,1,2…): cada mutación local renormaliza
+      superset_group: e.superset_group,
     })))
 
     emit('close')
@@ -319,14 +377,35 @@ watch(
 
         <!-- Exercise Rows -->
         <div v-if="exercises.length > 0" class="space-y-3 border-t border-line pt-3">
-          <div
-            v-for="(exercise, index) in exercises"
-            :key="exercise.id"
-            class="space-y-2 p-3 bg-stone rounded-sm border border-line"
-          >
-            <!-- Exercise name (read-only) -->
-            <div class="text-sm font-medium text-ink">
-              {{ exerciseName(allExercises.find(e => e.id === exercise.exercise_id), auth.user?.locale || 'es') }}
+          <template v-for="(exercise, index) in exercises" :key="exercise.id">
+            <!-- v0.5.0 superseries: botón de enlazar ENTRE filas consecutivas
+                 — enlaza/desenlaza esta fila con la anterior; el icono cambia
+                 de eslabón a eslabón roto según el estado (BkActionBtn) -->
+            <div v-if="index > 0" class="flex justify-center">
+              <BkActionBtn
+                :icon="linkedAt(index) ? 'unlink' : 'link'"
+                :data-testid="`superset-toggle-${index}`"
+                :aria-label="linkedAt(index) ? $t('routines.unlinkSuperset') : $t('routines.linkSuperset')"
+                :aria-pressed="linkedAt(index) ? 'true' : 'false'"
+                @click="toggleLink(index)"
+              />
+            </div>
+            <div
+              class="space-y-2 p-3 bg-stone rounded-sm border"
+              :class="rowSupersetLabels[index] ? 'border-aurora/40' : 'border-line'"
+            >
+            <!-- Exercise name (read-only) + chip de superserie (A/B/C…) -->
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-ink">
+                {{ exerciseName(allExercises.find(e => e.id === exercise.exercise_id), auth.user?.locale || 'es') }}
+              </span>
+              <span
+                v-if="rowSupersetLabels[index]"
+                :data-testid="`superset-row-chip-${index}`"
+                class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5 shrink-0"
+              >
+                {{ $t('routines.supersetLabel', { label: rowSupersetLabels[index] }) }}
+              </span>
             </div>
 
             <!-- Target Sets -->
@@ -404,7 +483,8 @@ watch(
                 {{ $t('routines.remove') }}
               </BkButton>
             </div>
-          </div>
+            </div>
+          </template>
         </div>
 
         <!-- Add Exercise -->
