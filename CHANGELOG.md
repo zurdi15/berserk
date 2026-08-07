@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.3.2 - 2026-08-07
+
+- Your custom exercises can be made visible to everyone: other users see them with attribution and can train with them, while editing stays yours.
+- Routine templates: mark a routine as visible to all, copy someone else's template (or an admin's global one) into your own list as a snapshot, and admins can promote a routine to a global template.
+- The cardio countdown now survives the phone killing the tab: it resumes where it was on return, and if it finished while you were away the set logs itself with the full duration.
+- README screenshots and feature list now reflect the current app.
+
 ## 0.3.1 - 2026-08-07
 
 - Retroactive workouts can now record their real start time and duration, and editing a workout's date moves its timestamps along with it — gym-time stats reflect reality.
