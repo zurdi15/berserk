@@ -24,8 +24,13 @@ const props = withDefaults(
     // restEnabled de WorkoutExerciseCard, pasado explícito aquí porque
     // SetForm no conoce ese prop
     live?: boolean
+    // v0.9.4 (zurdi: "no debería haber un añadir cardio"): el formulario de
+    // cardio vive PERMANENTE en el cuerpo de la tarjeta, no tras un botón.
+    // En ese modo "Registrar y otra" sobra: el formulario nunca se cierra,
+    // así que ambas variantes de submit harían exactamente lo mismo
+    inline?: boolean
   }>(),
-  { units: 'kg', initialSet: null, editing: false, live: true },
+  { units: 'kg', initialSet: null, editing: false, live: true, inline: false },
 )
 // keepOpen (item 1): false = "Registrar serie" (cierra el cajón), true =
 // "Registrar y otra" (se queda abierto, valores conservados para la
@@ -156,14 +161,19 @@ function onCountdownCancel() {
 </script>
 
 <template>
+  <!-- v0.9.4 (zurdi): swap animado countdown ⇄ formulario — out-in para que
+       la salida del countdown terminado (o cancelado) acabe antes de que el
+       formulario vuelva a entrar (ver bk-timer-swap en animations.css) -->
+  <Transition name="bk-timer-swap" mode="out-in">
   <CardioCountdown
     v-if="countdownActive"
+    key="countdown"
     :target-seconds="durationSeconds"
     @done="onCountdownDone"
     @cancel="onCountdownCancel"
   />
 
-  <form v-else class="space-y-3 flex flex-col items-center" @submit.prevent="submit(false)">
+  <form v-else key="form" class="space-y-3 flex flex-col items-center" @submit.prevent="submit(false)">
     <!-- item 4a: todo el contenido del formulario se centra (flex-col
          items-center en el <form>) — antes quedaba pegado al borde
          izquierdo del cajón -->
@@ -241,7 +251,7 @@ function onCountdownCancel() {
 
     <div class="flex gap-2 w-full">
       <BkButton
-        v-if="!editing"
+        v-if="!editing && !inline"
         type="button"
         variant="ghost"
         class="flex-1"
@@ -255,5 +265,6 @@ function onCountdownCancel() {
       </BkButton>
     </div>
   </form>
+  </Transition>
 </template>
 

@@ -214,7 +214,28 @@ describe('ExerciseManager', () => {
     })
   })
 
-  it('item 3: hides the is_global toggle for a non-admin user', async () => {
+  // v0.9.4 (zurdi: "visible para todos y global es un poco redundante"): los
+  // checks is_global + is_public colapsan en un select de visibilidad — los
+  // tests de item 3 / W2 feature 1 se re-apuntan a ese select
+  async function visibilityOptionLabels(): Promise<string[]> {
+    await byTestId('exercise-visibility-select').find('[role="combobox"]').trigger('click')
+    const labels = Array.from(document.querySelectorAll('[role="option"]'))
+      .map((o) => o.textContent?.trim() ?? '')
+    // cerrar el listbox para no contaminar la siguiente interacción
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    return labels
+  }
+
+  async function pickVisibility(label: string) {
+    await byTestId('exercise-visibility-select').find('[role="combobox"]').trigger('click')
+    const option = Array.from(document.querySelectorAll('[role="option"]'))
+      .find((o) => o.textContent?.trim() === label) as HTMLElement
+    expect(option).not.toBeUndefined()
+    option.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+  }
+
+  it('item 3: a non-admin user never sees the global-catalog visibility option', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([] as never)
     vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
@@ -225,10 +246,13 @@ describe('ExerciseManager', () => {
     await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
     await flushPromises()
 
-    expect(byTestId('exercise-is-global-checkbox').exists()).toBe(false)
+    const labels = await visibilityOptionLabels()
+    expect(labels).toContain('Privado')
+    expect(labels).toContain('Visible para todos')
+    expect(labels).not.toContain('Cat\u00e1logo global')
   })
 
-  it('item 3: shows the is_global toggle for an admin user and sends it true when checked', async () => {
+  it('item 3: an admin picking "Cat\u00e1logo global" on create sends is_global true (and is_public false)', async () => {
     const { listExercises, listMuscleGroups, createExercise } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([] as never)
     vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
@@ -242,18 +266,16 @@ describe('ExerciseManager', () => {
     await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
     await flushPromises()
 
-    expect(byTestId('exercise-is-global-checkbox').exists()).toBe(true)
-
     await byTestId('exercise-name-es-field').find('input').setValue('X')
     await byTestId('exercise-name-en-field').find('input').setValue('X')
-    await byTestId('exercise-is-global-checkbox').setValue(true)
+    await pickVisibility('Cat\u00e1logo global')
     await byTestId('save-exercise-btn').trigger('click')
     await flushPromises()
 
-    expect(createExercise).toHaveBeenCalledWith(expect.objectContaining({ is_global: true }))
+    expect(createExercise).toHaveBeenCalledWith(expect.objectContaining({ is_global: true, is_public: false }))
   })
 
-  it('item 3: does not render the is_global toggle when editing (create-only, not patchable)', async () => {
+  it('item 3: the global-catalog option is create-only \u2014 editing never offers it (is_global is not patchable)', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
@@ -267,10 +289,11 @@ describe('ExerciseManager', () => {
     await wrapper.find('[data-testid="edit-exercise-12"]').trigger('click')
     await flushPromises()
 
-    expect(byTestId('exercise-is-global-checkbox').exists()).toBe(false)
+    const labels = await visibilityOptionLabels()
+    expect(labels).not.toContain('Cat\u00e1logo global')
   })
 
-  it('W2 feature 1: is_public checkbox round-trips on create (unchecked by default, sent true when checked)', async () => {
+  it('W2 feature 1: visibility round-trips on create (Privado by default, is_public true when set to Visible para todos)', async () => {
     const { listExercises, listMuscleGroups, createExercise } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([] as never)
     vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
@@ -284,19 +307,19 @@ describe('ExerciseManager', () => {
     await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
     await flushPromises()
 
-    // por defecto sin marcar
-    expect((byTestId('exercise-is-public-checkbox').element as HTMLInputElement).checked).toBe(false)
+    // por defecto: privado
+    expect(byTestId('exercise-visibility-select').text()).toContain('Privado')
 
     await byTestId('exercise-name-es-field').find('input').setValue('X')
     await byTestId('exercise-name-en-field').find('input').setValue('X')
-    await byTestId('exercise-is-public-checkbox').setValue(true)
+    await pickVisibility('Visible para todos')
     await byTestId('save-exercise-btn').trigger('click')
     await flushPromises()
 
-    expect(createExercise).toHaveBeenCalledWith(expect.objectContaining({ is_public: true }))
+    expect(createExercise).toHaveBeenCalledWith(expect.objectContaining({ is_public: true, is_global: false }))
   })
 
-  it('W2 feature 1: editing a PUBLIC own exercise pre-checks is_public, and unchecking sends false', async () => {
+  it('W2 feature 1: editing a PUBLIC own exercise preselects Visible para todos, and switching to Privado sends is_public false', async () => {
     const { listExercises, listMuscleGroups, updateExercise } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       {
@@ -315,16 +338,17 @@ describe('ExerciseManager', () => {
     await wrapper.find('[data-testid="edit-exercise-12"]').trigger('click')
     await flushPromises()
 
-    expect((byTestId('exercise-is-public-checkbox').element as HTMLInputElement).checked).toBe(true)
+    // pre-seleccionado en "Visible para todos" por venir p\u00fablico
+    expect(byTestId('exercise-visibility-select').text()).toContain('Visible para todos')
 
-    await byTestId('exercise-is-public-checkbox').setValue(false)
+    await pickVisibility('Privado')
     await byTestId('save-exercise-btn').trigger('click')
     await flushPromises()
 
     expect(updateExercise).toHaveBeenCalledWith(12, expect.objectContaining({ is_public: false }))
   })
 
-  it('W2 feature 1: hides the is_public checkbox when an admin edits a predefined catalog row (owner_id null)', async () => {
+  it('W2 feature 1: hides the visibility select entirely when an admin edits a predefined catalog row (owner_id null)', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       {
@@ -340,7 +364,7 @@ describe('ExerciseManager', () => {
     await wrapper.get('[data-testid="edit-exercise-1"]').trigger('click')
     await flushPromises()
 
-    expect(byTestId('exercise-is-public-checkbox').exists()).toBe(false)
+    expect(byTestId('exercise-visibility-select').exists()).toBe(false)
   })
 
   it('UNIFIED-LISTINGS: a PUBLIC exercise from another user renders inline with a BkUser attribution, unusable for edit/delete even by an admin', async () => {
@@ -595,6 +619,89 @@ describe('ExerciseManager', () => {
     const groupTag = wrapper.get('[data-testid="exercise-group-tag-1"]')
     const attribution = wrapper.get('[data-testid="exercise-attribution-1"]')
     expect(groupTag.element.parentElement).toBe(attribution.element.parentElement)
+  })
+
+  // v0.9.4 (zurdi): búsqueda + filtro por grupo + chip de tipo — el origen
+  // fue "los ejercicios de cardio no salen": salían, pero en una lista de 59
+  // filas ordenada por name_en y sin nada en la fila que delatara el tipo
+  describe('v0.9.4: search, group filter and measurement chip', () => {
+    async function mountFiltered() {
+      const { listExercises, listMuscleGroups } = await import('@/api/domain')
+      vi.mocked(listExercises).mockResolvedValue([
+        { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [{ muscle_group_id: 1, is_primary: true }] },
+        { id: 2, name_es: 'Cinta de correr', name_en: 'Treadmill', measurement: 'cardio', owner_id: null, muscle_groups: [{ muscle_group_id: 2, is_primary: true }] },
+        { id: 3, name_es: 'Plancha', name_en: 'Plank', measurement: 'timed', owner_id: null, muscle_groups: [] },
+      ] as never)
+      vi.mocked(listMuscleGroups).mockResolvedValue([
+        { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+        { id: 2, slug: 'legs', name_es: 'Piernas', name_en: 'Legs', owner_id: null },
+      ] as never)
+
+      const wrapper = buildExerciseManager()
+      await flushPromises()
+      return wrapper
+    }
+
+    it('typing a name in the search field narrows the list (both locales match)', async () => {
+      const wrapper = await mountFiltered()
+      await wrapper.get('[data-testid="exercise-search-field"]').find('input').setValue('treadmill')
+      expect(wrapper.find('[data-testid="catalog-exercise-row-2"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="catalog-exercise-row-1"]').exists()).toBe(false)
+    })
+
+    it('typing "cardio" finds cardio exercises by their measurement, not just their name (the original zurdi report)', async () => {
+      const wrapper = await mountFiltered()
+      await wrapper.get('[data-testid="exercise-search-field"]').find('input').setValue('cardio')
+      expect(wrapper.find('[data-testid="catalog-exercise-row-2"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="catalog-exercise-row-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="catalog-exercise-row-3"]').exists()).toBe(false)
+    })
+
+    it('the group filter narrows to exercises linked to that muscle group', async () => {
+      const wrapper = await mountFiltered()
+      await wrapper.get('[data-testid="exercise-group-filter"]').find('[role="combobox"]').trigger('click')
+      const legsOption = Array.from(document.querySelectorAll('[role="option"]'))
+        .find((o) => o.textContent?.trim() === 'Piernas') as HTMLElement
+      expect(legsOption).not.toBeUndefined()
+      legsOption.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="catalog-exercise-row-2"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="catalog-exercise-row-1"]').exists()).toBe(false)
+    })
+
+    it('a filter with no matches shows the plain no-results line, never the global empty state', async () => {
+      const wrapper = await mountFiltered()
+      await wrapper.get('[data-testid="exercise-search-field"]').find('input').setValue('yunque de skadi')
+      expect(wrapper.find('[data-testid="exercise-filter-empty"]').exists()).toBe(true)
+      // el BkEmpty global (con su CTA de crear) es para "no hay NADA", no
+      // para un filtro sin resultados
+      expect(wrapper.text()).not.toContain('Sin ejercicios aún')
+    })
+
+    it('non-strength rows carry a measurement chip (Cardio/Tiempo), strength rows do not', async () => {
+      const wrapper = await mountFiltered()
+      expect(wrapper.get('[data-testid="exercise-measurement-tag-2"]').text()).toBe('Cardio')
+      expect(wrapper.get('[data-testid="exercise-measurement-tag-3"]').text()).toBe('Tiempo')
+      expect(wrapper.find('[data-testid="exercise-measurement-tag-1"]').exists()).toBe(false)
+    })
+
+    it('sorts each bucket by the DISPLAYED (locale) name, not by name_en', async () => {
+      const { listExercises, listMuscleGroups } = await import('@/api/domain')
+      // por name_en el orden sería Stationary bike < Treadmill; por el nombre
+      // ES mostrado debe ser Bicicleta estática < Cinta de correr
+      vi.mocked(listExercises).mockResolvedValue([
+        { id: 1, name_es: 'Cinta de correr', name_en: 'Treadmill', measurement: 'cardio', owner_id: null, muscle_groups: [] },
+        { id: 2, name_es: 'Bicicleta estática', name_en: 'Stationary bike', measurement: 'cardio', owner_id: null, muscle_groups: [] },
+      ] as never)
+      vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+
+      const wrapper = buildExerciseManager()
+      await flushPromises()
+
+      const testids = wrapper.findAll('[data-testid^="catalog-exercise-row-"]').map((row) => row.attributes('data-testid'))
+      expect(testids).toEqual(['catalog-exercise-row-2', 'catalog-exercise-row-1'])
+    })
   })
 })
 

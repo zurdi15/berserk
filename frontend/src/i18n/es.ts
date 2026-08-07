@@ -238,14 +238,24 @@ export const es = {
     slug: 'Identificador',
     globalGroup: 'Global',
     isGlobal: 'Global (todos los usuarios)',
-    // W2 feature 1: check de "globales" en un ejercicio PROPIO (checkbox de
-    // crear/editar) — distinto de isGlobal (catálogo admin, solo visible ahí)
-    isPublic: 'Visible para todos',
+    // v0.9.4 (zurdi: "visible para todos y global es un poco redundante"):
+    // un único select de visibilidad sustituye a los checks is_global +
+    // is_public del formulario de ejercicio (isGlobal sigue vivo para el
+    // check de grupos musculares)
+    visibility: 'Visibilidad',
+    visibilityPrivate: 'Privado',
+    visibilityPublic: 'Visible para todos',
+    visibilityGlobal: 'Catálogo global',
     // UNIFIED-LISTINGS: mensaje de vacío de la lista UNIFICADA (míos +
     // catálogo + públicos de otros / míos + globales) — ya no "propios",
     // porque ahora cubre toda la lista, no solo lo mío
     noExercises: 'Sin ejercicios aún',
     noGroups: 'Sin grupos musculares aún',
+    // v0.9.4 (zurdi): búsqueda + filtro por grupo sobre la lista unificada
+    // — con 59 filas de catálogo ordenadas por name_en, encontrar p.ej. los
+    // ejercicios de cardio a ojo era una lotería
+    searchExercises: 'Buscar ejercicio',
+    allGroups: 'Todos los grupos',
     // UNIFIED-LISTINGS: también el texto del chip de atribución por fila
     // del catálogo predefinido (antes era el título de su sección, colapsable)
     catalog: 'Catálogo predefinido',
@@ -408,7 +418,6 @@ export const es = {
     backToCalendar: 'Volver al calendario',
     retroPrs: 'Récords recalculados: {n}',
     addSet: 'Añadir serie',
-    addCardio: 'Añadir cardio',
     logSetAndAnother: 'Registrar y otra',
     startCountdown: 'Empezar',
     lastTime: 'Última vez ({date})',
@@ -436,6 +445,9 @@ export const es = {
     supersetSwapWarning: 'Cambiarlo descarta sus series registradas de este entreno.',
     cardio: {
       loggedWhileAway: 'Cardio registrado: {duration}',
+      // v0.9.4: estado de fin del countdown (zurdi: "más feedback de que el
+      // timer ha terminado")
+      timeUp: '¡Tiempo!',
     },
   },
 } as const

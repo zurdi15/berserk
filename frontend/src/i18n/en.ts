@@ -236,14 +236,21 @@ export const en = {
     slug: 'Slug',
     globalGroup: 'Global',
     isGlobal: 'Global (all users)',
-    // W2 feature 1: "public" check on an OWN exercise (create/edit
-    // checkbox) — distinct from isGlobal (admin catalog, only visible there)
-    isPublic: 'Visible to everyone',
+    // v0.9.4 (zurdi): one visibility select replaces the is_global +
+    // is_public checkboxes on the exercise form (see es.ts; isGlobal lives
+    // on for the muscle-group check)
+    visibility: 'Visibility',
+    visibilityPrivate: 'Private',
+    visibilityPublic: 'Visible to everyone',
+    visibilityGlobal: 'Global catalog',
     // UNIFIED-LISTINGS: empty message for the UNIFIED list (mine + catalog
     // + others' public / mine + global) — no longer "custom", since it now
     // covers the whole list, not just what's mine
     noExercises: 'No exercises yet',
     noGroups: 'No muscle groups yet',
+    // v0.9.4 (zurdi): search + group filter over the unified list (see es.ts)
+    searchExercises: 'Search exercise',
+    allGroups: 'All groups',
     // UNIFIED-LISTINGS: also the per-row attribution chip text for the
     // predefined catalog (used to be its collapsible section's title)
     catalog: 'Predefined catalog',
@@ -399,7 +406,6 @@ export const en = {
     backToCalendar: 'Back to calendar',
     retroPrs: 'Records recalculated: {n}',
     addSet: 'Add set',
-    addCardio: 'Add cardio',
     logSetAndAnother: 'Log and another',
     startCountdown: 'Start',
     lastTime: 'Last time ({date})',
@@ -426,6 +432,8 @@ export const en = {
     supersetSwapWarning: 'Swapping it discards its logged sets from this workout.',
     cardio: {
       loggedWhileAway: 'Cardio logged: {duration}',
+      // v0.9.4: countdown finish state (see es.ts)
+      timeUp: "Time's up!",
     },
   },
 } as const

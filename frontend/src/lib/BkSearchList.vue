@@ -9,6 +9,11 @@
 //     primitiva filtra en cliente, nunca llama a una API por su cuenta.
 //   - `labelFn`: cómo sacar el texto de cada item, tanto para filtrar como
 //     para el texto por defecto de cada fila (si no se usa el slot #item).
+//   - `searchFn` (opcional, v0.9.4): pajar ALTERNATIVO contra el que
+//     filtrar — para cuando un item debe encontrarse por más texto del que
+//     muestra su fila (AddExerciseSheet lo usa para que "cardio" o el
+//     nombre en el otro idioma también matcheen). Sin él, se filtra por
+//     labelFn como siempre.
 //   - `keyFn` (opcional): identidad estable para :key; por defecto el
 //     índice en la lista YA filtrada (basta si `items` no se reordena bajo
 //     el mismo filtro, pero un consumidor con ids estables debería pasarlo).
@@ -34,6 +39,7 @@ const props = withDefaults(
   defineProps<{
     items: T[]
     labelFn: (item: T) => string
+    searchFn?: (item: T) => string
     keyFn?: (item: T, index: number) => string | number
     modelValue?: string
     label?: string
@@ -60,7 +66,8 @@ const activeItem = ref<T | null>(null)
 const filtered = computed(() => {
   const q = props.modelValue.trim().toLowerCase()
   if (!q) return props.items
-  return props.items.filter((item) => props.labelFn(item).toLowerCase().includes(q))
+  const haystack = props.searchFn ?? props.labelFn
+  return props.items.filter((item) => haystack(item).toLowerCase().includes(q))
 })
 
 const activeIndex = computed(() => (activeItem.value === null ? -1 : filtered.value.indexOf(activeItem.value)))

@@ -50,17 +50,60 @@ interface DisplayExercise extends ExerciseOut {
   kind: ExerciseKind
 }
 
+// v0.9.4 (zurdi): cada bucket se reordena por el nombre MOSTRADO — el
+// backend ordena por name_en, así que un usuario en ES veía la lista en un
+// orden aparentemente aleatorio ("Bicicleta estática" donde tocaría
+// "Stationary bike"), y encontrar nada a ojo era una lotería
+function sortByDisplayName(bucket: DisplayExercise[]): DisplayExercise[] {
+  const locale = auth.user?.locale || 'es'
+  return bucket.sort((a, b) => exerciseName(a, locale).localeCompare(exerciseName(b, locale), locale))
+}
+
 const displayExercises = computed<DisplayExercise[]>(() => [
-  ...exercises.value
-    .filter((e) => e.owner_id === auth.user?.id)
-    .map((e): DisplayExercise => ({ ...e, kind: 'own' })),
-  ...exercises.value
-    .filter((e) => e.owner_id === null)
-    .map((e): DisplayExercise => ({ ...e, kind: 'catalog' })),
-  ...exercises.value
-    .filter((e) => e.owner_id !== null && e.owner_id !== auth.user?.id)
-    .map((e): DisplayExercise => ({ ...e, kind: 'other' })),
+  ...sortByDisplayName(
+    exercises.value
+      .filter((e) => e.owner_id === auth.user?.id)
+      .map((e): DisplayExercise => ({ ...e, kind: 'own' })),
+  ),
+  ...sortByDisplayName(
+    exercises.value
+      .filter((e) => e.owner_id === null)
+      .map((e): DisplayExercise => ({ ...e, kind: 'catalog' })),
+  ),
+  ...sortByDisplayName(
+    exercises.value
+      .filter((e) => e.owner_id !== null && e.owner_id !== auth.user?.id)
+      .map((e): DisplayExercise => ({ ...e, kind: 'other' })),
+  ),
 ])
+
+// v0.9.4 (zurdi): "añadir filtro por grupo en biblioteca y también barra de
+// búsqueda" — filtrado en CLIENTE sobre la lista unificada ya cargada (59
+// filas de catálogo + propias + públicas: el mismo tamaño que AddExerciseSheet
+// ya filtra en cliente sin despeinarse). La búsqueda matchea el nombre en
+// AMBOS idiomas Y la etiqueta del tipo de medición — así "cardio" encuentra
+// Cinta de correr aunque ningún ejercicio se llame literalmente así (el
+// origen del "los ejercicios de cardio no salen" de zurdi). El filtro de
+// grupo matchea CUALQUIER grupo enlazado, igual que el query param
+// muscle_group_id del backend.
+const query = ref('')
+const filterGroupId = ref('')
+
+const groupFilterOptions = computed(() => [
+  { value: '', label: t('library.allGroups') },
+  ...muscleGroups.value.map((g) => ({ value: String(g.id), label: groupLabel(g) })),
+])
+
+const filteredExercises = computed<DisplayExercise[]>(() => {
+  const q = query.value.trim().toLowerCase()
+  const groupId = filterGroupId.value ? Number(filterGroupId.value) : null
+  return displayExercises.value.filter((e) => {
+    if (groupId !== null && !e.muscle_groups.some((l) => l.muscle_group_id === groupId)) return false
+    if (!q) return true
+    const haystack = `${e.name_es} ${e.name_en} ${t(`library.measurements.${e.measurement}`)}`.toLowerCase()
+    return haystack.includes(q)
+  })
+})
 
 const measurementValues: Measurement[] = ['strength', 'bodyweight', 'timed', 'cardio']
 const measurementOptions = computed(() =>
@@ -96,12 +139,22 @@ const nameEn = ref('')
 const measurement = ref<Measurement>('strength')
 const checkedGroupIds = ref<number[]>([])
 const primaryGroupId = ref<number | null>(null)
-// item 3: solo en creación (igual que measurement arriba) — is_global no es
-// patchable en el backend, así que no tiene sentido mostrarlo al editar
-const isGlobal = ref(false)
-// W2 feature 1: check de "globales" de un ejercicio PROPIO — a diferencia
-// de isGlobal, SÍ es patchable (round-trip en create Y edit)
-const isPublic = ref(false)
+// v0.9.4 (zurdi: "visible para todos y global es un poco redundante"): los
+// dos checks (is_global admin-only + is_public) colapsan en UN select de
+// visibilidad — privado / visible para todos / catálogo global. El catálogo
+// global solo aparece creando Y siendo admin (is_global no es patchable,
+// mismo criterio que measurement); editando una fila del catálogo admin no
+// se muestra nada (ya es global de por sí, igual que antes)
+type Visibility = 'private' | 'public' | 'global'
+const visibility = ref<Visibility>('private')
+
+const visibilityOptions = computed(() => [
+  { value: 'private', label: t('library.visibilityPrivate') },
+  { value: 'public', label: t('library.visibilityPublic') },
+  ...(editingId.value === null && auth.user?.is_admin
+    ? [{ value: 'global', label: t('library.visibilityGlobal') }]
+    : []),
+])
 const saving = ref(false)
 
 const deleteConfirmOpen = ref(false)
@@ -133,8 +186,7 @@ function openCreate() {
   measurement.value = 'strength'
   checkedGroupIds.value = []
   primaryGroupId.value = null
-  isGlobal.value = false
-  isPublic.value = false
+  visibility.value = 'private'
   formOpen.value = true
 }
 
@@ -146,7 +198,7 @@ function openEdit(exercise: ExerciseOut) {
   measurement.value = exercise.measurement
   checkedGroupIds.value = exercise.muscle_groups.map((l) => l.muscle_group_id)
   primaryGroupId.value = exercise.muscle_groups.find((l) => l.is_primary)?.muscle_group_id ?? null
-  isPublic.value = exercise.is_public ?? false
+  visibility.value = exercise.is_public ? 'public' : 'private'
   formOpen.value = true
 }
 
@@ -176,7 +228,10 @@ async function submitForm() {
         name_es: nameEs.value,
         name_en: nameEn.value,
         muscle_groups,
-        is_public: isPublic.value,
+        // sobre una fila del catálogo admin (owner_id null) el control de
+        // visibilidad ni se muestra: no viaja is_public para no fingir un
+        // cambio que ahí no significa nada
+        ...(editingOwnerId.value !== null ? { is_public: visibility.value === 'public' } : {}),
       })
     } else {
       await createExercise({
@@ -184,8 +239,8 @@ async function submitForm() {
         name_en: nameEn.value,
         measurement: measurement.value,
         muscle_groups,
-        is_global: isGlobal.value,
-        is_public: isPublic.value,
+        is_global: visibility.value === 'global',
+        is_public: visibility.value === 'public',
       })
     }
     formOpen.value = false
@@ -247,9 +302,27 @@ async function confirmDelete() {
           </div>
         </div>
 
-        <div v-else-if="displayExercises.length > 0" class="space-y-2">
+        <template v-else-if="displayExercises.length > 0">
+          <!-- v0.9.4 (zurdi): barra de búsqueda + filtro por grupo, encima
+               de la lista — cliente puro sobre lo ya cargado, ver el
+               computed filteredExercises -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <BkField
+              v-model="query"
+              :label="$t('library.searchExercises')"
+              data-testid="exercise-search-field"
+            />
+            <BkSelect
+              v-model="filterGroupId"
+              :label="$t('library.muscleGroups')"
+              :options="groupFilterOptions"
+              data-testid="exercise-group-filter"
+            />
+          </div>
+
+          <div v-if="filteredExercises.length > 0" class="space-y-2">
           <div
-            v-for="exercise in displayExercises"
+            v-for="exercise in filteredExercises"
             :key="exercise.id"
             :data-testid="exercise.kind === 'own' ? `exercise-row-${exercise.id}` : `catalog-exercise-row-${exercise.id}`"
             class="flex items-start justify-between gap-2 p-2 rounded border border-line text-sm"
@@ -268,7 +341,7 @@ async function confirmDelete() {
                    renderiza esta fila en absoluto (item 2: "own items get no
                    chip row at all"). -->
               <div
-                v-if="primaryGroup(exercise) || exercise.kind !== 'own'"
+                v-if="primaryGroup(exercise) || exercise.kind !== 'own' || exercise.measurement !== 'strength'"
                 class="flex items-center gap-1.5 flex-wrap mt-1"
               >
                 <span
@@ -282,6 +355,19 @@ async function confirmDelete() {
                     :size="12"
                   />
                   <span>{{ groupLabel(primaryGroup(exercise)!) }}</span>
+                </span>
+                <!-- v0.9.4 (zurdi: "los de cardio no salen"): chip del TIPO
+                     para todo lo que no es fuerza (cardio/tiempo/peso
+                     corporal) — el chip de grupo dice "Piernas" en una cinta
+                     de correr, así que sin esto nada de la fila delataba que
+                     era cardio. Fuerza (la mayoría de la lista) no lo lleva:
+                     sería ruido repetido en 40 filas. -->
+                <span
+                  v-if="exercise.measurement !== 'strength'"
+                  class="inline-flex items-center rounded-full border border-aurora/40 px-1.5 py-0.5 text-2xs text-aurora"
+                  :data-testid="`exercise-measurement-tag-${exercise.id}`"
+                >
+                  {{ $t(`library.measurements.${exercise.measurement}`) }}
                 </span>
                 <!-- UNIFIED-LISTINGS: label de creador SOLO cuando no es mío —
                      chip "Catálogo predefinido" para el catálogo admin, BkUser
@@ -330,7 +416,15 @@ async function confirmDelete() {
               />
             </div>
           </div>
-        </div>
+          </div>
+
+          <!-- filtro/búsqueda sin resultados: mensaje plano, NUNCA el BkEmpty
+               de abajo (ese es "no hay nada en absoluto" y arrastra el CTA de
+               crear a otro sitio) -->
+          <p v-else class="text-sm text-ink-faint" data-testid="exercise-filter-empty">
+            {{ $t('common.noResults') }}
+          </p>
+        </template>
 
         <!-- item 10: en vacío el botón de crear se muda dentro del BkEmpty;
              fuera de ahí (aún no listo, o con filas) se queda donde estaba.
@@ -373,37 +467,19 @@ async function confirmDelete() {
           :options="measurementOptions"
           data-testid="exercise-measurement-select"
         />
-        <!-- item 3: global (owner_id null, visible a todos) — solo admin,
-             y solo al crear (no es patchable, mismo criterio que measurement) -->
-        <label
-          v-if="editingId === null && auth.user?.is_admin"
-          class="flex items-center gap-2 cursor-pointer"
-        >
-          <input
-            v-model="isGlobal"
-            type="checkbox"
-            class="rounded border border-line"
-            data-testid="exercise-is-global-checkbox"
-          />
-          <span class="text-sm text-ink-muted">{{ $t('library.isGlobal') }}</span>
-        </label>
-
-        <!-- W2 feature 1: "Visible para todos" — a diferencia de isGlobal,
-             cualquier usuario lo ve (sigue siendo el dueño), y SÍ es
-             patchable (crear Y editar); no tiene sentido sobre una fila del
-             catálogo admin (owner_id null ya es global de por sí) -->
-        <label
+        <!-- v0.9.4 (zurdi: "visible para todos y global es un poco
+             redundante"): UN select de visibilidad en vez de los dos checks
+             (item 3 is_global + W2 is_public). La opción de catálogo global
+             solo existe creando y siendo admin (no es patchable); sobre una
+             fila del catálogo admin (owner_id null, ya global de por sí) el
+             control entero desaparece, como desaparecía el check antes -->
+        <BkSelect
           v-if="editingOwnerId !== null || editingId === null"
-          class="flex items-center gap-2 cursor-pointer"
-        >
-          <input
-            v-model="isPublic"
-            type="checkbox"
-            class="rounded border border-line"
-            data-testid="exercise-is-public-checkbox"
-          />
-          <span class="text-sm text-ink-muted">{{ $t('library.isPublic') }}</span>
-        </label>
+          v-model="visibility"
+          :label="$t('library.visibility')"
+          :options="visibilityOptions"
+          data-testid="exercise-visibility-select"
+        />
 
         <div class="space-y-2">
           <span class="block text-sm text-ink-muted">{{ $t('library.muscleGroups') }}</span>

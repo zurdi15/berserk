@@ -1,6 +1,7 @@
 import type { RoutineOut } from '@/api/domain'
 
-export const DEFAULT_REST_SECONDS = 90
+// v0.9.4 (zurdi): "descanso por defecto 60s" — antes 90
+export const DEFAULT_REST_SECONDS = 60
 
 // item 11: presets del picker de descanso de la tarjeta — pasos "de gimnasio"
 // habituales, no un stepper libre (menos fricción que teclear un número cada vez)

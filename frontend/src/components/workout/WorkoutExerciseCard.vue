@@ -58,6 +58,12 @@ const props = withDefaults(
     // lo que "descansar" editando historial, ni countdown de cardio con
     // sentido — ver SetForm's `live` prop)
     restEnabled?: boolean
+    // v0.9.4: "¿es el entreno EN VIVO?" separado de restEnabled — antes el
+    // countdown de cardio colgaba de restEnabled, así que apagar el toggle
+    // de descanso automático también escondía "Empezar". Con el descanso
+    // fuera de cardio (zurdi) esa carambola ya no tiene ninguna lógica:
+    // WorkoutView deja el default (true) y el editor retroactivo pasa false
+    live?: boolean
     // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: id del entreno activo — hace
     // falta para poder persistir {workoutId, workoutExerciseId, ...} al
     // arrancar un countdown de cardio (ver uiPrefs.ts). Opcional (null en
@@ -91,6 +97,7 @@ const props = withDefaults(
     units: 'kg',
     locale: 'es',
     restEnabled: true,
+    live: true,
     workoutId: null,
     resumedCountdown: null,
     supersetLabel: null,
@@ -167,6 +174,14 @@ const effectiveRestSeconds = computed(() =>
 // comentario raíz convierte la raíz en fragmento y rompe fallthrough).
 const autoRestFires = computed(() => props.supersetLabel == null || props.supersetLast)
 
+// v0.9.4: gatea el formulario inline de cardio hasta que la historia
+// resolvió — SetForm siembra sus valores UNA vez al montar (no reacciona a
+// cambios de initialSet), así que montarlo antes de conocer la historia lo
+// dejaría con los defaults genéricos aunque hubiera una sesión previa de la
+// que precargar duración/distancia. true también en error, como `ready` en
+// el resto de la app: sin historia sigue habiendo formulario.
+const historyLoaded = ref(false)
+
 // item 3: se pide en cuanto se conoce el exercise_id (no solo al abrir el
 // drawer): también alimenta el hint de la tarjeta cuando aún no hay series
 watch(
@@ -178,6 +193,8 @@ watch(
       // hint no crítico de fondo: si falla, simplemente no se muestra — no
       // interrumpe el flujo de logueo con un toast por esto
       history.value = null
+    } finally {
+      historyLoaded.value = true
     }
   },
   { immediate: true },
@@ -275,7 +292,8 @@ async function onDrawerSubmit(value: SetIn, keepOpen: boolean) {
     // mano): nunca debe quedar una entrada "zombie" en localStorage tras un
     // logueo real de este mismo ejercicio
     clearPersistedCardioCountdownForThisExercise()
-    if (props.restEnabled && autoRestFires.value) {
+    // v0.9.4 (zurdi): un bloque de cardio no descansa — ni control ni timer
+    if (props.restEnabled && autoRestFires.value && !isCardio.value) {
       // nombre del ejercicio → cuerpo de la notificación de fin de descanso
       restTimer.start(effectiveRestSeconds.value, name.value)
     }
@@ -326,7 +344,7 @@ async function onResumedDone() {
     const result = await props.actions.logSet(persisted.workoutExerciseId, body)
     clearPersistedCardioCountdown()
     resumedActive.value = null
-    if (props.restEnabled && autoRestFires.value) restTimer.start(effectiveRestSeconds.value, name.value)
+    // v0.9.4: sin descanso tras cardio — este camino SIEMPRE es cardio
     if (result.new_records.length) emit('recorded', result.new_records)
     emit('logged', result.new_records.length > 0)
   } catch (error) {
@@ -464,8 +482,10 @@ async function moveDown() {
          de descanso entero se esconde en los miembros NO finales de un
          grupo — el descanso es un concepto de la RONDA, y la ronda la cierra
          el último miembro (autoRestFires, la misma condición que ya gateaba
-         el disparo automático; ahora también gobierna la UI). -->
-    <div v-if="restEnabled && autoRestFires" class="mb-2">
+         el disparo automático; ahora también gobierna la UI).
+         v0.9.4 (zurdi): un bloque de cardio no tiene descanso — ni este
+         control ni el disparo automático (ver onDrawerSubmit). -->
+    <div v-if="restEnabled && autoRestFires && !isCardio" class="mb-2">
       <button
         type="button"
         class="bk-press text-xs text-ink-faint underline decoration-dotted"
@@ -583,39 +603,65 @@ async function moveDown() {
          proceso de fondo que debería verse aunque el usuario no haya tocado
          nada todavía — visible de inmediato en la tarjeta es mejor UX que
          escondido tras un toque en "+ Cardio". -->
-    <div v-if="resumedActive" class="mb-3" :data-testid="`resumed-cardio-countdown-${workoutExercise.id}`">
-      <CardioCountdown
-        :target-seconds="resumedActive.targetSeconds"
-        :ends-at="resumedActive.endsAt"
-        @done="onResumedDone"
-        @cancel="onResumedCancel"
+    <Transition name="bk-timer-swap">
+      <div v-if="resumedActive" class="mb-3" :data-testid="`resumed-cardio-countdown-${workoutExercise.id}`">
+        <CardioCountdown
+          :target-seconds="resumedActive.targetSeconds"
+          :ends-at="resumedActive.endsAt"
+          @done="onResumedDone"
+          @cancel="onResumedCancel"
+        />
+      </div>
+    </Transition>
+
+    <!-- v0.9.4 (zurdi: "en cardio no debería haber un 'añadir cardio'"): el
+         formulario de cardio vive PERMANENTE en el cuerpo de la tarjeta —
+         sin botón ni cajón de por medio (el cajón queda solo para editar una
+         entrada ya registrada). Gateado por historyLoaded para que SetForm
+         monte ya con los defaults correctos (ver el ref arriba); el countdown
+         en marcha lo dibuja el propio SetForm aquí mismo, igual que la
+         superficie de resume de arriba. -->
+    <div
+      v-if="isCardio && exercise && !resumedActive && historyLoaded"
+      :data-testid="`cardio-inline-form-${workoutExercise.id}`"
+    >
+      <SetForm
+        :measurement="exercise.measurement"
+        :units="units"
+        :initial-set="drawerDefaults"
+        :live="live"
+        inline
+        @submit="onDrawerSubmit"
+        @countdown-start="onCountdownStart"
+        @countdown-cancel="onCountdownCancel"
       />
     </div>
 
-    <BkButton
-      v-if="exercise && !resumedActive"
-      variant="ghost"
-      size="sm"
-      :data-testid="`add-set-${workoutExercise.id}`"
-      @click="openNew"
-    >
-      {{ isCardio ? t('workout.addCardio') : t('workout.addSet') }}
-    </BkButton>
-
-    <!-- item 7: mismo idioma bk-pop-soft/out-in que el swap de arriba -->
-    <div class="mt-3 pt-3 border-t border-line">
+    <!-- v0.9.4 (zurdi): añadir serie y quitar ejercicio comparten fila —
+         quitar pasa de botón "Quitar" a BkActionBtn de eliminar (como el
+         resto de sitios), a la derecha; su swap de confirmación (item 7,
+         bk-pop-soft/out-in) queda tal cual -->
+    <div class="mt-3 flex items-center justify-between gap-2">
+      <BkButton
+        v-if="exercise && !isCardio"
+        variant="ghost"
+        size="sm"
+        :data-testid="`add-set-${workoutExercise.id}`"
+        @click="openNew"
+      >
+        {{ t('workout.addSet') }}
+      </BkButton>
+      <span v-else />
       <Transition name="bk-pop-soft" mode="out-in">
-        <div v-if="!removeConfirming" key="remove">
-          <BkButton
-            variant="ghost"
-            size="sm"
+        <div v-if="!removeConfirming" key="remove" class="shrink-0">
+          <BkActionBtn
+            icon="delete"
             :data-testid="`remove-exercise-${workoutExercise.id}`"
+            :aria-label="t('workout.remove')"
             @click="removeConfirming = true"
-          >
-            {{ t('workout.remove') }}
-          </BkButton>
+          />
         </div>
-        <div v-else key="confirm" class="flex gap-2">
+        <div v-else key="confirm" class="flex gap-2 shrink-0">
           <BkButton
             variant="danger"
             size="sm"
@@ -638,7 +684,7 @@ async function moveDown() {
           :units="units"
           :initial-set="drawerDefaults"
           :editing="editingSet !== null"
-          :live="restEnabled"
+          :live="live"
           @submit="onDrawerSubmit"
           @countdown-start="onCountdownStart"
           @countdown-cancel="onCountdownCancel"

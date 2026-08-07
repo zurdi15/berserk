@@ -97,9 +97,12 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
+    <!-- v0.9.4 (zurdi: "más smooth la transición a la runa"): el overlay
+         entero entra con un fade (bk-fade both) en vez de aparecer de golpe
+         — la runa ya se talla sola (bk-carve) una vez visible -->
     <div
       ref="panel"
-      class="fixed inset-0 z-(--bk-z-timer) bg-void/95 flex flex-col items-center justify-center gap-3 px-6 text-center"
+      class="fixed inset-0 z-(--bk-z-timer) bg-void/95 flex flex-col items-center justify-center gap-3 px-6 text-center bk-celebration-enter"
       data-testid="celebration-overlay"
       role="dialog"
       aria-modal="true"

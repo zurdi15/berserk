@@ -71,12 +71,13 @@ describe('restFor (item 11: workout-exercise override > routine target > default
     expect(restFor(null, 1, routines as never, 5)).toBe(120)
   })
 
-  it('falls back to 90 when the workout is free (no routine) and no override', () => {
-    expect(restFor(null, null, routines as never, 5)).toBe(90)
+  // v0.9.4 (zurdi): default 60s, antes 90
+  it('falls back to 60 when the workout is free (no routine) and no override', () => {
+    expect(restFor(null, null, routines as never, 5)).toBe(60)
   })
 
-  it('falls back to 90 when the exercise is not part of the matched routine', () => {
-    expect(restFor(null, 1, routines as never, 999)).toBe(90)
+  it('falls back to 60 when the exercise is not part of the matched routine', () => {
+    expect(restFor(null, 1, routines as never, 999)).toBe(60)
   })
 
   it('an override of 0 is still respected (falsy but not nullish)', () => {
@@ -469,9 +470,41 @@ describe('WorkoutExerciseCard', () => {
       expect(wrapper.classes()).toEqual(expect.arrayContaining(['border-l-2', 'border-aurora/50']))
     })
 
-    it('the add-set button reads "+ Cardio" instead of "+ Serie"', () => {
+    // v0.9.4 (zurdi: "no debería haber un 'añadir cardio' ni descanso"): el
+    // formulario vive PERMANENTE en el cuerpo de la tarjeta — ni botón de
+    // añadir ni cajón para registrar; y el descanso desaparece por completo
+    it('renders a permanent inline form instead of an add button (no "+ Cardio", no drawer)', async () => {
       const wrapper = mountCardio()
-      expect(wrapper.get('[data-testid="add-set-30"]').text()).toBe('Añadir cardio')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="add-set-30"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="cardio-inline-form-30"]').find('form').exists()).toBe(true)
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+    })
+
+    it('the inline form has no "Registrar y otra" (it never closes, both submits would be the same)', async () => {
+      const wrapper = mountCardio()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="log-set-and-another"]').exists()).toBe(false)
+    })
+
+    it('shows no rest control at all, even with restEnabled on', async () => {
+      const wrapper = mountCardio()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="rest-toggle-30"]').exists()).toBe(false)
+    })
+
+    it('logging cardio through the inline form never starts the rest timer', async () => {
+      const actions = makeActions()
+      const restTimer = useRestTimerStore()
+      const startSpy = vi.spyOn(restTimer, 'start')
+
+      const wrapper = mountCardio({ actions })
+      await flushPromises()
+      await wrapper.get('[data-testid="cardio-inline-form-30"]').find('form').trigger('submit')
+      await flushPromises()
+
+      expect(actions.logSet).toHaveBeenCalledWith(30, expect.objectContaining({ duration_seconds: expect.any(Number) }))
+      expect(startSpy).not.toHaveBeenCalled()
     })
 
     it('cardio rows are not numbered (no "N." prefix)', () => {
@@ -522,44 +555,64 @@ describe('WorkoutExerciseCard', () => {
       })
     }
 
-    it('shows "Empezar" for a live cardio drawer (not editing)', async () => {
+    // v0.9.4: el countdown arranca desde el formulario INLINE de la tarjeta
+    // (el cajón ya solo existe para editar) — "Empezar" cuelga del nuevo
+    // prop `live`, no de restEnabled: apagar el descanso automático no debe
+    // llevarse el countdown por delante (cardio ya ni siquiera descansa)
+    it('shows "Empezar" on the live inline cardio form', async () => {
       const actions = makeActions()
       mountCardio({ actions })
-      await openDrawer(30)
+      await flushPromises()
       expect(document.body.querySelector('[data-testid="cardio-start-countdown"]')).not.toBeNull()
     })
 
-    it('hides "Empezar" when restEnabled is false (retro editor)', async () => {
-      mountCardio({ restEnabled: false })
-      await openDrawer(30)
+    it('hides "Empezar" when live is false (retro editor)', async () => {
+      mountCardio({ live: false })
+      await flushPromises()
       expect(document.body.querySelector('[data-testid="cardio-start-countdown"]')).toBeNull()
     })
 
-    it('starting the countdown and letting it reach zero auto-logs the set and closes the drawer', async () => {
+    it('keeps "Empezar" with restEnabled off (the auto-rest toggle no longer gates the countdown)', async () => {
+      mountCardio({ restEnabled: false })
+      await flushPromises()
+      expect(document.body.querySelector('[data-testid="cardio-start-countdown"]')).not.toBeNull()
+    })
+
+    it('starting the countdown and letting it reach zero auto-logs the set after the finish hold, without rest', async () => {
       const actions = makeActions({
         logSet: vi.fn(async () => ({
           set: { id: 1, set_number: 1, reps: null, weight_kg: null, duration_seconds: 60, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
           new_records: [],
         })),
       })
+      const restTimer = useRestTimerStore()
+      const startSpy = vi.spyOn(restTimer, 'start')
       mountCardio({ actions })
-      await openDrawer(30)
+      await flushPromises()
 
       await byTestId('cardio-start-countdown').trigger('click')
       await flushPromises()
       expect(document.body.querySelector('[data-testid="cardio-countdown"]')).not.toBeNull()
 
+      // llega a 0: estado de fin visible, la serie AÚN no se registra (el
+      // hold de FINISH_HOLD_MS=1200 sostiene el feedback antes del submit)
       vi.advanceTimersByTime(60_000)
+      await flushPromises()
+      expect(document.body.querySelector('[data-testid="cardio-countdown-done"]')).not.toBeNull()
+      expect(actions.logSet).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(1_200)
       await flushPromises()
 
       expect(actions.logSet).toHaveBeenCalledWith(30, expect.objectContaining({ duration_seconds: 60, is_warmup: false }))
-      expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+      // v0.9.4: cardio no descansa — ni siquiera al auto-registrarse
+      expect(startSpy).not.toHaveBeenCalled()
     })
 
     describe('CARDIO-COUNTDOWN PERSISTENCE: persist on start / clear on cancel / clear on complete', () => {
       it('persists {endsAt, workoutId, workoutExerciseId, targetSeconds, distanceM} to localStorage when the countdown starts', async () => {
         mountCardio({ workoutId: 7 })
-        await openDrawer(30)
+        await flushPromises()
 
         // sube la distancia antes de arrancar, para afirmar que viaja también
         const plus = document.body.querySelectorAll('button[aria-label="Aumentar"]')[1] as HTMLElement
@@ -578,7 +631,7 @@ describe('WorkoutExerciseCard', () => {
 
       it('does not persist when workoutId is not provided (defensive: no orphaned entry with a bogus workout)', async () => {
         mountCardio({ workoutId: undefined })
-        await openDrawer(30)
+        await flushPromises()
 
         await byTestId('cardio-start-countdown').trigger('click')
         await flushPromises()
@@ -588,7 +641,7 @@ describe('WorkoutExerciseCard', () => {
 
       it('cancelling the countdown clears the persisted state', async () => {
         mountCardio()
-        await openDrawer(30)
+        await flushPromises()
         await byTestId('cardio-start-countdown').trigger('click')
         await flushPromises()
         expect(localStorage.getItem('berserk:cardio-countdown')).not.toBeNull()
@@ -607,12 +660,15 @@ describe('WorkoutExerciseCard', () => {
           })),
         })
         mountCardio({ actions })
-        await openDrawer(30)
+        await flushPromises()
         await byTestId('cardio-start-countdown').trigger('click')
         await flushPromises()
         expect(localStorage.getItem('berserk:cardio-countdown')).not.toBeNull()
 
+        // 60s de countdown + el hold del estado de fin (v0.9.4) antes del submit
         vi.advanceTimersByTime(60_000)
+        await flushPromises()
+        vi.advanceTimersByTime(1_200)
         await flushPromises()
 
         expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
@@ -620,27 +676,24 @@ describe('WorkoutExerciseCard', () => {
 
       it('a manual (non-countdown) cardio log also clears a persisted countdown for this exercise (never leaves a zombie entry)', async () => {
         const actions = makeActions()
-        mountCardio({ actions })
-        await openDrawer(30)
+        const wrapper = mountCardio({ actions })
+        await flushPromises()
         await byTestId('cardio-start-countdown').trigger('click')
         await flushPromises()
-        // el usuario cancela el countdown en marcha... espera, este test
-        // simula en cambio persistencia ya escrita "a mano" (p.ej. sesión
-        // anterior) y comprueba que loguear la limpia igual
         expect(localStorage.getItem('berserk:cardio-countdown')).not.toBeNull()
         await byTestId('cardio-countdown-cancel').trigger('click')
         await flushPromises()
 
         // se re-persiste como si el countdown siguiera corriendo, y en su
-        // lugar se loguea manualmente vía "Registrar y otra" antes de que
-        // termine — debe limpiarse igual
+        // lugar se loguea manualmente (submit del formulario inline) antes
+        // de que termine — debe limpiarse igual
         await byTestId('cardio-start-countdown').trigger('click')
         await flushPromises()
         expect(localStorage.getItem('berserk:cardio-countdown')).not.toBeNull()
 
         await byTestId('cardio-countdown-cancel').trigger('click')
         await flushPromises()
-        await byTestId('log-set-and-another').trigger('click')
+        await wrapper.get('[data-testid="cardio-inline-form-30"]').find('form').trigger('submit')
         await flushPromises()
 
         expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
@@ -650,21 +703,23 @@ describe('WorkoutExerciseCard', () => {
     describe('CARDIO-COUNTDOWN PERSISTENCE: resumed surface (endsAt still in the future)', () => {
       const resumed = { endsAt: 0, workoutId: 1, workoutExerciseId: 30, targetSeconds: 1800, distanceM: 5000 }
 
-      it('renders the resumed countdown at the correct remaining time, and hides "+ Cardio" while it runs', () => {
+      it('renders the resumed countdown at the correct remaining time, and hides the inline form while it runs', async () => {
         const wrapper = mountCardio({ resumedCountdown: { ...resumed, endsAt: Date.now() + 600_000 } })
+        await flushPromises()
         expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('10:00')
-        expect(wrapper.find('[data-testid="add-set-30"]').exists()).toBe(false)
+        expect(wrapper.find('[data-testid="cardio-inline-form-30"]').exists()).toBe(false)
       })
 
-      it('ignores a resumedCountdown for a DIFFERENT workoutExerciseId (no cross-exercise leakage)', () => {
+      it('ignores a resumedCountdown for a DIFFERENT workoutExerciseId (no cross-exercise leakage)', async () => {
         const wrapper = mountCardio({
           resumedCountdown: { ...resumed, workoutExerciseId: 999, endsAt: Date.now() + 600_000 },
         })
+        await flushPromises()
         expect(wrapper.find('[data-testid="cardio-countdown"]').exists()).toBe(false)
-        expect(wrapper.find('[data-testid="add-set-30"]').exists()).toBe(true)
+        expect(wrapper.find('[data-testid="cardio-inline-form-30"]').exists()).toBe(true)
       })
 
-      it('letting the resumed countdown reach zero logs the set with the persisted duration/distance, starts the rest timer, and clears storage', async () => {
+      it('letting the resumed countdown reach zero logs the set with the persisted duration/distance, without rest, and clears storage', async () => {
         const actions = makeActions({
           logSet: vi.fn(async () => ({
             set: { id: 1, set_number: 1, reps: null, weight_kg: null, duration_seconds: 1800, distance_m: 5000, is_warmup: false, rpe: null, completed_at: 'x' },
@@ -676,14 +731,18 @@ describe('WorkoutExerciseCard', () => {
         localStorage.setItem('berserk:cardio-countdown', JSON.stringify({ ...resumed, endsAt: Date.now() + 5_000 }))
 
         const wrapper = mountCardio({ actions, resumedCountdown: { ...resumed, endsAt: Date.now() + 5_000 } })
+        // 5s restantes + el hold del estado de fin (v0.9.4) antes del submit
         vi.advanceTimersByTime(5_000)
+        await flushPromises()
+        vi.advanceTimersByTime(1_200)
         await flushPromises()
 
         expect(actions.logSet).toHaveBeenCalledWith(30, expect.objectContaining({ duration_seconds: 1800, distance_m: 5000 }))
-        expect(startSpy).toHaveBeenCalled()
+        // v0.9.4 (zurdi): cardio no descansa — tampoco el countdown resumido
+        expect(startSpy).not.toHaveBeenCalled()
         expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
         expect(wrapper.find('[data-testid="cardio-countdown"]').exists()).toBe(false)
-        expect(wrapper.find('[data-testid="add-set-30"]').exists()).toBe(true)
+        expect(wrapper.find('[data-testid="cardio-inline-form-30"]').exists()).toBe(true)
       })
 
       it('cancelling the resumed countdown clears storage WITHOUT logging', async () => {
@@ -691,12 +750,13 @@ describe('WorkoutExerciseCard', () => {
         localStorage.setItem('berserk:cardio-countdown', JSON.stringify({ ...resumed, endsAt: Date.now() + 600_000 }))
 
         const wrapper = mountCardio({ actions, resumedCountdown: { ...resumed, endsAt: Date.now() + 600_000 } })
+        await flushPromises()
         await wrapper.get('[data-testid="cardio-countdown-cancel"]').trigger('click')
         await flushPromises()
 
         expect(actions.logSet).not.toHaveBeenCalled()
         expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
-        expect(wrapper.find('[data-testid="add-set-30"]').exists()).toBe(true)
+        expect(wrapper.find('[data-testid="cardio-inline-form-30"]').exists()).toBe(true)
       })
     })
   })
@@ -734,16 +794,16 @@ describe('WorkoutExerciseCard', () => {
       expect(stepper.props('step')).toBe(5)
       expect(stepper.props('min')).toBe(5)
       expect(stepper.props('max')).toBe(900)
-      // valor de arranque: el descanso EFECTIVO actual (90, default sin
+      // valor de arranque: el descanso EFECTIVO actual (60, default sin
       // override ni rutina), no un 0/vacío desconectado del resto del picker
-      expect(stepper.props('modelValue')).toBe(90)
+      expect(stepper.props('modelValue')).toBe(60)
 
       const plusButton = manual.findAll('button').find((b) => b.attributes('aria-label') === 'Aumentar')!
       await plusButton.trigger('pointerdown')
       await plusButton.trigger('pointerup')
       await flushPromises()
 
-      expect(actions.setExerciseRest).toHaveBeenCalledWith(20, 95)
+      expect(actions.setExerciseRest).toHaveBeenCalledWith(20, 65)
       // a diferencia de un preset, el stepper NO cierra el picker (se pulsa
       // varias veces seguidas para afinar)
       expect(wrapper.find('[data-testid="rest-picker-20"]').exists()).toBe(true)
@@ -761,7 +821,7 @@ describe('WorkoutExerciseCard', () => {
     })
   })
 
-  it('logs a set and starts the rest timer with the default 90s AND the exercise name for a free workout', async () => {
+  it('logs a set and starts the rest timer with the default 60s AND the exercise name for a free workout', async () => {
     const actions = makeActions()
     const restTimer = useRestTimerStore()
     const startSpy = vi.spyOn(restTimer, 'start')
@@ -771,7 +831,7 @@ describe('WorkoutExerciseCard', () => {
     await drawerForm().trigger('submit')
     await flushPromises()
 
-    expect(startSpy).toHaveBeenCalledWith(90, 'Press banca')
+    expect(startSpy).toHaveBeenCalledWith(60, 'Press banca')
   })
 
   it('starts the rest timer with the routine rest_seconds when the workout came from a routine', async () => {
@@ -988,7 +1048,7 @@ describe('v0.5.0 superseries: rest gating and chips', () => {
     await drawerForm().trigger('submit')
     await flushPromises()
 
-    expect(startSpy).toHaveBeenCalledWith(90, 'Press banca')
+    expect(startSpy).toHaveBeenCalledWith(60, 'Press banca')
   })
 
   it('a loose exercise (default props: no label) keeps firing auto-rest — only group members are gated', async () => {
@@ -1001,7 +1061,7 @@ describe('v0.5.0 superseries: rest gating and chips', () => {
     await drawerForm().trigger('submit')
     await flushPromises()
 
-    expect(startSpy).toHaveBeenCalledWith(90, 'Press banca')
+    expect(startSpy).toHaveBeenCalledWith(60, 'Press banca')
   })
 
   // v0.7.0 (feedback de zurdi): chip y acento del grupo suben al CONTENEDOR

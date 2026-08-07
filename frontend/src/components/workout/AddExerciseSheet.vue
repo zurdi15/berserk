@@ -55,6 +55,14 @@ function labelFor(exercise: ExerciseOut): string {
   return exerciseName(exercise, auth.user?.locale || 'es')
 }
 
+// v0.9.4 (zurdi: "los ejercicios de cardio no salen"): el pajar de búsqueda
+// incluye el nombre en AMBOS idiomas y la etiqueta del tipo de medición —
+// teclear "cardio" lista Cinta/Bici/Elíptica… aunque ninguno se llame así,
+// y un usuario en ES también encuentra por el nombre EN (o viceversa)
+function searchTextFor(exercise: ExerciseOut): string {
+  return `${exercise.name_es} ${exercise.name_en} ${t(`library.measurements.${exercise.measurement}`)}`
+}
+
 onMounted(async () => {
   try {
     const [exercisesList, muscleGroupsList] = await Promise.all([
@@ -137,6 +145,7 @@ watch(
       v-model="query"
       :items="exercises"
       :label-fn="labelFor"
+      :search-fn="searchTextFor"
       :key-fn="(exercise: ExerciseOut) => exercise.id"
       :label="t('workout.searchExercise')"
       max-height-class="max-h-[60dvh]"

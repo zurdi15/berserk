@@ -292,6 +292,7 @@ onMounted(() => {
       :locale="locale"
       :actions="workoutEditor"
       :rest-enabled="false"
+      :live="false"
       @recorded="onRecorded"
       @logged="onLogged"
     />

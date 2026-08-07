@@ -47,16 +47,27 @@ describe('CardioCountdown (item 7)', () => {
     expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('0:29')
   })
 
-  it('auto-completes at zero: vibrates and emits done exactly once', async () => {
+  // v0.9.4 (zurdi: "más feedback de que el timer ha terminado"): al llegar a
+  // 0 ya no se emite 'done' en el mismo tick — primero un estado de FIN
+  // visible (0:00 + "¡Tiempo!", sin cancelar) sostenido FINISH_HOLD_MS
+  // (dur-5 = 1200ms), y solo entonces se emite
+  it('auto-completes at zero: vibrates, shows the finished state, and emits done once AFTER the hold', async () => {
     const wrapper = build(5)
     vi.advanceTimersByTime(5_000)
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.emitted('done')).toHaveLength(1)
+    // fin alcanzado: vibra y muestra el estado de terminado, pero AÚN no emite
     expect(vibrate).toHaveBeenCalledTimes(1)
+    expect(wrapper.emitted('done')).toBeFalsy()
+    expect(wrapper.get('[data-testid="cardio-countdown-done"]').text()).toBe('¡Tiempo!')
+    // el cancelar desaparece: la serie está a punto de registrarse sola
+    expect(wrapper.find('[data-testid="cardio-countdown-cancel"]').exists()).toBe(false)
 
-    // sigue corriendo el ticker tras el 0 (si no se limpiara el interval):
-    // no debe volver a emitir ni vibrar de nuevo
+    vi.advanceTimersByTime(1_200)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('done')).toHaveLength(1)
+
+    // sigue corriendo el reloj tras el fin: no debe volver a emitir ni vibrar
     vi.advanceTimersByTime(5_000)
     await wrapper.vm.$nextTick()
     expect(wrapper.emitted('done')).toHaveLength(1)
@@ -98,14 +109,19 @@ describe('CardioCountdown (item 7)', () => {
       expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('1:30')
     })
 
-    it('an endsAt already in the past auto-completes immediately: vibrates and emits done on the very first tick', () => {
+    it('an endsAt already in the past enters the finished state on the very first tick and emits done after the hold', async () => {
       const vibrate = vi.fn()
       vi.stubGlobal('navigator', { vibrate })
       const endsAt = Date.now() - 5_000
       const wrapper = build(1800, endsAt)
       expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('0:00')
-      expect(wrapper.emitted('done')).toHaveLength(1)
       expect(vibrate).toHaveBeenCalledTimes(1)
+      // v0.9.4: el estado de fin también se sostiene aquí — el usuario debe
+      // VER que terminó antes de que la superficie cambie sola
+      expect(wrapper.emitted('done')).toBeFalsy()
+      vi.advanceTimersByTime(1_200)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('done')).toHaveLength(1)
     })
   })
 })

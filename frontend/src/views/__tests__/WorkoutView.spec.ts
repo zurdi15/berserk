@@ -422,15 +422,36 @@ describe('WorkoutView', () => {
     }
 
     // re-apuntado (ronda anterior: el pin cubría fecha+cronómetro+botones en
-    // una sola fila; ahora los botones ya no viven aquí, ver item 3 debajo)
+    // una sola fila; ahora los botones ya no viven aquí, ver item 3 debajo).
+    // v0.9.4: la fila cronómetro+fecha es un hijo del slab del header (los
+    // chips de grupos musculares viven debajo, ver el test de abajo) — el pin
+    // se comprueba sobre ESA fila, no sobre el slab entero
     it('pins flex-wrap (plus items-center/justify-between/gap-3) on the elapsed+date row', async () => {
       wrapper = mountLive()
       await flushPromises()
 
+      const row = wrapper.get('[data-testid="elapsed"]').element.parentElement!
+      for (const cls of ['flex', 'flex-wrap', 'items-center', 'justify-between', 'gap-3']) {
+        expect(Array.from(row.classList)).toContain(cls)
+      }
+    })
+
+    // v0.9.4 (zurdi): los grupos musculares derivados viven en el HEADER,
+    // bajo el cronómetro — ya no hay slab propio para ellos
+    it('v0.9.4: the derived muscle-group chips render inside the header slab, below the timer', async () => {
+      vi.mocked(domain.listMuscleGroups).mockResolvedValue([
+        { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+      ] as never)
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockImplementation(async () => {
+        activeWorkout.workout = { ...workoutFixture, muscle_tag_ids: [1] } as never
+      })
+      wrapper = build()
+      await flushPromises()
+
       const header = wrapper.get('[data-testid="workout-header"]')
-      expect(header.classes()).toEqual(
-        expect.arrayContaining(['flex', 'flex-wrap', 'items-center', 'justify-between', 'gap-3']),
-      )
+      const tags = header.get('[data-testid="workout-header-muscle-tags"]')
+      expect(tags.find('[data-testid="muscle-tag-1"]').text()).toBe('Pecho')
     })
 
     it('the header shows only the elapsed timer and the date — no discard/finish buttons in it', async () => {

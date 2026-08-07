@@ -445,20 +445,38 @@ onBeforeUnmount(() => {
         data-testid="workout-header-sticky"
         :style="{ '--bk-stagger-i': 0 }"
       >
-        <div
-          class="bk-slab p-4 flex flex-wrap items-center justify-between gap-3"
-          data-testid="workout-header"
-        >
-          <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
-          <!-- item 6 (v0.4.3, zurdi): el chip "M:SS ✕" que vivía AQUÍ se retira
-               — cancelar el descanso se mueve DENTRO del propio CTA del shell
-               (tocar el CTA mientras se descansa en /workout lo expande y
-               revela el botón ✕, ver ShellView.vue). El countdown en sí (el
-               timer.label del header/nav) ya era visible desde ahí; este chip
-               era la única superficie de CANCELAR fuera del CTA, y con el CTA
-               ya haciendo de tap-target siempre visible, mantenerla aquí
-               además duplicaba la acción en dos sitios. -->
-          <p class="text-sm text-ink-muted capitalize" data-testid="workout-date">{{ dateLabel }}</p>
+        <div class="bk-slab p-4 space-y-3" data-testid="workout-header">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
+            <!-- item 6 (v0.4.3, zurdi): el chip "M:SS ✕" que vivía AQUÍ se retira
+                 — cancelar el descanso se mueve DENTRO del propio CTA del shell
+                 (tocar el CTA mientras se descansa en /workout lo expande y
+                 revela el botón ✕, ver ShellView.vue). El countdown en sí (el
+                 timer.label del header/nav) ya era visible desde ahí; este chip
+                 era la única superficie de CANCELAR fuera del CTA, y con el CTA
+                 ya haciendo de tap-target siempre visible, mantenerla aquí
+                 además duplicaba la acción en dos sitios. -->
+            <p class="text-sm text-ink-muted capitalize" data-testid="workout-date">{{ dateLabel }}</p>
+          </div>
+          <!-- v0.9.4 (zurdi): los grupos musculares derivados suben del slab
+               propio que tenían más abajo a ESTE header, bajo el cronómetro —
+               chips más compactos que los de antes (esto es chrome sticky, no
+               una card de contenido), sin el título "Grupos musculares": los
+               nombres se explican solos -->
+          <div
+            v-if="derivedMuscleGroups.length"
+            class="flex flex-wrap gap-1.5"
+            data-testid="workout-header-muscle-tags"
+          >
+            <span
+              v-for="group in derivedMuscleGroups"
+              :key="group.id"
+              :data-testid="`muscle-tag-${group.id}`"
+              class="px-2 py-0.5 rounded-sm border border-line text-xs text-ink-muted"
+            >
+              {{ muscleTagLabel(group) }}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -486,20 +504,6 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div v-if="derivedMuscleGroups.length" class="bk-slab p-4 space-y-2" :style="{ '--bk-stagger-i': 2 }">
-        <p class="text-sm text-ink-muted">{{ t('workout.muscleTags') }}</p>
-        <div class="flex flex-wrap gap-2">
-          <span
-            v-for="group in derivedMuscleGroups"
-            :key="group.id"
-            :data-testid="`muscle-tag-${group.id}`"
-            class="px-3 py-1.5 rounded-sm border border-line text-sm text-ink-muted"
-          >
-            {{ muscleTagLabel(group) }}
-          </span>
-        </div>
-      </div>
-
       <!-- v0.8.0: bloques de superserie — los miembros van DENTRO de un
            contenedor con borde aurora ("los dos ejercicios en una card más
            grande me gusta, déjalo así" — zurdi), con el chip de cabecera y
@@ -512,7 +516,7 @@ onBeforeUnmount(() => {
           v-if="block.grouped"
           class="border border-aurora/50 rounded-sm p-2 space-y-3"
           :data-testid="`superset-container-${block.label}`"
-          :style="{ '--bk-stagger-i': block.entries[0].index + 3 }"
+          :style="{ '--bk-stagger-i': block.entries[0].index + 2 }"
         >
           <div class="flex items-center justify-center gap-2">
             <span class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5">
@@ -549,7 +553,7 @@ onBeforeUnmount(() => {
         </div>
         <WorkoutExerciseCard
           v-else
-          :style="{ '--bk-stagger-i': block.entries[0].index + 3 }"
+          :style="{ '--bk-stagger-i': block.entries[0].index + 2 }"
           :workout-exercise="block.entries[0].we"
           :exercise="exerciseMap.get(block.entries[0].we.exercise_id)"
           :muscle-groups="muscleGroups"
@@ -573,7 +577,7 @@ onBeforeUnmount(() => {
       <BkButton
         variant="ghost"
         block
-        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 3 }"
+        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 2 }"
         @click="addSheetOpen = true"
       >
         {{ t('workout.addExercise') }}
@@ -598,7 +602,7 @@ onBeforeUnmount(() => {
       <div
         class="border-t border-line pt-4 flex flex-wrap items-center gap-2"
         data-testid="workout-actions"
-        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 4 }"
+        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 3 }"
       >
         <BkButton
           variant="danger"

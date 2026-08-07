@@ -74,6 +74,28 @@ describe('AddExerciseSheet (item 5: consume BkSearchList, catálogo completo)', 
     expect(domain.listExercises).toHaveBeenCalledTimes(1)
   })
 
+  // v0.9.4 (zurdi: "los ejercicios de cardio no salen"): el pajar de búsqueda
+  // incluye el nombre en el OTRO idioma y la etiqueta del tipo de medición
+  it('v0.9.4: typing "cardio" or the other-locale name matches via searchFn, beyond the visible label', async () => {
+    vi.mocked(domain.listExercises).mockResolvedValueOnce([
+      ...EXERCISES,
+      { id: 7, name_es: 'Cinta de correr', name_en: 'Treadmill', measurement: 'cardio', owner_id: null, muscle_groups: [] },
+    ] as never)
+    mount(AddExerciseSheet, {
+      props: { open: true, actions: { addExercise: vi.fn() } },
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    await typeQuery('cardio')
+    expect(document.querySelector('[data-testid="exercise-result-7"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="exercise-result-5"]')).toBeNull()
+
+    // nombre EN aunque la UI muestre el ES
+    await typeQuery('treadmill')
+    expect(document.querySelector('[data-testid="exercise-result-7"]')).not.toBeNull()
+  })
+
   it('picking a search result calls actions.addExercise with its id and emits close', async () => {
     const addSpy = vi.fn().mockResolvedValue(undefined)
 

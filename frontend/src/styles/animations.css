@@ -203,6 +203,46 @@
 /* (v0.8.2 tuvo aquí bk-unfold, el despliegue vertical del chart de Entrenos
    — murió en v0.9.3 al mudarse la gráfica a un drawer, ver ProgressView) */
 
+/* v0.9.4 — fin del countdown de cardio (zurdi: "más feedback de que el
+   timer ha terminado"): al llegar a 0:00 el label da un pulso de escala
+   (transform puro) y un halo aurora se enciende detrás (opacity pura, el
+   gradiente es estático) mientras entra la palabra "¡Tiempo!" con el
+   bk-rise de siempre. Aurora y no ember: el ámbar sigue siendo exclusivo
+   de la celebración de PR (ver bk-ember-flash). */
+@keyframes bk-timer-done-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.bk-timer-done-pop {
+  animation: bk-timer-done-pop var(--bk-dur-3) var(--bk-ease-spring);
+}
+.bk-timer-done-glow {
+  background: radial-gradient(circle, var(--bk-aurora-glow), transparent 70%);
+  animation: bk-fade var(--bk-dur-4) var(--bk-ease-out) both;
+}
+.bk-timer-done-rise {
+  animation: bk-rise var(--bk-dur-3) var(--bk-ease-out) both;
+}
+
+/* v0.9.4 — swap countdown ⇄ formulario/tarjeta (zurdi: "animación de
+   salida cuando acaba el timer, más smooth la transición"): tercera
+   excepción sancionada a "solo entradas" (tras la salida de BkSheet y la X
+   del CTA) — el countdown que termina se desvanece encogiéndose un poco
+   antes de que lo que venga detrás (el formulario de cardio, o la
+   celebración de PR por encima) entre con bk-pop-soft. mode="out-in" en el
+   consumidor: la salida termina ANTES de que arranque la entrada. */
+.bk-timer-swap-leave-active {
+  transition: opacity var(--bk-dur-3) var(--bk-ease-out), transform var(--bk-dur-3) var(--bk-ease-out);
+}
+.bk-timer-swap-leave-to {
+  opacity: 0;
+  transform: scale(0.92);
+}
+.bk-timer-swap-enter-active {
+  animation: bk-pop-soft var(--bk-dur-2) var(--bk-ease-out);
+}
+
 /* stagger: el contenedor asigna --bk-stagger-i por hijo */
 .bk-stagger > * {
   animation: bk-rise var(--bk-dur-3) var(--bk-ease-out) backwards;
@@ -250,6 +290,12 @@
 .bk-ember-flash {
   background: radial-gradient(circle, var(--bk-ember-glow), transparent 70%);
   animation: bk-ember-flash var(--bk-dur-4) var(--bk-ease-out) forwards;
+}
+
+/* v0.9.4: entrada del overlay de celebración de PR — fade del panel entero
+   (zurdi: la runa aparecía de golpe al terminar el countdown de cardio) */
+.bk-celebration-enter {
+  animation: bk-fade var(--bk-dur-3) var(--bk-ease-out) both;
 }
 
 .bk-press {
