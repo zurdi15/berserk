@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.11.4 - 2026-08-08
+
+### Changed
+- El final del timer de descanso ya no muestra un ✓: el contador se difumina mientras el cuadrado del CTA se estrecha al tamaño de la runa, y la runa se talla directamente sobre él. Al empezar un descanso la animación es simétrica (el contador crece desde el hueco de la runa).
+
 ## 0.11.3 - 2026-08-08
 
 ### Fixed
