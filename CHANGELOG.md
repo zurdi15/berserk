@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.5.1 - 2026-08-07
+
+- Your own calendar dots now paint in your user color (aurora stays only for users without a color set); the viewed athlete's color still rules in athlete mode.
+
 ## 0.5.0 - 2026-08-07
 
 - Supersets: link exercises into A/B groups in the routine editor; grouped cards show joined in the workout with a "next up" hint, and the automatic rest fires only when the group's round closes — solo exercises rest as always.
