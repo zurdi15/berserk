@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.7.0 - 2026-08-07
+
+- Supersets can now be created and dissolved inside the live workout: a chain toggle between cards links or splits them (closed chain = linked, in the editor too), works offline, and grouped exercises render inside one aurora-bordered block with a single "Superset A" header.
+- The rest timer's cancel is a red X sitting right next to the countdown in the central button — always visible, no tap needed — and dismissing it (or the timer ending) animates the button narrowing while the rune carves itself back in.
+- Pinned bars (tabs, month bar, workout chrono) now carry the same subtle grain as the page background instead of reading as a flat different color.
+
 ## 0.6.0 - 2026-08-07
 
 - Gym offline: the live workout works without coverage — log, edit and delete sets, add or remove exercises, start from an already-seen routine and finish the workout, all applied instantly on-device and queued for sync. A shell band shows the pending count; when connectivity returns everything replays in order, exactly once (server-side idempotent dedupe), with a toast confirming the sync.
