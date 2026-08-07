@@ -131,6 +131,7 @@ export const en = {
   admin: {
     users: 'Users',
     createUser: 'Create user',
+    editUser: 'Edit user',
     username: 'Username',
     password: 'Password',
     isAdmin: 'Admin',

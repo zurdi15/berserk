@@ -131,6 +131,7 @@ export const es = {
   admin: {
     users: 'Usuarios',
     createUser: 'Crear usuario',
+    editUser: 'Editar usuario',
     username: 'Usuario',
     password: 'Contraseña',
     isAdmin: 'Administrador',
