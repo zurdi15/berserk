@@ -268,22 +268,17 @@ watch(activeIndex, () => nextTick(updateIndicator))
                 >
                   <!-- swap rune<->countdown: out-in para que la runa entre sola
                        tras salir el countdown — y como BkRune monta con carve,
-                       la runa se RE-TALLA al volver (la "transición bonita" que
-                       pidió zurdi al acabar/cancelar el descanso).
+                       la runa se RE-TALLA al volver.
                        whitespace-nowrap (item 8): el countdown nunca envuelve
                        línea; el ancho crece en su lugar. -->
-                  <!-- v0.10.0: tercer estado FINISHED entre countdown y runa —
-                       ✓ con bk-pop + glow a tope durante la gracia del store,
-                       y de ahí funde a la runa que se re-talla (carve) -->
-                  <Transition name="bk-fade" mode="out-in">
+                  <!-- v0.11.4 (zurdi revocó el ✓ de la v0.10.0): al llegar a 0
+                       el countdown SALE en bk-cta-melt (difumina + su ancho
+                       colapsa al hueco de la runa, la losa se estrecha durante
+                       la salida) y la runa entra tallándose sobre la losa ya
+                       del tamaño final; el glow a tope de la gracia se queda -->
+                  <Transition name="bk-cta-melt" mode="out-in">
                     <span
-                      v-if="timerFinished"
-                      key="finished"
-                      data-testid="cta-timer-finished"
-                      class="text-aurora text-lg leading-none"
-                    >✓</span>
-                    <span
-                      v-else-if="resting"
+                      v-if="resting && !timerFinished"
                       key="timer"
                       data-testid="cta-timer"
                       class="bk-metric text-sm whitespace-nowrap"
@@ -398,16 +393,10 @@ watch(activeIndex, () => nextTick(updateIndicator))
                   :aria-label="$t(item.label)"
                   @click="goWorkout"
                 >
-                  <!-- v0.10.0: estado finished intermedio, ver desktop -->
-                  <Transition name="bk-fade" mode="out-in">
+                  <!-- v0.11.4: countdown → runa directo vía bk-cta-melt, ver desktop -->
+                  <Transition name="bk-cta-melt" mode="out-in">
                     <span
-                      v-if="timerFinished"
-                      key="finished"
-                      data-testid="cta-timer-finished"
-                      class="text-aurora text-lg leading-none"
-                    >✓</span>
-                    <span
-                      v-else-if="resting"
+                      v-if="resting && !timerFinished"
                       key="timer"
                       data-testid="cta-timer"
                       class="bk-metric text-sm whitespace-nowrap"

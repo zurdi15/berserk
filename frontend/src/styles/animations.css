@@ -200,6 +200,37 @@
   opacity: 1;
 }
 
+/* v0.11.4 — fin del timer de descanso (zurdi revocó el ✓ de la v0.10.0:
+   "que se difumine el timer mientras el cuadrado se vuelve del tamaño
+   adecuado y luego se pinta la runa"): el countdown SALE fundiendo a blur
+   mientras su ancho colapsa al hueco de la runa (max-width como techo
+   determinista, mismo truco que bk-cta-x; overflow hidden recorta el texto
+   limpio durante el colapso) — la losa del CTA se estrecha DURANTE la
+   salida, no de golpe al desmontar — y con out-in la runa entra después
+   tallándose (carve de BkRune) sobre la losa ya del tamaño final. La
+   entrada es simétrica: al empezar un descanso el countdown crece desde el
+   hueco de la runa mientras desdifumina. */
+.bk-cta-melt-enter-active,
+.bk-cta-melt-leave-active {
+  overflow: hidden;
+  transition:
+    max-width var(--bk-dur-4) var(--bk-ease-out),
+    opacity var(--bk-dur-3) var(--bk-ease-out),
+    filter var(--bk-dur-3) var(--bk-ease-out);
+}
+.bk-cta-melt-enter-from,
+.bk-cta-melt-leave-to {
+  max-width: 1.625rem;
+  opacity: 0;
+  filter: blur(6px);
+}
+.bk-cta-melt-enter-to,
+.bk-cta-melt-leave-from {
+  max-width: 8rem;
+  opacity: 1;
+  filter: blur(0);
+}
+
 /* (v0.8.2 tuvo aquí bk-unfold, el despliegue vertical del chart de Entrenos
    — murió en v0.9.3 al mudarse la gráfica a un drawer, ver ProgressView) */
 
