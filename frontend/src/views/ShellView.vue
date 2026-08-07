@@ -392,7 +392,20 @@ watch(activeIndex, () => nextTick(updateIndicator))
          verdad).
          v0.4.1: <main> ya NO lleva pb-24/padding — ver el comentario del spacer, más abajo,
          para el porqué completo (el hueco del navbar fijo se mudó a un elemento de flujo
-         real, DENTRO del wrapper, no a un padding de <main>). -->
+         real, DENTRO del wrapper, no a un padding de <main>).
+         item 14 (v0.4.3, zurdi): el modelo de scroll interno se generaliza a TODAS las
+         vistas (antes solo Perfil/Progresión) — cada vista ahora se acota a sí misma
+         (h-full/flex-1 min-h-0/overflow-y-auto en su propia raíz, ver TodayView/
+         CalendarView/WorkoutView/WorkoutEditView/ProfileView/ProgressView) y nunca
+         debería desbordar el wrapper de abajo. overflow-y-auto se queda AQUÍ de todos
+         modos, sin quitarlo ni "simplificarlo": (1) sigue siendo la caja cuyo tamaño
+         resuelto necesita el wrapper de abajo (h-[calc(100%-6rem)]) como referencia de
+         altura — esa cadena no cambia, la usan TODAS las vistas ahora, no solo las que
+         antes tenían su propio h-full; (2) queda como red de seguridad silenciosa: si
+         alguna vista futura olvida acotarse a sí misma, su contenido desborda hacia AQUÍ
+         en vez de recortarse sin más — overflow visible sería peor (contenido tapado por
+         el navbar fijo, el bug original que motivó todo este modelo). En el uso normal,
+         con cada vista ya acotada, <main> mismo no llega a necesitar scrollear. -->
     <main class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable w-full">
       <!-- v0.4.1 — HISTORIA COMPLETA DEL MODELO DE ALTURA (bug real de zurdi en móvil: "se
            ha roto el scroll — parte del content de abajo se esconde detrás de la bottom

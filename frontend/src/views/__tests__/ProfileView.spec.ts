@@ -352,6 +352,100 @@ describe('ProfileView', () => {
     })
   })
 
+  // item 14 (v0.4.3, zurdi generaliza el modelo de scroll interno a TODAS
+  // las vistas): raíz h-full flex-col, tira de pestañas shrink-0, CADA
+  // panel scrollea dentro de su propio flex-1 min-h-0 overflow-y-auto
+  describe('item 14: internal scroll model (every tab, tab strip always visible)', () => {
+    it('root carries the bounded h-full flex-col chain, and the tab strip is shrink-0', async () => {
+      wrapper = build()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.classes()).toEqual(expect.arrayContaining(['h-full', 'flex', 'flex-col']))
+      const tabStrip = wrapper.get('[role="tablist"]')
+      expect(tabStrip.classes()).toContain('shrink-0')
+    })
+
+    it('the profile panel scrolls internally (flex-1 min-h-0 overflow-y-auto)', async () => {
+      wrapper = build()
+      await wrapper.vm.$nextTick()
+
+      const panel = wrapper.get('[data-testid="logout-btn"]').element.closest('.bk-stagger')!
+      expect(panel.classList.contains('flex-1')).toBe(true)
+      expect(panel.classList.contains('min-h-0')).toBe(true)
+      expect(panel.classList.contains('overflow-y-auto')).toBe(true)
+    })
+
+    it('the routines panel (RoutineList) scrolls internally', async () => {
+      wrapper = build()
+      await flushPromises()
+
+      const routinesTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Rutinas')!
+      await routinesTab.trigger('click')
+      await flushPromises()
+
+      const routineList = wrapper.findComponent({ name: 'RoutineList' })
+      expect(routineList.classes()).toEqual(expect.arrayContaining(['flex-1', 'min-h-0', 'overflow-y-auto']))
+    })
+
+    it('the admin panel (AdminCard) scrolls internally', async () => {
+      const auth = useAuthStore()
+      auth.user = { id: 1, username: 'root-admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' }
+      wrapper = build()
+      await flushPromises()
+
+      const adminTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Admin')!
+      await adminTab.trigger('click')
+      await flushPromises()
+
+      const adminCard = wrapper.findComponent({ name: 'AdminCard' })
+      expect(adminCard.classes()).toEqual(expect.arrayContaining(['flex-1', 'min-h-0', 'overflow-y-auto']))
+    })
+
+    it('the library panel is a flex-col chain: the segmented selector is shrink-0, the manager area is the ONE scroll container (not double-nested)', async () => {
+      wrapper = build()
+      await flushPromises()
+
+      const libraryTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')!
+      await libraryTab.trigger('click')
+      await flushPromises()
+
+      const selector = wrapper.get('[data-testid="library-section-tabs"]')
+      expect(selector.element.parentElement!.classList.contains('shrink-0')).toBe(true)
+
+      const exerciseManager = wrapper.findComponent({ name: 'ExerciseManager' })
+      const scrollRegion = exerciseManager.element.closest('.overflow-y-auto')!
+      expect(scrollRegion.classList.contains('flex-1')).toBe(true)
+      expect(scrollRegion.classList.contains('min-h-0')).toBe(true)
+      // NO hay un segundo .overflow-y-auto anidado dentro de ese mismo panel
+      // (item 14: "simplifica a UN scroll container por panel")
+      expect(scrollRegion.querySelectorAll('.overflow-y-auto')).toHaveLength(0)
+    })
+
+    // item 4 (reconciliado con item 14): exercises/muscleGroups comparten el
+    // MISMO contenedor de scroll (v-show) — un remount de v-if no lo
+    // resetea gratis aquí, así que hace falta el watch dedicado
+    it('item 4: switching the library sub-selector (exercises <-> muscleGroups) resets the SHARED scroll container to top', async () => {
+      wrapper = build()
+      await flushPromises()
+
+      const libraryTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')!
+      await libraryTab.trigger('click')
+      await flushPromises()
+
+      const exerciseManager = wrapper.findComponent({ name: 'ExerciseManager' })
+      const scrollRegion = exerciseManager.element.closest('.overflow-y-auto') as HTMLElement
+      // simula haber bajado viendo Ejercicios
+      Object.defineProperty(scrollRegion, 'scrollTop', { configurable: true, value: 400, writable: true })
+      expect(scrollRegion.scrollTop).toBe(400)
+
+      const sectionTabs = wrapper.get('[data-testid="library-section-tabs"]').findAll('[role="tab"]')
+      await sectionTabs[1].trigger('click')
+      await flushPromises()
+
+      expect(scrollRegion.scrollTop).toBe(0)
+    })
+  })
+
   describe('item 5 (v0.4.2): library gets the records-tab layout', () => {
     async function openLibraryTab(w: VueWrapper) {
       const libraryTab = w.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')

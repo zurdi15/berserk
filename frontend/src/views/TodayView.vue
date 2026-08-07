@@ -82,10 +82,25 @@ async function load() {
 // de ver a alguien): sin este watcher los datos de otro atleta quedaban
 // pegados en pantalla tras pulsar "dejar de ver"
 watch(() => athlete.userId, () => load(), { immediate: true })
+
+// item 14 (v0.4.3, zurdi generaliza el modelo de scroll interno a TODAS las
+// vistas, no solo Perfil/Progresión): la raíz del template lleva h-full
+// (referencia de altura ya provista por el wrapper del shell, ver
+// ShellView.vue) + overflow-y-auto — Hoy no tiene chrome fijo que anclar
+// arriba (sin cabecera propia, a diferencia de Calendario), así que la raíz
+// entera ES el único contenedor de scroll: sin esto, una Hoy con mucho
+// registro empujaba el scroll a <main> (borde real de la ventana); ahora
+// scrollea DENTRO de su propia caja, terminando por encima del navbar vía
+// el spacer del wrapper (item 4: el reset de scroll al cambiar de ruta
+// llega gratis — RouterView remonta la vista entera, y un contenedor de
+// scroll recién creado arranca en 0).
+// (comentario aquí y no como primer hijo de <template>: un comentario ahí
+// convierte la raíz en un fragmento de dos nodos y rompe wrapper.classes()
+// en los tests, ver el mismo criterio en BkStepper.vue/ProgressView.vue.)
 </script>
 
 <template>
-  <div v-if="ready" class="space-y-4 bk-stagger">
+  <div v-if="ready" class="h-full overflow-y-auto space-y-4 bk-stagger">
     <div :style="{ '--bk-stagger-i': 0 }">
       <StreakCard :streak="streak" />
     </div>

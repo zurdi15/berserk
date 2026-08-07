@@ -52,6 +52,24 @@ describe('WorkoutView', () => {
     for (const key of Object.keys(routeQuery)) delete routeQuery[key]
   })
 
+  // item 14 (v0.4.3, zurdi): modelo de scroll interno — la raíz es un
+  // h-full flex-col, y CUALQUIERA de las ramas visibles (idle/en curso) es
+  // el único hijo real de layout con flex-1 min-h-0 overflow-y-auto propio
+  it('item 14: root is h-full flex-col and the visible branch (idle, here) carries flex-1 min-h-0 overflow-y-auto', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+
+    const wrapper = build()
+    await flushPromises()
+
+    expect(wrapper.classes()).toEqual(expect.arrayContaining(['h-full', 'flex', 'flex-col']))
+    const startFree = wrapper.get('[data-testid="start-free"]')
+    const idleBranch = startFree.element.parentElement!
+    expect(idleBranch.classList.contains('flex-1')).toBe(true)
+    expect(idleBranch.classList.contains('min-h-0')).toBe(true)
+    expect(idleBranch.classList.contains('overflow-y-auto')).toBe(true)
+  })
+
   it('calls activeWorkout.resume on mount to survive reloads', async () => {
     const activeWorkout = useActiveWorkoutStore()
     const resumeSpy = vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)

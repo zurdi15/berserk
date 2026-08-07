@@ -92,6 +92,15 @@ describe('WorkoutEditView', () => {
     document.body.innerHTML = ''
   })
 
+  // item 14 (v0.4.3, zurdi): modelo de scroll interno — la raíz es su
+  // propio contenedor de scroll acotado, no empuja a <main>
+  it('item 14: the root is a bounded internal scroller (h-full overflow-y-auto)', async () => {
+    wrapper = build()
+    await flushPromises()
+    expect(wrapper.classes()).toContain('h-full')
+    expect(wrapper.classes()).toContain('overflow-y-auto')
+  })
+
   it('loads the workout by the :id route param on mount', async () => {
     wrapper = build()
     await flushPromises()

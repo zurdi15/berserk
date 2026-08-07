@@ -165,18 +165,28 @@ watch(() => athlete.userId, () => {
 
 // sin padding lateral propio en la raíz (item 4): <main> del shell ya pone
 // px-4/py-4, tenerlo también aquí duplicaba el gutter frente a Hoy.
+// item 14 (v0.4.3, zurdi generaliza el modelo de scroll interno a TODAS las
+// vistas): la raíz pasa a h-full flex flex-col — la fila de navegación de
+// mes queda shrink-0 (chrome fijo, siempre visible), y TODO lo demás (grid +
+// leyenda de compartidos + enlace de leyenda de runas + heatmap) vive en un
+// único flex-1 min-h-0 overflow-y-auto — antes esta vista entera scrolleaba
+// contra <main> (borde real de la ventana); el heatmap del año, el elemento
+// más alto, podía empujar mucho scroll con el selector de mes desapareciendo
+// de la vista. Reset de scroll (item 4): gratis vía remount de RouterView al
+// cambiar de ruta — un contenedor de scroll recién creado arranca en 0.
 // (comentario aquí y no como primer hijo de <template>: un comentario ahí
 // convierte la raíz en un fragmento de dos nodos y rompe wrapper.classes(), ver ShellView.vue)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="h-full flex flex-col gap-6">
     <!-- Month navigation: icon-only en móvil (el texto largo con flecha
          desbordaba y aplastaba el label en 390px), texto de vuelta desde sm.
          La leyenda de runas ya no vive aquí (item 13): se baja entre la
          rejilla y la actividad del año, como un enlace suelto en vez de un
-         icono en esta fila. -->
-    <div class="flex items-center gap-2">
+         icono en esta fila. shrink-0 (item 14): chrome fijo, no scrollea con
+         el resto. -->
+    <div class="shrink-0 flex items-center gap-2">
       <BkButton variant="ghost" size="sm" :aria-label="$t('calendar.prevMonth')" @click="prevMonth">
         <span aria-hidden="true">‹</span>
         <span class="hidden sm:inline">{{ $t('calendar.prevMonth') }}</span>
@@ -188,66 +198,70 @@ watch(() => athlete.userId, () => {
       </BkButton>
     </div>
 
-    <!-- Month grid -->
-    <MonthGrid
-      :month="monthData"
-      :year="year"
-      :month-num="month"
-      :group-map="groupMap"
-      :dot-color="athlete.viewing?.color"
-      @select="selectDay"
-    />
-
-    <!-- SHARED-DOTS OVERLAY legend (v0.4.1): solo cuando el propio calendario
-         trae usuarios compartidos (nunca en modo atleta, ahí monthData.shared
-         llega undefined — ver api/domain.ts) — reutiliza BkUser tal cual
-         (punto de color + username), mismo idiom que el resto de listados de
-         usuario de la app. item 1a (v0.4.2): la etiqueta "Compartido
-         contigo:" se quita — los dots ya llevan color+nombre vía BkUser, la
-         fila de puntos habla por sí sola sin la muletilla de texto delante. -->
-    <div
-      v-if="monthData.shared && monthData.shared.length > 0"
-      class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
-      data-testid="shared-legend"
-    >
-      <BkUser
-        v-for="sharedUser in monthData.shared"
-        :key="sharedUser.user_id"
-        :user="{ username: sharedUser.username, color: sharedUser.color }"
-        size="sm"
+    <!-- item 14: región de scroll ÚNICA para todo lo que no es la cabecera
+         de mes — grid, leyenda de compartidos, enlace de runas y heatmap -->
+    <div class="flex-1 min-h-0 overflow-y-auto space-y-6">
+      <!-- Month grid -->
+      <MonthGrid
+        :month="monthData"
+        :year="year"
+        :month-num="month"
+        :group-map="groupMap"
+        :dot-color="athlete.viewing?.color"
+        @select="selectDay"
       />
-    </div>
 
-    <!-- Rune legend trigger (item 13): las runas de los squares no se
-         autoexplican, pero ya no es un botón-icono junto a los chevrons —
-         un texto pequeño y subtle, mismo idiom que otros enlaces menores de
-         la app (ver el toggle de descanso en WorkoutExerciseCard.vue).
-         item 7 (v0.4.2): recupera el idiom de circulito-i bordeado que tenía
-         el botón ANTES de la item 13 (ver git show 60bd285), pero ahora como
-         span decorativo DENTRO del texto en vez de ser el botón entero — el
-         texto sigue siendo lo clicable y lo accesible, el icono es puro
-         refuerzo visual (aria-hidden). -->
-    <div class="flex justify-center">
-      <button
-        type="button"
-        class="bk-press inline-flex items-center gap-1.5 text-xs text-ink-faint underline decoration-dotted"
-        data-testid="rune-legend-btn"
-        @click="runeLegendOpen = true"
+      <!-- SHARED-DOTS OVERLAY legend (v0.4.1): solo cuando el propio calendario
+           trae usuarios compartidos (nunca en modo atleta, ahí monthData.shared
+           llega undefined — ver api/domain.ts) — reutiliza BkUser tal cual
+           (punto de color + username), mismo idiom que el resto de listados de
+           usuario de la app. item 1a (v0.4.2): la etiqueta "Compartido
+           contigo:" se quita — los dots ya llevan color+nombre vía BkUser, la
+           fila de puntos habla por sí sola sin la muletilla de texto delante. -->
+      <div
+        v-if="monthData.shared && monthData.shared.length > 0"
+        class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
+        data-testid="shared-legend"
       >
-        <span
-          class="flex items-center justify-center w-3.5 h-3.5 rounded-full border border-line-strong text-2xs leading-none not-italic no-underline"
-          aria-hidden="true"
-          data-testid="rune-legend-info-icon"
-        >i</span>
-        {{ $t('calendar.runeLegend') }}
-      </button>
-    </div>
+        <BkUser
+          v-for="sharedUser in monthData.shared"
+          :key="sharedUser.user_id"
+          :user="{ username: sharedUser.username, color: sharedUser.color }"
+          size="sm"
+        />
+      </div>
 
-    <!-- Heatmap: siempre visible, incluso con datos vacíos (BkHeatmap ya
-         tolera [] y dibuja la rejilla del año en blanco) -->
-    <div class="mt-8">
-      <h3 class="text-sm font-medium text-ink-muted mb-3 text-center">{{ $t('calendar.yearActivity') }}</h3>
-      <BkHeatmap :data="heatmapData" :year="year" />
+      <!-- Rune legend trigger (item 13): las runas de los squares no se
+           autoexplican, pero ya no es un botón-icono junto a los chevrons —
+           un texto pequeño y subtle, mismo idiom que otros enlaces menores de
+           la app (ver el toggle de descanso en WorkoutExerciseCard.vue).
+           item 7 (v0.4.2): recupera el idiom de circulito-i bordeado que tenía
+           el botón ANTES de la item 13 (ver git show 60bd285), pero ahora como
+           span decorativo DENTRO del texto en vez de ser el botón entero — el
+           texto sigue siendo lo clicable y lo accesible, el icono es puro
+           refuerzo visual (aria-hidden). -->
+      <div class="flex justify-center">
+        <button
+          type="button"
+          class="bk-press inline-flex items-center gap-1.5 text-xs text-ink-faint underline decoration-dotted"
+          data-testid="rune-legend-btn"
+          @click="runeLegendOpen = true"
+        >
+          <span
+            class="flex items-center justify-center w-3.5 h-3.5 rounded-full border border-line-strong text-2xs leading-none not-italic no-underline"
+            aria-hidden="true"
+            data-testid="rune-legend-info-icon"
+          >i</span>
+          {{ $t('calendar.runeLegend') }}
+        </button>
+      </div>
+
+      <!-- Heatmap: siempre visible, incluso con datos vacíos (BkHeatmap ya
+           tolera [] y dibuja la rejilla del año en blanco) -->
+      <div class="mt-8">
+        <h3 class="text-sm font-medium text-ink-muted mb-3 text-center">{{ $t('calendar.yearActivity') }}</h3>
+        <BkHeatmap :data="heatmapData" :year="year" />
+      </div>
     </div>
 
     <!-- Schedule sheet modal: sin título genérico (amendment D, round 10) —

@@ -1699,6 +1699,27 @@ describe('CalendarView layout (round 6, items 3/4)', () => {
     expect(wrapper.classes().some((c) => c === 'p-4' || c.startsWith('px-'))).toBe(false)
   })
 
+  // item 14 (v0.4.3, zurdi): modelo de scroll interno — la cabecera de mes
+  // queda fija (shrink-0), TODO lo demás (grid/leyenda/heatmap) scrollea
+  // dentro de un único contenedor propio, nunca contra <main>
+  it('item 14: root is a bounded h-full flex-col chain, month-nav header is shrink-0, everything else scrolls in ONE flex-1 min-h-0 overflow-y-auto region', async () => {
+    const wrapper = mount(CalendarView, {
+      global: { plugins: [createI18nInstance()] },
+    })
+    await flushPromises()
+
+    expect(wrapper.classes()).toEqual(expect.arrayContaining(['h-full', 'flex', 'flex-col']))
+
+    const monthNavRow = wrapper.get('.flex.items-center.gap-2')
+    expect(monthNavRow.classes()).toContain('shrink-0')
+
+    const scrollRegion = wrapper.get('.flex-1.min-h-0.overflow-y-auto')
+    // la región de scroll contiene el grid del mes Y el heatmap del año —
+    // UNA sola región, no dos contenedores anidados
+    expect(scrollRegion.findComponent({ name: 'MonthGrid' }).exists()).toBe(true)
+    expect(scrollRegion.find('[data-testid="rune-legend-btn"]').exists()).toBe(true)
+  })
+
   it('polish wave item 13: the rune-legend trigger is NOT in the month-navigation row anymore (only prev/next live there)', async () => {
     const wrapper = mount(CalendarView, {
       global: { plugins: [createI18nInstance()] },

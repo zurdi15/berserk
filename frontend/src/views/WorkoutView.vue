@@ -307,10 +307,20 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   if (ticker) clearInterval(ticker)
 })
+
+// item 14 (v0.4.3, zurdi generaliza el modelo de scroll interno a TODAS las
+// vistas): raíz h-full flex flex-col (referencia de altura ya provista por
+// el wrapper del shell) — BkCelebration/NeonPulse son <Teleport to="body">
+// (no ocupan hueco de flujo aquí, ver esos componentes), así que el ÚNICO
+// hijo real de layout en cada momento es UNA de las tres ramas del
+// v-if/else-if/else de abajo (FinishSummary / entreno en curso / idle).
+// Las TRES llevan flex-1 min-h-0 overflow-y-auto (a FinishSummary, un
+// componente hijo con una única raíz, le llega vía fallthrough de clase) —
+// sin esto, esta vista scrolleaba contra <main> entero.
 </script>
 
 <template>
-  <div>
+  <div class="h-full flex flex-col">
     <BkCelebration
       v-if="activeWorkout.lastRecords.length"
       :records="activeWorkout.lastRecords"
@@ -323,12 +333,13 @@ onBeforeUnmount(() => {
 
     <FinishSummary
       v-if="finishedWorkout"
+      class="flex-1 min-h-0 overflow-y-auto"
       :workout="finishedWorkout"
       :records="sessionRecords"
       @close="closeSummary"
     />
 
-    <div v-else-if="activeWorkout.workout" class="space-y-4 bk-stagger">
+    <div v-else-if="activeWorkout.workout" class="flex-1 min-h-0 overflow-y-auto space-y-4 bk-stagger">
       <!-- item 3 (ola de pulido v0.3.0): la fecha pasa a la MISMA fila que el
            cronómetro, a su derecha (antes iba apilada arriba) — flex-wrap se
            conserva como red de seguridad: una fecha larga (locale EN con
@@ -471,7 +482,7 @@ onBeforeUnmount(() => {
 
     <!-- item 4: sin bk-stagger propio, esta rama entraba desnuda (nunca tuvo
          entrada propia — dependía del ahora-eliminado Transition de ShellView) -->
-    <div v-else class="space-y-4 bk-stagger">
+    <div v-else class="flex-1 min-h-0 overflow-y-auto space-y-4 bk-stagger">
       <BkButton variant="primary" block data-testid="start-free" :style="{ '--bk-stagger-i': 0 }" @click="startFree">
         {{ t('workout.freeWorkout') }}
       </BkButton>
