@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.11.7 - 2026-08-08
+
+### Added
+- Todo lo que se borra sale con animación: la card, fila o entrada se difumina mientras el resto de la lista cierra el hueco deslizándose. Aplica a ejercicios del entreno, series, filas del editor de rutinas, rutinas, ejercicios y grupos de la biblioteca, invitaciones, usuarios de admin, accesos compartidos y entradas de cuerpo.
+
 ## 0.11.6 - 2026-08-08
 
 ### Changed
