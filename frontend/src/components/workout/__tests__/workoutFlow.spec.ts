@@ -561,6 +561,16 @@ describe('WorkoutExerciseCard', () => {
       })
     }
 
+    // v0.11.5 (zurdi): "Empezar" abre el picker de duración (sheet
+    // teleportado a body); el countdown arranca al confirmarlo — el objetivo
+    // por defecto sigue siendo el que anuncia la etiqueta del botón
+    async function startCardio(wrapper: ReturnType<typeof mountCard>) {
+      await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
+      await flushPromises()
+      await byTestId('cardio-start-confirm').trigger('click')
+      await flushPromises()
+    }
+
     // v0.10.0: "Empezar" vive en la CARD (con el objetivo por defecto en la
     // etiqueta) y arranca el countdown reutilizando la superficie de resume;
     // cuelga de `live`, no de restEnabled (cardio ya ni siquiera descansa)
@@ -583,6 +593,92 @@ describe('WorkoutExerciseCard', () => {
       expect(wrapper.find('[data-testid="cardio-start-30"]').exists()).toBe(true)
     })
 
+    // v0.11.5 (zurdi: "cuando se inicia un ejercicio de cardio se tiene que
+    // poder elegir cuánto tiempo vas a hacer ese cardio")
+    describe('start duration picker', () => {
+      it('"Empezar" opens the picker instead of starting the countdown straight away', async () => {
+        const wrapper = mountCardio()
+        await flushPromises()
+
+        await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
+        await flushPromises()
+
+        expect(document.body.querySelector('[data-testid="cardio-duration-picker"]')).not.toBeNull()
+        expect(wrapper.find('[data-testid="resumed-cardio-countdown-30"]').exists()).toBe(false)
+        expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
+      })
+
+      it('the picker opens on the target the button announces (20:00 with no history)', async () => {
+        const wrapper = mountCardio()
+        await flushPromises()
+
+        await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
+        await flushPromises()
+
+        expect(byTestId('cardio-duration-preset-20').attributes('aria-pressed')).toBe('true')
+        expect(byTestId('cardio-start-confirm').text()).toContain('20:00')
+      })
+
+      it('dismissing the picker starts nothing', async () => {
+        const wrapper = mountCardio()
+        await flushPromises()
+        await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
+        await flushPromises()
+
+        // click en el backdrop del sheet = cerrar
+        ;(document.body.querySelector('.bg-scrim') as HTMLElement).click()
+        await flushPromises()
+
+        expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
+        expect(wrapper.find('[data-testid="resumed-cardio-countdown-30"]').exists()).toBe(false)
+      })
+
+      it('the chosen duration drives the whole run: countdown, persistence and the auto-logged set', async () => {
+        const actions = makeActions({
+          logSet: vi.fn(async () => ({
+            set: { id: 1, set_number: 1, reps: null, weight_kg: null, duration_seconds: 900, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+            new_records: [],
+          })),
+        })
+        const wrapper = mountCardio({ actions, workoutId: 7 })
+        await flushPromises()
+
+        await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
+        await flushPromises()
+        await byTestId('cardio-duration-preset-15').trigger('click')
+        await flushPromises()
+        await byTestId('cardio-start-confirm').trigger('click')
+        await flushPromises()
+
+        expect(wrapper.get('[data-testid="cardio-countdown-label"]').text()).toBe('15:00')
+        expect(JSON.parse(localStorage.getItem('berserk:cardio-countdown')!).targetSeconds).toBe(900)
+
+        vi.advanceTimersByTime(900_000)
+        await flushPromises()
+        vi.advanceTimersByTime(1_200)
+        await flushPromises()
+
+        expect(actions.logSet).toHaveBeenCalledWith(30, expect.objectContaining({ duration_seconds: 900 }))
+      })
+
+      it('the picker stepper fine-tunes in 30s steps over the preset', async () => {
+        const wrapper = mountCardio({ workoutId: 7 })
+        await flushPromises()
+
+        await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
+        await flushPromises()
+        await byTestId('cardio-duration-preset-5').trigger('click')
+        await flushPromises()
+        const plus = document.body.querySelector('[data-testid="cardio-duration-picker"] button[aria-label="Aumentar"]') as HTMLElement
+        plus.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }))
+        await flushPromises()
+        await byTestId('cardio-start-confirm').trigger('click')
+        await flushPromises()
+
+        expect(JSON.parse(localStorage.getItem('berserk:cardio-countdown')!).targetSeconds).toBe(330)
+      })
+    })
+
     it('starting the countdown and letting it reach zero auto-logs the set after the finish hold, without rest', async () => {
       const actions = makeActions({
         logSet: vi.fn(async () => ({
@@ -596,8 +692,7 @@ describe('WorkoutExerciseCard', () => {
       await flushPromises()
 
       // sin historial, el objetivo por defecto es 20:00 (1200s)
-      await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
-      await flushPromises()
+      await startCardio(wrapper)
       expect(wrapper.find('[data-testid="resumed-cardio-countdown-30"]').exists()).toBe(true)
 
       vi.advanceTimersByTime(1_200_000)
@@ -615,8 +710,7 @@ describe('WorkoutExerciseCard', () => {
         const wrapper = mountCardio({ workoutId: 7 })
         await flushPromises()
 
-        await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
-        await flushPromises()
+        await startCardio(wrapper)
 
         const raw = localStorage.getItem('berserk:cardio-countdown')
         expect(raw).not.toBeNull()
@@ -629,8 +723,7 @@ describe('WorkoutExerciseCard', () => {
         const wrapper = mountCardio({ workoutId: undefined })
         await flushPromises()
 
-        await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
-        await flushPromises()
+        await startCardio(wrapper)
 
         expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
         expect(wrapper.find('[data-testid="resumed-cardio-countdown-30"]').exists()).toBe(false)
@@ -639,8 +732,7 @@ describe('WorkoutExerciseCard', () => {
       it('cancelling the countdown clears the persisted state', async () => {
         const wrapper = mountCardio()
         await flushPromises()
-        await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
-        await flushPromises()
+        await startCardio(wrapper)
         expect(localStorage.getItem('berserk:cardio-countdown')).not.toBeNull()
 
         await byTestId('cardio-countdown-cancel').trigger('click')
@@ -658,8 +750,7 @@ describe('WorkoutExerciseCard', () => {
         })
         const wrapper = mountCardio({ actions })
         await flushPromises()
-        await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
-        await flushPromises()
+        await startCardio(wrapper)
         expect(localStorage.getItem('berserk:cardio-countdown')).not.toBeNull()
 
         // objetivo por defecto (1200s) + el hold del estado de fin
@@ -970,6 +1061,45 @@ describe('WorkoutExerciseCard', () => {
     await flushPromises()
 
     expect(actions.removeExercise).toHaveBeenCalledWith(20)
+  })
+
+  // v0.11.5 (zurdi: "ya que aún no se ha registrado nada, ese botón debería
+  // cancelar directamente"): confirmar solo protege trabajo ya hecho
+  it('removes an exercise with no logged sets straight away, without the confirm step', async () => {
+    const actions = makeActions()
+    const wrapper = mountCard({
+      workoutExercise: cardioWorkoutExercise,
+      exercise: cardioExercise,
+      exerciseIds: [30],
+      actions,
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-testid="remove-exercise-30"]').trigger('click')
+    await flushPromises()
+
+    expect(actions.removeExercise).toHaveBeenCalledWith(30)
+    expect(wrapper.find('[data-testid="confirm-remove-exercise-30"]').exists()).toBe(false)
+  })
+
+  it('still asks for confirmation once something is logged (the sets, not the measurement, decide)', async () => {
+    const actions = makeActions()
+    const wrapper = mountCard({
+      workoutExercise: {
+        ...cardioWorkoutExercise,
+        sets: [{ id: 9, set_number: 1, reps: null, weight_kg: null, duration_seconds: 600, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' }],
+      },
+      exercise: cardioExercise,
+      exerciseIds: [30],
+      actions,
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-testid="remove-exercise-30"]').trigger('click')
+    await flushPromises()
+
+    expect(actions.removeExercise).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="confirm-remove-exercise-30"]').exists()).toBe(true)
   })
 
   it('reorders via actions.reorder with the full id list when moving down', async () => {

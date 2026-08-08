@@ -6,8 +6,13 @@ import { onBeforeUnmount } from 'vue'
 // desde 360px (ver SetForm.vue para la aritmética completa); "md" sigue
 // siendo el default, sin cambios para el resto de consumidores (p.ej.
 // RoutineEditorSheet, que usa un solo stepper por fila sin problema de sitio)
+// v0.11.5: `display` sustituye SOLO lo que se pinta, no lo que se maneja — el
+// stepper sigue trabajando en la unidad cruda del backend (step/min/max en
+// segundos, p.ej.) mientras el usuario lee "10:00" en vez de "600 s". Sin esa
+// separación, un objetivo de cardio en segundos obligaba a elegir entre un
+// valor legible y una unidad honesta con el payload.
 const props = withDefaults(
-  defineProps<{ modelValue: number; step?: number; min?: number; max?: number; suffix?: string; size?: 'md' | 'compact' }>(),
+  defineProps<{ modelValue: number; step?: number; min?: number; max?: number; suffix?: string; size?: 'md' | 'compact'; display?: string }>(),
   { step: 1, min: 0, max: 999, size: 'md' },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: number] }>()
@@ -80,7 +85,7 @@ onBeforeUnmount(release)
       class="bk-metric text-ink text-center"
       :class="size === 'compact' ? 'text-lg' : 'text-2xl'"
     >
-      {{ modelValue }}<span v-if="suffix" class="text-sm text-ink-faint ml-1">{{ suffix }}</span>
+      {{ display ?? modelValue }}<span v-if="suffix" class="text-sm text-ink-faint ml-1">{{ suffix }}</span>
     </span>
     <button
       type="button"

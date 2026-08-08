@@ -460,6 +460,10 @@ export const es = {
       // v0.9.4: estado de fin del countdown (zurdi: "más feedback de que el
       // timer ha terminado")
       timeUp: '¡Tiempo!',
+      // v0.11.5 (zurdi: "cuando se inicia un cardio se tiene que poder elegir
+      // cuánto tiempo vas a hacer"): picker que abre "Empezar" en la card
+      howLong: '¿Cuánto tiempo?',
+      minutesShort: '{n} min',
     },
   },
 } as const

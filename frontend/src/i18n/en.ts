@@ -446,6 +446,9 @@ export const en = {
       loggedWhileAway: 'Cardio logged: {duration}',
       // v0.9.4: countdown finish state (see es.ts)
       timeUp: "Time's up!",
+      // v0.11.5: duration picker behind the card's "Start" (see es.ts)
+      howLong: 'How long?',
+      minutesShort: '{n} min',
     },
   },
 } as const

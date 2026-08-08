@@ -31,6 +31,8 @@ import BkSheet from '@/lib/BkSheet.vue'
 import BkStepper from '@/lib/BkStepper.vue'
 import type { RuneName } from '@/lib/runes'
 import CardioCountdown from './CardioCountdown.vue'
+import CardioStartSheet from './CardioStartSheet.vue'
+import { formatDuration } from './duration'
 import { REST_MAX_SECONDS, REST_MIN_SECONDS, REST_PRESETS, REST_STEP_SECONDS, restFor } from './rest'
 import { resolveNewSetDefaults } from './setDefaults'
 import { formatHistoryLine, formatHistorySetLines } from './setHistoryFormat'
@@ -233,13 +235,6 @@ const drawerDefaults = computed(() => {
   )
 })
 
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = String(seconds % 60).padStart(2, '0')
-  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
-}
-
 function formatSetValue(set: SetOut): string {
   const measurement = props.exercise?.measurement
   if (measurement === 'strength' || (measurement === 'bodyweight' && set.weight_kg)) {
@@ -372,13 +367,22 @@ function onResumedCancel() {
 // también sabe arrancar countdown.
 const cardioTargetSeconds = computed(() => drawerDefaults.value?.duration_seconds ?? 20 * 60)
 
-function startCardio() {
+// v0.11.5 (zurdi: "cuando se inicia un ejercicio de cardio se tiene que poder
+// elegir cuánto tiempo vas a hacer ese cardio"): "Empezar" ya no arranca a
+// ciegas con cardioTargetSeconds — abre el picker (ver CardioStartSheet.vue),
+// que parte de ese mismo objetivo y devuelve el elegido. El objetivo heredado
+// sigue siendo el default y la etiqueta del botón, así que el caso normal es
+// abrir y confirmar.
+const cardioStartOpen = ref(false)
+
+function startCardio(seconds: number) {
+  cardioStartOpen.value = false
   if (props.workoutId == null) return
   const persisted: PersistedCardioCountdown = {
-    endsAt: Date.now() + Math.max(1, cardioTargetSeconds.value) * 1000,
+    endsAt: Date.now() + Math.max(1, seconds) * 1000,
     workoutId: props.workoutId,
     workoutExerciseId: props.workoutExercise.id,
-    targetSeconds: cardioTargetSeconds.value,
+    targetSeconds: seconds,
     distanceM: drawerDefaults.value?.distance_m ?? undefined,
   }
   setPersistedCardioCountdown(persisted)
@@ -427,6 +431,21 @@ async function pickRestManual(seconds: number) {
   } catch (error) {
     toastApiError(error)
   }
+}
+
+// v0.11.5 (zurdi: "ya que aún no se ha registrado nada, ese botón debería
+// cancelar directamente"): la confirmación existe para proteger TRABAJO YA
+// HECHO — un ejercicio sin ninguna serie registrada no tiene nada que
+// proteger, así que la X lo quita de un toque. Se nota sobre todo en cardio
+// (un bloque de cardio no acumula nada hasta que se registra el tiempo, así
+// que la X era casi siempre un "me he equivocado al añadirlo"), pero la regla
+// es general: lo que decide es si hay series, no la medición.
+function onRemoveClick() {
+  if (props.workoutExercise.sets.length) {
+    removeConfirming.value = true
+    return
+  }
+  confirmRemove()
 }
 
 async function confirmRemove() {
@@ -703,7 +722,7 @@ async function moveDown() {
           variant="primary"
           size="sm"
           :data-testid="`cardio-start-${workoutExercise.id}`"
-          @click="startCardio"
+          @click="cardioStartOpen = true"
         >
           {{ t('workout.cardioStart', { duration: formatDuration(cardioTargetSeconds) }) }}
         </BkButton>
@@ -715,7 +734,7 @@ async function moveDown() {
             icon="delete"
             :data-testid="`remove-exercise-${workoutExercise.id}`"
             :aria-label="t('workout.remove')"
-            @click="removeConfirming = true"
+            @click="onRemoveClick"
           />
         </div>
         <div v-else key="confirm" class="flex gap-2 shrink-0">
@@ -733,6 +752,17 @@ async function moveDown() {
         </div>
       </Transition>
     </div>
+
+    <!-- v0.11.5 (zurdi): el "cuánto tiempo" que faltaba antes del countdown —
+         solo se monta en cardio, y parte del mismo objetivo que anuncia el
+         botón "Empezar" -->
+    <CardioStartSheet
+      v-if="isCardio"
+      :open="cardioStartOpen"
+      :target-seconds="cardioTargetSeconds"
+      @close="cardioStartOpen = false"
+      @start="startCardio"
+    />
 
     <BkSheet :open="drawerOpen" :title="name" @close="closeDrawer">
       <div v-if="exercise" class="space-y-3">

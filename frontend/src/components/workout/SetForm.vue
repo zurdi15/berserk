@@ -8,6 +8,7 @@ import BkButton from '@/lib/BkButton.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkStepper from '@/lib/BkStepper.vue'
 import CardioCountdown from './CardioCountdown.vue'
+import { CARDIO_DURATION_MAX_SECONDS, CARDIO_DURATION_STEP_SECONDS, formatDuration } from './duration'
 
 const props = withDefaults(
   defineProps<{
@@ -90,6 +91,10 @@ const rpe = ref(props.initialSet?.rpe != null ? String(props.initialSet.rpe) : '
 // item 7: pantalla completa del cajón sustituida por el countdown mientras
 // corre — nunca en edición (corregir una serie pasada no es "vivirla ahora")
 const countdownActive = ref(false)
+
+// v0.11.5: lo que se PINTA en el stepper de duración de cardio (el valor sigue
+// viajando en segundos, ver BkStepper::display)
+const cardioDurationLabel = computed(() => formatDuration(durationSeconds.value))
 
 const rpeOptions = computed(() => [
   { value: '', label: '' },
@@ -214,7 +219,18 @@ function onCountdownCancel() {
       <div class="w-full grid grid-cols-2 gap-2">
         <div class="min-w-0 flex flex-col items-center">
           <span class="block text-xs text-ink-muted mb-2">{{ t('workout.duration') }}</span>
-          <BkStepper v-model="durationSeconds" size="compact" :step="60" :min="1" :max="21600" suffix="s" />
+          <!-- v0.11.5: mm:ss en vez de "1200 s" — es la misma duración que la
+               card anuncia en "Empezar 20:00" y que pinta el countdown;
+               leerla en dos formatos distintos era parte de por qué el timer
+               parecía ajeno a lo que hay en el cajón -->
+          <BkStepper
+            v-model="durationSeconds"
+            size="compact"
+            :step="CARDIO_DURATION_STEP_SECONDS"
+            :min="1"
+            :max="CARDIO_DURATION_MAX_SECONDS"
+            :display="cardioDurationLabel"
+          />
         </div>
         <div class="min-w-0 flex flex-col items-center">
           <span class="block text-xs text-ink-muted mb-2">{{ t('workout.distanceOptional') }}</span>
