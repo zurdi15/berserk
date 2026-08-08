@@ -13,6 +13,7 @@ import TodaySessionCard from '@/components/today/TodaySessionCard.vue'
 import WeekSummaryCard from '@/components/today/WeekSummaryCard.vue'
 import DistributionBars from '@/components/today/DistributionBars.vue'
 import RecentPrs from '@/components/today/RecentPrs.vue'
+import SocialFeedCard from '@/components/today/SocialFeedCard.vue'
 
 const { t } = useI18n()
 const athlete = useAthleteStore()
@@ -118,6 +119,13 @@ watch(() => athlete.userId, () => load(), { immediate: true })
     </div>
     <div :style="{ '--bk-stagger-i': 4 }">
       <RecentPrs :records="records" :exercises="exercises" />
+    </div>
+    <!-- v0.12.0 (backlog social): actividad de quienes comparten CONMIGO —
+         es contenido del usuario logueado, así que no se monta viendo a otro
+         atleta; la card se autoelimina si nadie comparte (ver el computed
+         visible del componente) -->
+    <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 5 }">
+      <SocialFeedCard />
     </div>
   </div>
 </template>

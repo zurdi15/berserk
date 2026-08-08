@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut, MuscleGroupOut } from '@/api/domain'
+import { exerciseImageUrl } from '@/api/domain'
 import { displayToKg, kgToDisplay } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -65,6 +66,13 @@ const restOptions = [
     <!-- cabecera: runa + nombre + mover/quitar — misma anatomía que la card
          del entreno (el chip de superserie vive en el contenedor del bloque) -->
     <div class="flex items-center gap-2">
+      <!-- v0.12.0: mismo thumb que la card del entreno (paridad de flujos) -->
+      <img
+        v-if="exercise?.has_image"
+        :src="exerciseImageUrl(exercise.id)"
+        alt=""
+        class="w-9 h-9 rounded-sm object-cover shrink-0"
+      />
       <BkRune v-if="rune" :name="rune" :size="14" />
       <span class="text-sm font-medium text-ink truncate">
         {{ exerciseName(exercise, locale) }}

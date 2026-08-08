@@ -3,7 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { BodyEntryOut, BodyIn } from '@/api/domain'
-import { deleteBody, listBody, upsertBody } from '@/api/domain'
+import { bodyPhotoUrl, deleteBody, deleteBodyPhoto, listBody, listBodyPhotos, uploadBodyPhoto, upsertBody } from '@/api/domain'
+import type { BodyPhotoOut } from '@/api/domain'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import { toastApiError } from '@/utils/apiErrors'
 import { todayIso } from '@/utils/dates'
@@ -120,10 +121,64 @@ function measuresLine(entry: BodyEntryOut): string {
 async function load() {
   try {
     entries.value = await listBody(athlete.userId)
+    // v0.12.0: fotos de progreso — PRIVADAS: solo en la vista propia (el
+    // backend tampoco las serviría de otro usuario)
+    if (isViewingSelf.value) photos.value = await listBodyPhotos()
   } catch (error) {
     toastApiError(error)
   }
 }
+
+// v0.12.0 (backlog "fotos de progreso"): subir con fecha (backdatable para
+// el "antes"), grid seleccionable de a dos y comparador lado a lado
+const photos = ref<BodyPhotoOut[]>([])
+const photoDate = ref(todayIso())
+const photoUploading = ref(false)
+const photoFileEl = ref<HTMLInputElement | null>(null)
+const selectedPhotoIds = ref<number[]>([])
+const compareOpen = ref(false)
+
+async function onPhotoChosen(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  try {
+    photoUploading.value = true
+    await uploadBodyPhoto(photoDate.value, file)
+    photos.value = await listBodyPhotos()
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    photoUploading.value = false
+    input.value = ''
+  }
+}
+
+function togglePhotoSelect(id: number) {
+  if (selectedPhotoIds.value.includes(id)) {
+    selectedPhotoIds.value = selectedPhotoIds.value.filter((p) => p !== id)
+  } else {
+    // máximo dos: elegir una tercera sustituye a la más antigua de la selección
+    selectedPhotoIds.value = [...selectedPhotoIds.value.slice(-1), id]
+  }
+}
+
+async function removePhoto(id: number) {
+  try {
+    await deleteBodyPhoto(id)
+    photos.value = photos.value.filter((p) => p.id !== id)
+    selectedPhotoIds.value = selectedPhotoIds.value.filter((p) => p !== id)
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
+// antes a la izquierda, después a la derecha (por fecha de la foto)
+const comparePair = computed(() =>
+  photos.value
+    .filter((p) => selectedPhotoIds.value.includes(p.id))
+    .sort((a, b) => a.date.localeCompare(b.date)),
+)
 
 // Sheet de alta (upsert por fecha)
 const sheetOpen = ref(false)
@@ -418,6 +473,81 @@ watch(() => athlete.userId, load, { immediate: true })
       </div>
       </TransitionGroup>
     </div>
+
+    <!-- v0.12.0 (backlog "fotos de progreso"): privadas — el bloque entero
+         solo existe en la vista propia -->
+    <div v-if="isViewingSelf" class="space-y-3" data-testid="body-photos">
+      <h3 class="text-sm font-medium text-ink">{{ t('body.photos.title') }}</h3>
+      <div class="flex items-end gap-2">
+        <div class="flex-1 min-w-0">
+          <BkDateField v-model="photoDate" :label="t('body.date')" />
+        </div>
+        <BkButton
+          variant="ghost"
+          :loading="photoUploading"
+          data-testid="body-photo-upload"
+          @click="photoFileEl?.click()"
+        >
+          {{ t('body.photos.add') }}
+        </BkButton>
+        <input
+          ref="photoFileEl"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          class="hidden"
+          data-testid="body-photo-input"
+          @change="onPhotoChosen"
+        />
+      </div>
+      <p v-if="!photos.length" class="text-sm text-ink-faint">{{ t('body.photos.empty') }}</p>
+      <template v-else>
+        <p class="text-xs text-ink-faint">{{ t('body.photos.hint') }}</p>
+        <div class="relative grid grid-cols-3 gap-2">
+          <TransitionGroup name="bk-remove">
+          <div v-for="photo in photos" :key="photo.id" class="relative">
+            <button
+              type="button"
+              class="block w-full rounded-sm"
+              :class="selectedPhotoIds.includes(photo.id) && 'ring-2 ring-aurora'"
+              :data-testid="`body-photo-${photo.id}`"
+              :aria-pressed="selectedPhotoIds.includes(photo.id) ? 'true' : 'false'"
+              @click="togglePhotoSelect(photo.id)"
+            >
+              <img :src="bodyPhotoUrl(photo.id)" alt="" class="w-full aspect-square object-cover rounded-sm" />
+              <span class="block bk-metric text-2xs text-ink-faint mt-0.5">{{ photo.date }}</span>
+            </button>
+            <span class="absolute top-1 right-1 rounded-sm bg-void/60">
+              <BkActionBtn
+                icon="delete"
+                :data-testid="`delete-body-photo-${photo.id}`"
+                :aria-label="t('common.delete')"
+                @click="removePhoto(photo.id)"
+              />
+            </span>
+          </div>
+          </TransitionGroup>
+        </div>
+        <BkButton
+          v-if="comparePair.length === 2"
+          variant="primary"
+          block
+          data-testid="body-photo-compare"
+          @click="compareOpen = true"
+        >
+          {{ t('body.photos.compare') }}
+        </BkButton>
+      </template>
+    </div>
+
+    <!-- comparador antes/después: las dos seleccionadas, la más antigua a la izquierda -->
+    <BkSheet :open="compareOpen" :title="t('body.photos.compareTitle')" @close="compareOpen = false">
+      <div class="grid grid-cols-2 gap-2" data-testid="body-photo-comparison">
+        <div v-for="photo in comparePair" :key="photo.id" class="space-y-1">
+          <img :src="bodyPhotoUrl(photo.id)" alt="" class="w-full rounded-sm object-cover" />
+          <p class="bk-metric text-xs text-ink-faint text-center">{{ photo.date }}</p>
+        </div>
+      </div>
+    </BkSheet>
 
     <BkSheet :open="sheetOpen" :title="editingEntry ? t('body.editEntry') : t('body.newEntry')" @close="closeSheet">
       <div class="space-y-3">

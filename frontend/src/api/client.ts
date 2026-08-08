@@ -88,6 +88,34 @@ function toSlug(detail: unknown): { slug: string; field?: string } {
   return { slug: 'generic' }
 }
 
+// v0.12.0 media: subida multipart — mismo contrato de errores/offline que
+// api(), pero con FormData (el navegador pone el boundary; nada de
+// Content-Type manual) y sin cache de lecturas (solo se usa para POSTs)
+export async function apiForm<T = unknown>(path: string, form: FormData): Promise<T> {
+  let response: Response
+  try {
+    response = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: form,
+    })
+  } catch {
+    markOffline()
+    throw new OfflineError()
+  }
+  markOnline()
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}))
+    const { slug, field } = toSlug((payload as { detail?: unknown }).detail)
+    if (response.status === 401 && slug === 'not_authenticated') {
+      unauthorizedHandler?.()
+    }
+    throw new ApiError(response.status, slug, field)
+  }
+  if (response.status === 204) return undefined as T
+  return (await response.json()) as T
+}
+
 export async function api<T = unknown>(
   path: string,
   options: { method?: string; body?: unknown } = {},

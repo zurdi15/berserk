@@ -29,6 +29,23 @@ export const useWorkoutEditorStore = defineStore('workoutEditor', () => {
     }
   }
 
+
+  // v0.12.0: nota por ejercicio — mismo contrato que activeWorkout
+  const noteCache = new Map<number, string>()
+
+  async function exerciseNote(exerciseId: number): Promise<string> {
+    if (noteCache.has(exerciseId)) return noteCache.get(exerciseId)!
+    const note = (await domain.getExerciseNote(exerciseId)).note
+    noteCache.set(exerciseId, note)
+    return note
+  }
+
+  async function saveExerciseNote(exerciseId: number, note: string): Promise<string> {
+    const saved = (await domain.putExerciseNote(exerciseId, note)).note
+    noteCache.set(exerciseId, saved)
+    return saved
+  }
+
   async function exerciseHistory(exerciseId: number): Promise<ExerciseHistoryOut | null> {
     if (historyCache.value.has(exerciseId)) return historyCache.value.get(exerciseId) ?? null
     const result = await domain.getExerciseHistory(exerciseId, {
@@ -105,6 +122,8 @@ export const useWorkoutEditorStore = defineStore('workoutEditor', () => {
     updateSet,
     deleteSet,
     exerciseHistory,
+    exerciseNote,
+    saveExerciseNote,
     setExerciseRest,
     patch,
     reset,

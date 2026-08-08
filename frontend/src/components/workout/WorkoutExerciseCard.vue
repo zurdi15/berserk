@@ -12,6 +12,7 @@ import type {
   SetOut,
   WorkoutExerciseOut,
 } from '@/api/domain'
+import { exerciseImageUrl } from '@/api/domain'
 import { primaryRune as resolvePrimaryRune } from '@/lib/runeResolve'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
@@ -189,6 +190,14 @@ const historyLoaded = ref(false)
 watch(
   () => props.workoutExercise.exercise_id,
   async (exerciseId) => {
+    // v0.12.0: la nota persistente viaja con el historial — misma política
+    // de "hint de fondo, jamás un toast" (sin red simplemente no aparece)
+    props.actions
+      .exerciseNote(exerciseId)
+      .then((value) => {
+        note.value = value
+      })
+      .catch(() => {})
     try {
       history.value = await props.actions.exerciseHistory(exerciseId)
     } catch {
@@ -201,6 +210,33 @@ watch(
   },
   { immediate: true },
 )
+
+// v0.12.0 (backlog "notas por ejercicio"): nota por usuario+ejercicio,
+// visible en la card y editable en un sheet — guardar vacía = borrar
+const note = ref('')
+const noteSheetOpen = ref(false)
+const noteDraft = ref('')
+const noteSaving = ref(false)
+
+function openNoteEdit() {
+  noteDraft.value = note.value
+  noteSheetOpen.value = true
+}
+
+async function saveNote() {
+  try {
+    noteSaving.value = true
+    note.value = await props.actions.saveExerciseNote(
+      props.workoutExercise.exercise_id,
+      noteDraft.value,
+    )
+    noteSheetOpen.value = false
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    noteSaving.value = false
+  }
+}
 
 const historyLine = computed(() => {
   if (!props.exercise || !history.value?.sets.length) return ''
@@ -477,6 +513,15 @@ async function moveDown() {
          porque sigue gobernando el gating del auto-descanso (autoRestFires). -->
     <div class="flex items-center justify-between mb-2">
       <div class="flex items-center gap-2 min-w-0">
+        <!-- v0.12.0 (zurdi: "que se vea la imagen en la card para mejor
+             visual"): thumb del ejercicio si la biblioteca le puso foto -->
+        <img
+          v-if="exercise?.has_image"
+          :src="exerciseImageUrl(exercise.id)"
+          alt=""
+          class="w-9 h-9 rounded-sm object-cover shrink-0"
+          :data-testid="`exercise-image-${workoutExercise.id}`"
+        />
         <BkRune v-if="primaryRune" :name="primaryRune" :size="14" />
         <h3 class="font-display font-semibold text-ink truncate">{{ name }}</h3>
         <span
@@ -517,6 +562,21 @@ async function moveDown() {
         </button>
       </div>
     </div>
+
+    <!-- v0.12.0: nota persistente del ejercicio ("asiento en el 5") — la
+         línea entera es el botón de edición; sin nota queda el affordance
+         tenue de añadirla -->
+    <button
+      v-if="exercise"
+      type="button"
+      :data-testid="`exercise-note-${workoutExercise.id}`"
+      class="bk-press block w-full text-left mb-2 text-xs italic border-l-2 pl-2 truncate"
+      :class="note ? 'text-ink-muted border-aurora/40' : 'text-ink-faint border-line'"
+      :aria-label="t('workout.noteTitle')"
+      @click="openNoteEdit"
+    >
+      {{ note || t('workout.noteAdd') }}
+    </button>
 
     <!-- v0.9.1 (zurdi: "el descanso debería estar solo al final de la
          superserie — ahora aparece después de cada ejercicio"): el control
@@ -753,6 +813,24 @@ async function moveDown() {
       @close="cardioStartOpen = false"
       @start="startCardio"
     />
+
+    <!-- v0.12.0: edición de la nota del ejercicio (sheets al FINAL del
+         template, la regla de siempre) -->
+    <BkSheet :open="noteSheetOpen" :title="t('workout.noteTitle')" @close="noteSheetOpen = false">
+      <div class="space-y-3">
+        <textarea
+          v-model="noteDraft"
+          rows="3"
+          maxlength="500"
+          class="bk-form-control w-full rounded-sm border border-line bg-stone px-3 py-2.5 text-ink text-sm placeholder:text-ink-faint focus:border-aurora"
+          :placeholder="t('workout.notePlaceholder')"
+          data-testid="note-input"
+        />
+        <BkButton variant="primary" block :loading="noteSaving" data-testid="note-save" @click="saveNote">
+          {{ t('common.save') }}
+        </BkButton>
+      </div>
+    </BkSheet>
 
     <BkSheet :open="drawerOpen" :title="name" @close="closeDrawer">
       <div v-if="exercise" class="space-y-3">

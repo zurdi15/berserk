@@ -142,6 +142,29 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     outbox.enqueue({ id: outbox.newClientId(), kind: 'startWorkout', tempWorkoutId, body, tempExerciseIds })
   }
 
+
+  // v0.12.0: nota por ejercicio — cache por store (misma vida que el
+  // historial); sin rama offline: sin red no se muestra ni se edita (v1)
+  const noteCache = new Map<number, string>()
+
+  async function exerciseNote(exerciseId: number): Promise<string> {
+    if (noteCache.has(exerciseId)) return noteCache.get(exerciseId)!
+    let note = ''
+    try {
+      note = (await domain.getExerciseNote(exerciseId)).note
+    } catch (error) {
+      if (!(error instanceof OfflineError)) throw error
+    }
+    noteCache.set(exerciseId, note)
+    return note
+  }
+
+  async function saveExerciseNote(exerciseId: number, note: string): Promise<string> {
+    const saved = (await domain.putExerciseNote(exerciseId, note)).note
+    noteCache.set(exerciseId, saved)
+    return saved
+  }
+
   async function exerciseHistory(exerciseId: number): Promise<ExerciseHistoryOut | null> {
     if (historyCache.value.has(exerciseId)) return historyCache.value.get(exerciseId) ?? null
     let result: ExerciseHistoryOut | null
@@ -446,6 +469,8 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     deleteSet,
     discard,
     exerciseHistory,
+    exerciseNote,
+    saveExerciseNote,
     setExerciseRest,
     reset,
   }

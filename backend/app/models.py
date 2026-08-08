@@ -113,6 +113,11 @@ class Exercise(Base):
     # rutinas/entrenos (ver get_visible_exercise) — distinto del catálogo
     # admin (owner_id NULL), que ya era global desde antes de esta columna
     is_public: Mapped[bool] = mapped_column(default=False)
+    # v0.12.0 (zurdi: "añadir fotos a un ejercicio para mejor visual"):
+    # nombre de fichero (uuid.ext) bajo BK_DATA_DIR/uploads/exercises — la
+    # visibilidad de la imagen sigue a la del ejercicio, subirla exige
+    # _can_edit (ver routers/media.py)
+    image_path: Mapped[str | None] = mapped_column(String(80), default=None)
 
     muscle_links: Mapped[list["ExerciseMuscleGroup"]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
@@ -369,6 +374,39 @@ class ScheduledSession(Base):
         ForeignKey("workouts.id", ondelete="SET NULL"), default=None
     )
     note: Mapped[str | None] = mapped_column(String(300), default=None)
+
+
+class ExerciseNote(Base):
+    """v0.12.0 — nota persistente POR USUARIO y ejercicio ("asiento en el 5,
+    agarre ancho"): se enseña en la card del entreno la siguiente sesión.
+    Upsert por (user, exercise); nota vacía = borrar (ver routers)."""
+
+    __tablename__ = "exercise_notes"
+    __table_args__ = (UniqueConstraint("user_id", "exercise_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    exercise_id: Mapped[int] = mapped_column(
+        ForeignKey("exercises.id", ondelete="CASCADE"), index=True
+    )
+    note: Mapped[str] = mapped_column(String(500))
+
+
+class BodyPhoto(Base):
+    """v0.12.0 — foto de progreso PRIVADA del usuario (no viaja por sharing):
+    fichero uuid.ext bajo BK_DATA_DIR/uploads/body, asociada a una fecha para
+    el comparador antes/después."""
+
+    __tablename__ = "body_photos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date)
+    path: Mapped[str] = mapped_column(String(80))
 
 
 class BodyEntry(Base):

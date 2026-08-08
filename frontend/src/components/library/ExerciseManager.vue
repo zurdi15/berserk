@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import type { ExerciseOut, Measurement, MuscleGroupOut } from '@/api/domain'
 import { createExercise, deleteExercise, listExercises, listMuscleGroups, updateExercise } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
+import { deleteExerciseImage, exerciseImageUrl, uploadExerciseImage } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { foldSearchText } from '@/utils/searchFold'
 import { useAuthStore } from '@/stores/auth'
@@ -191,6 +192,7 @@ function openCreate() {
 function openEdit(exercise: ExerciseOut) {
   editingId.value = exercise.id
   editingOwnerId.value = exercise.owner_id
+  editingHasImage.value = exercise.has_image ?? false
   nameEs.value = exercise.name_es
   nameEn.value = exercise.name_en
   measurement.value = exercise.measurement
@@ -198,6 +200,44 @@ function openEdit(exercise: ExerciseOut) {
   primaryGroupId.value = exercise.muscle_groups.find((l) => l.is_primary)?.muscle_group_id ?? null
   visibility.value = exercise.is_public ? 'public' : 'private'
   formOpen.value = true
+}
+
+// v0.12.0 (zurdi: "añadir fotos a un ejercicio para mejor visual"): la
+// imagen se sube/borra sobre un ejercicio YA existente (en creación el
+// bloque no aparece — primero se crea, luego se edita para ilustrarlo)
+const editingHasImage = ref(false)
+const imageBust = ref(0)
+const imageUploading = ref(false)
+const imageFileEl = ref<HTMLInputElement | null>(null)
+
+async function onImageChosen(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || editingId.value === null) return
+  try {
+    imageUploading.value = true
+    await uploadExerciseImage(editingId.value, file)
+    editingHasImage.value = true
+    // rompe la cache del <img> del preview y de las filas tras reemplazar
+    imageBust.value = Date.now()
+    await loadAll()
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    imageUploading.value = false
+    input.value = ''
+  }
+}
+
+async function removeImage() {
+  if (editingId.value === null) return
+  try {
+    await deleteExerciseImage(editingId.value)
+    editingHasImage.value = false
+    await loadAll()
+  } catch (error) {
+    toastApiError(error)
+  }
 }
 
 function setGroupChecked(id: number, checked: boolean) {
@@ -327,6 +367,14 @@ async function confirmDelete() {
             :data-testid="exercise.kind === 'own' ? `exercise-row-${exercise.id}` : `catalog-exercise-row-${exercise.id}`"
             class="flex items-start justify-between gap-2 p-2 rounded border border-line text-sm"
           >
+            <!-- v0.12.0: thumb de la imagen del ejercicio (si tiene) -->
+            <img
+              v-if="exercise.has_image"
+              :src="exerciseImageUrl(exercise.id, imageBust)"
+              :alt="''"
+              class="w-10 h-10 rounded-sm object-cover shrink-0"
+              :data-testid="`exercise-thumb-${exercise.id}`"
+            />
             <div class="min-w-0 flex-1">
               <p class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</p>
               <!-- item 2+6 (v0.4.2, records-tab layout): fila de chips
@@ -507,6 +555,47 @@ async function confirmDelete() {
               <span class="text-sm text-ink-muted">{{ $t('library.primary') }}</span>
             </label>
           </div>
+        </div>
+
+        <!-- v0.12.0: imagen del ejercicio (solo editando — ver comment
+             del script) -->
+        <div v-if="editingId !== null" class="space-y-2">
+          <span class="block text-sm text-ink-muted">{{ $t('library.image') }}</span>
+          <img
+            v-if="editingHasImage"
+            :src="exerciseImageUrl(editingId, imageBust)"
+            :alt="nameEs"
+            class="w-full max-h-40 object-cover rounded-sm border border-line"
+            data-testid="exercise-image-preview"
+          />
+          <div class="flex gap-2">
+            <BkButton
+              variant="ghost"
+              size="sm"
+              :loading="imageUploading"
+              data-testid="exercise-image-upload"
+              @click="imageFileEl?.click()"
+            >
+              {{ editingHasImage ? $t('library.imageReplace') : $t('library.imageAdd') }}
+            </BkButton>
+            <BkButton
+              v-if="editingHasImage"
+              variant="danger"
+              size="sm"
+              data-testid="exercise-image-delete"
+              @click="removeImage"
+            >
+              {{ $t('common.delete') }}
+            </BkButton>
+          </div>
+          <input
+            ref="imageFileEl"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            class="hidden"
+            data-testid="exercise-image-input"
+            @change="onImageChosen"
+          />
         </div>
 
         <div class="flex gap-2">

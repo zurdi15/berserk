@@ -119,3 +119,24 @@ export function setThemeMode(mode: ThemeMode): void {
     // no persiste, pero la clase ya aplicada en <html> sigue en pie en memoria
   }
 }
+
+// v0.12.0: config de la calculadora de discos (barra + inventario por pares,
+// en la unidad de display) — por dispositivo, como el resto de uiPrefs
+const PLATE_CONFIG_KEY = 'bk:plate-config'
+
+export function getPlateConfig(): unknown {
+  try {
+    const raw = localStorage.getItem(PLATE_CONFIG_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+export function setPlateConfig(value: unknown): void {
+  try {
+    localStorage.setItem(PLATE_CONFIG_KEY, JSON.stringify(value))
+  } catch {
+    // sin persistencia: la config vive lo que la sesión de página
+  }
+}

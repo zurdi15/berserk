@@ -26,4 +26,9 @@ export interface WorkoutActions {
   // item 11: override de descanso de este ejercicio en este entreno; null
   // limpia el override (vuelve a caer al target de rutina/default)
   setExerciseRest(weid: number, restSeconds: number | null): Promise<void>
+  // v0.12.0: nota persistente POR USUARIO y ejercicio ("asiento en el 5") —
+  // se enseña en la card la siguiente sesión. Cacheada por store como el
+  // historial; guardar vacío la borra. Sin rama offline (v1: exige red).
+  exerciseNote(exerciseId: number): Promise<string>
+  saveExerciseNote(exerciseId: number, note: string): Promise<string>
 }

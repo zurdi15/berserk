@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api, apiForm } from './client'
 import type { UserOut } from './auth'
 
 export type { UserOut }
@@ -36,6 +36,8 @@ export interface ExerciseOut {
   // frontend discrimine por union
   measurement: Measurement
   owner_id: number | null
+  // v0.12.0: el ejercicio tiene imagen — pedirla a exerciseImageUrl(id)
+  has_image?: boolean
   // W2 feature 1: ejercicio PROPIO compartido con todo el mundo (distinto de
   // owner_id null, el catálogo admin) — opcional en el tipo aunque el
   // backend siempre manda la clave (mismo criterio que MuscleGroupOut.rune):
@@ -618,3 +620,79 @@ export const adminListInvites = () =>
 
 export const adminDeleteInvite = (id: number) =>
   api<void>(`/admin/invites/${id}`, { method: 'DELETE' })
+
+// ---------- v0.12.0: media, notas y feed social ----------
+
+export interface ExerciseNoteOut {
+  note: string
+}
+
+export interface BodyPhotoOut {
+  id: number
+  date: string
+}
+
+export interface FeedUser {
+  id: number
+  username: string
+  color: string | null
+}
+
+export interface FeedEvent {
+  user: FeedUser
+  workout_id: number
+  date: string
+  duration_seconds: number
+  muscle_groups_es: string[]
+  muscle_groups_en: string[]
+  pr_count: number
+  volume_kg: number
+}
+
+export interface FeedComparisonRow {
+  user: FeedUser
+  is_me: boolean
+  streak_weeks: number
+  week_workouts: number
+  week_volume_kg: number
+}
+
+export interface FeedOut {
+  events: FeedEvent[]
+  comparison: FeedComparisonRow[]
+}
+
+export const getExerciseNote = (exerciseId: number) =>
+  api<ExerciseNoteOut>(`/exercises/${exerciseId}/note`)
+
+export const putExerciseNote = (exerciseId: number, note: string) =>
+  api<ExerciseNoteOut>(`/exercises/${exerciseId}/note`, { method: 'PUT', body: { note } })
+
+export const uploadExerciseImage = (exerciseId: number, file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return apiForm<void>(`/exercises/${exerciseId}/image`, form)
+}
+
+export const deleteExerciseImage = (exerciseId: number) =>
+  api<void>(`/exercises/${exerciseId}/image`, { method: 'DELETE' })
+
+// las <img> del DOM piden con cookies same-origin por sí solas: basta la URL.
+// El sufijo ?v= rompe la cache del navegador tras subir una imagen nueva.
+export const exerciseImageUrl = (exerciseId: number, cacheBust?: number) =>
+  `/api/v1/exercises/${exerciseId}/image${cacheBust ? `?v=${cacheBust}` : ''}`
+
+export const listBodyPhotos = () => api<BodyPhotoOut[]>('/body/photos')
+
+export const uploadBodyPhoto = (date: string, file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return apiForm<BodyPhotoOut>(`/body/photos?photo_date=${date}`, form)
+}
+
+export const deleteBodyPhoto = (photoId: number) =>
+  api<void>(`/body/photos/${photoId}`, { method: 'DELETE' })
+
+export const bodyPhotoUrl = (photoId: number) => `/api/v1/body/photos/${photoId}/file`
+
+export const getSocialFeed = () => api<FeedOut>('/social/feed')

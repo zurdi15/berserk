@@ -8,6 +8,7 @@ import BkButton from '@/lib/BkButton.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkStepper from '@/lib/BkStepper.vue'
 import { CARDIO_DURATION_MAX_SECONDS, CARDIO_DURATION_STEP_SECONDS, formatDuration } from './duration'
+import PlateCalculatorSheet from './PlateCalculatorSheet.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -77,6 +78,10 @@ const distanceM = ref(props.initialSet?.distance_m ?? 0)
 const isWarmup = ref(props.initialSet?.is_warmup ?? false)
 const rpe = ref(props.initialSet?.rpe != null ? String(props.initialSet.rpe) : '')
 
+// v0.12.0 (backlog "calculadora de discos"): sheet apilado sobre el cajón
+// (layerStack, mismo patrón que los drawers internos de MuscleGroupManager)
+const plateCalcOpen = ref(false)
+
 // v0.11.5: lo que se PINTA en el stepper de duración de cardio (el valor sigue
 // viajando en segundos, ver BkStepper::display)
 const cardioDurationLabel = computed(() => formatDuration(durationSeconds.value))
@@ -139,14 +144,23 @@ function submit(keepOpen: boolean) {
          propia línea. Con grid grid-cols-2 cada columna tiene un ancho FIJO
          (independiente del contenido); min-w-0 es la garantía estándar de
          Tailwind para que ese contenido nunca fuerce la columna a crecer -->
-    <div v-if="measurement === 'strength'" class="w-full grid grid-cols-2 gap-2">
-      <div class="min-w-0 flex flex-col items-center">
-        <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weight') }}</span>
-        <BkStepper v-model="weightDisplay" size="compact" :step="WEIGHT_UI[units].step" :min="2.5" :max="WEIGHT_UI[units].max" :suffix="units" />
+    <div v-if="measurement === 'strength'" class="w-full space-y-2">
+      <div class="w-full grid grid-cols-2 gap-2">
+        <div class="min-w-0 flex flex-col items-center">
+          <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weight') }}</span>
+          <BkStepper v-model="weightDisplay" size="compact" :step="WEIGHT_UI[units].step" :min="2.5" :max="WEIGHT_UI[units].max" :suffix="units" />
+        </div>
+        <div class="min-w-0 flex flex-col items-center">
+          <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
+          <BkStepper v-model="reps" size="compact" :step="1" :min="1" :max="100" />
+        </div>
       </div>
-      <div class="min-w-0 flex flex-col items-center">
-        <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
-        <BkStepper v-model="reps" size="compact" :step="1" :min="1" :max="100" />
+      <!-- v0.12.0: calculadora de discos — abre con el peso actual como
+           objetivo; solo tiene sentido con barra (fuerza) -->
+      <div class="flex justify-center">
+        <BkButton type="button" variant="ghost" size="sm" data-testid="plate-calc-open" @click="plateCalcOpen = true">
+          {{ t('workout.plates.open') }}
+        </BkButton>
       </div>
     </div>
 
@@ -209,6 +223,14 @@ function submit(keepOpen: boolean) {
     <div class="w-full max-w-32">
       <BkSelect v-model="rpe" :label="t('workout.rpe')" :options="rpeOptions" />
     </div>
+
+    <PlateCalculatorSheet
+      v-if="measurement === 'strength'"
+      :open="plateCalcOpen"
+      :target-weight="weightDisplay"
+      :units="units"
+      @close="plateCalcOpen = false"
+    />
 
     <div class="flex gap-2 w-full">
       <BkButton

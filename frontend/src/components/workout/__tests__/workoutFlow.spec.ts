@@ -111,6 +111,8 @@ function makeActions(overrides: Partial<Record<string, unknown>> = {}) {
     addExercise: vi.fn(async () => {}),
     exerciseHistory: vi.fn(async () => null),
     setExerciseRest: vi.fn(async () => {}),
+    exerciseNote: vi.fn(async () => ''),
+    saveExerciseNote: vi.fn(async (_id: number, note: string) => note.trim()),
     ...overrides,
   }
 }
@@ -1127,6 +1129,41 @@ describe('WorkoutExerciseCard', () => {
     await flushPromises()
 
     expect(toast.toasts.length).toBeGreaterThan(0)
+  })
+
+  // v0.12.0 (backlog "notas por ejercicio"): la nota persistente carga con la
+  // card, la línea entera abre el sheet de edición y guardar pasa por actions
+  describe('v0.12.0: per-exercise note', () => {
+    it('shows the loaded note on the card (and the add affordance when empty)', async () => {
+      document.body.innerHTML = ''
+      const actions = makeActions({ exerciseNote: vi.fn(async () => 'asiento en el 5') })
+      const wrapper = mountCard({ actions })
+      await flushPromises()
+      expect(wrapper.get('[data-testid="exercise-note-20"]').text()).toContain('asiento en el 5')
+
+      const empty = mountCard({})
+      await flushPromises()
+      expect(empty.get('[data-testid="exercise-note-20"]').text()).toContain('Añadir nota')
+    })
+
+    it('editing through the sheet saves via actions and updates the line', async () => {
+      document.body.innerHTML = ''
+      const actions = makeActions()
+      const wrapper = mountCard({ actions })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="exercise-note-20"]').trigger('click')
+      await flushPromises()
+      const input = document.querySelector('[data-testid="note-input"]') as HTMLTextAreaElement
+      input.value = 'agarre ancho'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await flushPromises()
+      ;(document.querySelector('[data-testid="note-save"]') as HTMLElement).click()
+      await flushPromises()
+
+      expect(actions.saveExerciseNote).toHaveBeenCalledWith(5, 'agarre ancho')
+      expect(wrapper.get('[data-testid="exercise-note-20"]').text()).toContain('agarre ancho')
+    })
   })
 })
 

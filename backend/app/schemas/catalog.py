@@ -98,4 +98,7 @@ class ExerciseOut(BaseModel):
     # admin (owner_id NULL); siempre poblado si hay owner_id, el frontend
     # decide si mostrarlo (no lo hace para las propias filas del usuario)
     owner_username: str | None
+    # v0.12.0: True si el ejercicio tiene imagen — el fichero real se sirve
+    # por GET /exercises/{id}/image, el cliente solo necesita saber si pedirla
+    has_image: bool = False
     muscle_groups: list[ExerciseMuscleLink]

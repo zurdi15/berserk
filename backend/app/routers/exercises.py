@@ -27,6 +27,7 @@ def exercise_out(exercise: Exercise) -> ExerciseOut:
         measurement=exercise.measurement,
         owner_id=exercise.owner_id,
         is_public=exercise.is_public,
+        has_image=exercise.image_path is not None,
         owner_username=exercise.owner_username,
         muscle_groups=[
             ExerciseMuscleLink(muscle_group_id=l.muscle_group_id, is_primary=l.is_primary)
