@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.11.8 - 2026-08-08
+
+### Fixed
+- Editar una entrada de peso ya no abre un diálogo titulado "Nueva entrada": el sheet se titula "Editar entrada" cuando se llega desde el lápiz de una fila.
+
+### Changed
+- En todas las superficies con filtro de grupo y buscador de ejercicios (biblioteca, añadir ejercicio, picker de progresión), el selector de grupo va siempre arriba y la búsqueda debajo.
+
 ## 0.11.7 - 2026-08-08
 
 ### Added
