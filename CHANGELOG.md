@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.12.0 - 2026-08-08
+
+### Added
+- **Calculadora de discos** en el registro de series de fuerza: peso objetivo → discos por lado, con barra e inventario del gym configurables (persisten en el dispositivo). Si el inventario no llega al peso exacto, lo dice.
+- **Notas por ejercicio**: una nota persistente ("asiento en el 5, agarre ancho") visible en la card del entreno cada sesión, editable de un toque.
+- **Fotos en los ejercicios**: sube una imagen a cualquier ejercicio editable desde la biblioteca y aparece como miniatura en la biblioteca, en las cards del entreno y en el editor de rutinas.
+- **Fotos de progreso** en Progresión → Cuerpo (privadas): sube fotos con fecha, y elige dos para el comparador antes/después.
+- **Feed social en Hoy**: actividad de la semana de quienes comparten su registro contigo (qué entrenaron, PRs, volumen) y una comparativa amistosa de racha, entrenos y volumen semanal. Sin nadie compartiendo, la sección no aparece.
+
 ## 0.11.8 - 2026-08-08
 
 ### Fixed
