@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.13.0 - 2026-08-08
+
+### Added
+- **App Android** (shell Capacitor): un WebView contra tu servidor con la misma sesión — siempre al día sin reinstalar. La APK firmada se adjunta a cada release de GitHub (instalable directa o vía Obtainium). Lo que aporta sobre la PWA: la notificación del fin de descanso suena aunque el móvil esté bloqueado o la app cerrada.
+
 ## 0.12.0 - 2026-08-08
 
 ### Added
