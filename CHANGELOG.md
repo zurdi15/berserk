@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.13.2 - 2026-08-08
+
+### Fixed
+- Notificaciones en Android 14+: la app pide el permiso una sola vez al arrancar (y avisa si está denegado), y el aviso sonoro del fin de descanso usa el mecanismo de alarmas del reloj — exento de la restricción de alarmas exactas que hacía que no llegara. Los permisos de notificación y vibración quedan declarados correctamente.
+
 ## 0.13.1 - 2026-08-08
 
 ### Added
