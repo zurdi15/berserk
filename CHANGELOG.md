@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.11.6 - 2026-08-08
+
+### Changed
+- El cajón de "Registrar tiempo" de cardio pierde su botón "Empezar": esa opción ya está en la propia card, junto a "Registrar tiempo". El cajón queda solo para registrar un tiempo ya hecho.
+
 ## 0.11.5 - 2026-08-08
 
 ### Changed
