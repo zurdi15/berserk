@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.13.1 - 2026-08-08
+
+### Added
+- En la app Android, notificaciones permanentes con cronómetro del sistema (como las del reloj): mientras entrenas, el tiempo de entreno corre en la barra de notificaciones y en la pantalla de bloqueo; durante el descanso, la cuenta atrás visible en vivo — y el aviso sonoro al llegar a cero se mantiene. Icono de barra propio (la runa en monocromo).
+
 ## 0.13.0 - 2026-08-08
 
 ### Added
