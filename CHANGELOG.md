@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 - Al empezar un cardio ya se elige cuánto tiempo: "Empezar" abre un selector con presets en minutos y ajuste fino, partiendo del objetivo que anuncia el propio botón. El tiempo elegido es el del countdown y el de la serie que se registra sola al terminar. Las duraciones de cardio se leen como reloj (20:00) en toda la tarjeta y en el cajón.
 - Quitar un ejercicio que todavía no tiene nada registrado ya no pide confirmación: la X lo borra directa. Si tiene series, el paso de confirmar sigue igual.
 
+## 0.11.4 - 2026-08-08
+
 ### Changed
 - El final del timer de descanso ya no muestra un ✓: el contador se difumina mientras el cuadrado del CTA se estrecha al tamaño de la runa, y la runa se talla directamente sobre él. Al empezar un descanso la animación es simétrica (el contador crece desde el hueco de la runa).
 

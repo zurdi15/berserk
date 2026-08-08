@@ -58,7 +58,7 @@ const props = withDefaults(
     // el descanso post-serie (y su control, item 11) es un concepto de
     // entreno EN VIVO: el editor retroactivo no lo quiere (no hay nada de
     // lo que "descansar" editando historial, ni countdown de cardio con
-    // sentido — ver SetForm's `live` prop)
+    // sentido — ver el prop `live` de abajo)
     restEnabled?: boolean
     // v0.9.4: "¿es el entreno EN VIVO?" separado de restEnabled — antes el
     // countdown de cardio colgaba de restEnabled, así que apagar el toggle
@@ -71,7 +71,7 @@ const props = withDefaults(
     // arrancar un countdown de cardio (ver uiPrefs.ts). Opcional (null en
     // vez de requerido) para no romper otros consumidores/tests de esta
     // tarjeta que no tienen ni necesitan cardio-countdown; sin él, sencillamente
-    // no se persiste nada (ver onCountdownStart).
+    // no se persiste nada (ver startCardio).
     workoutId?: number | null
     // countdown de cardio que WorkoutView detectó al montar como "todavía
     // corriendo" (endsAt en el futuro) tras volver de una pestaña evictada —
@@ -309,23 +309,9 @@ function clearPersistedCardioCountdownForThisExercise() {
   if (persisted?.workoutExerciseId === props.workoutExercise.id) clearPersistedCardioCountdown()
 }
 
-// SetForm emite esto al pulsar "Empezar" (ver SetForm.vue) — SetForm conoce
-// duration_seconds/distance_m en ese instante, esta tarjeta conoce
-// workoutId/workoutExerciseId: entre los dos arman el registro persistido
-function onCountdownStart(payload: { targetSeconds: number; distanceM?: number }) {
-  if (props.workoutId == null) return
-  setPersistedCardioCountdown({
-    endsAt: Date.now() + Math.max(0, payload.targetSeconds) * 1000,
-    workoutId: props.workoutId,
-    workoutExerciseId: props.workoutExercise.id,
-    targetSeconds: payload.targetSeconds,
-    distanceM: payload.distanceM,
-  })
-}
-
-function onCountdownCancel() {
-  clearPersistedCardioCountdownForThisExercise()
-}
+// (v0.11.6: los handlers onCountdownStart/onCountdownCancel del countdown
+// del CAJÓN murieron con el botón "Empezar" de SetForm — arrancar cardio es
+// exclusivo del "Empezar" de la card, ver startCardio)
 
 // countdown RESUMIDO (superficie compacta en el cuerpo de la tarjeta, no en
 // el cajón — ver la nota de diseño junto al <CardioCountdown> del template):
@@ -771,10 +757,7 @@ async function moveDown() {
           :units="units"
           :initial-set="drawerDefaults"
           :editing="editingSet !== null"
-          :live="live"
           @submit="onDrawerSubmit"
-          @countdown-start="onCountdownStart"
-          @countdown-cancel="onCountdownCancel"
         />
         <!-- item 4d: bloque multilínea en vez de una línea cramped — fecha en
              su propia línea, cada serie efectiva en la suya (Sn · reps × peso).

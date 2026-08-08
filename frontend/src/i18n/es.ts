@@ -431,7 +431,6 @@ export const es = {
     cardioLog: 'Registrar tiempo',
     cardioStart: 'Empezar {duration}',
     logSetAndAnother: 'Registrar y otra',
-    startCountdown: 'Empezar',
     lastTime: 'Última vez ({date})',
     lastTimeHint: 'Última vez: {line}',
     stretched: 'He estirado',

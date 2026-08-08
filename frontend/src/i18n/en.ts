@@ -419,7 +419,6 @@ export const en = {
     cardioLog: 'Log time',
     cardioStart: 'Start {duration}',
     logSetAndAnother: 'Log and another',
-    startCountdown: 'Start',
     lastTime: 'Last time ({date})',
     lastTimeHint: 'Last time: {line}',
     stretched: 'Stretched',
