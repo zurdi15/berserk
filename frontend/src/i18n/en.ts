@@ -105,6 +105,7 @@ export const en = {
     stop: 'Stop viewing',
   },
   timer: {
+    restOngoingTitle: 'Rest',
     rest: 'Rest',
     notifyTitle: 'Rest over',
     notifyBody: 'Tap to get back to your workout.',
@@ -407,6 +408,7 @@ export const en = {
     atLeastOneRequired: 'Enter at least one value',
   },
   workout: {
+    ongoingTitle: 'Training',
     plates: {
       open: 'Plates',
       title: 'Plate calculator',

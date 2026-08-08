@@ -4,7 +4,9 @@ import { ref, watch } from 'vue'
 import { ApiError, OfflineError } from '@/api/client'
 import * as domain from '@/api/domain'
 import type { ExerciseHistoryOut, PersonalRecordOut, SetIn, SetLogOut, SetOut, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
+import { i18n } from '@/i18n'
 import { normalizeSupersets } from '@/lib/supersets'
+import { isNativeShell, startNativeWorkoutChronometer, stopNativeWorkoutChronometer } from '@/utils/nativeShell'
 import { online } from '@/offline/net'
 import * as outbox from '@/offline/outbox'
 import { useRestTimerStore } from '@/stores/restTimer'
@@ -35,6 +37,30 @@ function loadSnapshot(): WorkoutOut | null {
 
 export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   const workout = ref<WorkoutOut | null>(null)
+
+  // v0.13.1 shell Android (zurdi: "notificación permanente con el tiempo de
+  // entreno, como la del cronómetro"): mientras hay entreno vivo, una
+  // notificación ongoing con cronómetro DEL SISTEMA corre en barra y
+  // pantalla de bloqueo; muere con el entreno (terminar/descartar). El
+  // watch cubre TODOS los caminos que fijan workout (start, resume desde
+  // snapshot offline, load al arrancar) sin tocar cada uno. En web es no-op.
+  watch(
+    () => workout.value && workout.value.started_at,
+    (startedAt) => {
+      if (!isNativeShell()) return
+      if (workout.value && workout.value.ended_at === null) {
+        // started_at llega naive en UTC del backend; en offline puede faltar
+        const startedMs = startedAt ? Date.parse(`${startedAt}Z`) : Date.now()
+        void startNativeWorkoutChronometer(
+          Number.isFinite(startedMs) ? startedMs : Date.now(),
+          i18n.global.t('workout.ongoingTitle'),
+        )
+      } else {
+        void stopNativeWorkoutChronometer()
+      }
+    },
+    { immediate: true },
+  )
   const loading = ref(false)
   const lastRecords = ref<PersonalRecordOut[]>([])
   // item 3: cache de "última sesión" por exercise_id, vigente mientras dure

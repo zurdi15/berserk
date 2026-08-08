@@ -107,6 +107,7 @@ export const es = {
     stop: 'Dejar de ver',
   },
   timer: {
+    restOngoingTitle: 'Descanso',
     rest: 'Descanso',
     notifyTitle: 'Descanso terminado',
     notifyBody: 'Toca para volver al entreno.',
@@ -419,6 +420,7 @@ export const es = {
     atLeastOneRequired: 'Introduce al menos un valor',
   },
   workout: {
+    ongoingTitle: 'Entrenando',
     plates: {
       open: 'Discos',
       title: 'Calculadora de discos',
