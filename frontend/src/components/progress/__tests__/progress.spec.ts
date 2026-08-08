@@ -585,6 +585,20 @@ describe('BodySection', () => {
     expect(weightInput.value).toBe('79')
   })
 
+  it('the sheet titles itself by the opening gesture: add → "Nueva entrada", edit → "Editar entrada" (v0.11.8)', async () => {
+    build()
+    await flushPromises()
+
+    await wrapper!.find('[data-testid="add-body-entry"]').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('Nueva entrada')
+    expect(document.body.textContent).not.toContain('Editar entrada')
+
+    await wrapper!.find('[data-testid="edit-body-2026-07-01"]').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('Editar entrada')
+  })
+
   it('clicking edit on a row pre-fills every field from that entry', async () => {
     build()
     await flushPromises()

@@ -365,6 +365,7 @@ export const en = {
     hip: 'Hip',
     add: 'Add entry',
     newEntry: 'New entry',
+    editEntry: 'Edit entry',
     date: 'Date',
     noEntries: 'No body entries yet',
     // v0.11.0: body-weight goal

@@ -127,6 +127,11 @@ async function load() {
 
 // Sheet de alta (upsert por fecha)
 const sheetOpen = ref(false)
+// v0.11.8 (zurdi: "el botón de editar peso abre el dialog de añadir
+// entrada"): el sheet siempre fue el mismo upsert precargado — lo que
+// engañaba era el TÍTULO, clavado en "Nueva entrada" también al editar.
+// Se titula según el gesto que lo abrió.
+const editingEntry = ref(false)
 const date = ref(todayIso())
 const weightStr = ref('')
 const waistStr = ref('')
@@ -190,11 +195,13 @@ function entryFor(dateStr: string): BodyEntryOut | undefined {
 function openAdd() {
   const today = todayIso()
   fillForm(entryFor(today), today)
+  editingEntry.value = false
   sheetOpen.value = true
 }
 
 function openEdit(entry: BodyEntryOut) {
   fillForm(entry, entry.date)
+  editingEntry.value = true
   sheetOpen.value = true
 }
 
@@ -412,7 +419,7 @@ watch(() => athlete.userId, load, { immediate: true })
       </TransitionGroup>
     </div>
 
-    <BkSheet :open="sheetOpen" :title="t('body.newEntry')" @close="closeSheet">
+    <BkSheet :open="sheetOpen" :title="editingEntry ? t('body.editEntry') : t('body.newEntry')" @close="closeSheet">
       <div class="space-y-3">
         <BkDateField v-model="date" :label="t('body.date')" />
         <BkField v-model="weightStr" type="number" mono :label="`${t('body.weight')} (${units})`" />

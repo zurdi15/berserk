@@ -100,11 +100,12 @@ watch(() => athlete.userId, load)
          en la v0.8.1 (seleccionaba null → sin chart, botón a ninguna parte).
          (comentario dentro de la raíz para no crear un fragmento de dos
          raíces que rompa el fall-through de atributos) -->
-    <BkField v-model="query" :label="t('progress.searchExercise')" class="shrink-0" />
-    <!-- v0.11.0: filtro de grupo compartido (GroupFilterSelect) -->
+    <!-- v0.11.8 (zurdi: "siempre arriba el selector de grupo y abajo la
+         búsqueda"): mismo orden en todas las superficies con filtro+buscador -->
     <div class="shrink-0" data-testid="picker-group-filter">
       <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
     </div>
+    <BkField v-model="query" :label="t('progress.searchExercise')" class="shrink-0" />
 
     <!-- esqueleto mientras carga: mismo hueco que la lista real -->
     <div v-if="!ready" class="flex-1 min-h-0 overflow-y-auto space-y-1" data-testid="exercise-list-skeleton">

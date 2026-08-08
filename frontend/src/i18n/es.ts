@@ -377,6 +377,7 @@ export const es = {
     hip: 'Cadera',
     add: 'Añadir entrada',
     newEntry: 'Nueva entrada',
+    editEntry: 'Editar entrada',
     date: 'Fecha',
     noEntries: 'Sin entradas de cuerpo aún',
     // v0.11.0: objetivo de peso corporal
