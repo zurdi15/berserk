@@ -376,7 +376,11 @@ function redeemUrl(token: string): string {
                 <th class="text-left py-2 px-2"><span class="sr-only">{{ $t('admin.actions') }}</span></th>
               </tr>
             </thead>
+            <!-- v0.11.7: borrar un usuario difumina su fila en el sitio
+                 (bk-remove-row — un <tr> no admite el position:absolute de
+                 bk-remove sin romper la tabla) -->
             <tbody class="divide-y divide-line">
+              <TransitionGroup name="bk-remove-row">
               <tr v-for="user in users" :key="user.id" :data-testid="`user-row-${user.id}`" class="hover:bg-stone/30">
                 <td class="py-2 px-2">
                   <span class="inline-flex items-center gap-2">
@@ -433,6 +437,7 @@ function redeemUrl(token: string): string {
                   </div>
                 </td>
               </tr>
+              </TransitionGroup>
             </tbody>
           </table>
         </div>
@@ -473,7 +478,9 @@ function redeemUrl(token: string): string {
              segundo salto separado. v0.11.1 (zurdi): la lista va PRIMERO y
              el botón de generar debajo (el h3 duplicado del título de la
              card murió con la reordenación) -->
-        <div v-else-if="invites.length > 0" class="space-y-2">
+        <!-- v0.11.7: borrar una invitación difumina su fila (bk-remove) -->
+        <div v-else-if="invites.length > 0" class="relative space-y-2">
+          <TransitionGroup name="bk-remove">
           <div
             v-for="invite in invites"
             :key="invite.id"
@@ -505,6 +512,7 @@ function redeemUrl(token: string): string {
               {{ $t('common.delete') }}
             </BkButton>
           </div>
+          </TransitionGroup>
         </div>
 
         <div v-else class="text-sm text-ink-muted">

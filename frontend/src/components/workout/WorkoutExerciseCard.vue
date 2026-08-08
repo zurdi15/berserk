@@ -575,7 +575,10 @@ async function moveDown() {
       </div>
     </div>
 
-    <div v-if="workoutExercise.sets.length" class="space-y-1 border-b border-line pb-3 mb-3">
+    <!-- v0.11.7: borrar una serie difumina su fila mientras las de abajo
+         suben a cerrar el hueco (bk-remove) -->
+    <div v-if="workoutExercise.sets.length" class="relative space-y-1 border-b border-line pb-3 mb-3">
+      <TransitionGroup name="bk-remove">
       <div
         v-for="set in workoutExercise.sets"
         :key="set.id"
@@ -629,6 +632,7 @@ async function moveDown() {
           </div>
         </Transition>
       </div>
+      </TransitionGroup>
     </div>
     <p v-else-if="historyLine" class="text-xs text-ink-faint mb-3 truncate" data-testid="card-history-hint">
       {{ t('workout.lastTimeHint', { line: historyLine }) }}

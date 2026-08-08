@@ -284,6 +284,10 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- v0.11.7: borrar una card la difumina mientras las demás cierran el
+         hueco (bk-remove, ver WorkoutView) -->
+    <div class="relative space-y-4">
+    <TransitionGroup name="bk-remove">
     <WorkoutExerciseCard
       v-for="(we, i) in workoutEditor.workout.exercises"
       :key="we.id"
@@ -300,6 +304,8 @@ onMounted(() => {
       @recorded="onRecorded"
       @logged="onLogged"
     />
+    </TransitionGroup>
+    </div>
 
     <BkButton
       variant="ghost"

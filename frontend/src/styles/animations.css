@@ -231,6 +231,42 @@
   filter: blur(0);
 }
 
+/* v0.11.7 — salida de elementos BORRADOS (zurdi: "mete animaciones a todos
+   los componentes y elementos que pueden ser eliminados"): excepción
+   sancionada a entry-only, familia visual de bk-cta-melt — lo borrado se
+   difumina (blur + opacity) encogiéndose un punto mientras los hermanos
+   cierran el hueco con la transición -move de TransitionGroup (FLIP).
+   El que sale pasa a position:absolute para ceder el flujo YA (patrón
+   canónico de Vue): sin eso el hueco se cerraría de golpe al desmontar.
+   Requiere contenedor `relative` y filas de ancho completo — todas las
+   listas apiladas del sistema lo son. */
+.bk-remove-move {
+  transition: transform var(--bk-dur-3) var(--bk-ease-out);
+}
+.bk-remove-leave-active {
+  position: absolute;
+  width: 100%;
+  transition:
+    opacity var(--bk-dur-3) var(--bk-ease-out),
+    transform var(--bk-dur-3) var(--bk-ease-out),
+    filter var(--bk-dur-3) var(--bk-ease-out);
+}
+.bk-remove-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+  filter: blur(6px);
+}
+
+/* variante para <tr> (position:absolute destroza el layout de tabla): solo
+   difumina en el sitio; el hueco se cierra al desmontar */
+.bk-remove-row-leave-active {
+  transition: opacity var(--bk-dur-3) var(--bk-ease-out), filter var(--bk-dur-3) var(--bk-ease-out);
+}
+.bk-remove-row-leave-to {
+  opacity: 0;
+  filter: blur(4px);
+}
+
 /* (v0.8.2 tuvo aquí bk-unfold, el despliegue vertical del chart de Entrenos
    — murió en v0.9.3 al mudarse la gráfica a un drawer, ver ProgressView) */
 

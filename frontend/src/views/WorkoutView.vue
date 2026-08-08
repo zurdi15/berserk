@@ -506,9 +506,18 @@ onBeforeUnmount(() => {
            se cambia un miembro o se deshace el grupo; el icono directo de
            deshacer de la v0.8.0 se sustituye por esto). Las superseries se
            crean desde el sheet de añadir ejercicio. -->
-      <template v-for="block in workoutBlocks" :key="`block-${block.entries[0].we.id}`">
+      <!-- v0.11.7 (zurdi: "mete animaciones a lo que se borra"): los bloques
+           viven en un TransitionGroup bk-remove — quitar un ejercicio difumina
+           su card mientras las demás cierran el hueco (-move). El contenedor
+           relative es el ancla del position:absolute de la que sale; las keys
+           van en AMBAS ramas (mismo valor) porque TransitionGroup necesita
+           hijos-elemento keyados, no fragments de template -->
+      <div class="relative space-y-4">
+      <TransitionGroup name="bk-remove">
+      <template v-for="block in workoutBlocks">
         <div
           v-if="block.grouped"
+          :key="`block-${block.entries[0].we.id}`"
           class="border border-aurora/50 rounded-sm p-2 space-y-3"
           :data-testid="`superset-container-${block.label}`"
           :style="{ '--bk-stagger-i': block.entries[0].index + 1 }"
@@ -548,6 +557,7 @@ onBeforeUnmount(() => {
         </div>
         <WorkoutExerciseCard
           v-else
+          :key="`block-${block.entries[0].we.id}`"
           :style="{ '--bk-stagger-i': block.entries[0].index + 1 }"
           :workout-exercise="block.entries[0].we"
           :exercise="exerciseMap.get(block.entries[0].we.exercise_id)"
@@ -568,6 +578,8 @@ onBeforeUnmount(() => {
           @logged="onLogged(block.entries[0].index, $event)"
         />
       </template>
+      </TransitionGroup>
+      </div>
 
       <BkButton
         variant="ghost"

@@ -316,7 +316,9 @@ async function confirmDelete() {
             </div>
           </div>
 
-          <div v-if="filteredExercises.length > 0" class="space-y-2">
+          <!-- v0.11.7: borrar un ejercicio difumina su fila (bk-remove) -->
+          <div v-if="filteredExercises.length > 0" class="relative space-y-2">
+          <TransitionGroup name="bk-remove">
           <div
             v-for="exercise in filteredExercises"
             :key="exercise.id"
@@ -412,6 +414,7 @@ async function confirmDelete() {
               />
             </div>
           </div>
+          </TransitionGroup>
           </div>
 
           <!-- filtro/búsqueda sin resultados: mensaje plano, NUNCA el BkEmpty

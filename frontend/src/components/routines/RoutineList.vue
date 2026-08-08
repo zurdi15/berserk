@@ -183,7 +183,9 @@ onMounted(() => {
     <!-- UNIFIED-LISTINGS: UNA lista con mías + plantillas globales/públicas
          de otros — gateada en ready para no mostrar el vacío y luego
          reemplazarlo de golpe por la lista real. -->
-    <div v-else-if="displayRoutines.length > 0" class="grid gap-3">
+    <div v-else-if="displayRoutines.length > 0" class="relative grid gap-3">
+      <!-- v0.11.7: borrar una rutina difumina su card (bk-remove) -->
+      <TransitionGroup name="bk-remove">
       <div
         v-for="item in displayRoutines"
         :key="`${item.kind}-${item.id}`"
@@ -328,6 +330,7 @@ onMounted(() => {
           </div>
         </Transition>
       </div>
+      </TransitionGroup>
     </div>
 
     <!-- Empty State: item 10, el botón de crear se muda aquí dentro. UNA

@@ -348,7 +348,9 @@ watch(() => athlete.userId, load, { immediate: true })
       action-testid="add-body-entry"
       @action="openAdd"
     />
-    <div v-else class="space-y-2">
+    <!-- v0.11.7: borrar una entrada difumina su fila (bk-remove) -->
+    <div v-else class="relative space-y-2">
+      <TransitionGroup name="bk-remove">
       <div
         v-for="entry in recentFirst"
         :key="entry.date"
@@ -407,6 +409,7 @@ watch(() => athlete.userId, load, { immediate: true })
           </template>
         </div>
       </div>
+      </TransitionGroup>
     </div>
 
     <BkSheet :open="sheetOpen" :title="t('body.newEntry')" @close="closeSheet">

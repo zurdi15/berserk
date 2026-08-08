@@ -215,7 +215,9 @@ async function confirmDelete() {
           </div>
         </div>
 
-        <div v-else-if="sortedGroups.length > 0" class="space-y-2">
+        <!-- v0.11.7: borrar un grupo difumina su fila (bk-remove) -->
+        <div v-else-if="sortedGroups.length > 0" class="relative space-y-2">
+          <TransitionGroup name="bk-remove">
           <div
             v-for="group in sortedGroups"
             :key="group.id"
@@ -263,6 +265,7 @@ async function confirmDelete() {
               />
             </div>
           </div>
+          </TransitionGroup>
         </div>
 
         <!-- item 10: en vacío el botón de crear se muda dentro del BkEmpty -->

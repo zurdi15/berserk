@@ -382,10 +382,14 @@ watch(
              (RoutineExerciseRow) y añadir vía el MISMO AddExerciseSheet del
              entreno (buscador+filtros+check de superserie). Los toggles de
              frontera y el buscador inline con debounce murieron. -->
-        <div v-if="exercises.length > 0" class="space-y-3 border-t border-line pt-3">
-          <template v-for="block in editorBlocks" :key="`block-${block.entries[0].row.id}`">
+        <!-- v0.11.7: quitar una fila la difumina mientras las demás cierran
+             el hueco (bk-remove, mismas keys en ambas ramas — ver WorkoutView) -->
+        <div v-if="exercises.length > 0" class="relative space-y-3 border-t border-line pt-3">
+          <TransitionGroup name="bk-remove">
+          <template v-for="block in editorBlocks">
             <div
               v-if="block.grouped"
+              :key="`block-${block.entries[0].row.id}`"
               class="border border-aurora/50 rounded-sm p-2 space-y-3"
               :data-testid="`editor-superset-container-${block.label}`"
             >
@@ -417,6 +421,7 @@ watch(
             </div>
             <RoutineExerciseRow
               v-else
+              :key="`block-${block.entries[0].row.id}`"
               :row="block.entries[0].row"
               :index="block.entries[0].index"
               :count="exercises.length"
@@ -429,6 +434,7 @@ watch(
               @remove="removeExercise"
             />
           </template>
+          </TransitionGroup>
         </div>
 
         <BkButton

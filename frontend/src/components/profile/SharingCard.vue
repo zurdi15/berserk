@@ -142,7 +142,9 @@ function handleViewUser(user: UserOut) {
                acceso exige elegir a alguien primero (picker de abajo), no
                es un botón de un solo click -->
           <BkEmpty v-if="givenUsers.length === 0" :message="$t('profile.noSharingGiven')" />
-          <div v-else class="space-y-2">
+          <!-- v0.11.7: revocar difumina la fila (bk-remove) -->
+          <div v-else class="relative space-y-2">
+            <TransitionGroup name="bk-remove">
             <div v-for="user in givenUsers" :key="user.id" class="flex items-center justify-between p-2 rounded border border-line">
               <BkUser :user="user" />
               <!-- item 5: icon-only (borrar = misma X que en el resto de la app) -->
@@ -153,6 +155,7 @@ function handleViewUser(user: UserOut) {
                 @click="handleRevoke(user.id)"
               />
             </div>
+            </TransitionGroup>
           </div>
         </template>
       </div>
