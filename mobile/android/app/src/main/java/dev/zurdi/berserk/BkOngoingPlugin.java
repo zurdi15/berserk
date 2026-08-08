@@ -103,4 +103,45 @@ public class BkOngoingPlugin extends Plugin {
         manager().cancel(call.getInt("id", 1003));
         call.resolve();
     }
+
+    private PendingIntent endAlarmIntent(String title, String body, String channelName) {
+        Intent intent = new Intent(getContext(), BkRestEndReceiver.class);
+        intent.putExtra("title", title);
+        intent.putExtra("body", body);
+        intent.putExtra("channelName", channelName);
+        return PendingIntent.getBroadcast(
+                getContext(), 2001, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /**
+     * v0.13.2 — aviso sonoro del fin de descanso vía setAlarmClock: EXENTO de
+     * la restricción de alarmas exactas de Android 14+ (SCHEDULE_EXACT_ALARM
+     * viene denegado por defecto y la programada de LocalNotifications se
+     * degradaba a inexacta — para un descanso de 60s, "no llega"). El
+     * receiver postea la notificación con sonido al dispararse.
+     */
+    @PluginMethod
+    public void scheduleEndAlarm(PluginCall call) {
+        long whenMs = call.getLong("whenMs", System.currentTimeMillis());
+        android.app.AlarmManager alarms =
+                (android.app.AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
+        PendingIntent operation = endAlarmIntent(
+                call.getString("title", "berserk"),
+                call.getString("body", ""),
+                call.getString("channelName", "berserk"));
+        alarms.setAlarmClock(
+                new android.app.AlarmManager.AlarmClockInfo(whenMs, launchIntent()), operation);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void cancelEndAlarm(PluginCall call) {
+        android.app.AlarmManager alarms =
+                (android.app.AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
+        alarms.cancel(endAlarmIntent("", "", ""));
+        // si ya se posteó (llegó a cero antes de cancelar), fuera de la barra
+        manager().cancel(BkRestEndReceiver.REST_END_NOTIFICATION_ID);
+        call.resolve();
+    }
 }

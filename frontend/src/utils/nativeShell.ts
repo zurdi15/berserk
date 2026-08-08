@@ -1,22 +1,41 @@
-// v0.13.0 — puente MÍNIMO con el shell Android de Capacitor (mobile/).
+// v0.13.x — puente MÍNIMO con el shell Android de Capacitor (mobile/).
 // El shell carga esta app desde el servidor (server.url), y el runtime
 // nativo inyecta window.Capacitor con los plugins registrados: se detecta
 // en runtime y se usa sin importar nada de @capacitor/* — la PWA no gana
 // dependencias y el mismo bundle sirve para web y para el shell.
 //
-// Único uso hoy: la notificación LOCAL del fin del descanso. En el shell
-// se PROGRAMA a la hora exacta del fin (suena con la pantalla bloqueada o
-// la app matada — el dolor real de la PWA que motivó el shell); en web se
-// sigue con la Notification API de siempre (restTimer.notifyRestOver).
+// Piezas (todas no-op en web):
+// - permiso de notificaciones: UNA petición memoizada para toda la app
+//   (v0.13.2 — dos requestPermissions concurrentes se pisaban y podían
+//   tumbar hasta la notificación programada)
+// - fin de descanso SONORO: alarma vía BkOngoing.scheduleEndAlarm
+//   (AlarmManager.setAlarmClock, EXENTO de la restricción de alarmas
+//   exactas de Android 14+ que degradaba la programada de
+//   LocalNotifications a inexacta = no llegaba); fallback a
+//   LocalNotifications.schedule en shells viejos
+// - cronómetros ONGOING (v0.13.1): el sistema pinta el tiempo del entreno
+//   corriendo / la cuenta atrás del descanso en barra y pantalla de
+//   bloqueo (plugin propio BkOngoing, ver mobile/android)
+
+interface LocalNotificationsPlugin {
+  requestPermissions: () => Promise<{ display: string }>
+  schedule: (options: { notifications: unknown[] }) => Promise<unknown>
+  cancel: (options: { notifications: { id: number }[] }) => Promise<unknown>
+}
+
+interface OngoingPlugin {
+  startChronometer: (options: Record<string, unknown>) => Promise<unknown>
+  startCountdown: (options: Record<string, unknown>) => Promise<unknown>
+  stop: (options: { id: number }) => Promise<unknown>
+  scheduleEndAlarm?: (options: Record<string, unknown>) => Promise<unknown>
+  cancelEndAlarm?: () => Promise<unknown>
+}
 
 interface CapacitorGlobal {
   isNativePlatform?: () => boolean
   Plugins?: {
-    LocalNotifications?: {
-      requestPermissions: () => Promise<{ display: string }>
-      schedule: (options: { notifications: unknown[] }) => Promise<unknown>
-      cancel: (options: { notifications: { id: number }[] }) => Promise<unknown>
-    }
+    LocalNotifications?: LocalNotificationsPlugin
+    BkOngoing?: OngoingPlugin
   }
 }
 
@@ -29,8 +48,30 @@ export function isNativeShell(): boolean {
   return capacitor() !== null
 }
 
-// id fijo: solo existe UNA notificación de descanso a la vez — reprogramar
-// con el mismo id sustituye a la anterior
+// ---------- permiso (una sola petición viva a la vez) ----------
+
+let permissionPromise: Promise<boolean> | null = null
+
+export function ensureNativeNotificationPermission(): Promise<boolean> {
+  const plugin = capacitor()?.Plugins?.LocalNotifications
+  if (!plugin) return Promise.resolve(false)
+  if (permissionPromise === null) {
+    permissionPromise = plugin
+      .requestPermissions()
+      .then((result) => result.display === 'granted')
+      .catch(() => false)
+      .then((granted) => {
+        // denegado: no memoizar para siempre — si el usuario lo activa en
+        // ajustes del sistema, la siguiente petición lo verá concedido
+        if (!granted) permissionPromise = null
+        return granted
+      })
+  }
+  return permissionPromise
+}
+
+// ---------- fin de descanso sonoro ----------
+
 const REST_NOTIFICATION_ID = 1001
 
 export async function scheduleNativeRestNotification(
@@ -38,11 +79,16 @@ export async function scheduleNativeRestNotification(
   title: string,
   body: string,
 ): Promise<void> {
-  const plugin = capacitor()?.Plugins?.LocalNotifications
-  if (!plugin) return
+  const cap = capacitor()
+  if (!cap) return
   try {
-    await plugin.requestPermissions()
-    await plugin.schedule({
+    await ensureNativeNotificationPermission()
+    const ongoing = cap.Plugins?.BkOngoing
+    if (ongoing?.scheduleEndAlarm) {
+      await ongoing.scheduleEndAlarm({ whenMs: endsAtMs, title, body, channelName: title })
+      return
+    }
+    await cap.Plugins?.LocalNotifications?.schedule({
       notifications: [
         {
           id: REST_NOTIFICATION_ID,
@@ -59,30 +105,22 @@ export async function scheduleNativeRestNotification(
 }
 
 export async function cancelNativeRestNotification(): Promise<void> {
-  const plugin = capacitor()?.Plugins?.LocalNotifications
-  if (!plugin) return
+  const cap = capacitor()
+  if (!cap) return
   try {
-    await plugin.cancel({ notifications: [{ id: REST_NOTIFICATION_ID }] })
+    if (cap.Plugins?.BkOngoing?.cancelEndAlarm) await cap.Plugins.BkOngoing.cancelEndAlarm()
+    await cap.Plugins?.LocalNotifications?.cancel({
+      notifications: [{ id: REST_NOTIFICATION_ID }],
+    })
   } catch {
     // nada que cancelar
   }
 }
 
-// ---------- v0.13.1: notificaciones ongoing con cronómetro del sistema ----------
-// (plugin propio BkOngoing del shell, ver mobile/android BkOngoingPlugin.java)
-// El SISTEMA pinta el tiempo corriendo/la cuenta atrás en la barra y en la
-// pantalla de bloqueo — la app no actualiza nada. Silenciosas (canal LOW):
-// el sonido del fin de descanso sigue siendo la programada de arriba.
-
-interface OngoingPlugin {
-  startChronometer: (options: Record<string, unknown>) => Promise<unknown>
-  startCountdown: (options: Record<string, unknown>) => Promise<unknown>
-  stop: (options: { id: number }) => Promise<unknown>
-}
+// ---------- cronómetros ongoing (el sistema pinta el tiempo) ----------
 
 function ongoingPlugin(): OngoingPlugin | null {
-  const cap = (globalThis as { Capacitor?: CapacitorGlobal & { Plugins?: { BkOngoing?: OngoingPlugin } } }).Capacitor
-  return cap?.isNativePlatform?.() ? (cap.Plugins?.BkOngoing ?? null) : null
+  return capacitor()?.Plugins?.BkOngoing ?? null
 }
 
 const REST_COUNTDOWN_ID = 1002
@@ -92,7 +130,7 @@ export async function startNativeRestCountdown(endsAtMs: number, title: string):
   const plugin = ongoingPlugin()
   if (!plugin) return
   try {
-    await capacitor()?.Plugins?.LocalNotifications?.requestPermissions()
+    await ensureNativeNotificationPermission()
     await plugin.startCountdown({ id: REST_COUNTDOWN_ID, whenMs: endsAtMs, title, channelName: title })
   } catch {
     // sin permiso: el CTA de la app sigue contando
@@ -113,7 +151,7 @@ export async function startNativeWorkoutChronometer(startedAtMs: number, title: 
   const plugin = ongoingPlugin()
   if (!plugin) return
   try {
-    await capacitor()?.Plugins?.LocalNotifications?.requestPermissions()
+    await ensureNativeNotificationPermission()
     await plugin.startChronometer({ id: WORKOUT_CHRONO_ID, whenMs: startedAtMs, title, channelName: title })
   } catch {
     // sin permiso: el header del entreno sigue mostrando el crono

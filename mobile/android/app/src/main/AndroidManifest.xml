@@ -20,6 +20,10 @@
             </intent-filter>
         </activity>
 
+        <!-- v0.13.2: receiver que POSTEA la notificación sonora del fin de
+             descanso cuando dispara la alarma (ver BkOngoingPlugin) -->
+        <receiver android:name=".BkRestEndReceiver" android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -32,4 +36,6 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

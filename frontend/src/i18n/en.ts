@@ -1,5 +1,6 @@
 export const en = {
   app: {
+    notificationsDenied: 'Notifications are off: enable them in Android Settings → Apps → berserk for the chronometer and the rest alert',
     name: 'berserk',
     nav: {
       today: 'Today',

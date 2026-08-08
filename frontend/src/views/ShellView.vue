@@ -12,6 +12,7 @@ import * as outbox from '@/offline/outbox'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { useToastStore } from '@/stores/toast'
+import { ensureNativeNotificationPermission, isNativeShell } from '@/utils/nativeShell'
 
 // item 4 (round 9): correcciones de runas del nav — streak/shoulders SIGUEN
 // existiendo en runes.ts (streak: StreakCard; shoulders: rune de grupo
@@ -179,6 +180,16 @@ let disposeDrained: (() => void) | null = null
 onMounted(() => {
   updateIndicator()
   window.addEventListener('resize', updateIndicator)
+
+  // v0.13.2 shell Android: pedir el permiso de notificaciones UNA vez al
+  // arrancar (momento claro de UX) en vez de en mitad del primer descanso;
+  // si está denegado, avisar cómo activarlo — sin él no hay cronómetros ni
+  // aviso de fin de descanso
+  if (isNativeShell()) {
+    void ensureNativeNotificationPermission().then((granted) => {
+      if (!granted) useToastStore().push('error', t('app.notificationsDenied'))
+    })
+  }
 
   attachNetListeners()
   outbox.refreshPendingCount()
