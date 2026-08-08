@@ -8,6 +8,14 @@ on:
   push:
     tags:
       - 'v*'
+  # relanzar a mano contra una release existente (p.ej. si el build del tag
+  # falló y el fix vive en un commit posterior): el dispatch corre con el
+  # código del ref elegido (main) y sube la APK a la release de `tag`
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag de la release destino (vX.Y.Z)'
+        required: true
 
 permissions:
   contents: write
@@ -44,23 +52,25 @@ jobs:
           BK_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           BK_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
+          RELEASE_TAG="${{ inputs.tag || github.ref_name }}"
+          TAG="${RELEASE_TAG#v}"
           # versionCode monotónico desde el semver del tag: 0.13.0 → 1300
           IFS=. read -r MAJOR MINOR PATCH <<< "$TAG"
           export BK_VERSION_NAME="$TAG"
           export BK_VERSION_CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
           ./gradlew --no-daemon assembleRelease
-          mv app/build/outputs/apk/release/app-release.apk "berserk-${GITHUB_REF_NAME}.apk"
+          mv app/build/outputs/apk/release/app-release.apk "berserk-${RELEASE_TAG}.apk"
 
       - name: Attach APK to the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          RELEASE_TAG="${{ inputs.tag || github.ref_name }}"
           # la Release del tag puede no existir aún (se crea tras el workflow
           # de imagen): reintenta unos minutos antes de rendirse
           for i in $(seq 1 30); do
-            if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-              gh release upload "$GITHUB_REF_NAME" "mobile/android/berserk-${GITHUB_REF_NAME}.apk" --repo "$GITHUB_REPOSITORY" --clobber
+            if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              gh release upload "$RELEASE_TAG" "mobile/android/berserk-${RELEASE_TAG}.apk" --repo "$GITHUB_REPOSITORY" --clobber
               exit 0
             fi
             sleep 20
