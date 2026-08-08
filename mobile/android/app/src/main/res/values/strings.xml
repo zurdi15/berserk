@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">berserk</string>
+    <string name="title_activity_main">berserk</string>
+    <string name="package_name">dev.zurdi.berserk</string>
+    <string name="custom_url_scheme">dev.zurdi.berserk</string>
+</resources>

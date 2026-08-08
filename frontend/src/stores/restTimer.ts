@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { i18n } from '@/i18n'
+import { cancelNativeRestNotification, isNativeShell, scheduleNativeRestNotification } from '@/utils/nativeShell'
 
 // timestamps absolutos: el interval solo refresca la vista; si el móvil se
 // bloquea y los ticks no corren, el tiempo restante sigue siendo exacto
@@ -99,6 +100,18 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     if (graceTimeout) clearTimeout(graceTimeout)
     total.value = seconds
     endsAt.value = Date.now() + seconds * 1000
+    // v0.13.0 shell Android: notificación LOCAL programada a la hora exacta
+    // del fin — suena con la pantalla bloqueada o la app matada, que es lo
+    // que la Notification API web no puede garantizar. En web es no-op.
+    if (isNativeShell()) {
+      void scheduleNativeRestNotification(
+        endsAt.value,
+        i18n.global.t('timer.notifyTitle'),
+        exerciseName
+          ? i18n.global.t('timer.notifyBodyWithExercise', { exercise: exerciseName })
+          : i18n.global.t('timer.notifyBody'),
+      )
+    }
     now.value = Date.now()
     vibrated = false
     restExerciseName = exerciseName ?? null
@@ -110,6 +123,9 @@ export const useRestTimerStore = defineStore('restTimer', () => {
   function clear() {
     // cancelar timeout de gracia si existe
     if (graceTimeout) clearTimeout(graceTimeout)
+    // v0.13.0 shell Android: un descanso cancelado a mano no debe sonar
+    // luego — la reprogramación de start() ya sustituye por id fijo
+    if (isNativeShell()) void cancelNativeRestNotification()
     endsAt.value = null
     total.value = 0
     vibrated = false

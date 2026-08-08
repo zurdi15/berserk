@@ -1,0 +1,9 @@
+{
+  "appId": "dev.zurdi.berserk",
+  "appName": "berserk",
+  "webDir": "www",
+  "server": {
+    "url": "https://berserk.ginnugagap.net",
+    "cleartext": false
+  }
+}
