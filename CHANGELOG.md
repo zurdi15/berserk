@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.14.0 - 2026-08-10
+
+### Added
+- **Plan rotatorio de rutinas**: define tu semana como una lista ordenada de rutinas (4 grupos, 3 + cardio, lo que sea) y la app siempre te dice cuál toca — en Hoy con arranque de un toque, y marcada en la lista del entreno. El orden manda: si una semana no completas el ciclo, la siguiente retoma exactamente donde lo dejaste. El plan se edita en Perfil → Rutinas.
+
 ## 0.13.2 - 2026-08-08
 
 ### Fixed
