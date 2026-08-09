@@ -100,14 +100,16 @@ watch(() => athlete.userId, () => load(), { immediate: true })
     <div :style="{ '--bk-stagger-i': 0 }">
       <StreakCard :streak="streak" />
     </div>
-    <div :style="{ '--bk-stagger-i': 1 }">
-      <TodaySessionCard :schedules="schedules" />
-    </div>
-    <!-- v0.14.0: "te toca" del plan rotatorio — pegado a la sesión del día
-         (mismo bloque de "qué hago hoy"); solo vista propia, y la card se
-         autoelimina sin plan -->
-    <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 2 }">
+    <!-- v0.14.1 (zurdi): "te toca" ENCIMA de la programada, y la actividad
+         social justo debajo del te toca — Hoy abre con qué hacer AHORA -->
+    <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 1 }">
       <RotationNextCard />
+    </div>
+    <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 2 }">
+      <SocialFeedCard />
+    </div>
+    <div :style="{ '--bk-stagger-i': 3 }">
+      <TodaySessionCard :schedules="schedules" />
     </div>
     <div :style="{ '--bk-stagger-i': 3 }">
       <WeekSummaryCard :workouts="workouts" :exercises="exercises" :muscle-groups="muscleGroups" />
@@ -126,13 +128,6 @@ watch(() => athlete.userId, () => load(), { immediate: true })
     </div>
     <div :style="{ '--bk-stagger-i': 5 }">
       <RecentPrs :records="records" :exercises="exercises" />
-    </div>
-    <!-- v0.12.0 (backlog social): actividad de quienes comparten CONMIGO —
-         es contenido del usuario logueado, así que no se monta viendo a otro
-         atleta; la card se autoelimina si nadie comparte (ver el computed
-         visible del componente) -->
-    <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 6 }">
-      <SocialFeedCard />
     </div>
   </div>
 </template>

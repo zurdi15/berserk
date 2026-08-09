@@ -90,3 +90,24 @@ def test_rotation_edit_and_validation(client: TestClient, app):
         "routines": [],
         "next_position": None,
     }
+
+
+def test_start_from_foreign_global_routine(client: TestClient, app):
+    """v0.14.1 — el bug del plan de zurdi: la rotación acepta globales ajenas,
+    así que arrancar un entreno desde ellas también debe funcionar."""
+    shared = _routine(client, "Global del admin")  # nace is_global (v0.4.3)
+    private = client.post(
+        "/api/v1/routines", json={"name": "Privada", "is_global": False}
+    ).json()["id"]
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+
+    resp = freyja.post("/api/v1/workouts", json={"routine_id": shared})
+    assert resp.status_code == 201, resp.text
+    workout = resp.json()
+    assert workout["routine_id"] == shared
+    freyja.delete(f"/api/v1/workouts/{workout['id']}")
+
+    resp = freyja.post("/api/v1/workouts", json={"routine_id": private})
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "routine_invalid"

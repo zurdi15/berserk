@@ -109,7 +109,15 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
     routine = None
     if routine_id is not None:
         routine = db.get(Routine, routine_id)
-        if routine is None or routine.owner_id != user.id:
+        # v0.14.1 (bug del plan rotatorio de zurdi: 422 al arrancar la
+        # sugerida): arrancar acepta cualquier rutina VISIBLE como plantilla
+        # (propia, global de otro, o legacy owner NULL) — la misma regla que
+        # la rotación (_visible_template). Los ejercicios se copian al
+        # entreno igual; no hay edición de la rutina ajena por aquí.
+        visible = routine is not None and (
+            routine.owner_id is None or routine.is_global or routine.owner_id == user.id
+        )
+        if not visible:
             raise HTTPException(status_code=422, detail="routine_invalid")
 
     if payload.finished:
