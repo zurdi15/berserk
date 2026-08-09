@@ -11,6 +11,7 @@ import {
   listRoutines,
 } from '@/api/domain'
 import { isValidRuneName } from '@/lib/runeResolve'
+import RotationPlanCard from './RotationPlanCard.vue'
 import { toastApiError } from '@/utils/apiErrors'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
@@ -159,6 +160,10 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4">
+    <!-- v0.14.0: plan rotatorio — editor encima de la lista de rutinas;
+         las candidatas son las mismas que esta lista ya conoce -->
+    <RotationPlanCard v-if="ready" :available="displayRoutines" />
+
     <!-- item 2/3 (v0.4.3, zurdi): esqueleto (shimmer) mientras carga, mismo
          hueco que las cards reales — antes esto era un gate a blanco
          (v-if="ready") que hacía saltar el layout al llegar los datos

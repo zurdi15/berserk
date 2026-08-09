@@ -376,6 +376,32 @@ class ScheduledSession(Base):
     note: Mapped[str | None] = mapped_column(String(300), default=None)
 
 
+class RotationEntry(Base):
+    """v0.14.0 — plan rotatorio de rutinas (zurdi: "rutina semanal rotatoria:
+    siempre te sugiere el siguiente entrenamiento que te toca, en orden").
+    Lista ORDENADA por usuario; el puntero de "te toca" NO se guarda: se
+    deriva del último entreno TERMINADO cuya rutina esté en la rotación
+    (siguiente posición, cíclico) — sin estado que desincronizar si una
+    semana queda a medias o se edita el plan."""
+
+    __tablename__ = "routine_rotation"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "position"),
+        # una rutina solo puede aparecer una vez: con duplicados el puntero
+        # derivado sería ambiguo
+        UniqueConstraint("owner_id", "routine_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column()
+    routine_id: Mapped[int] = mapped_column(
+        ForeignKey("routines.id", ondelete="CASCADE"), index=True
+    )
+
+
 class ExerciseNote(Base):
     """v0.12.0 — nota persistente POR USUARIO y ejercicio ("asiento en el 5,
     agarre ancho"): se enseña en la card del entreno la siguiente sesión.

@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/client'
 import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
-import { listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
+import { getRotation, listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
 import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
 import { isLastOfSuperset, nextSupersetIndex, normalizeSupersets, supersetLabels } from '@/lib/supersets'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
@@ -190,7 +190,24 @@ const derivedMuscleGroups = computed(() =>
   muscleGroups.value.filter((g) => activeWorkout.workout?.muscle_tag_ids.includes(g.id)),
 )
 
+// v0.14.0: la rutina que toca según el plan rotatorio — chip en la lista de
+// arranque. Petición aparte y tolerante a fallo: el chip es un hint, no
+// puede bloquear el catálogo.
+const rotationNextId = ref<number | null>(null)
+
 async function loadCatalog() {
+  // Promise.resolve().then(...): también captura un throw SÍNCRONO (p.ej. un
+  // mock parcial de domain en tests sin getRotation) — el hint jamás tumba
+  // el catálogo
+  Promise.resolve()
+    .then(() => getRotation())
+    .then((rotation) => {
+      rotationNextId.value =
+        rotation.next_position !== null
+          ? rotation.routines[rotation.next_position]?.id ?? null
+          : null
+    })
+    .catch(() => {})
   try {
     const [routinesList, exercisesList, muscleGroupsList] = await Promise.all([
       listRoutines(),
@@ -673,6 +690,12 @@ onBeforeUnmount(() => {
         >
           <BkRune v-if="routineRune(routine)" :name="routineRune(routine) as RuneName" :size="16" />
           <span>{{ routine.name }}</span>
+          <!-- v0.14.0: chip del plan rotatorio en la rutina que toca -->
+          <span
+            v-if="routine.id === rotationNextId"
+            class="text-2xs text-aurora border border-aurora/50 bg-aurora/10 rounded-sm px-1.5 py-0.5"
+            :data-testid="`rotation-chip-${routine.id}`"
+          >{{ t('rotation.chip') }}</span>
         </BkButton>
       </div>
     </div>

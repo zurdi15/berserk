@@ -31,6 +31,7 @@ export const es = {
     syncConflicts: '{n} cambios no se pudieron sincronizar (alguien los pisó desde otro sitio).',
   },
   errors: {
+    rotation_duplicate_routine: 'Una rutina no puede repetirse en el plan',
     unsupported_image_type: 'Formato de imagen no soportado (JPG, PNG o WebP)',
     image_too_large: 'La imagen supera los 5 MB',
     not_authenticated: 'Tu sesión ha caducado. Entra de nuevo.',
@@ -181,6 +182,17 @@ export const es = {
         'Esto reemplaza todos los datos actuales por los de la copia. Puede cerrar tu sesión; si ocurre, vuelve a entrar.',
       restoreSuccess: 'Copia restaurada. Recargando…',
     },
+  },
+  rotation: {
+    title: 'Plan rotatorio',
+    empty: 'Añade rutinas en orden y te diré siempre cuál toca — si una semana queda a medias, la siguiente retoma donde lo dejaste.',
+    next: 'Te toca:',
+    add: 'Añadir rutina al plan',
+    todayTitle: 'Te toca',
+    todayHint: 'Siguiente entreno de tu plan rotatorio',
+    start: 'Empezar',
+    continue: 'Continuar',
+    chip: 'Te toca',
   },
   routines: {
     newRoutine: 'Nueva rutina',

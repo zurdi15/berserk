@@ -9,7 +9,7 @@ from sqlalchemy.engine import Engine
 from .auth import get_current_user, require_admin
 from .config import get_settings
 from .db import make_engine, make_sessionmaker
-from .routers import admin, auth, backup, body, calendar as calendar_router, exercises, media, progress as progress_router, routines, sharing, social, users, workouts
+from .routers import admin, auth, backup, body, calendar as calendar_router, exercises, media, progress as progress_router, rotation, routines, sharing, social, users, workouts
 from .seed import ensure_catalog
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -68,6 +68,9 @@ def create_app(engine: Engine | None = None) -> FastAPI:
     )
     app.include_router(
         social.router, prefix=API_PREFIX, dependencies=[Depends(get_current_user)]
+    )
+    app.include_router(
+        rotation.router, prefix=API_PREFIX, dependencies=[Depends(get_current_user)]
     )
     # solo admin: gestión de usuarios e invitaciones
     app.include_router(

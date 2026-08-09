@@ -31,6 +31,7 @@ export const en = {
     syncConflicts: '{n} changes could not be synced (overwritten from elsewhere).',
   },
   errors: {
+    rotation_duplicate_routine: 'A routine cannot repeat in the plan',
     unsupported_image_type: 'Unsupported image format (JPG, PNG or WebP)',
     image_too_large: 'Image is larger than 5 MB',
     not_authenticated: 'Your session expired. Sign in again.',
@@ -179,6 +180,17 @@ export const en = {
         'This replaces all current data with the backup. Your session may close; if it does, sign in again.',
       restoreSuccess: 'Backup restored. Reloading…',
     },
+  },
+  rotation: {
+    title: 'Rotation plan',
+    empty: 'Add routines in order and the app always tells you which one is next — a half-finished week resumes where you left off.',
+    next: 'Up next:',
+    add: 'Add routine to the plan',
+    todayTitle: 'Up next',
+    todayHint: 'Next workout in your rotation plan',
+    start: 'Start',
+    continue: 'Continue',
+    chip: 'Up next',
   },
   routines: {
     newRoutine: 'New routine',

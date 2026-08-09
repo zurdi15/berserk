@@ -13,6 +13,7 @@ import TodaySessionCard from '@/components/today/TodaySessionCard.vue'
 import WeekSummaryCard from '@/components/today/WeekSummaryCard.vue'
 import DistributionBars from '@/components/today/DistributionBars.vue'
 import RecentPrs from '@/components/today/RecentPrs.vue'
+import RotationNextCard from '@/components/today/RotationNextCard.vue'
 import SocialFeedCard from '@/components/today/SocialFeedCard.vue'
 
 const { t } = useI18n()
@@ -102,7 +103,13 @@ watch(() => athlete.userId, () => load(), { immediate: true })
     <div :style="{ '--bk-stagger-i': 1 }">
       <TodaySessionCard :schedules="schedules" />
     </div>
-    <div :style="{ '--bk-stagger-i': 2 }">
+    <!-- v0.14.0: "te toca" del plan rotatorio — pegado a la sesión del día
+         (mismo bloque de "qué hago hoy"); solo vista propia, y la card se
+         autoelimina sin plan -->
+    <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 2 }">
+      <RotationNextCard />
+    </div>
+    <div :style="{ '--bk-stagger-i': 3 }">
       <WeekSummaryCard :workouts="workouts" :exercises="exercises" :muscle-groups="muscleGroups" />
     </div>
     <!-- item 4 (v0.4.2): Distribución muscular se muda aquí desde el panel de
@@ -112,19 +119,19 @@ watch(() => athlete.userId, () => load(), { immediate: true })
          récords históricos sin ventana. Va DIRECTAMENTE debajo de "Esta
          semana" (mismo bloque de ritmo reciente). Título vía BkCard con la
          key progress.distribution ya existente — se reusa, no se duplica -->
-    <div :style="{ '--bk-stagger-i': 3 }">
+    <div :style="{ '--bk-stagger-i': 4 }">
       <BkCard :title="t('progress.distribution')">
         <DistributionBars :items="distribution" :groups="muscleGroups" />
       </BkCard>
     </div>
-    <div :style="{ '--bk-stagger-i': 4 }">
+    <div :style="{ '--bk-stagger-i': 5 }">
       <RecentPrs :records="records" :exercises="exercises" />
     </div>
     <!-- v0.12.0 (backlog social): actividad de quienes comparten CONMIGO —
          es contenido del usuario logueado, así que no se monta viendo a otro
          atleta; la card se autoelimina si nadie comparte (ver el computed
          visible del componente) -->
-    <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 5 }">
+    <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 6 }">
       <SocialFeedCard />
     </div>
   </div>

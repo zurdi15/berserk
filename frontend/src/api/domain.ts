@@ -696,3 +696,17 @@ export const deleteBodyPhoto = (photoId: number) =>
 export const bodyPhotoUrl = (photoId: number) => `/api/v1/body/photos/${photoId}/file`
 
 export const getSocialFeed = () => api<FeedOut>('/social/feed')
+
+// ---------- v0.14.0: plan rotatorio de rutinas ----------
+
+export interface RotationOut {
+  routines: RoutineOut[]
+  // índice en `routines` de la que toca; null sin plan
+  next_position: number | null
+}
+
+export const getRotation = () => api<RotationOut>('/rotation')
+
+// contrato de completitud: la lista ENTERA y ordenada cada vez; vacía borra
+export const putRotation = (routine_ids: number[]) =>
+  api<RotationOut>('/rotation', { method: 'PUT', body: { routine_ids } })
