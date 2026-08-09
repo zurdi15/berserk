@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.14.1 - 2026-08-10
+
+### Fixed
+- Empezar el entreno sugerido por el plan rotatorio ya no falla cuando la rutina que toca es una plantilla global de otro usuario (o del catálogo antiguo): arrancar acepta cualquier rutina visible, igual que el plan.
+
+### Changed
+- Hoy reordenado: "Te toca" va encima de la sesión programada, con la actividad social justo debajo.
+
 ## 0.14.0 - 2026-08-10
 
 ### Added
