@@ -201,4 +201,12 @@ describe('SettingsCard', () => {
       expect(setTheme).toHaveBeenCalledWith('dark')
     })
   })
+
+  // v0.14.2: la versión del bundle visible en Sistema (semver, no valor
+  // exacto — el spec no debe romperse en cada bump)
+  it('shows the deployed app version (semver)', () => {
+    const wrapper = build()
+    expect(wrapper.get('[data-testid="app-version"]').text()).toMatch(/^berserk v\d+\.\d+\.\d+/)
+  })
+
 })

@@ -10,7 +10,13 @@ import BkSelect from '@/lib/BkSelect.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { USER_COLOR_SWATCHES } from '@/tokens/userColors'
+import { isNativeShell } from '@/utils/nativeShell'
 import { setTheme } from '@/utils/theme'
+// v0.14.2 (zurdi: "pon en algún sitio la versión actual"): la versión del
+// bundle desplegado — verdad de build (package.json en el momento de
+// compilar), la misma que ve el shell Android porque carga este bundle del
+// servidor. Con el sufijo · app se distingue shell de navegador.
+import { version as appVersion } from '../../../package.json'
 import { getThemeMode, type ThemeMode } from '@/utils/uiPrefs'
 
 const { t } = useI18n()
@@ -121,6 +127,12 @@ function pickTheme(mode: ThemeMode) {
           />
         </div>
       </div>
+
+      <!-- v0.14.2: versión desplegada, visible para poder verificar que la
+           PWA/shell ya corre el último bundle -->
+      <p class="bk-metric text-2xs text-ink-faint text-center pt-2" data-testid="app-version">
+        berserk v{{ appVersion }}<template v-if="isNativeShell()"> · app</template>
+      </p>
     </div>
   </BkCard>
 </template>
