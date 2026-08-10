@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.14.2 - 2026-08-10
+
+### Added
+- La versión de la app es visible en Perfil → Sistema ("berserk vX.Y.Z", con "· app" en el shell Android) — para comprobar de un vistazo que tienes el último despliegue y no un bundle cacheado.
+
 ## 0.14.1 - 2026-08-10
 
 ### Fixed
