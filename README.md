@@ -1,9 +1,18 @@
-# berserk
+<p align="center">
+  <img src="docs/assets/runes/berserk.svg" width="96" alt="berserk rune logo" />
+</p>
 
-Self-hosted workout tracker. Plan it, log it, watch the runes light up.
+<!-- Elder Futhark: ᛒ(b) ᛖ(e) ᚱ(r) ᛋ(s) ᛖ(e) ᚱ(r) ᚲ(k) -->
+<h1 align="center">ᛒᛖᚱᛋᛖᚱᚲ</h1>
 
-[![CI](https://github.com/zurdi15/berserk/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/zurdi15/berserk/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/zurdi15/berserk?sort=semver)](https://github.com/zurdi15/berserk/releases)
+<p align="center">
+  <em>berserk</em> — self-hosted workout tracker. Plan it, log it, watch the runes light up.
+</p>
+
+<p align="center">
+  <a href="https://github.com/zurdi15/berserk/actions/workflows/ci.yml"><img src="https://github.com/zurdi15/berserk/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
+  <a href="https://github.com/zurdi15/berserk/releases"><img src="https://img.shields.io/github/v/release/zurdi15/berserk?sort=semver" alt="Release" /></a>
+</p>
 
 ## Screenshots
 
