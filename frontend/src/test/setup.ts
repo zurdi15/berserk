@@ -11,7 +11,17 @@
 //     persistido en un test se filtraba al siguiente: 46 fallos.
 // Aquí igualamos los dos mundos: storage FUNCIONAL siempre (si el de Node
 // está roto, uno en memoria) y limpio antes de cada test.
-import { beforeEach } from 'vitest'
+// Y desmontaje automático de wrappers de VTU tras cada test: los wrappers
+// que sobreviven al test siguen REACTIVOS (watchers vivos) — en
+// progress.spec las instancias zombis de ProgressView reaccionaban a
+// mutaciones del mockRoute compartido e intentaban montar paneles en DOM ya
+// arrancado (document.body.innerHTML = '' en otros tests) → "insertBefore
+// of null", 2 Unhandled Errors que hacían salir a vitest con código 1 (y el
+// ci rojo) aunque los 1148 tests pasaran.
+import { afterEach, beforeEach } from 'vitest'
+import { enableAutoUnmount } from '@vue/test-utils'
+
+enableAutoUnmount(afterEach)
 
 function storageWorks(): boolean {
   try {
