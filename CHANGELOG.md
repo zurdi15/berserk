@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.15.0 - 2026-08-10
+
+### Added
+- El plan rotatorio ya se edita del todo: además del orden (flechas), puedes fijar a mano cuál toca hoy tocando la rutina en el editor. El ajuste manual vale hasta que termines cualquier entreno del plan — a partir de ahí la rotación continúa en orden desde el que hiciste.
+
 ## 0.14.2 - 2026-08-10
 
 ### Added
