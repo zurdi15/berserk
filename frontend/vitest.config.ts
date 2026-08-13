@@ -9,6 +9,9 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
+    // storage funcional + limpio por test en CUALQUIER versión de Node —
+    // el porqué completo vive en el propio setup (el ci rojo crónico)
+    setupFiles: ['./src/test/setup.ts'],
     // M3: pineada a una zona que SÍ observa horario de verano (a diferencia
     // de la del entorno CI, que podría no hacerlo) — el test de la trampa
     // del desplazamiento de día en dates.spec.ts (cruzar el cambio de hora
