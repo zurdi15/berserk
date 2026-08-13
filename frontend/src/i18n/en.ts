@@ -1,6 +1,7 @@
 export const en = {
   app: {
     notificationsDenied: 'Notifications are off: enable them in Android Settings → Apps → berserk for the chronometer and the rest alert',
+    shellUpdateAvailable: 'A new app version is available: download it in Profile → Settings',
     name: 'berserk',
     nav: {
       today: 'Today',
@@ -122,6 +123,7 @@ export const en = {
     libraryTab: 'Library',
     adminTab: 'Admin',
     settings: 'Settings',
+    updateShell: 'Update app to v{version}',
     theme: 'Theme',
     themeDark: 'Dark',
     themeLight: 'Light',

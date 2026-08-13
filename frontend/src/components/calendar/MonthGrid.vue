@@ -155,7 +155,12 @@ function selectDay(date: string) {
         :class="{
           'border-ink-faint': !cell.inMonth,
           'text-ink-muted': !cell.inMonth,
-          'bg-stone border-line': cell.inMonth,
+          'bg-stone': cell.inMonth,
+          // v0.16.0 (zurdi: 'el día actual casi no se aprecia'): border-line
+          // y border-aurora empatan en especificidad y con ambas puestas
+          // gana la que salga después en el stylesheet (la gris) — la celda
+          // de hoy debe llevar SOLO la aurora
+          'border-line': cell.inMonth && cell.date !== today,
           'border-2 border-aurora': cell.date === today && cell.inMonth,
         }"
         @click="selectDay(cell.date)"

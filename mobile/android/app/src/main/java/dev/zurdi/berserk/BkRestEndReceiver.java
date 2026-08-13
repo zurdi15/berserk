@@ -21,38 +21,47 @@ public class BkRestEndReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        NotificationManager manager =
-                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        // v0.16.0: un throw aquí también cierra el proceso entero (los
+        // receivers corren en el hilo principal de la app) — mejor un aviso
+        // que no suena que la app muerta
+        try {
+            NotificationManager manager =
+                    (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
 
-        NotificationChannel channel = new NotificationChannel(
-                ALERT_CHANNEL_ID,
-                intent.getStringExtra("channelName"),
-                NotificationManager.IMPORTANCE_HIGH);
-        channel.enableVibration(true);
-        manager.createNotificationChannel(channel);
+            NotificationChannel channel = new NotificationChannel(
+                    ALERT_CHANNEL_ID,
+                    intent.getStringExtra("channelName"),
+                    NotificationManager.IMPORTANCE_HIGH);
+            channel.enableVibration(true);
+            manager.createNotificationChannel(channel);
 
-        int icon = context.getResources().getIdentifier(
-                "ic_stat_berserk", "drawable", context.getPackageName());
-        if (icon == 0) icon = context.getApplicationInfo().icon;
+            int icon = context.getResources().getIdentifier(
+                    "ic_stat_berserk", "drawable", context.getPackageName());
+            if (icon == 0) icon = context.getApplicationInfo().icon;
 
-        Intent launch = context.getPackageManager()
-                .getLaunchIntentForPackage(context.getPackageName());
-        launch.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent contentIntent = PendingIntent.getActivity(
-                context, 1, launch,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            PendingIntent contentIntent = null;
+            Intent launch = context.getPackageManager()
+                    .getLaunchIntentForPackage(context.getPackageName());
+            if (launch != null) {
+                launch.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                contentIntent = PendingIntent.getActivity(
+                        context, 1, launch,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            }
 
-        Notification notification = new Notification.Builder(context, ALERT_CHANNEL_ID)
-                .setSmallIcon(icon)
-                .setContentTitle(intent.getStringExtra("title"))
-                .setContentText(intent.getStringExtra("body"))
-                .setAutoCancel(true)
-                .setContentIntent(contentIntent)
-                .setVisibility(Notification.VISIBILITY_PUBLIC)
-                .build();
-        manager.notify(REST_END_NOTIFICATION_ID, notification);
+            Notification notification = new Notification.Builder(context, ALERT_CHANNEL_ID)
+                    .setSmallIcon(icon)
+                    .setContentTitle(intent.getStringExtra("title"))
+                    .setContentText(intent.getStringExtra("body"))
+                    .setAutoCancel(true)
+                    .setContentIntent(contentIntent)
+                    .setVisibility(Notification.VISIBILITY_PUBLIC)
+                    .build();
+            manager.notify(REST_END_NOTIFICATION_ID, notification);
 
-        // el cronómetro ongoing de la cuenta atrás ya no pinta nada útil
-        manager.cancel(1002);
+            // el cronómetro ongoing de la cuenta atrás ya no pinta nada útil
+            manager.cancel(1002);
+        } catch (Exception ignored) {
+        }
     }
 }

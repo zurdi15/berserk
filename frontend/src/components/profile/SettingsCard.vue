@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { updateSettings } from '@/api/auth'
 import { toastApiError } from '@/utils/apiErrors'
 import { applyLocale } from '@/i18n'
+import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { USER_COLOR_SWATCHES } from '@/tokens/userColors'
-import { isNativeShell } from '@/utils/nativeShell'
+import { checkNativeShellUpdate, isNativeShell, openNativeShellDownload } from '@/utils/nativeShell'
 import { setTheme } from '@/utils/theme'
 // v0.14.2 (zurdi: "pon en algún sitio la versión actual"): la versión del
 // bundle desplegado — verdad de build (package.json en el momento de
@@ -33,6 +34,20 @@ const color = ref<string | null>(auth.user!.color ?? null)
 // uiPrefs), NO pasa por updateSettings/el backend, a diferencia de todo lo
 // demás en esta tarjeta (ver el why-comment en utils/uiPrefs.ts)
 const theme = ref<ThemeMode>(getThemeMode())
+
+// v0.16.0 (zurdi: "que la apk te avise o lo que sea para actualizarse"): si
+// el shell instalado va por detrás del bundle, aquí vive la descarga (el
+// toast del boot en ShellView solo apunta a esta tarjeta)
+const shellUpdateAvailable = ref(false)
+onMounted(() => {
+  void checkNativeShellUpdate(appVersion).then(({ available }) => {
+    shellUpdateAvailable.value = available
+  })
+})
+
+function downloadShellUpdate() {
+  void openNativeShellDownload(appVersion)
+}
 
 async function save(partial: Parameters<typeof updateSettings>[0]) {
   try {
@@ -133,6 +148,18 @@ function pickTheme(mode: ThemeMode) {
       <p class="bk-metric text-2xs text-ink-faint text-center pt-2" data-testid="app-version">
         berserk v{{ appVersion }}<template v-if="isNativeShell()"> · app</template>
       </p>
+      <!-- v0.16.0: APK instalada más vieja que el bundle → descarga directa
+           de la release (el asset se llama berserk-vX.Y.Z.apk) -->
+      <BkButton
+        v-if="shellUpdateAvailable"
+        variant="ghost"
+        size="sm"
+        block
+        data-testid="shell-update-btn"
+        @click="downloadShellUpdate"
+      >
+        {{ t('profile.updateShell', { version: appVersion }) }}
+      </BkButton>
     </div>
   </BkCard>
 </template>

@@ -38,4 +38,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- v0.16.0: setAlarmClock (aviso de fin de descanso, BkOngoingPlugin)
+         exige permiso de alarmas exactas en Android 13+ — sin él lanzaba
+         SecurityException y la app se CERRABA al registrar una serie.
+         USE_EXACT_ALARM (API 33+) se concede en la instalación para apps de
+         alarmas/timers; SCHEDULE_EXACT_ALARM cubre Android 12 (auto-
+         concedido al declararse en esas versiones). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 </manifest>

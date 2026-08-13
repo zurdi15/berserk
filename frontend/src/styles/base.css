@@ -56,29 +56,18 @@ html {
   overflow-y: auto;
 }
 
-/* Scrollbar aurora SOLO en punteros finos (v0.5.0, bug real de zurdi en
-   móvil: "el scrollbar aparece y se queda visible al entrar a una sección
-   hasta que se hace scroll"): declarar CUALQUIER estilo custom de scrollbar
-   (scrollbar-width/color o ::-webkit-scrollbar, da igual) saca a Chromium
-   del modo overlay nativo — en Android eso significa perder el
-   aparece-al-scrollear-y-se-desvanece y pasar a una barra pintada visible
-   desde el primer render. Con el scroll viviendo en <main>, la barra vivía
-   en el borde de la ventana y casi ni se veía; con el modelo de scroll
-   interno por vista (item 14, v0.4.3) cada sección estrena su contenedor y
-   la barra custom quedaba plantada dentro del contenido al entrar. El
-   gating es por capacidad del dispositivo, no por ancho de viewport: un
-   portátil estrecho quiere la barra aurora (la usa para arrastrar), un
-   tablet ancho no. En coarse no declaramos NADA de scrollbar: el overlay
-   nativo del sistema (auto-hide) es exactamente el comportamiento correcto
-   ahí. iOS Safari ya ignoraba ::-webkit-scrollbar; ahora además ni lo
-   recibe. */
-@media (hover: hover) and (pointer: fine) {
-  html {
-    /* Firefox: más fina y en aurora — hereda a los scrollers internos
-       (incluido el <main> del shell) sin repetir la regla en cada uno */
-    scrollbar-width: thin;
-    scrollbar-color: var(--bk-accent-aurora-deep) transparent;
-  }
+/* Scrollbar aurora EN TODAS PARTES (v0.16.0, zurdi: "todos los scrollbar,
+   ahora mismo son grises pero ponlos aurora"). Historia: la v0.5.0 los
+   gateaba a punteros finos porque cualquier estilo custom de scrollbar saca
+   a Chromium del modo overlay nativo (en Android: de auto-hide a barra
+   pintada siempre visible) y a zurdi le molestaba la barra plantada. Su
+   petición nueva revierte ese trade-off a sabiendas: prefiere la barra
+   aurora fija al overlay gris del sistema. thin + track transparente la
+   dejan lo más discreta posible. scrollbar-width/color en html hereda a los
+   scrollers internos (incluido el <main> del shell) sin repetir la regla. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bk-accent-aurora-deep) transparent;
 }
 
 html.bk-light {
@@ -192,25 +181,22 @@ body::before {
 /* WebKit no hereda scrollbar-width/color: van por selector universal para
    alcanzar tanto el scroller raíz (html) como los contenedores internos con
    su propio overflow (lista de ejercicios, PrList, tabla de admin...) sin
-   repetir la regla en cada uno. Mismo gating de puntero fino que el bloque
-   de html de arriba (y por la MISMA razón: cualquier regla webkit-scrollbar
-   mata el overlay nativo de Android aunque solo pinte un track
-   transparente) — las dos expresiones del estilo custom viajan juntas. */
-@media (hover: hover) and (pointer: fine) {
-  *::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  *::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  *::-webkit-scrollbar-thumb {
-    background-color: var(--bk-accent-aurora-deep);
-    border-radius: var(--bk-radius-full);
-  }
-  *::-webkit-scrollbar-thumb:hover {
-    background-color: var(--bk-accent-aurora);
-  }
+   repetir la regla en cada uno. Sin gating de puntero desde la v0.16.0 —
+   mismo motivo que el bloque de html de arriba: las dos expresiones del
+   estilo custom viajan juntas. */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--bk-accent-aurora-deep);
+  border-radius: var(--bk-radius-full);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bk-accent-aurora);
 }
 
 /* barras con scroll horizontal (tabs, etc.) sin scrollbar visible: el

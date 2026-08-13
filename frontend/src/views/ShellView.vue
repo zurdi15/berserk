@@ -12,7 +12,10 @@ import * as outbox from '@/offline/outbox'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { useToastStore } from '@/stores/toast'
-import { ensureNativeNotificationPermission, isNativeShell } from '@/utils/nativeShell'
+import { checkNativeShellUpdate, ensureNativeNotificationPermission, isNativeShell } from '@/utils/nativeShell'
+// v0.16.0: la versión del bundle (verdad de build, ver SettingsCard.vue) —
+// contra ella se compara la versionName del shell para avisar de APK nueva
+import { version as appVersion } from '../../package.json'
 
 // item 4 (round 9): correcciones de runas del nav — streak/shoulders SIGUEN
 // existiendo en runes.ts (streak: StreakCard; shoulders: rune de grupo
@@ -188,6 +191,12 @@ onMounted(() => {
   if (isNativeShell()) {
     void ensureNativeNotificationPermission().then((granted) => {
       if (!granted) useToastStore().push('error', t('app.notificationsDenied'))
+    })
+    // v0.16.0 (zurdi: "que la propia apk te avise para actualizarse"): el
+    // bundle (siempre al día, viene del servidor) detecta un shell viejo y
+    // avisa; la descarga vive en Perfil → Sistema (SettingsCard)
+    void checkNativeShellUpdate(appVersion).then(({ available }) => {
+      if (available) useToastStore().push('info', t('app.shellUpdateAvailable'))
     })
   }
 
