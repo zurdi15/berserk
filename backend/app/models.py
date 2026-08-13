@@ -402,6 +402,25 @@ class RotationEntry(Base):
     )
 
 
+class RotationState(Base):
+    """v0.15.0 — override manual del "te toca" (zurdi: "poder setear el que
+    toca hoy"). Gana sobre la derivación por historial hasta CONSUMIRSE:
+    cualquier entreno del plan TERMINADO después de set_at lo invalida (la
+    rotación sigue desde lo realmente hecho — la regla "siempre en orden" no
+    cambia). Tabla aparte de RotationEntry a propósito: el PUT del plan
+    reemplaza las entradas enteras y el pin debe sobrevivir a un reorden."""
+
+    __tablename__ = "rotation_state"
+
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    routine_id: Mapped[int] = mapped_column(
+        ForeignKey("routines.id", ondelete="CASCADE")
+    )
+    set_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class ExerciseNote(Base):
     """v0.12.0 — nota persistente POR USUARIO y ejercicio ("asiento en el 5,
     agarre ancho"): se enseña en la card del entreno la siguiente sesión.

@@ -8,7 +8,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { RotationOut, RoutineOut } from '@/api/domain'
-import { getRotation, putRotation } from '@/api/domain'
+import { getRotation, putRotation, putRotationNext } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
@@ -69,6 +69,16 @@ function remove(routineId: number) {
   void persist(ids().filter((id) => id !== routineId))
 }
 
+// v0.15.0 (zurdi: "setear el que toca hoy"): tocar la fila fija el override
+// — se consume solo al terminar cualquier entreno del plan (ver backend)
+async function setToday(routineId: number) {
+  try {
+    rotation.value = await putRotationNext(routineId)
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
 function move(index: number, delta: number) {
   const list = ids()
   const target = index + delta
@@ -87,11 +97,12 @@ function runeFor(routine: RoutineOut): RuneName | null {
     <div class="space-y-3">
       <p v-if="!entries.length" class="text-sm text-ink-faint">{{ t('rotation.empty') }}</p>
       <template v-else>
-        <!-- te toca: derivado del historial, no editable -->
+        <!-- te toca: derivado del historial, o fijado a mano tocando una fila -->
         <p v-if="nextRoutine" class="text-sm" data-testid="rotation-next">
           <span class="text-ink-muted">{{ t('rotation.next') }} </span>
           <span class="text-aurora font-medium">{{ nextRoutine.name }}</span>
         </p>
+        <p class="text-xs text-ink-faint">{{ t('rotation.tapToSet') }}</p>
         <div class="relative space-y-2">
           <TransitionGroup name="bk-remove">
           <div
@@ -101,9 +112,18 @@ function runeFor(routine: RoutineOut): RuneName | null {
             :class="index === rotation!.next_position ? 'border-aurora/60 bg-aurora/5' : 'border-line'"
             :data-testid="`rotation-entry-${routine.id}`"
           >
-            <span class="bk-metric text-xs text-ink-faint w-4 shrink-0">{{ index + 1 }}</span>
-            <BkRune v-if="runeFor(routine)" :name="runeFor(routine)!" :size="14" />
-            <span class="truncate text-ink flex-1 min-w-0">{{ routine.name }}</span>
+            <!-- v0.15.0: el cuerpo de la fila fija "la de hoy" de un toque -->
+            <button
+              type="button"
+              class="bk-press flex items-center gap-2 flex-1 min-w-0 text-left"
+              :aria-label="t('rotation.setToday')"
+              :data-testid="`rotation-set-next-${routine.id}`"
+              @click="setToday(routine.id)"
+            >
+              <span class="bk-metric text-xs text-ink-faint w-4 shrink-0">{{ index + 1 }}</span>
+              <BkRune v-if="runeFor(routine)" :name="runeFor(routine)!" :size="14" />
+              <span class="truncate text-ink flex-1 min-w-0">{{ routine.name }}</span>
+            </button>
             <button
               v-if="index > 0"
               type="button"

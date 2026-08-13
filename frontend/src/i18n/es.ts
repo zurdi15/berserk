@@ -31,6 +31,7 @@ export const es = {
     syncConflicts: '{n} cambios no se pudieron sincronizar (alguien los pisó desde otro sitio).',
   },
   errors: {
+    rotation_not_in_plan: 'Esa rutina no está en el plan',
     rotation_duplicate_routine: 'Una rutina no puede repetirse en el plan',
     unsupported_image_type: 'Formato de imagen no soportado (JPG, PNG o WebP)',
     image_too_large: 'La imagen supera los 5 MB',
@@ -184,6 +185,8 @@ export const es = {
     },
   },
   rotation: {
+    tapToSet: 'Toca una rutina para fijarla como la de hoy.',
+    setToday: 'Fijar como la de hoy',
     title: 'Plan rotatorio',
     empty: 'Añade rutinas en orden y te diré siempre cuál toca — si una semana queda a medias, la siguiente retoma donde lo dejaste.',
     next: 'Te toca:',

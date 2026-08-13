@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser
 from ..db import get_db
-from ..models import RotationEntry, Routine, Workout
-from ..schemas.rotation import RotationIn, RotationOut
+from ..models import RotationEntry, RotationState, Routine, Workout, utcnow
+from ..schemas.rotation import RotationIn, RotationNextIn, RotationOut
 from .routines import _visible_template
 
 router = APIRouter(prefix="/rotation", tags=["rotation"])
@@ -35,6 +35,29 @@ def _next_position(db: Session, owner_id: int, entries: list[RotationEntry]) -> 
     if not entries:
         return 0
     rotation_ids = [entry.routine_id for entry in entries]
+
+    # v0.15.0 — override manual ("hoy toca ésta"): gana mientras no se haya
+    # TERMINADO ningún entreno del plan después de fijarlo; hecho uno (el
+    # fijado u otro), la rotación sigue desde lo realmente hecho
+    state = db.get(RotationState, owner_id)
+    if state is not None and state.routine_id in rotation_ids:
+        consumed = db.scalar(
+            select(Workout.id)
+            .where(
+                Workout.owner_id == owner_id,
+                Workout.ended_at.is_not(None),
+                Workout.ended_at > state.set_at,
+                Workout.routine_id.in_(rotation_ids),
+            )
+            .limit(1)
+        )
+        if consumed is None:
+            return next(
+                index
+                for index, entry in enumerate(entries)
+                if entry.routine_id == state.routine_id
+            )
+
     last_routine_id = db.scalar(
         select(Workout.routine_id)
         .where(
@@ -87,5 +110,22 @@ def replace_rotation(payload: RotationIn, user: CurrentUser, db: Session = Depen
     db.flush()
     for position, routine_id in enumerate(payload.routine_ids):
         db.add(RotationEntry(owner_id=user.id, position=position, routine_id=routine_id))
+    db.commit()
+    return _serialize(db, user.id)
+
+
+@router.put("/next", response_model=RotationOut)
+def set_next(payload: RotationNextIn, user: CurrentUser, db: Session = Depends(get_db)):
+    """v0.15.0 — fija a mano cuál toca hoy (debe pertenecer al plan)."""
+    entries = _entries(db, user.id)
+    if payload.routine_id not in [entry.routine_id for entry in entries]:
+        raise HTTPException(status_code=422, detail="rotation_not_in_plan")
+    state = db.get(RotationState, user.id)
+    if state is None:
+        state = RotationState(owner_id=user.id, routine_id=payload.routine_id)
+        db.add(state)
+    else:
+        state.routine_id = payload.routine_id
+        state.set_at = utcnow()
     db.commit()
     return _serialize(db, user.id)

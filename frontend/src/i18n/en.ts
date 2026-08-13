@@ -31,6 +31,7 @@ export const en = {
     syncConflicts: '{n} changes could not be synced (overwritten from elsewhere).',
   },
   errors: {
+    rotation_not_in_plan: 'That routine is not in the plan',
     rotation_duplicate_routine: 'A routine cannot repeat in the plan',
     unsupported_image_type: 'Unsupported image format (JPG, PNG or WebP)',
     image_too_large: 'Image is larger than 5 MB',
@@ -182,6 +183,8 @@ export const en = {
     },
   },
   rotation: {
+    tapToSet: 'Tap a routine to make it today’s one.',
+    setToday: 'Set as today’s workout',
     title: 'Rotation plan',
     empty: 'Add routines in order and the app always tells you which one is next — a half-finished week resumes where you left off.',
     next: 'Up next:',

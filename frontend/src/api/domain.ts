@@ -710,3 +710,7 @@ export const getRotation = () => api<RotationOut>('/rotation')
 // contrato de completitud: la lista ENTERA y ordenada cada vez; vacía borra
 export const putRotation = (routine_ids: number[]) =>
   api<RotationOut>('/rotation', { method: 'PUT', body: { routine_ids } })
+
+// v0.15.0: fijar a mano cuál toca hoy (debe pertenecer al plan)
+export const putRotationNext = (routine_id: number) =>
+  api<RotationOut>('/rotation/next', { method: 'PUT', body: { routine_id } })

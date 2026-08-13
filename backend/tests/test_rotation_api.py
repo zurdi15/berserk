@@ -111,3 +111,36 @@ def test_start_from_foreign_global_routine(client: TestClient, app):
     resp = freyja.post("/api/v1/workouts", json={"routine_id": private})
     assert resp.status_code == 422
     assert resp.json()["detail"] == "routine_invalid"
+
+
+def test_manual_next_override(client: TestClient):
+    """v0.15.0 — fijar a mano el que toca hoy; se consume al terminar
+    cualquier entreno del plan."""
+    push = _routine(client, "Empuje")
+    pull = _routine(client, "Tirón")
+    legs = _routine(client, "Pierna")
+    client.put("/api/v1/rotation", json={"routine_ids": [push, pull, legs]})
+
+    # sin historial toca la 1ª; el override la salta a la 3ª
+    resp = client.put("/api/v1/rotation/next", json={"routine_id": legs})
+    assert resp.status_code == 200
+    assert resp.json()["next_position"] == 2
+    assert client.get("/api/v1/rotation").json()["next_position"] == 2
+
+    # el pin sobrevive a un reorden del plan (tabla aparte de las entradas)
+    body = client.put(
+        "/api/v1/rotation", json={"routine_ids": [pull, push, legs]}
+    ).json()
+    assert body["next_position"] == 2
+
+    # terminar CUALQUIER entreno del plan lo consume: hecha la 3ª (pierna),
+    # la derivación normal continúa desde ella → toca la 1ª del nuevo orden+1
+    _train_with(client, legs, "2026-08-10")
+    after = client.get("/api/v1/rotation").json()
+    assert after["next_position"] == 0  # pierna es la última → cíclico a pull
+
+    # una rutina fuera del plan no se puede fijar
+    outsider = _routine(client, "Fuera del plan")
+    resp = client.put("/api/v1/rotation/next", json={"routine_id": outsider})
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "rotation_not_in_plan"

@@ -13,3 +13,7 @@ class RotationOut(BaseModel):
     routines: list[RoutineOut]
     # índice en `routines` de la que toca; None sin plan
     next_position: int | None
+
+
+class RotationNextIn(BaseModel):
+    routine_id: int
