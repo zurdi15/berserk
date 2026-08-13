@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.16.0 - 2026-08-13
+
+### Fixed
+- La app Android se cerraba al registrar una serie: el aviso de fin de descanso (setAlarmClock) necesitaba el permiso de alarmas exactas de Android 13+ que no declarábamos, y la excepción tumbaba el proceso. La APK nueva lo declara y, si el sistema lo negara, degrada a una alarma inexacta antes que cerrarse. Además el bundle web deja de invocar la alarma en APKs viejas: sin actualizar ya no crashea (el aviso cae al respaldo inexacto hasta que instales la nueva).
+- El día actual del calendario apenas se distinguía: su borde aurora perdía contra el gris de las celdas normales; ahora la celda de hoy es inconfundible.
+
+### Added
+- La app avisa cuando hay APK nueva: toast al arrancar y botón de descarga directa en Perfil → Configuración (compara la versión instalada con la del bundle del servidor).
+- Scrollbars en aurora en todas partes, también en móvil (antes salía la barra gris del sistema).
+
 ## 0.15.0 - 2026-08-10
 
 ### Added
