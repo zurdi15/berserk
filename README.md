@@ -6,7 +6,7 @@
 <h1 align="center">ᛒᛖᚱᛋᛖᚱᚲ</h1>
 
 <p align="center">
-  <em>berserk</em> — self-hosted workout tracker. Plan it, log it, watch the runes light up.
+  Self-hosted workout tracker. Plan it, log it, watch the runes light up.
 </p>
 
 <p align="center">
