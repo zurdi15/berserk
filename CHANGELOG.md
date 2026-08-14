@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.17.1 - 2026-08-14
+
+### Added
+- Entrada directa del peso: tocar el valor del stepper de carga (cajón de series y objetivo del editor de rutinas) abre un campo para teclear literalmente cualquier peso, aceptando tanto punto como coma decimal.
+
 ## 0.17.0 - 2026-08-14
 
 ### Added
