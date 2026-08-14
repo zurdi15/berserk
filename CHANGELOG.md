@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.17.2 - 2026-08-14
+
+### Added
+- Selector de "Bloque" en cada fila del editor de rutinas: mueve un ejercicio ya existente a un bloque existente, sácalo a "sin bloque", o estrena un bloque nuevo desde la propia fila — pensado para organizar en bloques las rutinas creadas antes de que existieran.
+
 ## 0.17.1 - 2026-08-14
 
 ### Added
