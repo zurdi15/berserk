@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.17.0 - 2026-08-14
+
+### Added
+- Bloques en las rutinas y stepper por bloques en el entreno: define bloques con nombre en el editor (crear, renombrar, disolver, añadir dentro; las flechas en la frontera cambian el ejercicio de bloque), y el entreno en vivo se trocea en steps navegables — chips con progreso, solo el bloque visible en pantalla y "anterior/siguiente"; añadir un ejercicio mientras miras un bloque lo mete en ese bloque (también sin conexión).
+- Modo "nivel" por ejercicio: números planos (1-20) en vez de kg para máquinas asistidas/con posiciones — elegible en la biblioteca, sin conversión kg/lb ni calculadora de discos, con récords de nivel máximo y fuera de los agregados de volumen.
+- Modo admin "actuar como": un administrador puede operar la app entera como cualquier usuario (rutinas, ejercicios, entrenos…) desde Perfil → Admin, con banda persistente y salida en un toque.
+
+### Changed
+- El entreno ya no se desmonta al navegar: volver a la pestaña pinta al instante el estado retenido (bloque del stepper incluido) y refresca en segundo plano.
+- El "última vez" de la card de ejercicio pasa a líneas separadas (fecha + una línea por serie), como en el cajón de registrar — menos densidad.
+
 ## 0.16.0 - 2026-08-13
 
 ### Fixed
