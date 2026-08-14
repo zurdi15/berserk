@@ -727,6 +727,70 @@ describe('RoutineEditorSheet', () => {
       wrapper.unmount()
     })
 
+    // v0.17.2 (zurdi: "poder añadir ejercicios ya existentes a bloques ya
+    // existentes o crear uno nuevo desde el propio ejercicio"): selector de
+    // bloque por fila — asignar MUEVE la fila al final del bloque destino
+    it('v0.17.2: assignRowToBlock moves an existing row to the END of the target block', async () => {
+      const routine = routineWithBlocks()
+      // fila extra SIN bloque al final (el caso real: rutina pre-bloques)
+      routine.exercises.push({ id: 13, exercise_id: 4, position: 4, target_sets: 3, target_reps: null, target_weight_kg: null, rest_seconds: 60, block_label: null } as never)
+      const wrapper = build(routine)
+      await flushPromises()
+      const vm = wrapper.vm as any
+
+      vm.assignRowToBlock('13', 'Empuje')
+      await flushPromises()
+
+      expect(vm.exercises.map((e: any) => e.exercise_id)).toEqual([1, 2, 4, 3])
+      expect(vm.exercises[2].block_label).toBe('Empuje')
+      wrapper.unmount()
+    })
+
+    it('v0.17.2: assigning to null moves the row out of its block (to the end)', async () => {
+      const wrapper = build(routineWithBlocks())
+      await flushPromises()
+      const vm = wrapper.vm as any
+
+      vm.assignRowToBlock('10', null)
+      await flushPromises()
+
+      expect(vm.exercises.map((e: any) => e.exercise_id)).toEqual([2, 3, 1])
+      expect(vm.exercises[2].block_label).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('v0.17.2: "new block" from a row assigns THAT row on confirm, without opening the add-exercise sheet', async () => {
+      const wrapper = build(routineWithBlocks())
+      await flushPromises()
+      const vm = wrapper.vm as any
+
+      vm.openNewBlockFor('12')
+      vm.newBlockName = 'Aislamiento'
+      vm.confirmNewBlock()
+      await flushPromises()
+
+      const moved = vm.exercises.find((e: any) => e.id === '12')
+      expect(moved.block_label).toBe('Aislamiento')
+      expect(vm.addSheetOpen).toBe(false)
+      expect(vm.newBlockForRowId).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('v0.17.2: each row renders a block select with "sin bloque" + existing labels + "nuevo"', async () => {
+      const wrapper = build(routineWithBlocks())
+      await flushPromises()
+
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const dialog = dialogs[dialogs.length - 1] as HTMLElement
+      const rowSelect = dialog.querySelector('[data-testid="row-block-select-0"] [role="combobox"]') as HTMLElement
+      expect(rowSelect).not.toBeNull()
+      rowSelect.click()
+      await flushPromises()
+      const optionLabels = Array.from(document.querySelectorAll('[role="option"]')).map((o) => o.textContent?.trim())
+      expect(optionLabels).toEqual(expect.arrayContaining(['Sin bloque', 'Empuje', 'Tirón', '+ Nuevo bloque…']))
+      wrapper.unmount()
+    })
+
     it('adding into a block inserts at the END of that block, not at the end of the list', async () => {
       const wrapper = build(routineWithBlocks())
       await flushPromises()

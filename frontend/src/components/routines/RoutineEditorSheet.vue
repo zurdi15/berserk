@@ -175,13 +175,66 @@ function openAddTo(label: string | null) {
 // bloque nuevo (un bloque sin filas no existe: la etiqueta vive en las filas)
 const newBlockOpen = ref(false)
 const newBlockName = ref('')
+// v0.17.2: modo asignación — el sheet de nombre se abrió desde el select de
+// UNA fila existente: al confirmar, en vez de elegir un primer ejercicio
+// nuevo, esa fila se MUEVE al bloque recién nombrado
+const newBlockForRowId = ref<string | null>(null)
 
 function confirmNewBlock() {
   const name = newBlockName.value.trim().slice(0, 40)
   if (!name) return
   newBlockOpen.value = false
   newBlockName.value = ''
+  if (newBlockForRowId.value !== null) {
+    assignRowToBlock(newBlockForRowId.value, name)
+    newBlockForRowId.value = null
+    return
+  }
   openAddTo(name)
+}
+
+function closeNewBlock() {
+  newBlockOpen.value = false
+  newBlockForRowId.value = null
+}
+
+// v0.17.2 (zurdi: "quiero poder añadir ejercicios ya existentes a bloques ya
+// existentes o crear uno nuevo desde el propio ejercicio"): etiquetas
+// existentes en orden de aparición — alimentan el select de cada fila
+const existingBlockLabels = computed(() => {
+  const labels: string[] = []
+  for (const row of exercises.value) {
+    if (row.block_label !== null && !labels.includes(row.block_label)) labels.push(row.block_label)
+  }
+  return labels
+})
+
+// mueve la fila al FINAL del bloque destino (o al final de la lista si sale
+// a "sin bloque" o el bloque aún no existe) — la contigüidad por bloque se
+// conserva por construcción, y renormalize disuelve una superserie que el
+// movimiento haya partido
+function assignRowToBlock(rowId: string, label: string | null) {
+  const row = exercises.value.find((r) => r.id === rowId)
+  if (!row || (row.block_label ?? null) === label) return
+  const without = exercises.value.filter((r) => r.id !== rowId)
+  // índice calculado SIN la fila: quitarla primero evita el corrimiento de
+  // una posición al moverse hacia delante dentro del mismo array
+  let at = without.length
+  if (label !== null) {
+    let last = -1
+    without.forEach((r, i) => {
+      if ((r.block_label ?? null) === label) last = i
+    })
+    at = last === -1 ? without.length : last + 1
+  }
+  exercises.value = [...without.slice(0, at), { ...row, block_label: label }, ...without.slice(at)]
+  renormalizeSupersets()
+}
+
+function openNewBlockFor(rowId: string) {
+  newBlockForRowId.value = rowId
+  newBlockName.value = ''
+  newBlockOpen.value = true
 }
 
 // editar: renombrar (todas las filas de la etiqueta) o disolver (etiquetas a
@@ -420,6 +473,7 @@ watch(
       editingBlock.value = null
       pendingBlockLabel.value = null
       newBlockOpen.value = false
+      newBlockForRowId.value = null
       blockEditFor.value = null
     }
   },
@@ -563,9 +617,12 @@ watch(
                     :muscle-groups="muscleGroups"
                     :units="units"
                     :locale="auth.user?.locale || 'es'"
+                    :block-labels="existingBlockLabels"
                     @move-up="moveExerciseUp"
                     @move-down="moveExerciseDown"
                     @remove="removeExercise"
+                    @assign-block="assignRowToBlock"
+                    @new-block="openNewBlockFor"
                   />
                 </div>
                 <RoutineExerciseRow
@@ -578,9 +635,12 @@ watch(
                   :muscle-groups="muscleGroups"
                   :units="units"
                   :locale="auth.user?.locale || 'es'"
+                  :block-labels="existingBlockLabels"
                   @move-up="moveExerciseUp"
                   @move-down="moveExerciseDown"
                   @remove="removeExercise"
+                  @assign-block="assignRowToBlock"
+                  @new-block="openNewBlockFor"
                 />
               </template>
               </TransitionGroup>
@@ -631,15 +691,19 @@ watch(
           @swap="swapEditingMember"
         />
 
-        <!-- v0.17.0: crear bloque — nombre y de ahí al AddExerciseSheet -->
-        <BkSheet :open="newBlockOpen" :title="$t('routines.newBlock')" @close="newBlockOpen = false">
+        <!-- v0.17.0: crear bloque — nombre y de ahí al AddExerciseSheet.
+             v0.17.2: si se abrió desde el select de una fila (modo
+             asignación), al confirmar esa fila se MUEVE al bloque nuevo -->
+        <BkSheet :open="newBlockOpen" :title="$t('routines.newBlock')" @close="closeNewBlock">
           <div class="space-y-4" data-testid="new-block-sheet">
             <BkField
               v-model="newBlockName"
               :label="$t('routines.blockName')"
               data-testid="new-block-name-field"
             />
-            <p class="text-xs text-ink-faint">{{ $t('routines.newBlockHint') }}</p>
+            <p class="text-xs text-ink-faint">
+              {{ $t(newBlockForRowId !== null ? 'routines.newBlockAssignHint' : 'routines.newBlockHint') }}
+            </p>
             <BkButton
               variant="primary"
               block
@@ -647,7 +711,7 @@ watch(
               data-testid="new-block-confirm"
               @click="confirmNewBlock"
             >
-              {{ $t('routines.newBlockConfirm') }}
+              {{ $t(newBlockForRowId !== null ? 'routines.newBlockCreate' : 'routines.newBlockConfirm') }}
             </BkButton>
           </div>
         </BkSheet>

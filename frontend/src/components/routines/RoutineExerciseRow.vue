@@ -41,11 +41,41 @@ const props = defineProps<{
   muscleGroups: MuscleGroupOut[]
   units: 'kg' | 'lb'
   locale: string
+  // v0.17.2 (zurdi: "poder añadir ejercicios ya existentes a bloques ya
+  // existentes o crear uno nuevo desde el propio ejercicio"): etiquetas de
+  // los bloques que ya existen en la rutina — alimentan el select de abajo
+  blockLabels?: string[]
 }>()
 
-const emit = defineEmits<{ moveUp: [index: number]; moveDown: [index: number]; remove: [id: string] }>()
+const emit = defineEmits<{
+  moveUp: [index: number]
+  moveDown: [index: number]
+  remove: [id: string]
+  // v0.17.2: mover ESTA fila a un bloque existente (o a ninguno con null)
+  assignBlock: [id: string, label: string | null]
+  // v0.17.2: crear un bloque nuevo CON esta fila dentro (el editor abre su
+  // sheet de nombre y asigna al confirmar)
+  newBlock: [id: string]
+}>()
 
 const { t } = useI18n()
+
+// v0.17.2: select de bloque — controlado por el row (sin estado local: si el
+// flujo de "nuevo bloque" se cancela, el valor pintado simplemente no cambia)
+const NEW_BLOCK_SENTINEL = '__new__'
+const blockOptions = computed(() => [
+  { value: '', label: t('routines.blockNone') },
+  ...(props.blockLabels ?? []).map((label) => ({ value: label, label })),
+  { value: NEW_BLOCK_SENTINEL, label: t('routines.newBlockOption') },
+])
+
+function onBlockPick(value: string) {
+  if (value === NEW_BLOCK_SENTINEL) {
+    emit('newBlock', props.row.id)
+    return
+  }
+  emit('assignBlock', props.row.id, value === '' ? null : value)
+}
 
 const exercise = computed(() => props.allExercises.find((e) => e.id === props.row.exercise_id))
 const rune = computed<RuneName | null>(() => primaryRune(exercise.value, props.muscleGroups))
@@ -163,5 +193,19 @@ const restOptions = [
       :options="restOptions"
       @update:model-value="row.rest_seconds = $event"
     />
+
+    <!-- v0.17.2 (zurdi): mover el ejercicio a un bloque existente o estrenar
+         uno nuevo desde la propia fila — clave para rutinas creadas antes de
+         los bloques, donde todo nació sin etiqueta -->
+    <!-- testid SIN el prefijo routine-row-: los specs de secciones cuentan
+         filas por ese prefijo y este wrapper no es una fila -->
+    <div :data-testid="`row-block-select-${index}`">
+      <BkSelect
+        :model-value="row.block_label ?? ''"
+        :label="t('routines.blockField')"
+        :options="blockOptions"
+        @update:model-value="onBlockPick"
+      />
+    </div>
   </div>
 </template>
