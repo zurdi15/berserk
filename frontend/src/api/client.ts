@@ -33,6 +33,23 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
 
 const BASE = '/api/v1'
 
+// v0.17.0 act-as: mientras un admin actúa como otro usuario (ver
+// utils/actAs.ts), TODA petición lleva el header — el backend resuelve al
+// objetivo en get_current_user, así que lecturas y mutaciones van "como si
+// estuviese logado como ese usuario". Lectura directa del storage por
+// petición (barata y sin estado duplicado); import inline del literal para
+// no acoplar client.ts a utils/ (mismo criterio que las claves del outbox).
+function actAsHeader(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem('bk:act-as')
+    if (raw === null) return {}
+    const parsed = JSON.parse(raw) as { id?: unknown }
+    return typeof parsed?.id === 'number' ? { 'X-Bk-Act-As': String(parsed.id) } : {}
+  } catch {
+    return {}
+  }
+}
+
 // item (v0.4.0): los 422 de pydantic traen detail como una LISTA de errores
 // de validación (uno por campo), nunca un string — antes CUALQUIERA de estos
 // colapsaba al slug fijo 'generic' ("Algo ha fallado", inútil para saber qué
@@ -97,6 +114,7 @@ export async function apiForm<T = unknown>(path: string, form: FormData): Promis
     response = await fetch(`${BASE}${path}`, {
       method: 'POST',
       credentials: 'same-origin',
+      headers: actAsHeader(),
       body: form,
     })
   } catch {
@@ -126,7 +144,10 @@ export async function api<T = unknown>(
     response = await fetch(`${BASE}${path}`, {
       method,
       credentials: 'same-origin',
-      headers: options.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers: {
+        ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...actAsHeader(),
+      },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     })
   } catch {

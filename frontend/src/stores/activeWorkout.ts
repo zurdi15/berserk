@@ -148,6 +148,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
           note: null,
           rest_seconds: item.rest_seconds ?? null,
           superset_group: item.superset_group ?? null,
+          block_label: item.block_label ?? null,
           sets: [],
         }
       })
@@ -225,9 +226,14 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     return finished
   }
 
-  async function addExercise(exercise_id: number) {
+  // v0.17.0 bloques: blockLabel opcional — el stepper del entreno añade al
+  // bloque que se está mirando (null/omitido = sin bloque, como siempre)
+  async function addExercise(exercise_id: number, blockLabel: string | null = null) {
     if (!offline()) {
-      await domain.addWorkoutExercise(workout.value!.id, { exercise_id })
+      await domain.addWorkoutExercise(workout.value!.id, {
+        exercise_id,
+        block_label: blockLabel ?? undefined,
+      })
       await refresh()
       return
     }
@@ -243,6 +249,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
         // aplicaría sin rutina de origen a mano) y siempre suelto
         rest_seconds: null,
         superset_group: null,
+        block_label: blockLabel,
         sets: [],
       },
     ]
@@ -252,6 +259,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
       workoutId: workout.value!.id,
       tempExerciseId: tempId,
       exerciseId: exercise_id,
+      blockLabel,
     })
   }
 
@@ -281,10 +289,11 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
 
   // v0.8.0 (zurdi rediseña la creación): añade DOS ejercicios ya enlazados —
   // composición de acciones existentes, así que hereda el soporte offline
-  // entero gratis (dos altas + el bulk de grupos, cada una por su rama)
-  async function addSupersetPair(exerciseA: number, exerciseB: number) {
-    await addExercise(exerciseA)
-    await addExercise(exerciseB)
+  // entero gratis (dos altas + el bulk de grupos, cada una por su rama).
+  // v0.17.0: el par también puede nacer dentro del bloque visible del stepper
+  async function addSupersetPair(exerciseA: number, exerciseB: number, blockLabel: string | null = null) {
+    await addExercise(exerciseA, blockLabel)
+    await addExercise(exerciseB, blockLabel)
     const values = workout.value!.exercises.map((e) => e.superset_group ?? null)
     // valor marcador libre de colisiones (normalize renumera): length nunca
     // coincide con un grupo normalizado existente (siempre < length/2)

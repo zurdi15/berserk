@@ -25,6 +25,7 @@ def exercise_out(exercise: Exercise) -> ExerciseOut:
         name_es=exercise.name_es,
         name_en=exercise.name_en,
         measurement=exercise.measurement,
+        load_mode=exercise.load_mode,
         owner_id=exercise.owner_id,
         is_public=exercise.is_public,
         has_image=exercise.image_path is not None,
@@ -186,6 +187,7 @@ def create_exercise(payload: ExerciseIn, user: CurrentUser, db: Session = Depend
         name_es=payload.name_es,
         name_en=payload.name_en,
         measurement=payload.measurement,
+        load_mode=payload.load_mode,
         owner_id=owner_id,
         is_public=payload.is_public,
     )
@@ -209,6 +211,8 @@ def update_exercise(
         exercise.name_en = payload.name_en
     if payload.is_public is not None:
         exercise.is_public = payload.is_public
+    if payload.load_mode is not None:
+        exercise.load_mode = payload.load_mode
     if payload.muscle_groups is not None:
         _apply_links(db, exercise, payload.muscle_groups, user.id)
     db.commit()

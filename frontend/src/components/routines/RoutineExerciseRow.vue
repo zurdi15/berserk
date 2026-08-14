@@ -28,6 +28,9 @@ export interface EditorRow {
   target_weight_kg: number | null
   rest_seconds: string | null
   superset_group: number | null
+  // v0.17.0 bloques: null = sin bloque; el editor mantiene las filas del
+  // mismo bloque contiguas (ver RoutineEditorSheet)
+  block_label: string | null
 }
 
 const props = defineProps<{
@@ -51,6 +54,10 @@ const rune = computed<RuneName | null>(() => primaryRune(exercise.value, props.m
 // distancia y nunca descansa, así que reps/peso/descanso no se muestran
 // (las series objetivo sí: "3 × cinta" es un objetivo legítimo)
 const isCardio = computed(() => exercise.value?.measurement === 'cardio')
+
+// v0.17.0 (zurdi): ejercicio en modo nivel — el objetivo de carga es un
+// número plano (paso 1, sin unidad, sin conversión kg/lb)
+const isLevel = computed(() => (exercise.value?.load_mode ?? 'weight') === 'level')
 
 const restOptions = [
   { value: '30', label: '30 s' },
@@ -122,7 +129,19 @@ const restOptions = [
       />
     </div>
 
-    <div v-if="!isCardio">
+    <div v-if="!isCardio && isLevel">
+      <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetLevel') }}</label>
+      <!-- nivel plano: viaja tal cual en target_weight_kg, sin conversión -->
+      <BkStepper
+        :model-value="row.target_weight_kg || 0"
+        :min="0"
+        :max="100"
+        :step="1"
+        @update:model-value="row.target_weight_kg = $event > 0 ? $event : null"
+      />
+    </div>
+
+    <div v-else-if="!isCardio">
       <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetWeight') }}</label>
       <BkStepper
         :model-value="kgToDisplay(row.target_weight_kg || 0, units)"

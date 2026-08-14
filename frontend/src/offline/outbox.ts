@@ -29,7 +29,7 @@ import type { SetIn } from '@/api/domain'
 
 export type OutboxEntry =
   | { id: string; kind: 'startWorkout'; tempWorkoutId: number; body: Parameters<typeof domain.startWorkout>[0]; tempExerciseIds: number[] }
-  | { id: string; kind: 'addExercise'; workoutId: number; tempExerciseId: number; exerciseId: number }
+  | { id: string; kind: 'addExercise'; workoutId: number; tempExerciseId: number; exerciseId: number; blockLabel?: string | null }
   | { id: string; kind: 'logSet'; workoutId: number; exerciseId: number; tempSetId: number; body: SetIn }
   | { id: string; kind: 'updateSet'; workoutId: number; exerciseId: number; setId: number; body: SetIn }
   | { id: string; kind: 'deleteSet'; workoutId: number; exerciseId: number; setId: number }
@@ -158,6 +158,8 @@ async function replayEntry(entry: OutboxEntry, idMap: Map<number, number>): Prom
       if (workoutId === null) throw new ApiError(410, 'offline_dependency_lost')
       const wex = await domain.addWorkoutExercise(workoutId, {
         exercise_id: entry.exerciseId,
+        // v0.17.0 bloques: el alta encolada conserva su bloque en el replay
+        block_label: entry.blockLabel ?? undefined,
         client_id: entry.id,
       })
       idMap.set(entry.tempExerciseId, wex.id)

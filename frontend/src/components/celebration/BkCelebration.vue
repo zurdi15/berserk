@@ -9,8 +9,11 @@ import { core } from '@/tokens'
 import { formatWeight } from '@/utils/units'
 
 const props = withDefaults(
-  defineProps<{ records: PersonalRecordOut[]; runeName: RuneName; units?: 'kg' | 'lb' }>(),
-  { units: 'kg' },
+  // v0.17.0 plainLoad: el ejercicio del récord va en modo nivel — el valor
+  // se pinta como número plano, sin unidad ni conversión (lo computa quien
+  // monta, que es quien tiene el catálogo; ver WorkoutView)
+  defineProps<{ records: PersonalRecordOut[]; runeName: RuneName; units?: 'kg' | 'lb'; plainLoad?: boolean }>(),
+  { units: 'kg', plainLoad: false },
 )
 const emit = defineEmits<{ done: [] }>()
 
@@ -38,7 +41,7 @@ let dismissed = false
 // en kg — mismo formateador que FinishSummary, para que el mismo PR no cambie
 // de aspecto entre la celebración y el resumen
 function formatValue(value: number): string {
-  return formatWeight(value, props.units)
+  return props.plainLoad ? `${value}` : formatWeight(value, props.units)
 }
 
 function countUp() {

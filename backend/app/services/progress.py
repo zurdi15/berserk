@@ -287,12 +287,20 @@ def lifetime_stats(db: Session, owner_id: int) -> dict:
     total_cardio_seconds, total_distance_m = int(cardio_row[0]), float(cardio_row[1])
 
     # mismo criterio de "volumen efectivo" que session_volume (item 5 de este
-    # módulo): se reutiliza effective_set_filters en vez de repetir la tripleta
+    # módulo): se reutiliza effective_set_filters en vez de repetir la
+    # tripleta. v0.17.0: las series de ejercicios en modo 'level' quedan
+    # fuera — su weight_kg es un número plano de máquina, sumarlo como kg
+    # inflaría el volumen con unidades inventadas
     total_volume_kg = db.scalar(
         select(func.coalesce(func.sum(WorkoutSet.reps * WorkoutSet.weight_kg), 0.0))
         .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .join(Exercise, Exercise.id == WorkoutExercise.exercise_id)
         .join(Workout, Workout.id == WorkoutExercise.workout_id)
-        .where(Workout.owner_id == owner_id, *effective_set_filters())
+        .where(
+            Workout.owner_id == owner_id,
+            Exercise.load_mode != "level",
+            *effective_set_filters(),
+        )
     )
 
     prs_count = db.scalar(

@@ -48,9 +48,14 @@ function getExerciseName(exerciseId: number): string {
 // mismo criterio que BkCelebration: todos pasan por formatWeight/Int, sin
 // caso especial de conversión para max_volume (antes se mostraba como número
 // pelado). max_weight es un peso REAL registrado: conserva su precisión.
-// est_1rm/max_volume son DERIVADOS (estimación/suma agregada): sin decimales
-function formatRecordValue(value: number, kind: string): string {
-  return kind === 'max_weight' ? formatWeight(value, units.value) : formatWeightInt(value, units.value)
+// est_1rm/max_volume son DERIVADOS (estimación/suma agregada): sin decimales.
+// v0.17.0: un ejercicio en modo nivel puntúa como número plano (sin unidad
+// ni conversión — el backend solo le genera max_weight, ver detect_prs)
+function formatRecordValue(value: number, record: PersonalRecordOut): string {
+  if (exerciseMap.value.get(record.exercise_id)?.load_mode === 'level') return `${value}`
+  return record.kind === 'max_weight'
+    ? formatWeight(value, units.value)
+    : formatWeightInt(value, units.value)
 }
 
 function formatAchievedDate(dateStr: string): string {
@@ -97,7 +102,7 @@ function formatAchievedDate(dateStr: string): string {
           <!-- decimals: max_weight es peso real (1 decimal, formatWeight no
                redondea en kg); est_1rm/max_volume son derivados y van a entero -->
           <BkAnimatedNumber :value="record.value" :decimals="record.kind === 'max_weight' ? 1 : 0" v-slot="{ value }">
-            <p class="text-ember font-semibold tabular-nums" data-testid="pr-value">{{ formatRecordValue(value ?? 0, record.kind) }}</p>
+            <p class="text-ember font-semibold tabular-nums" data-testid="pr-value">{{ formatRecordValue(value ?? 0, record) }}</p>
           </BkAnimatedNumber>
           <p class="text-xs text-ink-faint">{{ formatAchievedDate(record.achieved_at) }}</p>
         </div>

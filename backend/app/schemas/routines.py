@@ -38,6 +38,9 @@ class RoutineExerciseIn(BaseModel):
     # re-valida: el editor normaliza antes de guardar, y todos los lectores
     # recomputan runs contiguos — ver frontend lib/supersets.ts)
     superset_group: int | None = Field(None, ge=0)
+    # v0.17.0 bloques: nombre del bloque de la fila (None = sin bloque) — el
+    # backend lo persiste tal cual, la agrupación es por etiqueta en cliente
+    block_label: str | None = Field(None, min_length=1, max_length=40)
 
 
 class RoutineExerciseOut(BaseModel):
@@ -49,6 +52,7 @@ class RoutineExerciseOut(BaseModel):
     target_weight_kg: float | None
     rest_seconds: int | None
     superset_group: int | None
+    block_label: str | None
 
     model_config = {"from_attributes": True}
 

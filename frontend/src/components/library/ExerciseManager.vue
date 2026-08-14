@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { ExerciseOut, Measurement, MuscleGroupOut } from '@/api/domain'
+import type { ExerciseOut, LoadMode, Measurement, MuscleGroupOut } from '@/api/domain'
 import { createExercise, deleteExercise, listExercises, listMuscleGroups, updateExercise } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { deleteExerciseImage, exerciseImageUrl, uploadExerciseImage } from '@/api/domain'
@@ -136,6 +136,18 @@ const editingOwnerId = ref<number | null>(null)
 const nameEs = ref('')
 const nameEn = ref('')
 const measurement = ref<Measurement>('strength')
+// v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg — opción para
+// uno o para otro"): modo de carga, solo con sentido donde se registra
+// carga (strength/bodyweight) — editable a posteriori, cambiar el modo no
+// toca las series ya guardadas
+const loadMode = ref<LoadMode>('weight')
+const loadModeApplies = computed(
+  () => measurement.value === 'strength' || measurement.value === 'bodyweight',
+)
+const loadModeOptions = computed(() => [
+  { value: 'weight', label: t('library.loadWeight') },
+  { value: 'level', label: t('library.loadLevel') },
+])
 const checkedGroupIds = ref<number[]>([])
 const primaryGroupId = ref<number | null>(null)
 // v0.9.4 (zurdi: "visible para todos y global es un poco redundante"): los
@@ -183,6 +195,7 @@ function openCreate() {
   nameEs.value = ''
   nameEn.value = ''
   measurement.value = 'strength'
+  loadMode.value = 'weight'
   checkedGroupIds.value = []
   primaryGroupId.value = null
   visibility.value = 'private'
@@ -196,6 +209,7 @@ function openEdit(exercise: ExerciseOut) {
   nameEs.value = exercise.name_es
   nameEn.value = exercise.name_en
   measurement.value = exercise.measurement
+  loadMode.value = exercise.load_mode ?? 'weight'
   checkedGroupIds.value = exercise.muscle_groups.map((l) => l.muscle_group_id)
   primaryGroupId.value = exercise.muscle_groups.find((l) => l.is_primary)?.muscle_group_id ?? null
   visibility.value = exercise.is_public ? 'public' : 'private'
@@ -265,6 +279,7 @@ async function submitForm() {
       await updateExercise(editingId.value, {
         name_es: nameEs.value,
         name_en: nameEn.value,
+        load_mode: loadMode.value,
         muscle_groups,
         // sobre una fila del catálogo admin (owner_id null) el control de
         // visibilidad ni se muestra: no viaja is_public para no fingir un
@@ -276,6 +291,7 @@ async function submitForm() {
         name_es: nameEs.value,
         name_en: nameEn.value,
         measurement: measurement.value,
+        load_mode: loadMode.value,
         muscle_groups,
         is_global: visibility.value === 'global',
         is_public: visibility.value === 'public',
@@ -515,6 +531,15 @@ async function confirmDelete() {
           :label="$t('library.measurement')"
           :options="measurementOptions"
           data-testid="exercise-measurement-select"
+        />
+        <!-- v0.17.0: kg vs nivel plano — solo donde se registra carga
+             (fuerza/peso corporal); editable también a posteriori -->
+        <BkSelect
+          v-if="loadModeApplies"
+          v-model="loadMode"
+          :label="$t('library.loadMode')"
+          :options="loadModeOptions"
+          data-testid="exercise-load-mode-select"
         />
         <!-- v0.9.4 (zurdi: "visible para todos y global es un poco
              redundante"): UN select de visibilidad en vez de los dos checks

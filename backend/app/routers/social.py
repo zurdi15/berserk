@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from ..auth import CurrentUser
 from ..db import get_db
 from ..models import (
+    Exercise,
     MuscleGroup,
     PersonalRecord,
     ShareGrant,
@@ -50,7 +51,14 @@ def _volumes_by_workout(db: Session, workout_ids: list[int]) -> dict[int, float]
             func.coalesce(func.sum(WorkoutSet.reps * WorkoutSet.weight_kg), 0.0),
         )
         .join(WorkoutSet, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
-        .where(WorkoutExercise.workout_id.in_(workout_ids), *effective_set_filters())
+        # v0.17.0: las series en modo 'level' no son kg — fuera del volumen
+        # (mismo criterio que lifetime_stats en services/progress.py)
+        .join(Exercise, Exercise.id == WorkoutExercise.exercise_id)
+        .where(
+            WorkoutExercise.workout_id.in_(workout_ids),
+            Exercise.load_mode != "level",
+            *effective_set_filters(),
+        )
         .group_by(WorkoutExercise.workout_id)
     ).all()
     return {int(workout_id): float(volume) for workout_id, volume in rows}

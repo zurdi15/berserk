@@ -13,6 +13,19 @@ export function formatWeight(kg: number, units: 'kg' | 'lb'): string {
   return `${kgToDisplay(kg, units)} ${units}`
 }
 
+// v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg"): la carga de
+// un ejercicio en modo 'level' es un número plano de máquina — se pinta TAL
+// CUAL, sin unidad y sin conversión kg/lb (el nivel 12 es 12 en cualquier
+// unidad). Todo punto que formatee la carga de una serie/objetivo debe pasar
+// por aquí en vez de por formatWeight a pelo.
+export function formatLoad(
+  value: number,
+  units: 'kg' | 'lb',
+  loadMode: 'weight' | 'level' = 'weight',
+): string {
+  return loadMode === 'level' ? `${value}` : formatWeight(value, units)
+}
+
 // para magnitudes DERIVADAS/agregadas (est. 1RM, volumen) — zurdi: "los kg...
 // no pueden tener decimales". Los pesos REALES (registrados/objetivo) NUNCA
 // pasan por aquí, conservan su precisión real (formatWeight de arriba).

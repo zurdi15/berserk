@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { PersonalRecordOut, WorkoutOut } from '@/api/domain'
+import type { ExerciseOut, PersonalRecordOut, WorkoutOut } from '@/api/domain'
 import { updateWorkout } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { useAnimatedNumber } from '@/composables/useAnimatedNumber'
@@ -14,8 +14,11 @@ import BkRune from '@/lib/BkRune.vue'
 import SaveAsRoutineSheet from './SaveAsRoutineSheet.vue'
 
 const props = withDefaults(
-  defineProps<{ workout: WorkoutOut; records?: PersonalRecordOut[] }>(),
-  { records: () => [] },
+  // v0.17.0: el catálogo (opcional — sin él todo cuenta como kg, el
+  // comportamiento de siempre) permite excluir del volumen los ejercicios en
+  // modo nivel y pintar sus PRs como número plano
+  defineProps<{ workout: WorkoutOut; records?: PersonalRecordOut[]; exercises?: ExerciseOut[] }>(),
+  { records: () => [], exercises: () => [] },
 )
 const emit = defineEmits<{ close: [] }>()
 
@@ -46,9 +49,16 @@ const totalSets = computed(() =>
   props.workout.exercises.reduce((sum, e) => sum + e.sets.filter((s) => !s.is_warmup).length, 0),
 )
 
-// volumen efectivo: reps × kg de las series no-calentamiento con ambos valores
+const levelExerciseIds = computed(
+  () => new Set(props.exercises.filter((e) => e.load_mode === 'level').map((e) => e.id)),
+)
+
+// volumen efectivo: reps × kg de las series no-calentamiento con ambos
+// valores. v0.17.0: los ejercicios en modo nivel quedan fuera (su weight_kg
+// es un número plano, no kg — mismo criterio que el backend)
 const totalVolume = computed(() =>
   props.workout.exercises.reduce((sum, e) => {
+    if (levelExerciseIds.value.has(e.exercise_id)) return sum
     const exerciseVolume = e.sets
       .filter((s) => !s.is_warmup && s.weight_kg != null && s.reps != null)
       .reduce((acc, s) => acc + s.weight_kg! * s.reps!, 0)
@@ -67,6 +77,8 @@ const animatedTotalVolume = useAnimatedNumber(() => totalVolume.value)
 // convertir). max_weight es un peso REAL registrado: conserva su precisión.
 // est_1rm/max_volume son DERIVADOS: sin decimales
 function formatRecordValue(record: PersonalRecordOut): string {
+  // v0.17.0: nivel = número plano sin unidad (mismo criterio que PrList)
+  if (levelExerciseIds.value.has(record.exercise_id)) return `${record.value}`
   return record.kind === 'max_weight'
     ? formatWeight(record.value, units.value)
     : formatWeightInt(record.value, units.value)

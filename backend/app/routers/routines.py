@@ -181,6 +181,8 @@ def copy_routine(routine_id: int, user: CurrentUser, db: Session = Depends(get_d
                 # snapshot copia TODOS los ejercicios en el mismo orden, la
                 # contigüidad (que es lo que define el grupo) viaja intacta
                 superset_group=item.superset_group,
+                # v0.17.0: los bloques viajan con la copia igual
+                block_label=item.block_label,
             )
         )
     db.commit()

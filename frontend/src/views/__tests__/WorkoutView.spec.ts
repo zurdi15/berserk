@@ -1,6 +1,7 @@
 import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent } from 'vue'
 
 const push = vi.fn()
 const routeQuery: Record<string, unknown> = {}
@@ -77,6 +78,130 @@ describe('WorkoutView', () => {
     await flushPromises()
 
     expect(resumeSpy).toHaveBeenCalled()
+  })
+
+  // v0.17.0 STEPPER POR BLOQUES (zurdi: "cada step del stepper es un bloque
+  // molaría"): con block_label en los ejercicios, la vista trocea en steps —
+  // chips navegables y SOLO el bloque visible renderizado
+  describe('v0.17.0 block stepper', () => {
+    function workoutWithBlocks() {
+      const wex = (id: number, label: string | null) => ({
+        id,
+        exercise_id: id,
+        position: id,
+        note: null,
+        rest_seconds: null,
+        superset_group: null,
+        block_label: label,
+        sets: [],
+      })
+      return {
+        id: 1,
+        date: '2026-08-14',
+        started_at: '2026-08-14T10:00:00',
+        ended_at: null,
+        routine_id: null,
+        note: null,
+        feeling: null,
+        stretched: false,
+        exercises: [wex(1, 'Empuje'), wex(2, 'Empuje'), wex(3, 'Tirón')],
+        muscle_tag_ids: [],
+      }
+    }
+
+    it('renders one chip per block and only the current block\'s cards', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+      activeWorkout.workout = workoutWithBlocks()
+
+      const wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="block-stepper"]').exists()).toBe(true)
+      expect(wrapper.findAll('[data-testid^="block-step-"]')).toHaveLength(2)
+      // step 0 (Empuje): 2 cards visibles, la de Tirón no
+      expect(wrapper.findAllComponents(WorkoutExerciseCard)).toHaveLength(2)
+
+      await wrapper.find('[data-testid="block-next"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.findAllComponents(WorkoutExerciseCard)).toHaveLength(1)
+      // en el último step no hay "siguiente", sí "anterior"
+      expect(wrapper.find('[data-testid="block-next"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="block-prev"]').exists()).toBe(true)
+    })
+
+    it('renders the flat list (no stepper) when no exercise has a block label', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+      const workout = workoutWithBlocks()
+      workout.exercises = workout.exercises.map((e) => ({ ...e, block_label: null }))
+      activeWorkout.workout = workout
+
+      const wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="block-stepper"]').exists()).toBe(false)
+      expect(wrapper.findAllComponents(WorkoutExerciseCard)).toHaveLength(3)
+    })
+
+    it('ad-hoc null-labeled exercises fold into a "General" step alongside the named blocks', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+      const workout = workoutWithBlocks()
+      workout.exercises = [
+        ...workout.exercises,
+        { id: 4, exercise_id: 4, position: 4, note: null, rest_seconds: null, superset_group: null, block_label: null, sets: [] },
+      ]
+      activeWorkout.workout = workout
+
+      const wrapper = build()
+      await flushPromises()
+
+      const chips = wrapper.findAll('[data-testid^="block-step-"]')
+      expect(chips).toHaveLength(3)
+      expect(chips[2].text()).toContain('General')
+    })
+  })
+
+  // v0.17.0 (zurdi: "no desmontar el entrenamiento para que cargue
+  // instantáneo al volver"): bajo <KeepAlive> la vista NO se remonta al
+  // volver — onActivated refresca en fondo (refresh ligero con entreno vivo,
+  // sin repetir el resume del montaje)
+  it('v0.17.0 keep-alive: returning re-activates (background refresh) instead of re-mounting', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    const resumeSpy = vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+    const refreshSpy = vi.spyOn(activeWorkout, 'refresh').mockResolvedValue(undefined)
+    activeWorkout.workout = {
+      id: 1,
+      date: '2026-08-14',
+      started_at: '2026-08-14T10:00:00',
+      ended_at: null,
+      routine_id: null,
+      note: null,
+      feeling: null,
+      stretched: false,
+      exercises: [],
+      muscle_tag_ids: [],
+    }
+
+    const Host = defineComponent({
+      components: { WorkoutView },
+      props: { show: { type: Boolean, default: true } },
+      template: '<KeepAlive include="WorkoutView"><WorkoutView v-if="show" /></KeepAlive>',
+    })
+    const wrapper = mount(Host, { global: { plugins: [createI18nInstance()] } })
+    await flushPromises()
+    expect(resumeSpy).toHaveBeenCalledTimes(1)
+    expect(refreshSpy).not.toHaveBeenCalled()
+
+    await wrapper.setProps({ show: false })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    // sin remount: resume (camino de montaje) no se repite; el refresh de
+    // fondo sí corre sobre el entreno retenido
+    expect(resumeSpy).toHaveBeenCalledTimes(1)
+    expect(refreshSpy).toHaveBeenCalledTimes(1)
   })
 
   it('item 4: the idle (no active workout) state has its own bk-stagger entry, since it no longer gets one from the removed router Transition', async () => {

@@ -118,6 +118,14 @@ class Exercise(Base):
     # visibilidad de la imagen sigue a la del ejercicio, subirla exige
     # _can_edit (ver routers/media.py)
     image_path: Mapped[str | None] = mapped_column(String(80), default=None)
+    # v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg — opción
+    # para uno o para otro"): 'weight' (kg canónicos, conversión lb en
+    # cliente) o 'level' (número plano de máquina/goma, guardado TAL CUAL en
+    # weight_kg, sin conversión de unidades). En 'level' los PRs solo
+    # registran max_weight (el nivel más alto: e1RM y volumen no significan
+    # nada ahí) y las series de nivel quedan FUERA de los agregados de
+    # volumen (ver services/workout_sets.py y services/progress.py).
+    load_mode: Mapped[str] = mapped_column(String(10), default="weight")
 
     muscle_links: Mapped[list["ExerciseMuscleGroup"]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
@@ -217,6 +225,14 @@ class RoutineExercise(Base):
     # usuario es presentacional (frontend lib/supersets.ts). Se edita SOLO en
     # el editor de rutina; el entreno lo recibe copiado (ver WorkoutExercise)
     superset_group: Mapped[int | None] = mapped_column(default=None)
+    # v0.17.0 bloques (zurdi: "definir bloques en las rutinas, cada bloque
+    # tiene unos ejercicios y cada step del stepper es un bloque"): nombre
+    # del bloque al que pertenece la fila, NULL = sin bloque. El editor
+    # mantiene las filas del mismo bloque contiguas, pero los lectores
+    # agrupan por ETIQUETA (no por contigüidad, a diferencia de
+    # superset_group): un alta posterior no-contigua se recoloca sola en su
+    # step. El entreno lo recibe copiado (ver WorkoutExercise).
+    block_label: Mapped[str | None] = mapped_column(String(40), default=None)
 
 
 class Workout(Base):
@@ -295,6 +311,11 @@ class WorkoutExercise(Base):
     # mid-workout — gobierna el gating del auto-descanso (frontend
     # WorkoutExerciseCard: solo descansa el ÚLTIMO miembro del grupo)
     superset_group: Mapped[int | None] = mapped_column(default=None)
+    # v0.17.0 bloques: snapshot de RoutineExercise.block_label al empezar
+    # (mismo patrón que superset_group). Un alta ad-hoc SÍ puede traer
+    # etiqueta (add_exercise la acepta): en el stepper del entreno, añadir un
+    # ejercicio mientras miras un bloque lo mete en ESE bloque.
+    block_label: Mapped[str | None] = mapped_column(String(40), default=None)
 
     sets: Mapped[list["WorkoutSet"]] = relationship(
         cascade="all, delete-orphan",

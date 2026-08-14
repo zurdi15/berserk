@@ -160,6 +160,9 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
                     # la rutina (vale igual para el entreno en vivo y el
                     # retroactivo finished=True — ambos pasan por aquí)
                     superset_group=item.superset_group,
+                    # v0.17.0 bloques: mismo snapshot (el stepper del entreno
+                    # agrupa por esta etiqueta)
+                    block_label=item.block_label,
                 )
             )
         db.flush()
@@ -376,6 +379,9 @@ def add_exercise(
         position=position,
         note=payload.note,
         rest_seconds=rest_seconds,
+        # v0.17.0 bloques: el alta desde el stepper trae la etiqueta del
+        # bloque que se está mirando (None = sin bloque, como siempre)
+        block_label=payload.block_label,
         client_id=payload.client_id,
     )
     db.add(wex)

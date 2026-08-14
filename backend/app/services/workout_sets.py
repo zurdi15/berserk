@@ -86,11 +86,17 @@ def detect_prs(
         return []
     if wset.is_warmup or not wset.reps or not wset.weight_kg:
         return []
-    candidates = {
-        "max_weight": float(wset.weight_kg),
-        "est_1rm": estimate_1rm(wset.weight_kg, wset.reps),
-        "max_volume": volume,
-    }
+    # v0.17.0 load_mode='level': el "peso" es un número plano de máquina —
+    # el nivel más alto sigue siendo un récord legítimo, pero e1RM (fórmula
+    # sobre kg) y volumen (nivel×reps) no significan nada
+    if exercise.load_mode == "level":
+        candidates = {"max_weight": float(wset.weight_kg)}
+    else:
+        candidates = {
+            "max_weight": float(wset.weight_kg),
+            "est_1rm": estimate_1rm(wset.weight_kg, wset.reps),
+            "max_volume": volume,
+        }
     new_records: list[PersonalRecord] = []
     for kind, value in candidates.items():
         best = db.scalar(

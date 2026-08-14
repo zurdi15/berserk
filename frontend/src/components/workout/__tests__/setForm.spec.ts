@@ -7,12 +7,12 @@ import { createI18nInstance } from '@/i18n'
 import { displayToKg } from '@/utils/units'
 import SetForm from '../SetForm.vue'
 
-function build(measurement: string, units?: 'kg' | 'lb') {
+function build(measurement: string, units?: 'kg' | 'lb', extraProps: Record<string, unknown> = {}) {
   setActivePinia(createPinia())
   return mount(SetForm, {
     // measurement viaja como Measurement en producción; aquí se castea en el
     // harness (no se afloja el tipo del componente) para simular valores libres
-    props: { measurement: measurement as Measurement, units },
+    props: { measurement: measurement as Measurement, units, ...extraProps },
     global: { plugins: [createI18nInstance()] },
   })
 }
@@ -39,6 +39,31 @@ describe('SetForm', () => {
     expect(payload.reps).toBeGreaterThan(0)
     expect(payload.weight_kg).toBeGreaterThan(0)
     expect(payload.duration_seconds).toBeUndefined()
+  })
+
+  // v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg")
+  describe('v0.17.0: level load mode', () => {
+    it('emits the plain number WITHOUT unit conversion even for an lb user', async () => {
+      wrapper = build('strength', 'lb', { loadMode: 'level', initialSet: { weight_kg: 12, reps: 10 } })
+      await wrapper.find('form').trigger('submit')
+      const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+      // en modo peso, 12 kg para un usuario lb pasaría por kgToDisplay/
+      // displayToKg y saldría con error de redondeo; el nivel viaja tal cual
+      expect(payload.weight_kg).toBe(12)
+      expect(payload.reps).toBe(10)
+    })
+
+    it('labels the load column "Nivel", drops the unit suffix and hides the plate calculator', () => {
+      wrapper = build('strength', 'kg', { loadMode: 'level' })
+      expect(wrapper.text()).toContain('Nivel')
+      expect(wrapper.text()).not.toContain('kg')
+      expect(wrapper.find('[data-testid="plate-calc-open"]').exists()).toBe(false)
+    })
+
+    it('weight mode still shows the plate calculator for strength', () => {
+      wrapper = build('strength', 'kg')
+      expect(wrapper.find('[data-testid="plate-calc-open"]').exists()).toBe(true)
+    })
   })
 
   it('timed emits only duration', async () => {

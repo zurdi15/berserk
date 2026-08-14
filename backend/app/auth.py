@@ -99,6 +99,17 @@ def resolve_session_user(db: Session, raw_token: str) -> User | None:
     return db.get(User, session.user_id)
 
 
+# v0.17.0 act-as (zurdi: "que los admin puedan editar las rutinas,
+# ejercicios, etc. de cualquier usuario, como si estuviesen logados como ese
+# usuario"): suplantación a nivel de AUTH — con este header, TODO el backend
+# (lecturas Y mutaciones, sin tocar un solo endpoint) resuelve el usuario
+# objetivo en vez del admin de la sesión. Solo un admin puede usarlo (403
+# para cualquier otro, nunca silencio: un header ignorado haría creer al
+# cliente que ve datos ajenos cuando ve los suyos); un objetivo inexistente
+# es 404 con el slug genérico, como el resto del backend.
+ACT_AS_HEADER = "x-bk-act-as"
+
+
 def get_current_user(
     request: Request, response: Response, db: Session = Depends(get_db)
 ) -> User:
@@ -110,6 +121,14 @@ def get_current_user(
     # no se reemitía la cookie: reemitirla en cada request autenticado la hace
     # deslizante de verdad (max_age fresco), no solo en la DB
     set_session_cookie(response, token)
+    act_as = request.headers.get(ACT_AS_HEADER)
+    if act_as is not None:
+        if not user.is_admin:
+            raise HTTPException(status_code=403, detail="admin_only")
+        target = db.get(User, int(act_as)) if act_as.isdigit() else None
+        if target is None:
+            raise HTTPException(status_code=404, detail="not_found")
+        return target
     return user
 
 

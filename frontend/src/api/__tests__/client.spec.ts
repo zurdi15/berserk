@@ -17,6 +17,21 @@ describe('api client', () => {
     await expect(api('/health')).resolves.toEqual({ ok: true })
   })
 
+  // v0.17.0 act-as: con el modo activo (utils/actAs.ts), TODA petición lleva
+  // el header — el backend resuelve al usuario objetivo en get_current_user
+  it('adds the X-Bk-Act-As header while act-as mode is stored, and omits it otherwise', async () => {
+    mockFetch(200, { ok: true })
+    localStorage.setItem('bk:act-as', JSON.stringify({ id: 7, username: 'loki' }))
+    await api('/routines', { method: 'POST', body: { name: 'x' } })
+    let call = vi.mocked(fetch).mock.calls.at(-1)![1] as RequestInit
+    expect((call.headers as Record<string, string>)['X-Bk-Act-As']).toBe('7')
+
+    localStorage.removeItem('bk:act-as')
+    await api('/routines')
+    call = vi.mocked(fetch).mock.calls.at(-1)![1] as RequestInit
+    expect((call.headers as Record<string, string>)['X-Bk-Act-As']).toBeUndefined()
+  })
+
   it('returns undefined on 204', async () => {
     mockFetch(204)
     await expect(api('/auth/logout', { method: 'POST' })).resolves.toBeUndefined()

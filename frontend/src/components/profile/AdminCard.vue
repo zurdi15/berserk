@@ -14,6 +14,7 @@ import {
   type InviteOut,
 } from '@/api/domain'
 import { restoreBackup, BACKUP_EXPORT_URL } from '@/api/backup'
+import { switchActAs } from '@/utils/actAs'
 import { toastApiError } from '@/utils/apiErrors'
 import { parseUtc } from '@/utils/datetime'
 import { isPasswordValid, passwordErrorKey } from '@/utils/passwordValidation'
@@ -324,6 +325,15 @@ function isOwnUser(userId: number): boolean {
   return userId === auth.user?.id
 }
 
+// v0.17.0 act-as (zurdi: "que los admin puedan editar las rutinas,
+// ejercicios, etc. de cualquier usuario, como si estuviesen logados como ese
+// usuario"): purga el estado local por-usuario, fija el modo y recarga —
+// desde el boot siguiente TODA la app opera como el usuario elegido (ver
+// utils/actAs.ts); el banner del shell es la vuelta atrás
+function actAsUser(user: UserOut) {
+  void switchActAs({ id: user.id, username: user.username })
+}
+
 function formatDate(dateString: string): string {
   return parseUtc(dateString).toLocaleDateString()
 }
@@ -414,6 +424,16 @@ function redeemUrl(token: string): string {
                       :aria-label="$t('common.edit')"
                       data-testid="edit-user-btn"
                       @click="openEditUser(user)"
+                    />
+                    <!-- v0.17.0 act-as: entrar como este usuario — toda la
+                         app pasa a operar con su identidad hasta salir desde
+                         el banner del shell -->
+                    <BkActionBtn
+                      v-if="!isOwnUser(user.id)"
+                      icon="view"
+                      :aria-label="$t('admin.actAs')"
+                      data-testid="act-as-user-btn"
+                      @click="actAsUser(user)"
                     />
                     <!-- resetear contraseña se queda como su propio icono/
                          sheet, no dentro del de editar: es una acción de

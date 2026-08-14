@@ -221,6 +221,17 @@ describe('AdminCard', () => {
     expect(deleteInOtherRow.exists()).toBe(true)
   })
 
+  // v0.17.0 act-as: "entrar como" existe en las filas ajenas, nunca en la
+  // propia (actuar como uno mismo no significa nada)
+  it('shows the act-as button on other rows only', async () => {
+    const wrapper = build()
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(wrapper.find('[data-testid="user-row-1"]').find('[data-testid="act-as-user-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="user-row-2"]').find('[data-testid="act-as-user-btn"]').exists()).toBe(true)
+  })
+
   it('clicking delete user opens confirmation sheet', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()

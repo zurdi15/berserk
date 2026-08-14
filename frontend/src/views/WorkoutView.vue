@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -24,6 +24,7 @@ import {
 import AddExerciseSheet from '@/components/workout/AddExerciseSheet.vue'
 import SupersetEditSheet from '@/components/workout/SupersetEditSheet.vue'
 import { exerciseName } from '@/components/routines/exerciseName'
+import type { WorkoutActions } from '@/components/workout/workoutActions'
 import FinishSummary from '@/components/workout/FinishSummary.vue'
 import NeonPulse from '@/components/workout/NeonPulse.vue'
 import WorkoutExerciseCard from '@/components/workout/WorkoutExerciseCard.vue'
@@ -32,6 +33,11 @@ import BkButton from '@/lib/BkButton.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import type { RuneName } from '@/lib/runes'
+
+// v0.17.0 keep-alive: el include de <KeepAlive> en ShellView casa por ESTE
+// nombre — explícito en vez de confiar en la inferencia por nombre de
+// fichero, que un rename silencioso rompería sin error
+defineOptions({ name: 'WorkoutView' })
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -125,6 +131,94 @@ const workoutBlocks = computed<WorkoutBlock[]>(() => {
 // miembros o se deshace el grupo entero.
 const editingBlock = ref<WorkoutBlock | null>(null)
 
+// ── v0.17.0 STEPPER POR BLOQUES (zurdi: "la vista de entrenamiento está un
+// poco densa — cada step del stepper es un bloque molaría") ────────────────
+// Un "step" agrupa los contenedores de workoutBlocks por la ETIQUETA de
+// bloque de su primera fila (block_label, definido en el editor de rutinas y
+// copiado al entreno). Agrupación por etiqueta y NO por contigüidad a
+// propósito: un alta ad-hoc aterriza al final de la lista del servidor, y
+// agrupar por etiqueta la recoloca sola en su step. Los sin-bloque (null)
+// forman el step "General".
+type WorkoutStep = {
+  label: string | null
+  blocks: WorkoutBlock[]
+}
+const workoutSteps = computed<WorkoutStep[]>(() => {
+  const steps: WorkoutStep[] = []
+  const byLabel = new Map<string | null, WorkoutStep>()
+  for (const block of workoutBlocks.value) {
+    const label = block.entries[0].we.block_label ?? null
+    let step = byLabel.get(label)
+    if (!step) {
+      step = { label, blocks: [] }
+      byLabel.set(label, step)
+      steps.push(step)
+    }
+    step.blocks.push(block)
+  }
+  return steps
+})
+
+// el stepper solo aparece con ≥2 steps y algún bloque REAL definido — un
+// entreno sin bloques (todo null) se ve como siempre, en lista plana
+const stepperActive = computed(
+  () => workoutSteps.value.length > 1 && workoutSteps.value.some((s) => s.label !== null),
+)
+
+const currentStep = ref(0)
+// clamp defensivo: quitar el último ejercicio de un bloque puede hacer
+// desaparecer su step con el puntero encima
+const currentStepSafe = computed(() =>
+  Math.min(currentStep.value, Math.max(0, workoutSteps.value.length - 1)),
+)
+
+// cambiar de entreno (empezar otro, descartar y arrancar de cero) resetea el
+// puntero — con keep-alive la vista sobrevive entre entrenos
+watch(
+  () => activeWorkout.workout?.id,
+  () => {
+    currentStep.value = 0
+  },
+)
+
+const visibleBlocks = computed<WorkoutBlock[]>(() =>
+  stepperActive.value ? workoutSteps.value[currentStepSafe.value]?.blocks ?? [] : workoutBlocks.value,
+)
+
+function stepTitle(step: WorkoutStep): string {
+  return step.label ?? t('workout.blockGeneral')
+}
+
+// progreso del chip: ejercicios del step con al menos una serie efectiva
+function stepProgress(step: WorkoutStep): string {
+  const entries = step.blocks.flatMap((b) => b.entries)
+  const done = entries.filter((e) => e.we.sets.some((s) => !s.is_warmup)).length
+  return `${done}/${entries.length}`
+}
+
+// etiqueta del bloque visible: las altas hechas desde el stepper caen en él
+const currentBlockLabel = computed<string | null>(() =>
+  stepperActive.value ? workoutSteps.value[currentStepSafe.value]?.label ?? null : null,
+)
+
+// acciones que ve AddExerciseSheet: mismas del store, pero el alta lleva el
+// bloque visible. Objeto explícito (no spread del store: esparcir un store
+// de pinia congela el estado reactivo leído en ese instante).
+const sheetActions = computed<WorkoutActions>(() => ({
+  addExercise: (id: number) => activeWorkout.addExercise(id, currentBlockLabel.value),
+  addSupersetPair: (a: number, b: number) => activeWorkout.addSupersetPair(a, b, currentBlockLabel.value),
+  removeExercise: (weid: number) => activeWorkout.removeExercise(weid),
+  reorder: (ids: number[]) => activeWorkout.reorder(ids),
+  logSet: (weid: number, body: Parameters<WorkoutActions['logSet']>[1]) => activeWorkout.logSet(weid, body),
+  updateSet: (weid: number, sid: number, body: Parameters<WorkoutActions['updateSet']>[2]) =>
+    activeWorkout.updateSet(weid, sid, body),
+  deleteSet: (weid: number, sid: number) => activeWorkout.deleteSet(weid, sid),
+  exerciseHistory: (id: number) => activeWorkout.exerciseHistory(id),
+  setExerciseRest: (weid: number, rest: number | null) => activeWorkout.setExerciseRest(weid, rest),
+  exerciseNote: (id: number) => activeWorkout.exerciseNote(id),
+  saveExerciseNote: (id: number, note: string) => activeWorkout.saveExerciseNote(id, note),
+}))
+
 const editingMembers = computed(() =>
   (editingBlock.value?.entries ?? []).map((entry) => {
     const exercise = exerciseMap.value.get(entry.we.exercise_id)
@@ -161,6 +255,15 @@ const celebrationRune = computed<RuneName>(() => {
   const exercise = exerciseMap.value.get(activeWorkout.lastRecords[0]?.exercise_id)
   return primaryRune(exercise, muscleGroups.value) ?? 'pr'
 })
+
+// v0.17.0: los récords de una tanda son siempre del MISMO ejercicio (los
+// produce una única serie) — si va en modo nivel, la celebración pinta el
+// valor como número plano
+const celebrationPlainLoad = computed(
+  () =>
+    (exerciseMap.value.get(activeWorkout.lastRecords[0]?.exercise_id)?.load_mode ?? 'weight') ===
+    'level',
+)
 
 // ticks cada segundo con setInterval, pero el cálculo parte siempre de started_at:
 // si la pestaña estuvo dormida el número salta a lo correcto en el próximo tick
@@ -383,6 +486,32 @@ function closeSummary() {
   router.push({ name: 'today' })
 }
 
+function startTicker() {
+  if (ticker) return
+  ticker = setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
+}
+
+function stopTicker() {
+  if (ticker) clearInterval(ticker)
+  ticker = null
+}
+
+// arranque desde ?session= (calendario → "Empezar"): compartido entre el
+// montaje inicial y las re-activaciones del keep-alive — el query param
+// puede llegar en cualquiera de los dos caminos
+async function maybeStartFromSession() {
+  if (activeWorkout.workout) return
+  const sessionParam = route.query.session
+  if (!sessionParam) return
+  try {
+    await activeWorkout.start({ scheduled_session_id: Number(sessionParam) })
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
 onMounted(async () => {
   await loadCatalog()
   try {
@@ -390,29 +519,52 @@ onMounted(async () => {
   } catch (error) {
     toastApiError(error)
   }
-  if (!activeWorkout.workout) {
-    const sessionParam = route.query.session
-    if (sessionParam) {
-      try {
-        await activeWorkout.start({ scheduled_session_id: Number(sessionParam) })
-      } catch (error) {
-        toastApiError(error)
-      }
-    }
-  }
+  await maybeStartFromSession()
   // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: después de que activeWorkout.workout
   // ya refleje su estado final para este montaje (resume, y el auto-start
   // desde ?session si aplicaba) — antes de esto, un countdown "todavía
   // corriendo" no tendría con qué workout compararse
   await checkPersistedCardioCountdown()
-  ticker = setInterval(() => {
-    now.value = Date.now()
-  }, 1000)
+  startTicker()
 })
 
-onBeforeUnmount(() => {
-  if (ticker) clearInterval(ticker)
+// v0.17.0 keep-alive (zurdi: "no desmontar el entrenamiento"): la vista
+// sobrevive a la navegación, así que volver NO pasa por onMounted — el DOM
+// retenido pinta al instante y ESTE hook refresca en fondo sin bloquear
+// nada. onActivated también dispara tras el primer onMounted; ese primer
+// disparo se salta (el montaje ya hizo todo el trabajo).
+let activatedOnce = false
+onActivated(() => {
+  if (!activatedOnce) {
+    activatedOnce = true
+    return
+  }
+  // catálogo/rotación en fondo: una rutina editada mientras tanto se refleja
+  // sin costar nada al pintado instantáneo (loadCatalog solo reemplaza refs)
+  void loadCatalog()
+  void (async () => {
+    try {
+      // con entreno vivo basta el GET ligero (refresh no limpia el cache de
+      // historial); sin él, resume() re-deriva el estado (activo del
+      // servidor, snapshot offline o nada)
+      if (activeWorkout.workout) await activeWorkout.refresh()
+      else await activeWorkout.resume()
+    } catch {
+      // refresco de fondo: el estado retenido sigue siendo válido — nunca un
+      // toast por volver a la pestaña
+    }
+    await maybeStartFromSession()
+    await checkPersistedCardioCountdown()
+  })()
+  startTicker()
 })
+
+// pausar el crono de re-render mientras la vista vive oculta bajo el
+// keep-alive: el elapsed se recalcula desde started_at al volver, así que
+// no se pierde nada por no tickear en fondo
+onDeactivated(stopTicker)
+
+onBeforeUnmount(stopTicker)
 
 // v0.5.0 (modelo de scroll único, ver ShellView.vue): las tres ramas del
 // v-if/else-if/else (FinishSummary / entreno en curso / idle) FLUYEN contra
@@ -435,6 +587,7 @@ onBeforeUnmount(() => {
       :records="activeWorkout.lastRecords"
       :rune-name="celebrationRune"
       :units="units"
+      :plain-load="celebrationPlainLoad"
       @done="onCelebrationDone"
     />
 
@@ -444,6 +597,7 @@ onBeforeUnmount(() => {
       v-if="finishedWorkout"
       :workout="finishedWorkout"
       :records="sessionRecords"
+      :exercises="exercises"
       @close="closeSummary"
     />
 
@@ -516,6 +670,31 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <!-- v0.17.0 STEPPER POR BLOQUES (zurdi: "cada step del stepper es un
+           bloque molaría"): con bloques definidos en la rutina, la lista se
+           trocea en steps — chips navegables arriba y SOLO el bloque visible
+           renderizado (menos densidad); sin bloques, lista plana de siempre -->
+      <div
+        v-if="stepperActive"
+        class="flex gap-1.5 overflow-x-auto"
+        data-testid="block-stepper"
+        :style="{ '--bk-stagger-i': 1 }"
+      >
+        <button
+          v-for="(step, si) in workoutSteps"
+          :key="step.label ?? '__general__'"
+          type="button"
+          class="bk-press px-3 py-1.5 rounded-sm border text-xs shrink-0 flex items-center gap-1.5"
+          :class="si === currentStepSafe ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+          :aria-pressed="si === currentStepSafe ? 'true' : 'false'"
+          :data-testid="`block-step-${si}`"
+          @click="currentStep = si"
+        >
+          <span>{{ stepTitle(step) }}</span>
+          <span class="bk-metric text-2xs opacity-80">{{ stepProgress(step) }}</span>
+        </button>
+      </div>
+
       <!-- v0.8.0: bloques de superserie — los miembros van DENTRO de un
            contenedor con borde aurora ("los dos ejercicios en una card más
            grande me gusta, déjalo así" — zurdi), con el chip de cabecera y
@@ -529,15 +708,19 @@ onBeforeUnmount(() => {
            relative es el ancla del position:absolute de la que sale; las keys
            van en AMBAS ramas (mismo valor) porque TransitionGroup necesita
            hijos-elemento keyados, no fragments de template -->
-      <div class="relative space-y-4">
+      <!-- v0.17.0: :key del contenedor por step — cambiar de step REMONTA la
+           lista entera de golpe (sin animaciones bk-remove de salida, que
+           leerían como borrados) y el bk-stagger del padre re-anima la
+           entrada del bloque nuevo -->
+      <div :key="`step-${currentBlockLabel ?? '__all__'}`" class="relative space-y-4">
       <TransitionGroup name="bk-remove">
-      <template v-for="block in workoutBlocks">
+      <template v-for="(block, vi) in visibleBlocks">
         <div
           v-if="block.grouped"
           :key="`block-${block.entries[0].we.id}`"
           class="border border-aurora/50 rounded-sm p-2 space-y-3"
           :data-testid="`superset-container-${block.label}`"
-          :style="{ '--bk-stagger-i': block.entries[0].index + 1 }"
+          :style="{ '--bk-stagger-i': vi + 2 }"
         >
           <div class="flex items-center justify-center gap-2">
             <span class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5">
@@ -575,7 +758,7 @@ onBeforeUnmount(() => {
         <WorkoutExerciseCard
           v-else
           :key="`block-${block.entries[0].we.id}`"
-          :style="{ '--bk-stagger-i': block.entries[0].index + 1 }"
+          :style="{ '--bk-stagger-i': vi + 2 }"
           :workout-exercise="block.entries[0].we"
           :exercise="exerciseMap.get(block.entries[0].we.exercise_id)"
           :muscle-groups="muscleGroups"
@@ -598,16 +781,47 @@ onBeforeUnmount(() => {
       </TransitionGroup>
       </div>
 
+      <!-- v0.17.0: navegación anterior/siguiente entre bloques, bajo la
+           lista del step visible — complementa los chips de arriba para el
+           flujo natural de "terminé este bloque, al siguiente" -->
+      <div
+        v-if="stepperActive"
+        class="flex items-center justify-between gap-2"
+        data-testid="block-nav"
+        :style="{ '--bk-stagger-i': visibleBlocks.length + 2 }"
+      >
+        <BkButton
+          v-if="currentStepSafe > 0"
+          variant="ghost"
+          size="sm"
+          data-testid="block-prev"
+          @click="currentStep = currentStepSafe - 1"
+        >
+          ‹ {{ stepTitle(workoutSteps[currentStepSafe - 1]) }}
+        </BkButton>
+        <span v-else />
+        <BkButton
+          v-if="currentStepSafe < workoutSteps.length - 1"
+          variant="ghost"
+          size="sm"
+          data-testid="block-next"
+          @click="currentStep = currentStepSafe + 1"
+        >
+          {{ stepTitle(workoutSteps[currentStepSafe + 1]) }} ›
+        </BkButton>
+        <span v-else />
+      </div>
+
       <BkButton
         variant="ghost"
         block
-        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 1 }"
+        :style="{ '--bk-stagger-i': visibleBlocks.length + 3 }"
         @click="addSheetOpen = true"
       >
         {{ t('workout.addExercise') }}
       </BkButton>
 
-      <AddExerciseSheet :open="addSheetOpen" :actions="activeWorkout" @close="addSheetOpen = false" />
+      <AddExerciseSheet :open="addSheetOpen" :actions="sheetActions" @close="addSheetOpen = false" />
 
       <SupersetEditSheet
         :open="editingBlock !== null"
@@ -626,7 +840,7 @@ onBeforeUnmount(() => {
       <div
         class="border-t border-line pt-4 flex flex-wrap items-center gap-2"
         data-testid="workout-actions"
-        :style="{ '--bk-stagger-i': activeWorkout.workout.exercises.length + 2 }"
+        :style="{ '--bk-stagger-i': visibleBlocks.length + 4 }"
       >
         <BkButton
           variant="danger"

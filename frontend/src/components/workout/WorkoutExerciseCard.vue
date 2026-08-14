@@ -23,7 +23,7 @@ import {
   setPersistedCardioCountdown,
   type PersistedCardioCountdown,
 } from '@/utils/uiPrefs'
-import { formatWeight } from '@/utils/units'
+import { formatLoad } from '@/utils/units'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
@@ -36,7 +36,7 @@ import CardioStartSheet from './CardioStartSheet.vue'
 import { formatDuration } from './duration'
 import { REST_MAX_SECONDS, REST_MIN_SECONDS, REST_PRESETS, REST_STEP_SECONDS, restFor } from './rest'
 import { resolveNewSetDefaults } from './setDefaults'
-import { formatHistoryLine, formatHistorySetLines } from './setHistoryFormat'
+import { formatHistorySetLines } from './setHistoryFormat'
 import SetForm from './SetForm.vue'
 import type { WorkoutActions } from './workoutActions'
 
@@ -155,6 +155,12 @@ const isLast = computed(() => index.value === -1 || index.value === props.exerci
 // numerar, con acento de borde) en vez de series numeradas de fuerza
 const isCardio = computed(() => props.exercise?.measurement === 'cardio')
 
+// v0.17.0 (zurdi: "números planos en vez de kg"): modo de carga del
+// ejercicio — gobierna cómo se pinta weight_kg en TODA la card (filas de
+// series, hint de última vez) y baja al SetForm (stepper de nivel sin
+// unidad ni calculadora de discos)
+const loadMode = computed(() => props.exercise?.load_mode ?? 'weight')
+
 // fix M10a (revisión): el contador del header debe ser el nº de series
 // EFECTIVAS (sin calentamiento), como en el resto de la app (FinishSummary,
 // saveAsRoutine.ts...) — antes contaba workoutExercise.sets.length a secas
@@ -238,17 +244,13 @@ async function saveNote() {
   }
 }
 
-const historyLine = computed(() => {
-  if (!props.exercise || !history.value?.sets.length) return ''
-  return formatHistoryLine(history.value.sets, props.exercise.measurement, props.units)
-})
-
-// item 4d: bloque multilínea para el cajón (hay sitio vertical de sobra
-// ahí) — distinto de historyLine, que sigue siendo la línea densa para el
-// hint compacto de la tarjeta (card-history-hint, sin sitio de sobra)
+// item 4d + v0.17.0 (zurdi: "las series x reps de las últimas veces están en
+// una sola línea, ponlas en distintas líneas como en el drawer"): el MISMO
+// bloque multilínea sirve al cajón y al hint de la tarjeta — la línea densa
+// agrupada (formatHistoryLine) murió con su último consumidor
 const historyLines = computed(() => {
   if (!props.exercise || !history.value?.sets.length) return []
-  return formatHistorySetLines(history.value.sets, props.exercise.measurement, props.units)
+  return formatHistorySetLines(history.value.sets, props.exercise.measurement, props.units, loadMode.value)
 })
 
 const historyDateLabel = computed(() => {
@@ -274,7 +276,7 @@ const drawerDefaults = computed(() => {
 function formatSetValue(set: SetOut): string {
   const measurement = props.exercise?.measurement
   if (measurement === 'strength' || (measurement === 'bodyweight' && set.weight_kg)) {
-    return `${set.reps} × ${formatWeight(set.weight_kg ?? 0, props.units)}`
+    return `${set.reps} × ${formatLoad(set.weight_kg ?? 0, props.units, loadMode.value)}`
   }
   if (measurement === 'bodyweight') {
     return `${set.reps} ${t('workout.reps')}`
@@ -694,9 +696,17 @@ async function moveDown() {
       </div>
       </TransitionGroup>
     </div>
-    <p v-else-if="historyLine" class="text-xs text-ink-faint mb-3 truncate" data-testid="card-history-hint">
-      {{ t('workout.lastTimeHint', { line: historyLine }) }}
-    </p>
+    <!-- v0.17.0 (zurdi): el hint de "última vez" deja la línea densa truncada
+         y pasa al mismo bloque multilínea del drawer — fecha en su línea y
+         cada serie en la suya, menos densidad en la card -->
+    <div
+      v-else-if="historyLines.length"
+      class="text-xs text-ink-faint mb-3 space-y-0.5"
+      data-testid="card-history-hint"
+    >
+      <p class="text-ink-muted">{{ t('workout.lastTime', { date: historyDateLabel }) }}</p>
+      <p v-for="(line, i) in historyLines" :key="i" class="bk-metric">{{ line }}</p>
+    </div>
 
     <!-- v0.3.2 CARDIO-COUNTDOWN PERSISTENCE — superficie de RESUME: se
          reutiliza CardioCountdown.vue directo aquí en el CUERPO de la
@@ -836,6 +846,7 @@ async function moveDown() {
       <div v-if="exercise" class="space-y-3">
         <SetForm
           :measurement="exercise.measurement"
+          :load-mode="loadMode"
           :units="units"
           :initial-set="drawerDefaults"
           :editing="editingSet !== null"

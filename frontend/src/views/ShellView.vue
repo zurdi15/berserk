@@ -12,6 +12,7 @@ import * as outbox from '@/offline/outbox'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { useToastStore } from '@/stores/toast'
+import { getActAs, switchActAs } from '@/utils/actAs'
 import { checkNativeShellUpdate, ensureNativeNotificationPermission, isNativeShell } from '@/utils/nativeShell'
 // v0.16.0: la versión del bundle (verdad de build, ver SettingsCard.vue) —
 // contra ella se compara la versionName del shell para avisar de APK nueva
@@ -33,6 +34,15 @@ const router = useRouter()
 const { t } = useI18n()
 const timer = useRestTimerStore()
 const activeWorkout = useActiveWorkoutStore()
+
+// v0.17.0 act-as: leído UNA vez al montar el shell — el modo solo cambia vía
+// switchActAs, que recarga la app entera (ver utils/actAs.ts), así que no
+// hay estado que mantener sincronizado
+const actAs = getActAs()
+
+function exitActAs() {
+  void switchActAs(null)
+}
 
 // v0.5.0 (zurdi revoca el scroll interno por vista del item 14): <main>
 // vuelve a ser el ÚNICO contenedor de scroll de la app y las vistas fluyen.
@@ -352,6 +362,25 @@ watch(activeIndex, () => nextTick(updateIndicator))
       />
     </header>
     <AthleteBanner />
+    <!-- v0.17.0 act-as: banda PERSISTENTE mientras un admin actúa como otro
+         usuario — acento ember (no aurora: el modo atleta de arriba es "ver",
+         esto es OPERAR con otra identidad y debe distinguirse de un vistazo);
+         salir purga el estado local y recarga (ver utils/actAs.ts) -->
+    <div
+      v-if="actAs"
+      data-testid="act-as-banner"
+      class="flex items-center justify-between gap-2 px-4 py-2 border-b border-ember bg-stone text-sm"
+    >
+      <span class="text-ember">{{ t('admin.actingAs', { name: actAs.username }) }}</span>
+      <button
+        type="button"
+        data-testid="act-as-exit"
+        class="bk-press text-ink-muted hover:text-ink"
+        @click="exitActAs"
+      >
+        {{ t('admin.actAsExit') }}
+      </button>
+    </div>
     <!-- v0.6.0 offline: banda de estado — visible sin red o con cola
          pendiente; desaparece sola al drenar. Informativa, no interactiva:
          la sincronización es automática (ver onMounted) y un botón de
@@ -498,7 +527,18 @@ watch(activeIndex, () => nextTick(updateIndicator))
              las opacidades de ambos se multiplican. Cada vista es dueña de su
              única animación de entrada ahora (bk-stagger/bk-rise propio, o
              ninguna si no hace falta) — ver auditoría por vista en el informe. -->
-        <RouterView />
+        <!-- v0.17.0 (zurdi: "no desmontar el entrenamiento para que cargue
+             instantáneo al volver"): SOLO WorkoutView se mantiene viva entre
+             navegaciones — volver al entreno pinta el DOM retenido al
+             instante en vez de repetir catálogo+resume+stagger. El resto de
+             vistas siguen remontando (su reset de scroll/estado por remount
+             es comportamiento deseado). WorkoutView refresca en fondo vía
+             onActivated (ver esa vista). -->
+        <RouterView v-slot="{ Component }">
+          <KeepAlive include="WorkoutView">
+            <component :is="Component" />
+          </KeepAlive>
+        </RouterView>
       </div>
     </main>
   </div>

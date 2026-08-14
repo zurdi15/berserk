@@ -128,6 +128,20 @@ describe('ShellView nav', () => {
 
   // item 3 (v0.4.0, scrollbar): <main> pasa a ancho completo (su scrollbar
   // pinta en el borde real de la ventana) y la columna centrada se mueve a un
+  // v0.17.0 act-as: banda persistente mientras un admin actúa como otro
+  // usuario (leída del storage al montar; salir recarga vía utils/actAs.ts)
+  it('v0.17.0: shows the act-as banner when the mode is stored, hides it otherwise', async () => {
+    localStorage.setItem('bk:act-as', JSON.stringify({ id: 7, username: 'loki' }))
+    const withMode = await mountWithRoute('today')
+    expect(withMode.find('[data-testid="act-as-banner"]').exists()).toBe(true)
+    expect(withMode.find('[data-testid="act-as-banner"]').text()).toContain('loki')
+    withMode.unmount()
+
+    localStorage.removeItem('bk:act-as')
+    const withoutMode = await mountWithRoute('today')
+    expect(withoutMode.find('[data-testid="act-as-banner"]').exists()).toBe(false)
+  })
+
   // <div> interno que envuelve RouterView y hereda el px/py que antes llevaba
   // <main> directamente
   it("item 3: <main> is full-width (no max-w-3xl/mx-auto of its own) and an inner wrapper div carries the centered column + a definite flex context for RouterView", async () => {

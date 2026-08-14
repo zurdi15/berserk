@@ -107,13 +107,33 @@ const mainTabs = computed(() => [
   { value: 'records', label: t('progress.records') },
 ])
 
-const metricTabs = computed(() => [
-  { value: 'top_weight', label: t('progress.metric.weight') },
-  { value: 'volume', label: t('progress.metric.volume') },
-  { value: 'est_1rm', label: t('progress.metric.est1rm') },
-])
+// v0.17.0: ejercicio en modo nivel — su "peso" es un número plano de
+// máquina: la única métrica con sentido es el nivel máximo por sesión
+// (volumen y 1RM estimado son aritmética sobre kg que aquí no existe)
+const selectedIsLevel = computed(
+  () => (exercises.value.find((e) => e.id === exerciseId.value)?.load_mode ?? 'weight') === 'level',
+)
 
-const chartPoints = computed(() => seriesFor(series.value, metric.value, units.value))
+const metricTabs = computed(() =>
+  selectedIsLevel.value
+    ? [{ value: 'top_weight', label: t('progress.metric.level') }]
+    : [
+        { value: 'top_weight', label: t('progress.metric.weight') },
+        { value: 'volume', label: t('progress.metric.volume') },
+        { value: 'est_1rm', label: t('progress.metric.est1rm') },
+      ],
+)
+
+// si el ejercicio elegido pasa a ser de nivel, una métrica que ya no existe
+// en las tabs cae a la única válida
+watch(selectedIsLevel, (isLevel) => {
+  if (isLevel) metric.value = 'top_weight'
+})
+
+// nivel: sin conversión kg/lb — pasar 'kg' a seriesFor la deja en no-op
+const chartPoints = computed(() =>
+  seriesFor(series.value, metric.value, selectedIsLevel.value ? 'kg' : units.value),
+)
 
 // item 4 (v0.4.2): antes cargaba también grupos musculares + distribución
 // para DistributionBars, que se mudó a Hoy (ver TodayView.vue) — aquí ya

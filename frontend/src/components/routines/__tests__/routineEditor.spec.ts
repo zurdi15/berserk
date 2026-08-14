@@ -628,6 +628,120 @@ describe('RoutineEditorSheet', () => {
     })
   })
 
+  // v0.17.0 bloques (zurdi: "definir bloques en las rutinas, cada bloque
+  // tiene unos ejercicios"): secciones por etiqueta, renombrar/disolver, y
+  // flechas que en frontera CAMBIAN de bloque en vez de saltar la fila vecina
+  describe('v0.17.0 bloques', () => {
+    function routineWithBlocks(): RoutineOut {
+      return {
+        id: 5,
+        name: 'Torso',
+        description: null,
+        rune: null,
+        color: null,
+        exercises: [
+          { id: 10, exercise_id: 1, position: 1, target_sets: 3, target_reps: null, target_weight_kg: null, rest_seconds: 60, block_label: 'Empuje' },
+          { id: 11, exercise_id: 2, position: 2, target_sets: 3, target_reps: null, target_weight_kg: null, rest_seconds: 60, block_label: 'Empuje' },
+          { id: 12, exercise_id: 3, position: 3, target_sets: 3, target_reps: null, target_weight_kg: null, rest_seconds: 60, block_label: 'Tirón' },
+        ],
+      } as RoutineOut
+    }
+
+    it('renders one section per block label with its name in the header', async () => {
+      const wrapper = build(routineWithBlocks())
+      await flushPromises()
+
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const dialog = dialogs[dialogs.length - 1] as HTMLElement
+      expect(dialog.querySelector('[data-testid="routine-block-Empuje"]')).not.toBeNull()
+      expect(dialog.querySelector('[data-testid="routine-block-Tirón"]')).not.toBeNull()
+      // dos filas en Empuje, una en Tirón
+      expect(dialog.querySelector('[data-testid="routine-block-Empuje"]')!.querySelectorAll('[data-testid^="routine-row-"]').length).toBe(2)
+      wrapper.unmount()
+    })
+
+    it('moving up across a block boundary ADOPTS the block above instead of swapping rows', async () => {
+      const wrapper = build(routineWithBlocks())
+      await flushPromises()
+      const vm = wrapper.vm as any
+
+      vm.moveExerciseUp(2)
+      await flushPromises()
+
+      // la fila 12 no se mueve de posición: entra en "Empuje" como última
+      expect(vm.exercises.map((e: any) => e.exercise_id)).toEqual([1, 2, 3])
+      expect(vm.exercises[2].block_label).toBe('Empuje')
+      wrapper.unmount()
+    })
+
+    it('moving down across a boundary adopts the block below', async () => {
+      const wrapper = build(routineWithBlocks())
+      await flushPromises()
+      const vm = wrapper.vm as any
+
+      vm.moveExerciseDown(1)
+      await flushPromises()
+
+      expect(vm.exercises.map((e: any) => e.exercise_id)).toEqual([1, 2, 3])
+      expect(vm.exercises[1].block_label).toBe('Tirón')
+      wrapper.unmount()
+    })
+
+    it('renaming a block updates every row and travels in the save payload', async () => {
+      const { replaceRoutineExercises } = await import('@/api/domain')
+      vi.mocked(replaceRoutineExercises).mockClear()
+      const wrapper = build(routineWithBlocks())
+      await flushPromises()
+      const vm = wrapper.vm as any
+
+      vm.openBlockEdit('Empuje')
+      vm.blockNameDraft = 'Pecho y hombro'
+      vm.saveBlockRename()
+      await flushPromises()
+      expect(vm.exercises[0].block_label).toBe('Pecho y hombro')
+      expect(vm.exercises[1].block_label).toBe('Pecho y hombro')
+      expect(vm.exercises[2].block_label).toBe('Tirón')
+
+      await vm.saveRoutine()
+      expect(replaceRoutineExercises).toHaveBeenCalledWith(5, [
+        expect.objectContaining({ exercise_id: 1, block_label: 'Pecho y hombro' }),
+        expect.objectContaining({ exercise_id: 2, block_label: 'Pecho y hombro' }),
+        expect.objectContaining({ exercise_id: 3, block_label: 'Tirón' }),
+      ])
+      wrapper.unmount()
+    })
+
+    it('dissolving a block clears its labels but keeps the rows', async () => {
+      const wrapper = build(routineWithBlocks())
+      await flushPromises()
+      const vm = wrapper.vm as any
+
+      vm.openBlockEdit('Empuje')
+      vm.dissolveEditorBlock()
+      await flushPromises()
+
+      expect(vm.exercises).toHaveLength(3)
+      expect(vm.exercises[0].block_label).toBeNull()
+      expect(vm.exercises[1].block_label).toBeNull()
+      expect(vm.exercises[2].block_label).toBe('Tirón')
+      wrapper.unmount()
+    })
+
+    it('adding into a block inserts at the END of that block, not at the end of the list', async () => {
+      const wrapper = build(routineWithBlocks())
+      await flushPromises()
+      const vm = wrapper.vm as any
+
+      vm.openAddTo('Empuje')
+      await vm.editorActions.addExercise(9)
+      await flushPromises()
+
+      expect(vm.exercises.map((e: any) => e.exercise_id)).toEqual([1, 2, 9, 3])
+      expect(vm.exercises[2].block_label).toBe('Empuje')
+      wrapper.unmount()
+    })
+  })
+
   // v0.5.0 superseries: enlazado entre filas consecutivas (botón de eslabón),
   // etiquetas A/B/C presentacionales, normalización y particiones por reorden
   describe('v0.5.0 superseries', () => {

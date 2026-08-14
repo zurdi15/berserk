@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { Measurement, SetIn, SetOut } from '@/api/domain'
+import type { LoadMode, Measurement, SetIn, SetOut } from '@/api/domain'
 import { displayToKg, kgToDisplay } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkSelect from '@/lib/BkSelect.vue'
@@ -13,6 +13,10 @@ import PlateCalculatorSheet from './PlateCalculatorSheet.vue'
 const props = withDefaults(
   defineProps<{
     measurement: Measurement
+    // v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg"): en modo
+    // 'level' la columna de carga es un stepper plano (paso 1, sin unidad,
+    // sin conversión kg/lb y sin calculadora de discos)
+    loadMode?: LoadMode
     units?: 'kg' | 'lb'
     // precarga desde una serie existente (edición) o desde el default
     // calculado por item 2 (registro nuevo) — Partial porque el default de
@@ -26,7 +30,7 @@ const props = withDefaults(
     // así que ambas variantes de submit harían exactamente lo mismo
     inline?: boolean
   }>(),
-  { units: 'kg', initialSet: null, editing: false, inline: false },
+  { loadMode: 'weight', units: 'kg', initialSet: null, editing: false, inline: false },
 )
 // keepOpen (item 1): false = "Registrar serie" (cierra el cajón), true =
 // "Registrar y otra" (se queda abierto, valores conservados para la
@@ -63,6 +67,20 @@ const WEIGHT_UI = {
   lb: { step: 5, initial: 45, max: 1100 },
 } as const
 
+// v0.17.0 modo nivel: número plano de máquina — el valor viaja TAL CUAL en
+// weight_kg (sin displayToKg/kgToDisplay: el nivel 12 es 12 en cualquier
+// unidad). Rango generoso (zurdi dijo "del 1 al 20" pero hay máquinas con
+// más posiciones); paso siempre 1.
+const LEVEL_UI = { step: 1, initial: 10, max: 100 } as const
+const isLevel = computed(() => props.loadMode === 'level')
+const loadStep = computed(() => (isLevel.value ? LEVEL_UI.step : WEIGHT_UI[props.units].step))
+const loadMax = computed(() => (isLevel.value ? LEVEL_UI.max : WEIGHT_UI[props.units].max))
+const loadSuffix = computed(() => (isLevel.value ? '' : props.units))
+const loadLabel = computed(() => t(isLevel.value ? 'workout.level' : 'workout.weight'))
+const loadLabelOptional = computed(() =>
+  t(isLevel.value ? 'workout.levelOptional' : 'workout.weightOptional'),
+)
+
 // valores por defecto razonables; se mantienen entre series del mismo bloque
 // (no se resetean tras cada submit) para no repetir el mismo tecleo en cada serie.
 // En modo edición, el punto de partida es la serie que se está corrigiendo;
@@ -70,8 +88,12 @@ const WEIGHT_UI = {
 const reps = ref(props.initialSet?.reps ?? 8)
 const weightDisplay = ref(
   props.initialSet?.weight_kg != null
-    ? kgToDisplay(props.initialSet.weight_kg, props.units)
-    : (props.measurement === 'strength' ? WEIGHT_UI[props.units].initial : 0),
+    ? (props.loadMode === 'level'
+        ? props.initialSet.weight_kg
+        : kgToDisplay(props.initialSet.weight_kg, props.units))
+    : (props.measurement === 'strength'
+        ? (props.loadMode === 'level' ? LEVEL_UI.initial : WEIGHT_UI[props.units].initial)
+        : 0),
 )
 const durationSeconds = ref(props.initialSet?.duration_seconds ?? (props.measurement === 'cardio' ? 60 : 30))
 const distanceM = ref(props.initialSet?.distance_m ?? 0)
@@ -100,11 +122,18 @@ function buildValue(): SetIn | null {
   switch (props.measurement) {
     case 'strength':
       value.reps = reps.value
-      value.weight_kg = displayToKg(weightDisplay.value, units.value)
+      // modo nivel: el número plano viaja tal cual, sin conversión de unidad
+      value.weight_kg = isLevel.value
+        ? weightDisplay.value
+        : displayToKg(weightDisplay.value, units.value)
       break
     case 'bodyweight':
       value.reps = reps.value
-      if (weightDisplay.value > 0) value.weight_kg = displayToKg(weightDisplay.value, units.value)
+      if (weightDisplay.value > 0) {
+        value.weight_kg = isLevel.value
+          ? weightDisplay.value
+          : displayToKg(weightDisplay.value, units.value)
+      }
       break
     case 'timed':
       value.duration_seconds = durationSeconds.value
@@ -144,11 +173,14 @@ function submit(keepOpen: boolean) {
          propia línea. Con grid grid-cols-2 cada columna tiene un ancho FIJO
          (independiente del contenido); min-w-0 es la garantía estándar de
          Tailwind para que ese contenido nunca fuerce la columna a crecer -->
+    <!-- v0.17.0: en modo nivel el stepper de carga es plano (paso 1, sin
+         unidad) y la calculadora de discos no aplica — un nivel de máquina
+         no se compone con discos -->
     <div v-if="measurement === 'strength'" class="w-full space-y-2">
       <div class="w-full grid grid-cols-2 gap-2">
         <div class="min-w-0 flex flex-col items-center">
-          <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weight') }}</span>
-          <BkStepper v-model="weightDisplay" size="compact" :step="WEIGHT_UI[units].step" :min="2.5" :max="WEIGHT_UI[units].max" :suffix="units" />
+          <span class="block text-xs text-ink-muted mb-2">{{ loadLabel }}</span>
+          <BkStepper v-model="weightDisplay" size="compact" :step="loadStep" :min="isLevel ? 1 : 2.5" :max="loadMax" :suffix="loadSuffix" />
         </div>
         <div class="min-w-0 flex flex-col items-center">
           <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
@@ -156,8 +188,8 @@ function submit(keepOpen: boolean) {
         </div>
       </div>
       <!-- v0.12.0: calculadora de discos — abre con el peso actual como
-           objetivo; solo tiene sentido con barra (fuerza) -->
-      <div class="flex justify-center">
+           objetivo; solo tiene sentido con barra (fuerza en kg) -->
+      <div v-if="!isLevel" class="flex justify-center">
         <BkButton type="button" variant="ghost" size="sm" data-testid="plate-calc-open" @click="plateCalcOpen = true">
           {{ t('workout.plates.open') }}
         </BkButton>
@@ -170,8 +202,8 @@ function submit(keepOpen: boolean) {
         <BkStepper v-model="reps" size="compact" :step="1" :min="1" :max="100" />
       </div>
       <div class="min-w-0 flex flex-col items-center">
-        <span class="block text-xs text-ink-muted mb-2">{{ t('workout.weightOptional') }}</span>
-        <BkStepper v-model="weightDisplay" size="compact" :step="WEIGHT_UI[units].step" :min="0" :max="WEIGHT_UI[units].max" :suffix="units" />
+        <span class="block text-xs text-ink-muted mb-2">{{ loadLabelOptional }}</span>
+        <BkStepper v-model="weightDisplay" size="compact" :step="loadStep" :min="0" :max="loadMax" :suffix="loadSuffix" />
       </div>
     </div>
 
@@ -225,7 +257,7 @@ function submit(keepOpen: boolean) {
     </div>
 
     <PlateCalculatorSheet
-      v-if="measurement === 'strength'"
+      v-if="measurement === 'strength' && !isLevel"
       :open="plateCalcOpen"
       :target-weight="weightDisplay"
       :units="units"

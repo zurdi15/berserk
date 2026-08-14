@@ -48,6 +48,28 @@ describe('active workout store', () => {
     expect(domain.getWorkout).toHaveBeenCalledWith(4)
   })
 
+  // v0.17.0 bloques: el alta desde el stepper viaja con la etiqueta del
+  // bloque visible; sin etiqueta no manda block_label (comportamiento viejo)
+  it('addExercise forwards the block label to the API (and omits it when absent)', async () => {
+    vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+    const store = useActiveWorkoutStore()
+    await store.resume()
+    vi.mocked(domain.addWorkoutExercise).mockResolvedValue({ id: 7 } as never)
+    vi.mocked(domain.getWorkout).mockResolvedValue(workout as never)
+
+    await store.addExercise(9, 'Empuje')
+    expect(domain.addWorkoutExercise).toHaveBeenCalledWith(4, {
+      exercise_id: 9,
+      block_label: 'Empuje',
+    })
+
+    await store.addExercise(10)
+    expect(domain.addWorkoutExercise).toHaveBeenLastCalledWith(4, {
+      exercise_id: 10,
+      block_label: undefined,
+    })
+  })
+
   it('updateSet never touches lastRecords (celebration only fires from live logging via logSet)', async () => {
     vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
     const store = useActiveWorkoutStore()

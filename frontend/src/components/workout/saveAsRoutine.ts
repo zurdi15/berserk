@@ -77,6 +77,8 @@ export function buildRoutineExercisesFromWorkout(workout: WorkoutOut): RoutineEx
       // mid-workout lo rompió, todos los lectores normalizan por contigüidad
       // (lib/supersets.ts) así que un run de 1 se disuelve solo
       superset_group: we.superset_group ?? null,
+      // v0.17.0: los bloques del entreno también viajan a la rutina
+      block_label: we.block_label ?? null,
     }
   })
 }

@@ -73,6 +73,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
     const { refreshPendingCount } = await import('@/offline/outbox')
     refreshPendingCount()
+    // v0.17.0 act-as: cerrar sesión también sale del modo suplantación — un
+    // login posterior de un no-admin con el header residual sería 403 en todo
+    const { clearActAsStorage } = await import('@/utils/actAs')
+    clearActAsStorage()
   }
 
   return { user, bootstrapped, ready, isAuthenticated, init, login, bootstrapAccount, redeemAccount, logout }

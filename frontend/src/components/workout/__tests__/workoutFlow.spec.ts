@@ -375,7 +375,7 @@ describe('WorkoutExerciseCard', () => {
   })
 
   describe('item 3: previous-session history', () => {
-    it('shows a one-line hint on the compact card when the exercise has no sets yet', async () => {
+    it('shows the multi-line "last time" block on the compact card when the exercise has no sets yet (v0.17.0)', async () => {
       const emptyExercise = { ...pushExercise, sets: [] }
       const actions = makeActions({
         exerciseHistory: vi.fn(async () => ({
@@ -390,7 +390,11 @@ describe('WorkoutExerciseCard', () => {
       const wrapper = mountCard({ workoutExercise: emptyExercise, actions })
       await flushPromises()
 
-      expect(wrapper.get('[data-testid="card-history-hint"]').text()).toContain('2×8·80 kg')
+      // v0.17.0 (zurdi): una línea por serie, como el bloque del drawer — la
+      // línea densa agrupada ("2×8·80 kg") murió
+      const hint = wrapper.get('[data-testid="card-history-hint"]').text()
+      expect(hint).toContain('S1 · 8 × 80 kg')
+      expect(hint).toContain('S2 · 8 × 80 kg')
     })
 
     it('does not show the card hint once the exercise already has sets logged', async () => {

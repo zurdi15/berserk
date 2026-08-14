@@ -84,6 +84,7 @@ async function initializeForm() {
       target_weight_kg: e.target_weight_kg || null,
       rest_seconds: e.rest_seconds ? String(e.rest_seconds) : '60',
       superset_group: e.superset_group ?? null,
+      block_label: e.block_label ?? null,
     }))
     // defensivo: lo guardado puede venir sin normalizar (p.ej. un
     // save-as-routine con contigüidad rota por un reorden mid-workout) —
@@ -107,11 +108,29 @@ async function initializeForm() {
 // v0.10.0 (zurdi: "el flow de rutina, exactamente el mismo que el de
 // entrenamiento"): añadir pasa por el MISMO AddExerciseSheet del entreno
 // (buscador con pajar ES+EN+tipo, filtro de grupo y check de superserie) —
-// este adaptador satisface su contrato WorkoutActions con mutaciones locales
+// este adaptador satisface su contrato WorkoutActions con mutaciones locales.
+// v0.17.0 bloques: pendingBlockLabel = bloque de destino de las próximas
+// altas (el "+ añadir aquí" de cada sección lo fija; el botón global lo
+// deja a null) — la inserción cae al FINAL del run de ese bloque, así las
+// filas del mismo bloque se mantienen contiguas por construcción
+const pendingBlockLabel = ref<string | null>(null)
+
+// índice de inserción para un alta con esa etiqueta: tras la última fila
+// del bloque (o al final del todo si el bloque aún no tiene filas)
+function insertIndexFor(label: string | null): number {
+  if (label === null) return exercises.value.length
+  let last = -1
+  exercises.value.forEach((row, i) => {
+    if ((row.block_label ?? null) === label) last = i
+  })
+  return last === -1 ? exercises.value.length : last + 1
+}
+
 let rowSeq = 0
-function pushRow(exerciseId: number) {
-  exercises.value.push({
-    id: `row-${++rowSeq}-${exercises.value.length}`,
+function pushRow(exerciseId: number, label: string | null = null): string {
+  const id = `row-${++rowSeq}-${exercises.value.length}`
+  const row: EditorRow = {
+    id,
     exercise_id: exerciseId,
     target_sets: 3,
     target_reps: 0,
@@ -119,23 +138,78 @@ function pushRow(exerciseId: number) {
     rest_seconds: '60',
     // un ejercicio recién añadido nace suelto (o enlazado vía addSupersetPair)
     superset_group: null,
-  })
+    block_label: label,
+  }
+  const at = insertIndexFor(label)
+  exercises.value = [...exercises.value.slice(0, at), row, ...exercises.value.slice(at)]
+  return id
 }
 
 const addSheetOpen = ref(false)
 const editorActions = {
   addExercise: async (exerciseId: number) => {
-    pushRow(exerciseId)
+    pushRow(exerciseId, pendingBlockLabel.value)
   },
   addSupersetPair: async (exerciseA: number, exerciseB: number) => {
-    pushRow(exerciseA)
-    pushRow(exerciseB)
+    const label = pendingBlockLabel.value
+    const firstId = pushRow(exerciseA, label)
+    const secondId = pushRow(exerciseB, label)
     const values = currentSupersetValues()
     const marker = values.length
-    values[values.length - 2] = marker
-    values[values.length - 1] = marker
+    const iA = exercises.value.findIndex((r) => r.id === firstId)
+    const iB = exercises.value.findIndex((r) => r.id === secondId)
+    values[iA] = marker
+    values[iB] = marker
     applySupersetValues(normalizeSupersets(values))
   },
+}
+
+function openAddTo(label: string | null) {
+  pendingBlockLabel.value = label
+  addSheetOpen.value = true
+}
+
+// ── v0.17.0 BLOQUES (zurdi: "definir bloques en las rutinas, cada bloque
+// tiene unos ejercicios") ─────────────────────────────────────────────────
+// crear: nombre en un mini-sheet → se abre el AddExerciseSheet apuntando al
+// bloque nuevo (un bloque sin filas no existe: la etiqueta vive en las filas)
+const newBlockOpen = ref(false)
+const newBlockName = ref('')
+
+function confirmNewBlock() {
+  const name = newBlockName.value.trim().slice(0, 40)
+  if (!name) return
+  newBlockOpen.value = false
+  newBlockName.value = ''
+  openAddTo(name)
+}
+
+// editar: renombrar (todas las filas de la etiqueta) o disolver (etiquetas a
+// null — los ejercicios se quedan, solo desaparece la agrupación)
+const blockEditFor = ref<string | null>(null)
+const blockNameDraft = ref('')
+
+function openBlockEdit(label: string) {
+  blockEditFor.value = label
+  blockNameDraft.value = label
+}
+
+function saveBlockRename() {
+  const from = blockEditFor.value
+  const to = blockNameDraft.value.trim().slice(0, 40)
+  if (!from || !to) return
+  exercises.value = exercises.value.map((r) =>
+    r.block_label === from ? { ...r, block_label: to } : r,
+  )
+  blockEditFor.value = null
+}
+
+function dissolveEditorBlock() {
+  const from = blockEditFor.value
+  exercises.value = exercises.value.map((r) =>
+    r.block_label === from ? { ...r, block_label: null } : r,
+  )
+  blockEditFor.value = null
 }
 
 function removeExercise(id: string) {
@@ -145,24 +219,46 @@ function removeExercise(id: string) {
   renormalizeSupersets()
 }
 
+// v0.17.0 bloques — semántica de flechas en FRONTERA de bloque: en vez de
+// saltar por encima de la fila vecina, el ejercicio CAMBIA de bloque (adopta
+// la etiqueta del vecino sin moverse de posición): ↑ en la primera fila de
+// un bloque lo mete como última fila del bloque de arriba; ↓ en la última lo
+// mete como primera del de abajo. Dentro del mismo bloque, swap de siempre.
+// La contigüidad por bloque se conserva por construcción en ambos casos.
 function moveExerciseUp(index: number) {
-  if (index > 0) {
-    const temp = exercises.value[index]
-    exercises.value[index] = exercises.value[index - 1]
-    exercises.value[index - 1] = temp
-    // reordenar recomputa la contigüidad: un grupo roto por el movimiento se
-    // parte (los runs de 1 que queden se disuelven a sueltos)
+  if (index <= 0) return
+  const row = exercises.value[index]
+  const prev = exercises.value[index - 1]
+  if ((prev.block_label ?? null) !== (row.block_label ?? null)) {
+    exercises.value = exercises.value.map((r, i) =>
+      i === index ? { ...r, block_label: prev.block_label ?? null } : r,
+    )
     renormalizeSupersets()
+    return
   }
+  const next = [...exercises.value]
+  ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+  exercises.value = next
+  // reordenar recomputa la contigüidad: un grupo roto por el movimiento se
+  // parte (los runs de 1 que queden se disuelven a sueltos)
+  renormalizeSupersets()
 }
 
 function moveExerciseDown(index: number) {
-  if (index < exercises.value.length - 1) {
-    const temp = exercises.value[index]
-    exercises.value[index] = exercises.value[index + 1]
-    exercises.value[index + 1] = temp
+  if (index >= exercises.value.length - 1) return
+  const row = exercises.value[index]
+  const nextRow = exercises.value[index + 1]
+  if ((nextRow.block_label ?? null) !== (row.block_label ?? null)) {
+    exercises.value = exercises.value.map((r, i) =>
+      i === index ? { ...r, block_label: nextRow.block_label ?? null } : r,
+    )
     renormalizeSupersets()
+    return
   }
+  const next = [...exercises.value]
+  ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
+  exercises.value = next
+  renormalizeSupersets()
 }
 
 // ── v0.5.0 superseries ─────────────────────────────────────────────────────
@@ -209,6 +305,29 @@ const editorBlocks = computed<EditorBlock[]>(() => {
     }
   })
   return blocks
+})
+
+// v0.17.0: los contenedores (superseries/filas sueltas) se agrupan en
+// SECCIONES por etiqueta de bloque — misma agrupación por etiqueta que el
+// stepper del entreno (WorkoutView.workoutSteps); null = fuera de bloque
+type EditorSection = {
+  label: string | null
+  blocks: EditorBlock[]
+}
+const editorSections = computed<EditorSection[]>(() => {
+  const sections: EditorSection[] = []
+  const byLabel = new Map<string | null, EditorSection>()
+  for (const block of editorBlocks.value) {
+    const label = block.entries[0].row.block_label ?? null
+    let section = byLabel.get(label)
+    if (!section) {
+      section = { label, blocks: [] }
+      byLabel.set(label, section)
+      sections.push(section)
+    }
+    section.blocks.push(block)
+  }
+  return sections
 })
 
 const editingBlock = ref<EditorBlock | null>(null)
@@ -278,6 +397,8 @@ async function saveRoutine() {
         rest_seconds: !isCardio && e.rest_seconds ? parseInt(e.rest_seconds, 10) : null,
         // ya normalizado (0,1,2…): cada mutación local renormaliza
         superset_group: e.superset_group,
+        // v0.17.0 bloques
+        block_label: e.block_label,
       }
     }))
 
@@ -297,6 +418,9 @@ watch(
     } else {
       addSheetOpen.value = false
       editingBlock.value = null
+      pendingBlockLabel.value = null
+      newBlockOpen.value = false
+      blockEditFor.value = null
     }
   },
   { immediate: true }
@@ -382,69 +506,119 @@ watch(
              (RoutineExerciseRow) y añadir vía el MISMO AddExerciseSheet del
              entreno (buscador+filtros+check de superserie). Los toggles de
              frontera y el buscador inline con debounce murieron. -->
+        <!-- v0.17.0 BLOQUES: los contenedores se agrupan en SECCIONES por
+             etiqueta (editorSections) — cada bloque con nombre lleva marco
+             gris, cabecera con su nombre + editar (renombrar/disolver) y su
+             propio "añadir aquí"; las filas sin bloque quedan a ras, como
+             siempre. Las flechas en frontera CAMBIAN de bloque (ver
+             moveExerciseUp/Down). -->
         <!-- v0.11.7: quitar una fila la difumina mientras las demás cierran
              el hueco (bk-remove, mismas keys en ambas ramas — ver WorkoutView) -->
-        <div v-if="exercises.length > 0" class="relative space-y-3 border-t border-line pt-3">
-          <TransitionGroup name="bk-remove">
-          <template v-for="block in editorBlocks">
-            <div
-              v-if="block.grouped"
-              :key="`block-${block.entries[0].row.id}`"
-              class="border border-aurora/50 rounded-sm p-2 space-y-3"
-              :data-testid="`editor-superset-container-${block.label}`"
-            >
-              <div class="flex items-center justify-center gap-2">
-                <span class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5">
-                  {{ $t('routines.supersetLabel', { label: block.label }) }}
-                </span>
-                <BkActionBtn
-                  icon="edit"
-                  :data-testid="`editor-superset-edit-${block.label}`"
-                  :aria-label="$t('workout.supersetEdit')"
-                  @click="editingBlock = block"
-                />
-              </div>
-              <RoutineExerciseRow
-                v-for="entry in block.entries"
-                :key="entry.row.id"
-                :row="entry.row"
-                :index="entry.index"
-                :count="exercises.length"
-                :all-exercises="allExercises"
-                :muscle-groups="muscleGroups"
-                :units="units"
-                :locale="auth.user?.locale || 'es'"
-                @move-up="moveExerciseUp"
-                @move-down="moveExerciseDown"
-                @remove="removeExercise"
+        <div v-if="exercises.length > 0" class="space-y-3 border-t border-line pt-3">
+          <div
+            v-for="section in editorSections"
+            :key="section.label ?? '__none__'"
+            :class="section.label !== null ? 'border border-line rounded-sm p-2 space-y-3' : 'space-y-3'"
+            :data-testid="section.label !== null ? `routine-block-${section.label}` : undefined"
+          >
+            <div v-if="section.label !== null" class="flex items-center justify-between gap-2 px-1">
+              <span class="text-xs font-display font-semibold uppercase tracking-wider text-ink-muted truncate">
+                {{ section.label }}
+              </span>
+              <BkActionBtn
+                icon="edit"
+                :data-testid="`routine-block-edit-${section.label}`"
+                :aria-label="$t('routines.blockEdit')"
+                @click="openBlockEdit(section.label)"
               />
             </div>
-            <RoutineExerciseRow
-              v-else
-              :key="`block-${block.entries[0].row.id}`"
-              :row="block.entries[0].row"
-              :index="block.entries[0].index"
-              :count="exercises.length"
-              :all-exercises="allExercises"
-              :muscle-groups="muscleGroups"
-              :units="units"
-              :locale="auth.user?.locale || 'es'"
-              @move-up="moveExerciseUp"
-              @move-down="moveExerciseDown"
-              @remove="removeExercise"
-            />
-          </template>
-          </TransitionGroup>
+
+            <div class="relative space-y-3">
+              <TransitionGroup name="bk-remove">
+              <template v-for="block in section.blocks">
+                <div
+                  v-if="block.grouped"
+                  :key="`block-${block.entries[0].row.id}`"
+                  class="border border-aurora/50 rounded-sm p-2 space-y-3"
+                  :data-testid="`editor-superset-container-${block.label}`"
+                >
+                  <div class="flex items-center justify-center gap-2">
+                    <span class="text-xs text-aurora border border-aurora/40 rounded-sm px-1.5 py-0.5">
+                      {{ $t('routines.supersetLabel', { label: block.label }) }}
+                    </span>
+                    <BkActionBtn
+                      icon="edit"
+                      :data-testid="`editor-superset-edit-${block.label}`"
+                      :aria-label="$t('workout.supersetEdit')"
+                      @click="editingBlock = block"
+                    />
+                  </div>
+                  <RoutineExerciseRow
+                    v-for="entry in block.entries"
+                    :key="entry.row.id"
+                    :row="entry.row"
+                    :index="entry.index"
+                    :count="exercises.length"
+                    :all-exercises="allExercises"
+                    :muscle-groups="muscleGroups"
+                    :units="units"
+                    :locale="auth.user?.locale || 'es'"
+                    @move-up="moveExerciseUp"
+                    @move-down="moveExerciseDown"
+                    @remove="removeExercise"
+                  />
+                </div>
+                <RoutineExerciseRow
+                  v-else
+                  :key="`block-${block.entries[0].row.id}`"
+                  :row="block.entries[0].row"
+                  :index="block.entries[0].index"
+                  :count="exercises.length"
+                  :all-exercises="allExercises"
+                  :muscle-groups="muscleGroups"
+                  :units="units"
+                  :locale="auth.user?.locale || 'es'"
+                  @move-up="moveExerciseUp"
+                  @move-down="moveExerciseDown"
+                  @remove="removeExercise"
+                />
+              </template>
+              </TransitionGroup>
+            </div>
+
+            <BkButton
+              v-if="section.label !== null"
+              variant="ghost"
+              size="sm"
+              block
+              :data-testid="`routine-block-add-${section.label}`"
+              @click="openAddTo(section.label)"
+            >
+              {{ $t('routines.addHere') }}
+            </BkButton>
+          </div>
         </div>
 
-        <BkButton
-          variant="ghost"
-          block
-          data-testid="routine-add-exercise-btn"
-          @click="addSheetOpen = true"
-        >
-          {{ $t('routines.addExercise') }}
-        </BkButton>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <BkButton
+            variant="ghost"
+            block
+            data-testid="routine-add-exercise-btn"
+            @click="openAddTo(null)"
+          >
+            {{ $t('routines.addExercise') }}
+          </BkButton>
+          <!-- v0.17.0: crear bloque = nombre + primer ejercicio (la etiqueta
+               vive en las filas: un bloque vacío no existe) -->
+          <BkButton
+            variant="ghost"
+            block
+            data-testid="routine-new-block-btn"
+            @click="newBlockOpen = true"
+          >
+            {{ $t('routines.newBlock') }}
+          </BkButton>
+        </div>
 
         <AddExerciseSheet :open="addSheetOpen" :actions="editorActions" @close="addSheetOpen = false" />
 
@@ -456,6 +630,62 @@ watch(
           @dissolve="dissolveEditingBlock"
           @swap="swapEditingMember"
         />
+
+        <!-- v0.17.0: crear bloque — nombre y de ahí al AddExerciseSheet -->
+        <BkSheet :open="newBlockOpen" :title="$t('routines.newBlock')" @close="newBlockOpen = false">
+          <div class="space-y-4" data-testid="new-block-sheet">
+            <BkField
+              v-model="newBlockName"
+              :label="$t('routines.blockName')"
+              data-testid="new-block-name-field"
+            />
+            <p class="text-xs text-ink-faint">{{ $t('routines.newBlockHint') }}</p>
+            <BkButton
+              variant="primary"
+              block
+              :disabled="!newBlockName.trim()"
+              data-testid="new-block-confirm"
+              @click="confirmNewBlock"
+            >
+              {{ $t('routines.newBlockConfirm') }}
+            </BkButton>
+          </div>
+        </BkSheet>
+
+        <!-- v0.17.0: editar bloque — renombrar o disolver -->
+        <BkSheet
+          :open="blockEditFor !== null"
+          :title="$t('routines.blockEdit')"
+          @close="blockEditFor = null"
+        >
+          <div class="space-y-4" data-testid="block-edit-sheet">
+            <BkField
+              v-model="blockNameDraft"
+              :label="$t('routines.blockName')"
+              data-testid="block-rename-field"
+            />
+            <BkButton
+              variant="primary"
+              block
+              :disabled="!blockNameDraft.trim()"
+              data-testid="block-rename-save"
+              @click="saveBlockRename"
+            >
+              {{ $t('common.save') }}
+            </BkButton>
+            <div class="border-t border-line pt-3 space-y-2">
+              <p class="text-xs text-ink-faint">{{ $t('routines.blockDissolveHint') }}</p>
+              <BkButton
+                variant="danger"
+                block
+                data-testid="block-dissolve"
+                @click="dissolveEditorBlock"
+              >
+                {{ $t('routines.blockDissolve') }}
+              </BkButton>
+            </div>
+          </div>
+        </BkSheet>
       </div>
 
       <!-- Action Buttons -->

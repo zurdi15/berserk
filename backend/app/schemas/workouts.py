@@ -61,6 +61,9 @@ class WorkoutExerciseOut(BaseModel):
     # WorkoutExercisePatchIn a propósito) — solo gobierna render agrupado y
     # gating del auto-descanso en el frontend
     superset_group: int | None
+    # v0.17.0 bloques: snapshot de la rutina (o etiqueta del alta ad-hoc en
+    # el stepper) — None = sin bloque
+    block_label: str | None
     sets: list[SetOut]
 
     model_config = {"from_attributes": True}
@@ -92,6 +95,9 @@ class PersonalRecordOut(BaseModel):
 class WorkoutExerciseIn(BaseModel):
     exercise_id: int
     note: str | None = Field(None, max_length=300)
+    # v0.17.0 bloques: en el stepper del entreno, añadir mientras miras un
+    # bloque mete el ejercicio en ESE bloque (None = sin bloque, como antes)
+    block_label: str | None = Field(None, min_length=1, max_length=40)
     # v0.6.0 offline: ver WorkoutStartIn.client_id
     client_id: str | None = Field(None, max_length=36)
 

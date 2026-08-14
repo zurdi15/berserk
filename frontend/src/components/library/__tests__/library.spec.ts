@@ -208,10 +208,52 @@ describe('ExerciseManager', () => {
       name_es: 'Press Arnold',
       name_en: 'Arnold press',
       measurement: 'strength',
+      // v0.17.0: el modo de carga viaja siempre (default kg)
+      load_mode: 'weight',
       muscle_groups: [{ muscle_group_id: 1, is_primary: true }],
       is_global: false,
       is_public: false,
     })
+  })
+
+  // v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg — opción para
+  // uno o para otro"): el selector de carga existe para fuerza/peso corporal
+  // y el valor elegido viaja en el payload de creación
+  it('v0.17.0: picking "level" load mode sends load_mode=level on create', async () => {
+    const { listExercises, listMuscleGroups, createExercise } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([
+      { id: 1, slug: 'pecho', name_es: 'Pecho', name_en: 'Chest', owner_id: null },
+    ] as never)
+    vi.mocked(createExercise).mockResolvedValue({
+      id: 21, name_es: 'Jalón asistido', name_en: 'Assisted pulldown', measurement: 'strength',
+      owner_id: 7, muscle_groups: [{ muscle_group_id: 1, is_primary: true }],
+    } as never)
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
+    await flushPromises()
+    await byTestId('exercise-name-es-field').find('input').setValue('Jalón asistido')
+    await byTestId('exercise-name-en-field').find('input').setValue('Assisted pulldown')
+
+    await byTestId('exercise-load-mode-select').find('[role="combobox"]').trigger('click')
+    const levelOption = Array.from(document.querySelectorAll('[role="option"]'))
+      .find((o) => o.textContent?.includes('Nivel')) as HTMLElement
+    expect(levelOption).not.toBeUndefined()
+    levelOption.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+
+    await byTestId('muscle-group-checkbox-1').setValue(true)
+    await byTestId('muscle-group-primary-1').setValue(true)
+
+    await byTestId('save-exercise-btn').trigger('click')
+    await flushPromises()
+
+    expect(createExercise).toHaveBeenCalledWith(
+      expect.objectContaining({ load_mode: 'level', measurement: 'strength' }),
+    )
   })
 
   // v0.9.4 (zurdi: "visible para todos y global es un poco redundante"): los

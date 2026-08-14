@@ -6,6 +6,11 @@ export type { UserOut }
 // Shared types
 export type Measurement = 'strength' | 'bodyweight' | 'timed' | 'cardio'
 
+// v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg"): 'level' =
+// el valor de la serie sigue viajando en weight_kg pero es un número plano
+// de máquina — sin conversión kg/lb, sin discos, PRs solo de nivel máximo
+export type LoadMode = 'weight' | 'level'
+
 // Catalog types
 export interface MuscleGroupOut {
   id: number
@@ -35,6 +40,10 @@ export interface ExerciseOut {
   // estos 4 valores vía Literal: narrower a propósito para que el resto del
   // frontend discrimine por union
   measurement: Measurement
+  // v0.17.0: opcional en el tipo aunque el backend siempre manda la clave
+  // (criterio de siempre: fixtures viejos siguen tipando) — resolución
+  // efectiva vía `?? 'weight'`
+  load_mode?: LoadMode
   owner_id: number | null
   // v0.12.0: el ejercicio tiene imagen — pedirla a exerciseImageUrl(id)
   has_image?: boolean
@@ -91,6 +100,10 @@ export interface WorkoutExerciseOut {
   // siguen tipando. Resolución efectiva siempre vía `?? null` y SIEMPRE a
   // través de lib/supersets.ts (contigüidad manda, nunca el valor a pelo).
   superset_group?: number | null
+  // v0.17.0 bloques: snapshot de la rutina (o etiqueta del alta ad-hoc en el
+  // stepper) — null = sin bloque. La agrupación en steps es por ETIQUETA
+  // (no por contigüidad, a diferencia de superset_group).
+  block_label?: string | null
   sets: SetOut[]
 }
 
@@ -161,6 +174,8 @@ export interface RoutineExerciseOut {
   // grupo, null = suelto) — opcional por el mismo criterio que
   // WorkoutExerciseOut.superset_group; leer siempre vía lib/supersets.ts
   superset_group?: number | null
+  // v0.17.0 bloques: nombre del bloque de la fila (null = sin bloque)
+  block_label?: string | null
 }
 
 export interface RoutineOut {
@@ -193,6 +208,8 @@ export interface RoutineExerciseIn {
   // v0.5.0 superseries: el editor manda valores YA normalizados (0,1,2…, ver
   // lib/supersets.ts); el backend los persiste tal cual
   superset_group?: number | null
+  // v0.17.0 bloques
+  block_label?: string | null
 }
 
 // Calendar types
@@ -353,6 +370,8 @@ export const createExercise = (body: {
   name_es: string
   name_en: string
   measurement: Measurement
+  // v0.17.0: 'level' = número plano en vez de kg (default 'weight')
+  load_mode?: LoadMode
   muscle_groups: ExerciseMuscleLink[]
   // item 3: ejercicio global (owner_id null) — solo un admin puede pedirlo
   is_global?: boolean
@@ -364,6 +383,8 @@ export const createExercise = (body: {
 export const updateExercise = (id: number, body: {
   name_es?: string
   name_en?: string
+  // v0.17.0: editable a posteriori — cambiar el modo no toca series guardadas
+  load_mode?: LoadMode
   muscle_groups?: ExerciseMuscleLink[]
   is_public?: boolean
 }) =>
@@ -469,6 +490,9 @@ export const deleteWorkout = (id: number) =>
 export const addWorkoutExercise = (id: number, body: {
   exercise_id: number
   note?: string | null
+  // v0.17.0 bloques: añadir mientras se mira un bloque del stepper mete el
+  // ejercicio en ese bloque
+  block_label?: string | null
   // v0.6.0 offline: UUID de replay idempotente (solo lo manda el outbox)
   client_id?: string
 }) =>
