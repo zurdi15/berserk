@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount } from 'vue'
+import { nextTick, onBeforeUnmount, ref } from 'vue'
 
 // item 2 (post-0.3.0): size="compact" para el cajón de series — dos steppers
 // a la vez en grid-cols-2 con los botones/gap por defecto ("md") no caben
@@ -11,11 +11,47 @@ import { onBeforeUnmount } from 'vue'
 // segundos, p.ej.) mientras el usuario lee "10:00" en vez de "600 s". Sin esa
 // separación, un objetivo de cardio en segundos obligaba a elegir entre un
 // valor legible y una unidad honesta con el payload.
+// v0.17.1 (zurdi: "aparte de los increase/decrease, que se pueda editar
+// directamente para poner literalmente cualquier peso, con punto o coma"):
+// `editable` convierte el VALOR en un botón que abre un input numérico —
+// tap, teclea (82,5 y 82.5 valen igual), Enter/fuera confirma, Escape
+// cancela. El valor tecleado se clampa a min/max como los taps de +/− pero
+// NO se cuantiza al step: ese era justo el punto. No combinar con `display`
+// (el input precarga el número CRUDO del modelo, no el texto pintado).
 const props = withDefaults(
-  defineProps<{ modelValue: number; step?: number; min?: number; max?: number; suffix?: string; size?: 'md' | 'compact'; display?: string }>(),
-  { step: 1, min: 0, max: 999, size: 'md' },
+  defineProps<{ modelValue: number; step?: number; min?: number; max?: number; suffix?: string; size?: 'md' | 'compact'; display?: string; editable?: boolean }>(),
+  { step: 1, min: 0, max: 999, size: 'md', editable: false },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: number] }>()
+
+const editing = ref(false)
+const draft = ref('')
+const inputEl = ref<HTMLInputElement | null>(null)
+
+async function startEdit() {
+  draft.value = String(props.modelValue)
+  editing.value = true
+  await nextTick()
+  inputEl.value?.focus()
+  // todo seleccionado: teclear reemplaza en vez de concatenar (el gesto es
+  // "pon ESTE peso", no "edita cifras del anterior")
+  inputEl.value?.select()
+}
+
+function commitEdit() {
+  // Enter confirma y el blur posterior (el input se desmonta) re-entra aquí:
+  // el guard hace el segundo paso un no-op
+  if (!editing.value) return
+  editing.value = false
+  const raw = draft.value.trim().replace(',', '.')
+  const parsed = Number(raw)
+  if (raw === '' || !Number.isFinite(parsed)) return
+  emit('update:modelValue', Number(Math.min(props.max, Math.max(props.min, parsed)).toFixed(2)))
+}
+
+function cancelEdit() {
+  editing.value = false
+}
 
 let timer: ReturnType<typeof setInterval> | null = null
 let current = 0
@@ -81,7 +117,39 @@ onBeforeUnmount(release)
     >
       −
     </button>
+    <!-- v0.17.1: con editable, el valor es un botón que abre el input de
+         entrada directa; sin él, el span de siempre. type=text +
+         inputmode=decimal (no type=number): el teclado móvil trae decimal y
+         el parseo propio acepta coma Y punto — type=number rechazaría la
+         coma en la mayoría de locales -->
+    <input
+      v-if="editing"
+      ref="inputEl"
+      v-model="draft"
+      type="text"
+      inputmode="decimal"
+      autocomplete="off"
+      data-testid="stepper-edit-input"
+      class="bk-metric text-ink text-center bg-transparent border-b border-aurora focus:outline-none min-w-0"
+      :class="size === 'compact' ? 'text-lg w-20' : 'text-2xl w-24'"
+      :aria-label="$t('common.edit')"
+      @keydown.enter.prevent="commitEdit"
+      @keydown.esc.prevent="cancelEdit"
+      @blur="commitEdit"
+    />
+    <button
+      v-else-if="editable"
+      type="button"
+      data-testid="stepper-edit"
+      class="bk-press bk-metric text-ink text-center"
+      :class="size === 'compact' ? 'text-lg' : 'text-2xl'"
+      :aria-label="$t('common.edit')"
+      @click="startEdit"
+    >
+      {{ display ?? modelValue }}<span v-if="suffix" class="text-sm text-ink-faint ml-1">{{ suffix }}</span>
+    </button>
     <span
+      v-else
       class="bk-metric text-ink text-center"
       :class="size === 'compact' ? 'text-lg' : 'text-2xl'"
     >

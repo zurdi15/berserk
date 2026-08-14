@@ -135,6 +135,90 @@ describe('BkStepper', () => {
     expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([6])
   })
 
+  // v0.17.1 (zurdi: "que se pueda editar directamente para poner literalmente
+  // cualquier peso, con punto o coma"): entrada directa tocando el valor
+  describe('editable (v0.17.1)', () => {
+    function buildEditable(props: Record<string, unknown> = {}) {
+      return mount(BkStepper, {
+        props: { modelValue: 20, step: 2.5, min: 2.5, max: 500, suffix: 'kg', editable: true, ...props },
+        global: { plugins: [createI18nInstance()] },
+      })
+    }
+
+    it('renders the value as a button that opens a decimal input on click', async () => {
+      const wrapper = buildEditable()
+      const valueBtn = wrapper.get('[data-testid="stepper-edit"]')
+      expect(valueBtn.text()).toContain('20')
+      await valueBtn.trigger('click')
+      const input = wrapper.get('[data-testid="stepper-edit-input"]')
+      expect(input.attributes('inputmode')).toBe('decimal')
+      expect((input.element as HTMLInputElement).value).toBe('20')
+    })
+
+    it('accepts a comma as decimal separator (82,5 → 82.5)', async () => {
+      const wrapper = buildEditable()
+      await wrapper.get('[data-testid="stepper-edit"]').trigger('click')
+      const input = wrapper.get('[data-testid="stepper-edit-input"]')
+      await input.setValue('82,5')
+      await input.trigger('keydown', { key: 'Enter' })
+      expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([82.5])
+    })
+
+    it('accepts a dot too, and values off the step grid (43.7)', async () => {
+      const wrapper = buildEditable()
+      await wrapper.get('[data-testid="stepper-edit"]').trigger('click')
+      const input = wrapper.get('[data-testid="stepper-edit-input"]')
+      await input.setValue('43.7')
+      await input.trigger('blur')
+      expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([43.7])
+    })
+
+    it('clamps typed values to min/max like the +/- taps', async () => {
+      const wrapper = buildEditable()
+      await wrapper.get('[data-testid="stepper-edit"]').trigger('click')
+      const input = wrapper.get('[data-testid="stepper-edit-input"]')
+      await input.setValue('9999')
+      await input.trigger('keydown', { key: 'Enter' })
+      expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([500])
+    })
+
+    it('ignores garbage and empty input (no emit), and Escape cancels', async () => {
+      const wrapper = buildEditable()
+      await wrapper.get('[data-testid="stepper-edit"]').trigger('click')
+      const input = wrapper.get('[data-testid="stepper-edit-input"]')
+      await input.setValue('8kg2')
+      await input.trigger('keydown', { key: 'Enter' })
+      expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+
+      await wrapper.get('[data-testid="stepper-edit"]').trigger('click')
+      const input2 = wrapper.get('[data-testid="stepper-edit-input"]')
+      await input2.setValue('90')
+      await input2.trigger('keydown', { key: 'Escape' })
+      expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+      // el botón vuelve con el valor original
+      expect(wrapper.get('[data-testid="stepper-edit"]').text()).toContain('20')
+    })
+
+    it('Enter commits once even though the input blur fires right after (guard)', async () => {
+      const wrapper = buildEditable()
+      await wrapper.get('[data-testid="stepper-edit"]').trigger('click')
+      const input = wrapper.get('[data-testid="stepper-edit-input"]')
+      await input.setValue('100')
+      await input.trigger('keydown', { key: 'Enter' })
+      await input.trigger('blur')
+      expect(wrapper.emitted('update:modelValue')).toHaveLength(1)
+    })
+
+    it('a non-editable stepper keeps the plain span (no value button)', () => {
+      const wrapper = mount(BkStepper, {
+        props: { modelValue: 20 },
+        global: { plugins: [createI18nInstance()] },
+      })
+      expect(wrapper.find('[data-testid="stepper-edit"]').exists()).toBe(false)
+      expect(wrapper.findAll('button')).toHaveLength(2)
+    })
+  })
+
   it('labels the buttons via i18n', () => {
     const wrapper = mount(BkStepper, {
       props: { modelValue: 5 },

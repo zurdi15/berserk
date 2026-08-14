@@ -180,7 +180,9 @@ function submit(keepOpen: boolean) {
       <div class="w-full grid grid-cols-2 gap-2">
         <div class="min-w-0 flex flex-col items-center">
           <span class="block text-xs text-ink-muted mb-2">{{ loadLabel }}</span>
-          <BkStepper v-model="weightDisplay" size="compact" :step="loadStep" :min="isLevel ? 1 : 2.5" :max="loadMax" :suffix="loadSuffix" />
+          <!-- v0.17.1 (zurdi): tocar el valor abre entrada directa —
+               "literalmente cualquier peso", con coma o punto decimal -->
+          <BkStepper v-model="weightDisplay" size="compact" editable :step="loadStep" :min="isLevel ? 1 : 2.5" :max="loadMax" :suffix="loadSuffix" />
         </div>
         <div class="min-w-0 flex flex-col items-center">
           <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
@@ -203,7 +205,7 @@ function submit(keepOpen: boolean) {
       </div>
       <div class="min-w-0 flex flex-col items-center">
         <span class="block text-xs text-ink-muted mb-2">{{ loadLabelOptional }}</span>
-        <BkStepper v-model="weightDisplay" size="compact" :step="loadStep" :min="0" :max="loadMax" :suffix="loadSuffix" />
+        <BkStepper v-model="weightDisplay" size="compact" editable :step="loadStep" :min="0" :max="loadMax" :suffix="loadSuffix" />
       </div>
     </div>
 

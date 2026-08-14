@@ -137,18 +137,21 @@ const restOptions = [
         :min="0"
         :max="100"
         :step="1"
+        editable
         @update:model-value="row.target_weight_kg = $event > 0 ? $event : null"
       />
     </div>
 
     <div v-else-if="!isCardio">
       <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetWeight') }}</label>
+      <!-- v0.17.1 (zurdi): el objetivo también admite entrada directa -->
       <BkStepper
         :model-value="kgToDisplay(row.target_weight_kg || 0, units)"
         :min="0"
         :max="kgToDisplay(300, units)"
         :step="2.5"
         :suffix="units"
+        editable
         @update:model-value="row.target_weight_kg = $event > 0 ? displayToKg($event, units) : null"
       />
     </div>

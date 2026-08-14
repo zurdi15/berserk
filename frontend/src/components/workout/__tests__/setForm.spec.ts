@@ -41,6 +41,21 @@ describe('SetForm', () => {
     expect(payload.duration_seconds).toBeUndefined()
   })
 
+  // v0.17.1 (zurdi: "que se pueda editar directamente para poner literalmente
+  // cualquier peso y que acepte punto y coma"): el stepper de carga admite
+  // entrada directa — el valor tecleado viaja al payload sin cuantizar al step
+  it('v0.17.1: typing a comma-decimal weight directly lands in the payload (62,5 → 62.5 kg)', async () => {
+    wrapper = build('strength', 'kg')
+    await wrapper.get('[data-testid="stepper-edit"]').trigger('click')
+    const input = wrapper.get('[data-testid="stepper-edit-input"]')
+    await input.setValue('62,5')
+    await input.trigger('keydown', { key: 'Enter' })
+
+    await wrapper.find('form').trigger('submit')
+    const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+    expect(payload.weight_kg).toBe(62.5)
+  })
+
   // v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg")
   describe('v0.17.0: level load mode', () => {
     it('emits the plain number WITHOUT unit conversion even for an lb user', async () => {
@@ -274,7 +289,12 @@ describe('SetForm', () => {
       // columnas en un móvil real (ver la aritmética en SetForm.vue)
       for (const measurement of ['strength', 'bodyweight', 'cardio'] as const) {
         wrapper = build(measurement)
-        const gridButtons = wrapper.get('.grid.grid-cols-2').findAll('button')
+        // v0.17.1: el VALOR del stepper de carga también es un botón
+        // (entrada directa) — aquí solo se miden los slabs +/− de verdad
+        const gridButtons = wrapper
+          .get('.grid.grid-cols-2')
+          .findAll('button')
+          .filter((b) => b.attributes('data-testid') !== 'stepper-edit')
         expect(gridButtons.length).toBeGreaterThan(0)
         for (const button of gridButtons) {
           expect(button.classes()).toEqual(expect.arrayContaining(['w-8', 'h-8']))
