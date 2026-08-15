@@ -256,15 +256,6 @@ const celebrationRune = computed<RuneName>(() => {
   return primaryRune(exercise, muscleGroups.value) ?? 'pr'
 })
 
-// v0.17.0: los récords de una tanda son siempre del MISMO ejercicio (los
-// produce una única serie) — si va en modo nivel, la celebración pinta el
-// valor como número plano
-const celebrationPlainLoad = computed(
-  () =>
-    (exerciseMap.value.get(activeWorkout.lastRecords[0]?.exercise_id)?.load_mode ?? 'weight') ===
-    'level',
-)
-
 // ticks cada segundo con setInterval, pero el cálculo parte siempre de started_at:
 // si la pestaña estuvo dormida el número salta a lo correcto en el próximo tick
 const elapsedLabel = computed(() => {
@@ -587,7 +578,6 @@ onBeforeUnmount(stopTicker)
       :records="activeWorkout.lastRecords"
       :rune-name="celebrationRune"
       :units="units"
-      :plain-load="celebrationPlainLoad"
       @done="onCelebrationDone"
     />
 
@@ -597,7 +587,6 @@ onBeforeUnmount(stopTicker)
       v-if="finishedWorkout"
       :workout="finishedWorkout"
       :records="sessionRecords"
-      :exercises="exercises"
       @close="closeSummary"
     />
 

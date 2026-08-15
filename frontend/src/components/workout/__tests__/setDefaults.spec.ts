@@ -34,7 +34,7 @@ describe('resolveNewSetDefaults (item 2)', () => {
       [historySet({ reps: 5, weight_kg: 80 })],
       1, routines as never, 5,
     )
-    expect(result).toEqual({ reps: 3, weight_kg: 120, duration_seconds: null, distance_m: null })
+    expect(result).toEqual({ reps: 3, weight_kg: 120, duration_seconds: null, distance_m: null, load_mode: 'weight' })
   })
 
   it('priority 2: falls back to the last set of the previous session when this workout has none yet', () => {
@@ -43,7 +43,7 @@ describe('resolveNewSetDefaults (item 2)', () => {
       [historySet({ reps: 6, weight_kg: 82.5 }), historySet({ reps: 5, weight_kg: 85 })],
       1, routines as never, 5,
     )
-    expect(result).toEqual({ reps: 5, weight_kg: 85, duration_seconds: null, distance_m: null })
+    expect(result).toEqual({ reps: 5, weight_kg: 85, duration_seconds: null, distance_m: null, load_mode: 'weight' })
   })
 
   // fix I1 (revisión): el ÚLTIMO set del array, is_warmup incluido, tapaba el
@@ -53,7 +53,7 @@ describe('resolveNewSetDefaults (item 2)', () => {
       [set({ reps: 5, weight_kg: 100, is_warmup: false }), set({ id: 2, reps: 10, weight_kg: 40, is_warmup: true })],
       null, null, [], 5,
     )
-    expect(result).toEqual({ reps: 5, weight_kg: 100, duration_seconds: null, distance_m: null })
+    expect(result).toEqual({ reps: 5, weight_kg: 100, duration_seconds: null, distance_m: null, load_mode: 'weight' })
   })
 
   it('I1 fix: warmups-then-first-working-set — the previous session\'s effective value wins over its own trailing warmup, when today has no sets yet', () => {
@@ -62,7 +62,7 @@ describe('resolveNewSetDefaults (item 2)', () => {
       [historySet({ reps: 8, weight_kg: 80, is_warmup: false }), historySet({ reps: 10, weight_kg: 20, is_warmup: true })],
       1, routines as never, 5,
     )
-    expect(result).toEqual({ reps: 8, weight_kg: 80, duration_seconds: null, distance_m: null })
+    expect(result).toEqual({ reps: 8, weight_kg: 80, duration_seconds: null, distance_m: null, load_mode: 'weight' })
   })
 
   it('I1 fix: falls back to the raw last set when EVERY set in this workout was a warmup (better than nothing)', () => {
@@ -70,7 +70,7 @@ describe('resolveNewSetDefaults (item 2)', () => {
       [set({ reps: 12, weight_kg: 20, is_warmup: true })],
       null, null, [], 5,
     )
-    expect(result).toEqual({ reps: 12, weight_kg: 20, duration_seconds: null, distance_m: null })
+    expect(result).toEqual({ reps: 12, weight_kg: 20, duration_seconds: null, distance_m: null, load_mode: 'weight' })
   })
 
   it('priority 3: falls back to the routine target when there is no workout or history data', () => {

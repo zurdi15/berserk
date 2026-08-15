@@ -13,10 +13,6 @@ import PlateCalculatorSheet from './PlateCalculatorSheet.vue'
 const props = withDefaults(
   defineProps<{
     measurement: Measurement
-    // v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg"): en modo
-    // 'level' la columna de carga es un stepper plano (paso 1, sin unidad,
-    // sin conversión kg/lb y sin calculadora de discos)
-    loadMode?: LoadMode
     units?: 'kg' | 'lb'
     // precarga desde una serie existente (edición) o desde el default
     // calculado por item 2 (registro nuevo) — Partial porque el default de
@@ -30,7 +26,7 @@ const props = withDefaults(
     // así que ambas variantes de submit harían exactamente lo mismo
     inline?: boolean
   }>(),
-  { loadMode: 'weight', units: 'kg', initialSet: null, editing: false, inline: false },
+  { units: 'kg', initialSet: null, editing: false, inline: false },
 )
 // keepOpen (item 1): false = "Registrar serie" (cierra el cajón), true =
 // "Registrar y otra" (se queda abierto, valores conservados para la
@@ -67,19 +63,39 @@ const WEIGHT_UI = {
   lb: { step: 5, initial: 45, max: 1100 },
 } as const
 
-// v0.17.0 modo nivel: número plano de máquina — el valor viaja TAL CUAL en
-// weight_kg (sin displayToKg/kgToDisplay: el nivel 12 es 12 en cualquier
-// unidad). Rango generoso (zurdi dijo "del 1 al 20" pero hay máquinas con
-// más posiciones); paso siempre 1.
+// v0.18.0 (zurdi: "el modo se pone cuando VAS A HACER el ejercicio — un día
+// la polea libre es la de kg y otro la de niveles"): el modo kg/nivel se
+// elige AQUÍ, por serie, con un toggle sobre la columna de carga. Default:
+// el modo de la última serie (initialSet lo trae del prefill/edición —
+// dentro del entreno, de la sesión anterior o de la serie que se corrige).
+// En nivel el valor viaja TAL CUAL en weight_kg (sin displayToKg/
+// kgToDisplay: el nivel 12 es 12 en cualquier unidad); rango generoso
+// (zurdi dijo "del 1 al 20" pero hay máquinas con más posiciones), paso 1.
 const LEVEL_UI = { step: 1, initial: 10, max: 100 } as const
-const isLevel = computed(() => props.loadMode === 'level')
+const mode = ref<LoadMode>(props.initialSet?.load_mode ?? 'weight')
+const isLevel = computed(() => mode.value === 'level')
 const loadStep = computed(() => (isLevel.value ? LEVEL_UI.step : WEIGHT_UI[props.units].step))
 const loadMax = computed(() => (isLevel.value ? LEVEL_UI.max : WEIGHT_UI[props.units].max))
 const loadSuffix = computed(() => (isLevel.value ? '' : props.units))
-const loadLabel = computed(() => t(isLevel.value ? 'workout.level' : 'workout.weight'))
-const loadLabelOptional = computed(() =>
-  t(isLevel.value ? 'workout.levelOptional' : 'workout.weightOptional'),
-)
+
+// cambiar de modo resetea la carga: 80 kg no "son" un nivel ni al revés —
+// si el prefill venía justo del modo al que se vuelve, se restaura su valor
+function switchMode(next: LoadMode) {
+  if (mode.value === next) return
+  mode.value = next
+  if (
+    props.initialSet?.weight_kg != null &&
+    (props.initialSet.load_mode ?? 'weight') === next
+  ) {
+    weightDisplay.value =
+      next === 'level'
+        ? props.initialSet.weight_kg
+        : kgToDisplay(props.initialSet.weight_kg, props.units)
+    return
+  }
+  if (next === 'level') weightDisplay.value = LEVEL_UI.initial
+  else weightDisplay.value = props.measurement === 'strength' ? WEIGHT_UI[props.units].initial : 0
+}
 
 // valores por defecto razonables; se mantienen entre series del mismo bloque
 // (no se resetean tras cada submit) para no repetir el mismo tecleo en cada serie.
@@ -88,11 +104,11 @@ const loadLabelOptional = computed(() =>
 const reps = ref(props.initialSet?.reps ?? 8)
 const weightDisplay = ref(
   props.initialSet?.weight_kg != null
-    ? (props.loadMode === 'level'
+    ? (mode.value === 'level'
         ? props.initialSet.weight_kg
         : kgToDisplay(props.initialSet.weight_kg, props.units))
     : (props.measurement === 'strength'
-        ? (props.loadMode === 'level' ? LEVEL_UI.initial : WEIGHT_UI[props.units].initial)
+        ? (mode.value === 'level' ? LEVEL_UI.initial : WEIGHT_UI[props.units].initial)
         : 0),
 )
 const durationSeconds = ref(props.initialSet?.duration_seconds ?? (props.measurement === 'cardio' ? 60 : 30))
@@ -126,6 +142,7 @@ function buildValue(): SetIn | null {
       value.weight_kg = isLevel.value
         ? weightDisplay.value
         : displayToKg(weightDisplay.value, units.value)
+      value.load_mode = mode.value
       break
     case 'bodyweight':
       value.reps = reps.value
@@ -133,6 +150,7 @@ function buildValue(): SetIn | null {
         value.weight_kg = isLevel.value
           ? weightDisplay.value
           : displayToKg(weightDisplay.value, units.value)
+        value.load_mode = mode.value
       }
       break
     case 'timed':
@@ -173,13 +191,35 @@ function submit(keepOpen: boolean) {
          propia línea. Con grid grid-cols-2 cada columna tiene un ancho FIJO
          (independiente del contenido); min-w-0 es la garantía estándar de
          Tailwind para que ese contenido nunca fuerce la columna a crecer -->
-    <!-- v0.17.0: en modo nivel el stepper de carga es plano (paso 1, sin
-         unidad) y la calculadora de discos no aplica — un nivel de máquina
-         no se compone con discos -->
+    <!-- v0.18.0 (zurdi: "el modo se pone cuando vas a hacer el ejercicio"):
+         la cabecera de la columna de carga ES el toggle kg/nivel — por
+         serie, con el último modo usado como default. En nivel el stepper es
+         plano (paso 1, sin unidad) y la calculadora de discos no aplica -->
     <div v-if="measurement === 'strength'" class="w-full space-y-2">
       <div class="w-full grid grid-cols-2 gap-2">
         <div class="min-w-0 flex flex-col items-center">
-          <span class="block text-xs text-ink-muted mb-2">{{ loadLabel }}</span>
+          <div class="flex items-center gap-1 mb-2" data-testid="load-mode-toggle">
+            <button
+              type="button"
+              class="bk-press px-2 py-0.5 rounded-sm border text-xs"
+              :class="!isLevel ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+              :aria-pressed="!isLevel ? 'true' : 'false'"
+              data-testid="load-mode-weight"
+              @click="switchMode('weight')"
+            >
+              {{ t('workout.weight') }}
+            </button>
+            <button
+              type="button"
+              class="bk-press px-2 py-0.5 rounded-sm border text-xs"
+              :class="isLevel ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+              :aria-pressed="isLevel ? 'true' : 'false'"
+              data-testid="load-mode-level"
+              @click="switchMode('level')"
+            >
+              {{ t('workout.level') }}
+            </button>
+          </div>
           <!-- v0.17.1 (zurdi): tocar el valor abre entrada directa —
                "literalmente cualquier peso", con coma o punto decimal -->
           <BkStepper v-model="weightDisplay" size="compact" editable :step="loadStep" :min="isLevel ? 1 : 2.5" :max="loadMax" :suffix="loadSuffix" />
@@ -204,7 +244,30 @@ function submit(keepOpen: boolean) {
         <BkStepper v-model="reps" size="compact" :step="1" :min="1" :max="100" />
       </div>
       <div class="min-w-0 flex flex-col items-center">
-        <span class="block text-xs text-ink-muted mb-2">{{ loadLabelOptional }}</span>
+        <!-- mismo toggle que en fuerza — el lastre opcional también puede
+             ser un nivel de máquina asistida (0 = sin carga, como siempre) -->
+        <div class="flex items-center gap-1 mb-2" data-testid="load-mode-toggle">
+          <button
+            type="button"
+            class="bk-press px-2 py-0.5 rounded-sm border text-xs"
+            :class="!isLevel ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+            :aria-pressed="!isLevel ? 'true' : 'false'"
+            data-testid="load-mode-weight"
+            @click="switchMode('weight')"
+          >
+            {{ t('workout.weight') }}
+          </button>
+          <button
+            type="button"
+            class="bk-press px-2 py-0.5 rounded-sm border text-xs"
+            :class="isLevel ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+            :aria-pressed="isLevel ? 'true' : 'false'"
+            data-testid="load-mode-level"
+            @click="switchMode('level')"
+          >
+            {{ t('workout.level') }}
+          </button>
+        </div>
         <BkStepper v-model="weightDisplay" size="compact" editable :step="loadStep" :min="0" :max="loadMax" :suffix="loadSuffix" />
       </div>
     </div>

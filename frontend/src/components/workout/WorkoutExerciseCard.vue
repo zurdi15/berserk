@@ -154,12 +154,8 @@ const isLast = computed(() => index.value === -1 || index.value === props.exerci
 // item 6: los ejercicios de cardio se leen como un bloque distinto (sin
 // numerar, con acento de borde) en vez de series numeradas de fuerza
 const isCardio = computed(() => props.exercise?.measurement === 'cardio')
-
-// v0.17.0 (zurdi: "números planos en vez de kg"): modo de carga del
-// ejercicio — gobierna cómo se pinta weight_kg en TODA la card (filas de
-// series, hint de última vez) y baja al SetForm (stepper de nivel sin
-// unidad ni calculadora de discos)
-const loadMode = computed(() => props.exercise?.load_mode ?? 'weight')
+// (v0.18.0: el modo kg/nivel vive en CADA SERIE — set.load_mode; el modo
+// por-ejercicio de la v0.17.x murió)
 
 // fix M10a (revisión): el contador del header debe ser el nº de series
 // EFECTIVAS (sin calentamiento), como en el resto de la app (FinishSummary,
@@ -250,7 +246,7 @@ async function saveNote() {
 // agrupada (formatHistoryLine) murió con su último consumidor
 const historyLines = computed(() => {
   if (!props.exercise || !history.value?.sets.length) return []
-  return formatHistorySetLines(history.value.sets, props.exercise.measurement, props.units, loadMode.value)
+  return formatHistorySetLines(history.value.sets, props.exercise.measurement, props.units)
 })
 
 const historyDateLabel = computed(() => {
@@ -276,7 +272,7 @@ const drawerDefaults = computed(() => {
 function formatSetValue(set: SetOut): string {
   const measurement = props.exercise?.measurement
   if (measurement === 'strength' || (measurement === 'bodyweight' && set.weight_kg)) {
-    return `${set.reps} × ${formatLoad(set.weight_kg ?? 0, props.units, loadMode.value)}`
+    return `${set.reps} × ${formatLoad(set.weight_kg ?? 0, props.units, set.load_mode ?? 'weight')}`
   }
   if (measurement === 'bodyweight') {
     return `${set.reps} ${t('workout.reps')}`
@@ -846,7 +842,6 @@ async function moveDown() {
       <div v-if="exercise" class="space-y-3">
         <SetForm
           :measurement="exercise.measurement"
-          :load-mode="loadMode"
           :units="units"
           :initial-set="drawerDefaults"
           :editing="editingSet !== null"

@@ -61,11 +61,10 @@ const totalSets = computed(() =>
 
 const totalVolume = computed(() =>
   props.workout.exercises.reduce((sum, e) => {
-    // v0.17.0: los ejercicios en modo nivel no suman volumen — su weight_kg
-    // es un número plano de máquina, no kg (mismo criterio que el backend)
-    if (resolveExercise(e.exercise_id)?.load_mode === 'level') return sum
+    // v0.18.0: las series en modo nivel no suman volumen — su weight_kg es
+    // un número plano de máquina, no kg (mismo criterio que el backend)
     const exerciseVolume = e.sets
-      .filter((s) => !s.is_warmup && s.weight_kg != null && s.reps != null)
+      .filter((s) => !s.is_warmup && s.weight_kg != null && s.reps != null && (s.load_mode ?? 'weight') !== 'level')
       .reduce((acc, s) => acc + s.weight_kg! * s.reps!, 0)
     return sum + exerciseVolume
   }, 0),

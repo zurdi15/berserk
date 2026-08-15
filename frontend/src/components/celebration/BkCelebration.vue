@@ -9,11 +9,8 @@ import { core } from '@/tokens'
 import { formatWeight } from '@/utils/units'
 
 const props = withDefaults(
-  // v0.17.0 plainLoad: el ejercicio del récord va en modo nivel — el valor
-  // se pinta como número plano, sin unidad ni conversión (lo computa quien
-  // monta, que es quien tiene el catálogo; ver WorkoutView)
-  defineProps<{ records: PersonalRecordOut[]; runeName: RuneName; units?: 'kg' | 'lb'; plainLoad?: boolean }>(),
-  { units: 'kg', plainLoad: false },
+  defineProps<{ records: PersonalRecordOut[]; runeName: RuneName; units?: 'kg' | 'lb' }>(),
+  { units: 'kg' },
 )
 const emit = defineEmits<{ done: [] }>()
 
@@ -40,8 +37,11 @@ let dismissed = false
 // todos los kinds de récord (max_weight, est_1rm, max_volume) vienen del backend
 // en kg — mismo formateador que FinishSummary, para que el mismo PR no cambie
 // de aspecto entre la celebración y el resumen
-function formatValue(value: number): string {
-  return props.plainLoad ? `${value}` : formatWeight(value, props.units)
+// v0.18.0: un récord de nivel (load_mode en el propio récord) se pinta como
+// número plano, sin unidad ni conversión
+function formatValue(value: number, record: PersonalRecordOut): string {
+  if ((record.load_mode ?? 'weight') === 'level') return `${value}`
+  return formatWeight(value, props.units)
 }
 
 function countUp() {
@@ -127,7 +127,7 @@ onBeforeUnmount(() => {
         class="relative bk-metric text-ember text-xl"
         :data-testid="`celebration-record-${record.id}`"
       >
-        {{ t(`progress.kinds.${record.kind}`) }} — {{ formatValue(displayValues[i]) }}
+        {{ t(`progress.kinds.${record.kind}`) }} — {{ formatValue(displayValues[i], record) }}
       </p>
     </div>
   </Teleport>

@@ -257,7 +257,7 @@ describe('WorkoutExerciseCard', () => {
       await drawerForm().trigger('submit')
       await flushPromises()
 
-      expect(actions.updateSet).toHaveBeenCalledWith(20, 1, { is_warmup: false, reps: 5, weight_kg: 100 })
+      expect(actions.updateSet).toHaveBeenCalledWith(20, 1, { is_warmup: false, reps: 5, weight_kg: 100, load_mode: 'weight' })
       expect(document.body.querySelector('[role="dialog"]')).toBeNull()
     })
 
@@ -290,6 +290,8 @@ describe('WorkoutExerciseCard', () => {
         is_warmup: false,
         reps: 5,
         weight_kg: 102.5,
+        // v0.18.0: el modo viaja en todo payload de serie de fuerza
+        load_mode: 'weight',
       })
     })
 

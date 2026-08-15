@@ -387,6 +387,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
       distance_m: body.distance_m ?? null,
       is_warmup: body.is_warmup ?? false,
       rpe: body.rpe ?? null,
+      load_mode: body.load_mode ?? 'weight',
       completed_at: new Date().toISOString(),
     }
     wex.sets = [...wex.sets, newSet]
@@ -419,6 +420,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
             distance_m: body.distance_m ?? null,
             is_warmup: body.is_warmup ?? false,
             rpe: body.rpe ?? null,
+            load_mode: body.load_mode ?? 'weight',
           }
         : s,
     )

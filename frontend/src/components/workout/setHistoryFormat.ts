@@ -1,4 +1,4 @@
-import type { ExerciseHistorySetOut, LoadMode, Measurement } from '@/api/domain'
+import type { ExerciseHistorySetOut, Measurement } from '@/api/domain'
 import { formatLoad } from '@/utils/units'
 import { formatDuration } from './duration'
 
@@ -13,8 +13,10 @@ function setLineLabel(
   set: ExerciseHistorySetOut,
   measurement: Measurement,
   units: 'kg' | 'lb',
-  loadMode: LoadMode,
 ): string {
+  // v0.18.0: el modo viaja en CADA serie — una sesión puede mezclar kg y
+  // niveles (la polea de turno), y cada línea se pinta como se registró
+  const loadMode = set.load_mode ?? 'weight'
   switch (measurement) {
     case 'strength':
       return `${set.reps} × ${formatLoad(set.weight_kg ?? 0, units, loadMode)}`
@@ -49,10 +51,8 @@ export function formatHistorySetLines(
   sets: ExerciseHistorySetOut[],
   measurement: Measurement,
   units: 'kg' | 'lb',
-  // v0.17.0: en modo 'level' la carga se pinta como número plano sin unidad
-  loadMode: LoadMode = 'weight',
 ): string[] {
   const effective = sets.filter((s) => !s.is_warmup)
   const source = effective.length ? effective : sets
-  return source.map((set, i) => `S${i + 1} · ${setLineLabel(set, measurement, units, loadMode)}`)
+  return source.map((set, i) => `S${i + 1} · ${setLineLabel(set, measurement, units)}`)
 }

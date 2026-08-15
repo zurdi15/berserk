@@ -55,11 +55,6 @@ class ExerciseIn(BaseModel):
     name_es: str = Field(min_length=1, max_length=80)
     name_en: str = Field(min_length=1, max_length=80)
     measurement: Literal["strength", "bodyweight", "timed", "cardio"]
-    # v0.17.0: 'level' = número plano de máquina en vez de kg (ver
-    # models.Exercise.load_mode) — solo tiene efecto real en strength/
-    # bodyweight (timed/cardio ni registran peso), pero no se valida esa
-    # combinación: un load_mode en un cardio es inerte, no un error
-    load_mode: Literal["weight", "level"] = "weight"
     muscle_groups: list[ExerciseMuscleLink] = Field(min_length=1)
     # item 3: ejercicio global (owner_id null, visible a todo el mundo) —
     # solo un admin puede pedirlo, igual que MuscleGroupIn.is_global
@@ -79,9 +74,6 @@ class ExerciseIn(BaseModel):
 class ExercisePatchIn(BaseModel):
     name_es: str | None = Field(None, min_length=1, max_length=80)
     name_en: str | None = Field(None, min_length=1, max_length=80)
-    # v0.17.0: editable a posteriori (a diferencia de measurement): cambiar
-    # el modo no toca las series ya guardadas, solo cómo se leen desde ya
-    load_mode: Literal["weight", "level"] | None = None
     muscle_groups: list[ExerciseMuscleLink] | None = Field(None, min_length=1)
     # anulable a nivel de tipo por consistencia, pero None = "no lo toques"
     # (ver update_exercise: solo se aplica si no es None), nunca "vuelve a
@@ -99,8 +91,6 @@ class ExerciseOut(BaseModel):
     name_es: str
     name_en: str
     measurement: str
-    # v0.17.0: 'weight' | 'level' — default para no tocar fixtures viejos
-    load_mode: str = "weight"
     owner_id: int | None
     is_public: bool
     # W2 feature 1: atribución para la sección "catálogo-ish" del frontend

@@ -43,14 +43,17 @@ def estimate_1rm(weight_kg: float, reps: int) -> float:
 
 
 def effective_set_filters() -> tuple:
-    """Condiciones de un set "efectivo" de fuerza: sin calentamientos, con
-    reps y peso registrados. Único sitio que define el criterio — lo comparten
-    session_volume (por sesión) y las stats agregadas de progress.py (por
-    usuario, item de round 8) para no repetir la misma tripleta de where()."""
+    """Condiciones de un set "efectivo" de fuerza EN KG: sin calentamientos,
+    con reps y peso registrados, y en modo peso — una serie en modo nivel
+    (v0.18.0) lleva un número plano de máquina en weight_kg y sumarla como
+    kg inventaría unidades. Único sitio que define el criterio — lo
+    comparten session_volume (por sesión) y los agregados de volumen de
+    progress.py/social.py para no repetir el mismo where()."""
     return (
         WorkoutSet.is_warmup.is_(False),
         WorkoutSet.reps.is_not(None),
         WorkoutSet.weight_kg.is_not(None),
+        WorkoutSet.load_mode != "level",
     )
 
 
@@ -86,10 +89,12 @@ def detect_prs(
         return []
     if wset.is_warmup or not wset.reps or not wset.weight_kg:
         return []
-    # v0.17.0 load_mode='level': el "peso" es un número plano de máquina —
-    # el nivel más alto sigue siendo un récord legítimo, pero e1RM (fórmula
-    # sobre kg) y volumen (nivel×reps) no significan nada
-    if exercise.load_mode == "level":
+    # v0.18.0: el modo vive en la SERIE ("un día la polea es la de kg y otro
+    # la de niveles" — zurdi). Una serie en nivel solo puntúa el nivel más
+    # alto (e1RM y volumen son aritmética de kg), y SOLO compite contra
+    # récords de nivel — comparar nivel 12 contra 100 kg no significa nada,
+    # de ahí el filtro por load_mode en la búsqueda del mejor.
+    if wset.load_mode == "level":
         candidates = {"max_weight": float(wset.weight_kg)}
     else:
         candidates = {
@@ -104,6 +109,7 @@ def detect_prs(
                 PersonalRecord.owner_id == owner_id,
                 PersonalRecord.exercise_id == exercise.id,
                 PersonalRecord.kind == kind,
+                PersonalRecord.load_mode == wset.load_mode,
             )
         )
         if best is None or value > best:
@@ -113,6 +119,7 @@ def detect_prs(
                 kind=kind,
                 value=value,
                 set_id=wset.id,
+                load_mode=wset.load_mode,
                 achieved_at=achieved_at or utcnow(),
             )
             db.add(record)

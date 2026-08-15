@@ -555,7 +555,7 @@ def update_set(
         validate_set_fields(exercise.measurement, payload.model_dump())
     except ValueError:
         raise HTTPException(status_code=422, detail="invalid_set_fields") from None
-    for field in (*SET_VALUE_FIELDS, "is_warmup", "rpe"):
+    for field in (*SET_VALUE_FIELDS, "is_warmup", "rpe", "load_mode"):
         setattr(wset, field, getattr(payload, field))
     # el volumen se calcula con una query aparte (autoflush está desactivado):
     # sin este flush leería el peso/reps viejos de la serie que se acaba de editar

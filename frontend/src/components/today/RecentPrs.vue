@@ -38,9 +38,10 @@ function getExerciseName(exerciseId: number): string {
 // max_weight es un peso REAL registrado: conserva su precisión. est_1rm y
 // max_volume son magnitudes DERIVADAS (estimación / suma agregada): zurdi
 // pidió sin decimales para esas — ver formatWeightInt en utils/units.ts
-// v0.17.0: modo nivel = número plano sin unidad (mismo criterio que PrList)
+// v0.18.0: modo nivel = número plano sin unidad, leído DEL récord (mismo
+// criterio que PrList)
 function formatRecordValue(value: number, record: PersonalRecordOut): string {
-  if (exerciseMap.value.get(record.exercise_id)?.load_mode === 'level') return `${value}`
+  if ((record.load_mode ?? 'weight') === 'level') return `${value}`
   return record.kind === 'max_weight'
     ? formatWeight(value, units.value)
     : formatWeightInt(value, units.value)

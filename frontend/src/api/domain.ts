@@ -6,9 +6,11 @@ export type { UserOut }
 // Shared types
 export type Measurement = 'strength' | 'bodyweight' | 'timed' | 'cardio'
 
-// v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg"): 'level' =
-// el valor de la serie sigue viajando en weight_kg pero es un número plano
-// de máquina — sin conversión kg/lb, sin discos, PRs solo de nivel máximo
+// v0.18.0 (zurdi: "el modo se pone cuando VAS A HACER el ejercicio — un día
+// la polea libre es la de kg y otro la de niveles"): 'level' = weight_kg es
+// un número plano de máquina, sin conversión kg/lb ni discos. Por SERIE
+// (SetOut.load_mode), ya no por ejercicio; los PRs compiten dentro de su
+// modo y llevan el suyo (PersonalRecordOut.load_mode).
 export type LoadMode = 'weight' | 'level'
 
 // Catalog types
@@ -40,10 +42,6 @@ export interface ExerciseOut {
   // estos 4 valores vía Literal: narrower a propósito para que el resto del
   // frontend discrimine por union
   measurement: Measurement
-  // v0.17.0: opcional en el tipo aunque el backend siempre manda la clave
-  // (criterio de siempre: fixtures viejos siguen tipando) — resolución
-  // efectiva vía `?? 'weight'`
-  load_mode?: LoadMode
   owner_id: number | null
   // v0.12.0: el ejercicio tiene imagen — pedirla a exerciseImageUrl(id)
   has_image?: boolean
@@ -70,6 +68,9 @@ export interface SetOut {
   distance_m: number | null
   is_warmup: boolean
   rpe: number | null
+  // v0.18.0: modo elegido al registrar — opcional en el tipo (fixtures
+  // viejos siguen tipando), resolución efectiva vía `?? 'weight'`
+  load_mode?: LoadMode
   completed_at: string
 }
 
@@ -78,6 +79,8 @@ export interface PersonalRecordOut {
   exercise_id: number
   kind: string
   value: number
+  // v0.18.0: los récords de nivel se pintan planos, sin unidad
+  load_mode?: LoadMode
   achieved_at: string
 }
 
@@ -133,6 +136,8 @@ export interface ExerciseHistorySetOut {
   duration_seconds: number | null
   distance_m: number | null
   is_warmup: boolean
+  // v0.18.0: cómo se registró — pinta el hint y alimenta el prefill del modo
+  load_mode?: LoadMode
 }
 
 // v0.10.0 (zurdi): últimas 4 veces de cardio — solo se puebla para
@@ -157,6 +162,8 @@ export interface SetIn {
   distance_m?: number | null
   is_warmup?: boolean
   rpe?: number | null
+  // v0.18.0: modo de carga de esta serie (default 'weight' en el backend)
+  load_mode?: LoadMode
   // v0.6.0 offline: UUID de replay idempotente (solo lo manda el outbox)
   client_id?: string
 }
@@ -370,8 +377,6 @@ export const createExercise = (body: {
   name_es: string
   name_en: string
   measurement: Measurement
-  // v0.17.0: 'level' = número plano en vez de kg (default 'weight')
-  load_mode?: LoadMode
   muscle_groups: ExerciseMuscleLink[]
   // item 3: ejercicio global (owner_id null) — solo un admin puede pedirlo
   is_global?: boolean
@@ -383,8 +388,6 @@ export const createExercise = (body: {
 export const updateExercise = (id: number, body: {
   name_es?: string
   name_en?: string
-  // v0.17.0: editable a posteriori — cambiar el modo no toca series guardadas
-  load_mode?: LoadMode
   muscle_groups?: ExerciseMuscleLink[]
   is_public?: boolean
 }) =>

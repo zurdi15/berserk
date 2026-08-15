@@ -49,10 +49,10 @@ function getExerciseName(exerciseId: number): string {
 // caso especial de conversión para max_volume (antes se mostraba como número
 // pelado). max_weight es un peso REAL registrado: conserva su precisión.
 // est_1rm/max_volume son DERIVADOS (estimación/suma agregada): sin decimales.
-// v0.17.0: un ejercicio en modo nivel puntúa como número plano (sin unidad
-// ni conversión — el backend solo le genera max_weight, ver detect_prs)
+// v0.18.0: el modo viaja EN el récord (una serie en nivel puntúa su nivel
+// máximo, que se pinta plano sin unidad ni conversión)
 function formatRecordValue(value: number, record: PersonalRecordOut): string {
-  if (exerciseMap.value.get(record.exercise_id)?.load_mode === 'level') return `${value}`
+  if ((record.load_mode ?? 'weight') === 'level') return `${value}`
   return record.kind === 'max_weight'
     ? formatWeight(value, units.value)
     : formatWeightInt(value, units.value)

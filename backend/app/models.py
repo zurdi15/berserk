@@ -118,14 +118,9 @@ class Exercise(Base):
     # visibilidad de la imagen sigue a la del ejercicio, subirla exige
     # _can_edit (ver routers/media.py)
     image_path: Mapped[str | None] = mapped_column(String(80), default=None)
-    # v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg — opción
-    # para uno o para otro"): 'weight' (kg canónicos, conversión lb en
-    # cliente) o 'level' (número plano de máquina/goma, guardado TAL CUAL en
-    # weight_kg, sin conversión de unidades). En 'level' los PRs solo
-    # registran max_weight (el nivel más alto: e1RM y volumen no significan
-    # nada ahí) y las series de nivel quedan FUERA de los agregados de
-    # volumen (ver services/workout_sets.py y services/progress.py).
-    load_mode: Mapped[str] = mapped_column(String(10), default="weight")
+    # (v0.18.0: el load_mode por-EJERCICIO de la v0.17.x murió — el modo
+    # kg/nivel se elige al registrar cada serie, ver WorkoutSet.load_mode:
+    # "un día la polea libre es la de kg y otro la de niveles" — zurdi)
 
     muscle_links: Mapped[list["ExerciseMuscleGroup"]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
@@ -344,6 +339,14 @@ class WorkoutSet(Base):
     distance_m: Mapped[float | None] = mapped_column(Float, default=None)
     is_warmup: Mapped[bool] = mapped_column(default=False)
     rpe: Mapped[int | None] = mapped_column(default=None)
+    # v0.18.0 (zurdi: "el modo se pone cuando VAS A HACER el ejercicio"):
+    # 'weight' = weight_kg son kg canónicos; 'level' = número plano de
+    # máquina guardado tal cual (sin conversión). Por SERIE, no por
+    # ejercicio: la misma polea un día tiene etiquetas de kg y otro de
+    # niveles. Las series de nivel quedan fuera de todo agregado de volumen
+    # (effective_set_filters) y sus PRs compiten solo entre niveles
+    # (PersonalRecord.load_mode).
+    load_mode: Mapped[str] = mapped_column(String(10), default="weight")
     completed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
@@ -373,6 +376,10 @@ class PersonalRecord(Base):
     set_id: Mapped[int | None] = mapped_column(
         ForeignKey("workout_sets.id", ondelete="SET NULL"), default=None
     )
+    # v0.18.0: modo de la serie que lo logró — un récord de nivel solo
+    # compite contra récords de nivel (detect_prs filtra por esto) y el
+    # frontend lo pinta plano sin unidad
+    load_mode: Mapped[str] = mapped_column(String(10), default="weight")
     achieved_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

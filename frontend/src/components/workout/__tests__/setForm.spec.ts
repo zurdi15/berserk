@@ -56,28 +56,72 @@ describe('SetForm', () => {
     expect(payload.weight_kg).toBe(62.5)
   })
 
-  // v0.17.0 (zurdi: "números planos, del 1 al 20, en vez de kg")
-  describe('v0.17.0: level load mode', () => {
-    it('emits the plain number WITHOUT unit conversion even for an lb user', async () => {
-      wrapper = build('strength', 'lb', { loadMode: 'level', initialSet: { weight_kg: 12, reps: 10 } })
+  // v0.18.0 (zurdi: "el modo se pone cuando VAS A HACER el ejercicio — un
+  // día la polea libre es la de kg y otro la de niveles"): toggle kg/nivel
+  // POR SERIE en el propio cajón
+  describe('v0.18.0: per-set load mode toggle', () => {
+    it('defaults to weight and switching to level emits the plain number + load_mode', async () => {
+      wrapper = build('strength', 'lb')
+      expect(wrapper.get('[data-testid="load-mode-weight"]').attributes('aria-pressed')).toBe('true')
+
+      await wrapper.get('[data-testid="load-mode-level"]').trigger('click')
+      // entrada directa del nivel (v0.17.1) — 12 tal cual, sin conversión lb
+      await wrapper.get('[data-testid="stepper-edit"]').trigger('click')
+      const input = wrapper.get('[data-testid="stepper-edit-input"]')
+      await input.setValue('12')
+      await input.trigger('keydown', { key: 'Enter' })
+
       await wrapper.find('form').trigger('submit')
       const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
-      // en modo peso, 12 kg para un usuario lb pasaría por kgToDisplay/
-      // displayToKg y saldría con error de redondeo; el nivel viaja tal cual
       expect(payload.weight_kg).toBe(12)
-      expect(payload.reps).toBe(10)
+      expect(payload.load_mode).toBe('level')
     })
 
-    it('labels the load column "Nivel", drops the unit suffix and hides the plate calculator', () => {
-      wrapper = build('strength', 'kg', { loadMode: 'level' })
-      expect(wrapper.text()).toContain('Nivel')
-      expect(wrapper.text()).not.toContain('kg')
+    it('weight mode stamps load_mode=weight and converts from the display unit', async () => {
+      wrapper = build('strength', 'kg')
+      await wrapper.find('form').trigger('submit')
+      const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+      expect(payload.load_mode).toBe('weight')
+      expect(payload.weight_kg).toBeGreaterThan(0)
+    })
+
+    it('prefills the mode from the initial set (last set was a level one)', () => {
+      wrapper = build('strength', 'kg', { initialSet: { weight_kg: 14, reps: 10, load_mode: 'level' } })
+      expect(wrapper.get('[data-testid="load-mode-level"]').attributes('aria-pressed')).toBe('true')
+      // el valor precarga el nivel tal cual y sin sufijo kg ni discos
+      expect(wrapper.get('[data-testid="stepper-edit"]').text()).toContain('14')
       expect(wrapper.find('[data-testid="plate-calc-open"]').exists()).toBe(false)
     })
 
-    it('weight mode still shows the plate calculator for strength', () => {
+    it('level mode hides the plate calculator; switching back to weight restores it', async () => {
       wrapper = build('strength', 'kg')
       expect(wrapper.find('[data-testid="plate-calc-open"]').exists()).toBe(true)
+      await wrapper.get('[data-testid="load-mode-level"]').trigger('click')
+      expect(wrapper.find('[data-testid="plate-calc-open"]').exists()).toBe(false)
+      await wrapper.get('[data-testid="load-mode-weight"]').trigger('click')
+      expect(wrapper.find('[data-testid="plate-calc-open"]').exists()).toBe(true)
+    })
+
+    it('switching modes resets the value (80 kg is not "level 80"), restoring the prefill when it matches', async () => {
+      wrapper = build('strength', 'kg', { initialSet: { weight_kg: 80, reps: 5, load_mode: 'weight' } })
+      await wrapper.get('[data-testid="load-mode-level"]').trigger('click')
+      expect(wrapper.get('[data-testid="stepper-edit"]').text()).toContain('10')
+      await wrapper.get('[data-testid="load-mode-weight"]').trigger('click')
+      // vuelta al modo del prefill: recupera los 80 kg
+      expect(wrapper.get('[data-testid="stepper-edit"]').text()).toContain('80')
+    })
+
+    it('bodyweight also carries the toggle and stamps the mode when weight is present', async () => {
+      wrapper = build('bodyweight', 'kg')
+      await wrapper.get('[data-testid="load-mode-level"]').trigger('click')
+      await wrapper.get('[data-testid="stepper-edit"]').trigger('click')
+      const input = wrapper.get('[data-testid="stepper-edit-input"]')
+      await input.setValue('6')
+      await input.trigger('keydown', { key: 'Enter' })
+      await wrapper.find('form').trigger('submit')
+      const payload = wrapper.emitted('submit')![0][0] as Record<string, unknown>
+      expect(payload.weight_kg).toBe(6)
+      expect(payload.load_mode).toBe('level')
     })
   })
 
@@ -289,12 +333,16 @@ describe('SetForm', () => {
       // columnas en un móvil real (ver la aritmética en SetForm.vue)
       for (const measurement of ['strength', 'bodyweight', 'cardio'] as const) {
         wrapper = build(measurement)
-        // v0.17.1: el VALOR del stepper de carga también es un botón
-        // (entrada directa) — aquí solo se miden los slabs +/− de verdad
+        // v0.17.1/v0.18.0: el VALOR del stepper (entrada directa) y los chips
+        // del toggle kg/nivel también son botones — aquí solo se miden los
+        // slabs +/− de verdad
         const gridButtons = wrapper
           .get('.grid.grid-cols-2')
           .findAll('button')
-          .filter((b) => b.attributes('data-testid') !== 'stepper-edit')
+          .filter((b) => {
+            const testid = b.attributes('data-testid') ?? ''
+            return testid !== 'stepper-edit' && !testid.startsWith('load-mode-')
+          })
         expect(gridButtons.length).toBeGreaterThan(0)
         for (const button of gridButtons) {
           expect(button.classes()).toEqual(expect.arrayContaining(['w-8', 'h-8']))

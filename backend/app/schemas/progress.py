@@ -42,6 +42,11 @@ class ExerciseHistorySetOut(BaseModel):
     duration_seconds: int | None
     distance_m: float | None
     is_warmup: bool
+    # v0.18.0: el modo viaja con la historia — el hint "última vez" pinta
+    # cada serie según cómo se registró, y el prefill del cajón hereda el
+    # modo de la última serie (el default inteligente que sustituye al
+    # ajuste por-ejercicio retirado)
+    load_mode: str = "weight"
 
     model_config = {"from_attributes": True}
 

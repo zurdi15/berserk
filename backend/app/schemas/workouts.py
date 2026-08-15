@@ -1,5 +1,6 @@
 from datetime import date as date_type
 from datetime import datetime, time
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -43,6 +44,9 @@ class SetOut(BaseModel):
     distance_m: float | None
     is_warmup: bool
     rpe: int | None
+    # v0.18.0: 'weight' | 'level' — modo elegido AL REGISTRAR (weight_kg es
+    # kg canónico o número plano de máquina según esto)
+    load_mode: str = "weight"
     completed_at: datetime
 
     model_config = {"from_attributes": True}
@@ -87,6 +91,8 @@ class PersonalRecordOut(BaseModel):
     exercise_id: int
     kind: str
     value: float
+    # v0.18.0: el frontend pinta plano (sin unidad) los récords de nivel
+    load_mode: str = "weight"
     achieved_at: datetime
 
     model_config = {"from_attributes": True}
@@ -139,6 +145,8 @@ class SetIn(BaseModel):
     distance_m: float | None = Field(None, gt=0, le=1000000)
     is_warmup: bool = False
     rpe: int | None = Field(None, ge=1, le=10)
+    # v0.18.0: modo de carga de ESTA serie (el cajón lo elige al registrar)
+    load_mode: Literal["weight", "level"] = "weight"
     # v0.6.0 offline: ver WorkoutStartIn.client_id — solo lo usa log_set
     # (dedupe de replay + se persiste vía **model_dump()); update_set lo
     # ignora (su setattr itera solo los campos de valor)

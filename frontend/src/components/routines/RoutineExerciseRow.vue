@@ -84,10 +84,8 @@ const rune = computed<RuneName | null>(() => primaryRune(exercise.value, props.m
 // distancia y nunca descansa, así que reps/peso/descanso no se muestran
 // (las series objetivo sí: "3 × cinta" es un objetivo legítimo)
 const isCardio = computed(() => exercise.value?.measurement === 'cardio')
-
-// v0.17.0 (zurdi): ejercicio en modo nivel — el objetivo de carga es un
-// número plano (paso 1, sin unidad, sin conversión kg/lb)
-const isLevel = computed(() => (exercise.value?.load_mode ?? 'weight') === 'level')
+// (v0.18.0: el objetivo de rutina es SIEMPRE kg — el modo nivel se decide
+// al registrar cada serie, en el cajón del entreno)
 
 const restOptions = [
   { value: '30', label: '30 s' },
@@ -159,20 +157,7 @@ const restOptions = [
       />
     </div>
 
-    <div v-if="!isCardio && isLevel">
-      <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetLevel') }}</label>
-      <!-- nivel plano: viaja tal cual en target_weight_kg, sin conversión -->
-      <BkStepper
-        :model-value="row.target_weight_kg || 0"
-        :min="0"
-        :max="100"
-        :step="1"
-        editable
-        @update:model-value="row.target_weight_kg = $event > 0 ? $event : null"
-      />
-    </div>
-
-    <div v-else-if="!isCardio">
+    <div v-if="!isCardio">
       <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetWeight') }}</label>
       <!-- v0.17.1 (zurdi): el objetivo también admite entrada directa -->
       <BkStepper

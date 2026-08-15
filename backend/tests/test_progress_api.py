@@ -130,7 +130,8 @@ def test_exercise_history_returns_latest_finished_session(client: TestClient):
     assert result["workout_id"] == second_id
     assert result["date"] == "2026-08-01"
     assert result["sets"] == [
-        {"reps": 5, "weight_kg": 105.0, "duration_seconds": None, "distance_m": None, "is_warmup": False}
+        # v0.18.0: el modo de carga viaja con la historia (prefill del cajón)
+        {"reps": 5, "weight_kg": 105.0, "duration_seconds": None, "distance_m": None, "is_warmup": False, "load_mode": "weight"}
     ]
 
 

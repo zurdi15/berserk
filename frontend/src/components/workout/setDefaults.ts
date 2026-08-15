@@ -1,10 +1,14 @@
-import type { ExerciseHistorySetOut, RoutineOut, SetOut } from '@/api/domain'
+import type { ExerciseHistorySetOut, LoadMode, RoutineOut, SetOut } from '@/api/domain'
 
 export interface SetDefaults {
   reps?: number | null
   weight_kg?: number | null
   duration_seconds?: number | null
   distance_m?: number | null
+  // v0.18.0: el modo kg/nivel HEREDA de la última serie (el default
+  // inteligente que sustituye al ajuste por-ejercicio retirado) — el
+  // objetivo de rutina es siempre kg
+  load_mode?: LoadMode
 }
 
 /**
@@ -40,6 +44,7 @@ export function resolveNewSetDefaults(
       weight_kg: lastInWorkout.weight_kg,
       duration_seconds: lastInWorkout.duration_seconds,
       distance_m: lastInWorkout.distance_m,
+      load_mode: lastInWorkout.load_mode ?? 'weight',
     }
   }
 
@@ -54,6 +59,7 @@ export function resolveNewSetDefaults(
       weight_kg: lastInHistory.weight_kg,
       duration_seconds: lastInHistory.duration_seconds,
       distance_m: lastInHistory.distance_m,
+      load_mode: lastInHistory.load_mode ?? 'weight',
     }
   }
 
