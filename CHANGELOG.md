@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.18.0 - 2026-08-15
+
+### Changed
+- El modo kg/nivel se elige ahora al registrar cada serie, con un toggle en el propio cajón — un día la polea libre es la de kg y otro la de los niveles. El ajuste por ejercicio de la biblioteca desaparece (las series y récords antiguos en modo nivel se migran solos), la última serie marca el modo por defecto de la siguiente, y una misma tanda puede mezclar kg y niveles. Los récords de nivel solo compiten contra récords de nivel.
+
 ## 0.17.2 - 2026-08-14
 
 ### Added
