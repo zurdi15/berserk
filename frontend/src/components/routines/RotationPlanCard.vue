@@ -11,6 +11,7 @@ import type { RotationOut, RoutineOut } from '@/api/domain'
 import { getRotation, putRotation, putRotationNext, routineImageUrl } from '@/api/domain'
 import { useAuthStore } from '@/stores/auth'
 import { toastApiError } from '@/utils/apiErrors'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
@@ -30,11 +31,21 @@ const rotation = ref<RotationOut | null>(null)
 const ready = ref(false)
 const addOpen = ref(false)
 
+// v0.25.1 (zurdi: "no hay skeleton y molaría que cargase instantáneo"): el
+// prefetch del splash YA calienta today:rotation — este card ahora HIDRATA
+// de ahí (pinta al momento) y refresca en fondo; toda mutación reescribe la
+// caché para que Hoy y este editor cuenten lo mismo
 onMounted(async () => {
+  const cached = getViewCache<RotationOut>('today:rotation')
+  if (cached) {
+    rotation.value = cached
+    ready.value = true
+  }
   try {
-    rotation.value = await getRotation()
+    rotation.value = (await getRotation()) ?? null
+    if (rotation.value) setViewCache('today:rotation', rotation.value)
   } catch (error) {
-    toastApiError(error)
+    if (!cached) toastApiError(error)
   } finally {
     ready.value = true
   }
@@ -53,6 +64,7 @@ const addable = computed(() =>
 async function persist(ids: number[]) {
   try {
     rotation.value = await putRotation(ids)
+    if (rotation.value) setViewCache('today:rotation', rotation.value)
   } catch (error) {
     toastApiError(error)
   }
@@ -76,6 +88,7 @@ function remove(routineId: number) {
 async function setToday(routineId: number) {
   try {
     rotation.value = await putRotationNext(routineId)
+    if (rotation.value) setViewCache('today:rotation', rotation.value)
   } catch (error) {
     toastApiError(error)
   }
@@ -106,7 +119,16 @@ function ownerOf(routine: RoutineOut): 'mine' | 'global' | 'user' {
 </script>
 
 <template>
-  <BkCard v-if="ready" :title="t('rotation.title')" data-testid="rotation-plan">
+  <!-- v0.25.1: skeleton shimmer mientras no hay ni caché ni fetch — antes
+       la card entera aparecía de golpe al resolver (salto de layout) -->
+  <BkCard v-if="!ready" :title="t('rotation.title')" data-testid="rotation-plan-skeleton">
+    <div class="space-y-2" aria-hidden="true">
+      <div class="h-4 w-1/2 rounded-sm bk-shimmer" />
+      <div class="h-10 rounded-lg bk-shimmer" />
+      <div class="h-10 rounded-lg bk-shimmer" />
+    </div>
+  </BkCard>
+  <BkCard v-else :title="t('rotation.title')" data-testid="rotation-plan">
     <div class="space-y-3">
       <p v-if="!entries.length" class="text-sm text-ink-faint">{{ t('rotation.empty') }}</p>
       <template v-else>
