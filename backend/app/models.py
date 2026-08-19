@@ -128,6 +128,13 @@ class Exercise(Base):
     # visibilidad de la imagen sigue a la del ejercicio, subirla exige
     # _can_edit (ver routers/media.py)
     image_path: Mapped[str | None] = mapped_column(String(80), default=None)
+    # v0.21.4 encuadre WYSIWYG de la foto (zurdi: "mover la imagen y hacer
+    # zoom — tal cual quede en la preview es como se ve"): posición focal en
+    # % (50/50 = centrada) y zoom (1 = sin zoom); el frontend los aplica como
+    # object-position + scale con el mismo origen en toda superficie 9:16
+    image_pos_x: Mapped[float] = mapped_column(Float, default=50)
+    image_pos_y: Mapped[float] = mapped_column(Float, default=50)
+    image_zoom: Mapped[float] = mapped_column(Float, default=1)
     # (v0.18.0: el load_mode por-EJERCICIO de la v0.17.x murió — el modo
     # kg/nivel se elige al registrar cada serie, ver WorkoutSet.load_mode:
     # "un día la polea libre es la de kg y otro la de niveles" — zurdi)

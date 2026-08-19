@@ -7,6 +7,7 @@ import { createExercise, deleteExercise, listExercises, listMuscleGroups, update
 import { exerciseName } from '@/components/routines/exerciseName'
 import { deleteExerciseImage, exerciseImageUrl, uploadExerciseImage } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
+import { imageFramingStyle } from '@/utils/imageFraming'
 import { getViewCache, setViewCache } from '@/utils/viewCache'
 import { foldSearchText } from '@/utils/searchFold'
 import { useAuthStore } from '@/stores/auth'
@@ -20,6 +21,7 @@ import BkRadio from '@/lib/BkRadio.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSelect from '@/lib/BkSelect.vue'
+import BkStepper from '@/lib/BkStepper.vue'
 import GroupFilterSelect from '@/lib/GroupFilterSelect.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
@@ -199,6 +201,9 @@ function openEdit(exercise: ExerciseOut) {
   editingId.value = exercise.id
   editingOwnerId.value = exercise.owner_id
   editingHasImage.value = exercise.has_image ?? false
+  framePosX.value = exercise.image_pos_x ?? 50
+  framePosY.value = exercise.image_pos_y ?? 50
+  frameZoom.value = exercise.image_zoom ?? 1
   nameEs.value = exercise.name_es
   nameEn.value = exercise.name_en
   measurement.value = exercise.measurement
@@ -211,6 +216,86 @@ function openEdit(exercise: ExerciseOut) {
 // imagen se sube/borra sobre un ejercicio YA existente (en creación el
 // bloque no aparece — primero se crea, luego se edita para ilustrarlo)
 const editingHasImage = ref(false)
+
+// ── v0.21.4 ENCUADRE WYSIWYG (zurdi: "la preview debería ser 9:16 como
+// luego se ve; y poder mover la imagen y hacer zoom — tal cual quede en la
+// preview es como se vaya a ver") ──────────────────────────────────────────
+// La preview es un marco 9:16 (el aspect real de BkMedia tallSm/tall);
+// arrastrar mueve el punto focal y el stepper hace zoom. El estilo es el
+// MISMO imageFramingStyle que aplican todas las superficies → WYSIWYG.
+const framePosX = ref(50)
+const framePosY = ref(50)
+const frameZoom = ref(1)
+
+const editorFramingStyle = computed(() =>
+  imageFramingStyle({
+    image_pos_x: framePosX.value,
+    image_pos_y: framePosY.value,
+    image_zoom: frameZoom.value,
+  }),
+)
+
+function clampPct(value: number): number {
+  return Math.min(100, Math.max(0, value))
+}
+
+let framePointerId: number | null = null
+let frameLastX = 0
+let frameLastY = 0
+
+function onFramePointerDown(event: PointerEvent) {
+  framePointerId = event.pointerId
+  frameLastX = event.clientX
+  frameLastY = event.clientY
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+}
+
+function onFramePointerMove(event: PointerEvent) {
+  if (framePointerId !== event.pointerId) return
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const dx = event.clientX - frameLastX
+  const dy = event.clientY - frameLastY
+  frameLastX = event.clientX
+  frameLastY = event.clientY
+  // arrastrar a la derecha revela el lado IZQUIERDO de la foto (el focal
+  // baja); dividir por el zoom mantiene la sensación 1:1 con el dedo
+  framePosX.value = clampPct(framePosX.value - (dx / rect.width) * (100 / frameZoom.value))
+  framePosY.value = clampPct(framePosY.value - (dy / rect.height) * (100 / frameZoom.value))
+}
+
+function onFramePointerUp(event: PointerEvent) {
+  if (framePointerId !== event.pointerId) return
+  framePointerId = null
+  scheduleFramingSave()
+}
+
+// guardado con debounce: el pointerup y cada tap del stepper de zoom lo
+// programan — un solo PATCH por ráfaga de ajustes
+let framingSaveTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleFramingSave() {
+  if (framingSaveTimer) clearTimeout(framingSaveTimer)
+  framingSaveTimer = setTimeout(saveFraming, 400)
+}
+
+async function saveFraming() {
+  if (editingId.value === null) return
+  try {
+    const updated = await updateExercise(editingId.value, {
+      image_pos_x: framePosX.value,
+      image_pos_y: framePosY.value,
+      image_zoom: frameZoom.value,
+    })
+    // los thumbs de la lista repintan el encuadre sin recargar todo
+    exercises.value = exercises.value.map((e) => (e.id === updated.id ? { ...e, ...updated } : e))
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
+function onFrameZoom(value: number) {
+  frameZoom.value = value
+  scheduleFramingSave()
+}
 const imageBust = ref(0)
 const imageUploading = ref(false)
 const imageFileEl = ref<HTMLInputElement | null>(null)
@@ -384,7 +469,9 @@ async function confirmDelete() {
               :data-testid="`exercise-thumb-${exercise.id}`"
             />
             <div class="min-w-0 flex-1">
-              <p class="truncate">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</p>
+              <!-- v0.21.4 (zurdi): el nombre NO se trunca — multilínea si
+                   hace falta (break-words cubre nombres largos sin espacios) -->
+              <p class="break-words">{{ exerciseName(exercise, auth.user?.locale || 'es') }}</p>
               <!-- item 2+6 (v0.4.2, records-tab layout): fila de chips
                    DEDICADA debajo del nombre, más pequeña (text-2xs) que el
                    cuerpo de la fila — mismo criterio que la fila de
@@ -397,7 +484,7 @@ async function confirmDelete() {
                    renderiza esta fila en absoluto (item 2: "own items get no
                    chip row at all"). -->
               <div
-                v-if="primaryGroup(exercise) || exercise.kind !== 'own' || exercise.measurement !== 'strength'"
+                v-if="primaryGroup(exercise) || exercise.kind === 'other' || exercise.measurement !== 'strength'"
                 class="flex items-center gap-1.5 flex-wrap mt-1"
               >
                 <span
@@ -425,23 +512,17 @@ async function confirmDelete() {
                 >
                   {{ $t(`library.measurements.${exercise.measurement}`) }}
                 </span>
-                <!-- UNIFIED-LISTINGS: label de creador SOLO cuando no es mío —
-                     chip "Catálogo predefinido" para el catálogo admin, BkUser
-                     (punto de color + nombre) para lo público de otro usuario.
-                     Sin owner_color en ExerciseOut (fuera de este carril),
-                     BkUser cae a su fallback aurora. -->
+                <!-- UNIFIED-LISTINGS → v0.21.4 (zurdi: "quita la tag de
+                     catálogo predefinido"): la atribución queda SOLO para lo
+                     público de otro usuario (BkUser); el catálogo admin va
+                     sin chip, como lo propio. Sin owner_color en ExerciseOut
+                     (fuera de este carril), BkUser cae a su fallback aurora. -->
                 <span
-                  v-if="exercise.kind !== 'own'"
+                  v-if="exercise.kind === 'other'"
                   :data-testid="`exercise-attribution-${exercise.id}`"
                 >
-                  <span
-                    v-if="exercise.kind === 'catalog'"
-                    class="inline-flex items-center rounded-full border border-line px-1.5 py-0.5 text-2xs text-ink-muted"
-                  >
-                    {{ $t('library.catalog') }}
-                  </span>
                   <BkUser
-                    v-else-if="exercise.owner_username"
+                    v-if="exercise.owner_username"
                     :user="{ username: exercise.owner_username, color: null }"
                     size="sm"
                   />
@@ -454,9 +535,11 @@ async function confirmDelete() {
                  feature 1: lo público de OTRO usuario NUNCA es editable por
                  mí (ni siquiera admin — _can_edit es owner-o-admin-de-
                  global, no admin-de-lo-ajeno), así que sin acciones ahí -->
+            <!-- v0.21.4 (zurdi): acciones en COLUMNA a la derecha, editar
+                 arriba y borrar debajo -->
             <div
               v-if="exercise.kind === 'own' || (exercise.kind === 'catalog' && auth.user?.is_admin)"
-              class="flex items-center gap-2 shrink-0"
+              class="flex flex-col items-center gap-2 shrink-0"
             >
               <BkActionBtn
                 icon="edit"
@@ -551,16 +634,46 @@ async function confirmDelete() {
         </div>
 
         <!-- v0.12.0: imagen del ejercicio (solo editando — ver comment
-             del script) -->
+             del script). v0.21.4: la preview pasa de la franja 16:9 a un
+             MARCO 9:16 (el aspect real con el que se ve en la app, mismo
+             criterio que BkMedia tallSm) con encuadre WYSIWYG: arrastrar
+             mueve el foco, el stepper hace zoom, y tal cual queda aquí es
+             como se pinta en todas las superficies (imageFramingStyle) -->
         <div v-if="editingId !== null" class="space-y-2">
           <span class="block text-sm text-ink-muted">{{ $t('library.image') }}</span>
-          <img
-            v-if="editingHasImage"
-            :src="exerciseImageUrl(editingId, imageBust)"
-            :alt="nameEs"
-            class="w-full max-h-40 object-cover rounded-sm border border-line"
-            data-testid="exercise-image-preview"
-          />
+          <template v-if="editingHasImage">
+            <div
+              class="relative w-40 mx-auto aspect-[9/16] overflow-hidden rounded-md border border-line select-none cursor-grab active:cursor-grabbing"
+              style="touch-action: none"
+              data-testid="exercise-image-frame"
+              @pointerdown="onFramePointerDown"
+              @pointermove="onFramePointerMove"
+              @pointerup="onFramePointerUp"
+              @pointercancel="onFramePointerUp"
+            >
+              <img
+                :src="exerciseImageUrl(editingId, imageBust)"
+                :alt="nameEs"
+                class="w-full h-full object-cover pointer-events-none"
+                :style="editorFramingStyle"
+                draggable="false"
+                data-testid="exercise-image-preview"
+              />
+            </div>
+            <p class="text-xs text-ink-faint text-center">{{ $t('library.imageFrameHint') }}</p>
+            <div class="w-44 mx-auto" data-testid="exercise-image-zoom">
+              <BkStepper
+                :model-value="frameZoom"
+                size="compact"
+                editable
+                :step="0.1"
+                :min="1"
+                :max="3"
+                suffix="×"
+                @update:model-value="onFrameZoom"
+              />
+            </div>
+          </template>
           <div class="flex gap-2">
             <BkButton
               variant="ghost"

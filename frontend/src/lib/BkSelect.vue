@@ -13,6 +13,10 @@ const props = defineProps<{
   label: string
   modelValue: string
   options: { value: string; label: string; disabled?: boolean }[]
+  // v0.21.4 (zurdi: "el selector de grupos musculares que se vea siempre
+  // entero"): listas cortas pueden pedir el panel SIN tope de altura —
+  // el default max-h-64 sigue protegiendo a las largas (zonas horarias)
+  fullPanel?: boolean
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
@@ -265,7 +269,8 @@ watch(filterQuery, () => {
             :id="listboxId"
             role="listbox"
             :aria-labelledby="labelId"
-            class="max-h-64 overflow-y-auto py-1"
+            class="py-1"
+            :class="!fullPanel && 'max-h-64 overflow-y-auto'"
           >
             <li
               v-for="opt in filteredOptions"

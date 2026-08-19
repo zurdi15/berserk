@@ -45,6 +45,11 @@ export interface ExerciseOut {
   owner_id: number | null
   // v0.12.0: el ejercicio tiene imagen — pedirla a exerciseImageUrl(id)
   has_image?: boolean
+  // v0.21.4 encuadre WYSIWYG de la foto (posición focal % + zoom) — leer
+  // SIEMPRE vía utils/imageFraming.imageFramingStyle (defaults 50/50/1)
+  image_pos_x?: number
+  image_pos_y?: number
+  image_zoom?: number
   // W2 feature 1: ejercicio PROPIO compartido con todo el mundo (distinto de
   // owner_id null, el catálogo admin) — opcional en el tipo aunque el
   // backend siempre manda la clave (mismo criterio que MuscleGroupOut.rune):
@@ -394,6 +399,10 @@ export const updateExercise = (id: number, body: {
   name_en?: string
   muscle_groups?: ExerciseMuscleLink[]
   is_public?: boolean
+  // v0.21.4: encuadre de la foto — se guarda al soltar el arrastre/zoom
+  image_pos_x?: number
+  image_pos_y?: number
+  image_zoom?: number
 }) =>
   api<ExerciseOut>(`/exercises/${id}`, { method: 'PATCH', body })
 

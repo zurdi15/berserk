@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut, MuscleGroupOut } from '@/api/domain'
 import { exerciseImageUrl } from '@/api/domain'
+import { imageFramingStyle } from '@/utils/imageFraming'
 import { displayToKg, kgToDisplay } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -102,12 +103,16 @@ const restOptions = [
          del entreno (el chip de superserie vive en el contenedor del bloque) -->
     <div class="flex items-center gap-2">
       <!-- v0.12.0: mismo thumb que la card del entreno (paridad de flujos) -->
-      <img
-        v-if="exercise?.has_image"
-        :src="exerciseImageUrl(exercise.id)"
-        alt=""
-        class="w-9 h-9 rounded-sm object-cover shrink-0"
-      />
+      <!-- v0.21.4: mismo encuadre WYSIWYG que el resto de superficies; el
+           wrapper con overflow recorta el zoom del scale -->
+      <span v-if="exercise?.has_image" class="w-9 h-9 rounded-sm overflow-hidden shrink-0">
+        <img
+          :src="exerciseImageUrl(exercise.id)"
+          alt=""
+          class="w-full h-full object-cover"
+          :style="imageFramingStyle(exercise)"
+        />
+      </span>
       <BkRune v-if="rune" :name="rune" :size="14" />
       <span class="text-sm font-medium text-ink truncate">
         {{ exerciseName(exercise, locale) }}

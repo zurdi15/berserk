@@ -148,7 +148,12 @@ async function start() {
 }
 
 function goBack() {
-  if (window.history.length > 1) router.back()
+  // v0.21.4: history.length > 1 era casi siempre verdad (cuenta TODO el
+  // historial de la pestaña, incluida la página de antes de la app) y
+  // router.back() podía no llevar a ningún sitio útil — el registro del
+  // propio vue-router (state.back) sí dice si hay una ruta ANTERIOR DE LA
+  // APP a la que volver; sin ella, a la sección de Entreno
+  if (router.options.history.state.back) router.back()
   else router.push({ name: 'workout' })
 }
 

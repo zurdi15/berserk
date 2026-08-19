@@ -3,10 +3,23 @@ import { createPinia, setActivePinia } from 'pinia'
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
+// v0.21.4: el splash de arranque real esperaría 700ms de mínimo en CADA
+// mount — mockeado inerte para toda la batería (sus specs propios viven en
+// utils/__tests__/bootSplash.spec.ts); el ref se flipa a mano en los tests
+// del splash de abajo
+vi.mock('@/utils/bootSplash', async () => {
+  const { ref } = await import('vue')
+  return {
+    bootSplashActive: ref(false),
+    runBootSplash: vi.fn(),
+  }
+})
+
 import { createI18nInstance } from '../../i18n'
 import BkRune from '@/lib/BkRune.vue'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useRestTimerStore } from '@/stores/restTimer'
+import { bootSplashActive, runBootSplash } from '@/utils/bootSplash'
 import ShellView from '../ShellView.vue'
 
 // router mínimo, propio de este test: las 5 secciones del shell como rutas
@@ -21,11 +34,15 @@ function buildRouter(initialName: string): Router {
       { path: '/today', name: 'today', component: stub },
       { path: '/calendar', name: 'calendar', component: stub },
       { path: '/workout', name: 'workout', component: stub },
+      // v0.21.4: mismo meta.section que la ruta real — el nav debe tratar el
+      // pre-inicio como la sección de Entreno
+      { path: '/workout/start/:routineId', name: 'workout-start', component: stub, meta: { section: 'workout' } },
       { path: '/progress', name: 'progress', component: stub },
       { path: '/profile', name: 'profile', component: stub },
     ],
   })
-  router.push({ name: initialName })
+  if (initialName === 'workout-start') router.push({ name: initialName, params: { routineId: 1 } })
+  else router.push({ name: initialName })
   return router
 }
 
@@ -128,6 +145,49 @@ describe('ShellView nav', () => {
 
   // item 3 (v0.4.0, scrollbar): <main> pasa a ancho completo (su scrollbar
   // pinta en el borde real de la ventana) y la columna centrada se mueve a un
+  // v0.21.4 (zurdi: "prefetch de las 5 secciones + splashart mientras
+  // carga"): el shell arranca el splash al montar; mientras está activo el
+  // RouterView no se monta (la vista de aterrizaje espera a la caché
+  // caliente) y el overlay cubre la app
+  describe('v0.21.4 boot splash', () => {
+    it('kicks off the boot splash + prefetch on mount', async () => {
+      vi.mocked(runBootSplash).mockClear()
+      await mountWithRoute('today')
+      expect(runBootSplash).toHaveBeenCalledTimes(1)
+    })
+
+    it('while the splash is active, the overlay shows and the RouterView is NOT mounted', async () => {
+      bootSplashActive.value = true
+      try {
+        const wrapper = await mountWithRoute('today')
+        expect(wrapper.find('[data-testid="boot-splash"]').exists()).toBe(true)
+        expect(wrapper.find('router-view-stub').exists()).toBe(false)
+      } finally {
+        bootSplashActive.value = false
+      }
+    })
+
+    it('once the splash clears, the overlay goes and the RouterView mounts', async () => {
+      const wrapper = await mountWithRoute('today')
+      expect(wrapper.find('[data-testid="boot-splash"]').exists()).toBe(false)
+      expect(wrapper.find('router-view-stub').exists()).toBe(true)
+    })
+  })
+
+  // v0.21.4 (zurdi: "en el pre-inicio debería seleccionarse la sección de
+  // entrenamiento, no Hoy"): meta.section manda sobre route.name en el nav
+  describe('v0.21.4 active section on child routes', () => {
+    it('workout-start highlights the Entreno CTA and slides the indicator to its column', async () => {
+      const wrapper = await mountWithRoute('workout-start')
+      // el indicador móvil apunta a la columna 2 (workout), no a la 0 (today)
+      const indicator = wrapper.get('[data-testid="nav-indicator"]')
+      expect(indicator.attributes('style')).toContain('translateX(200%)')
+      // y la losa del CTA va en aurora, como si estuvieras en /workout
+      const ctaWrap = wrapper.get('[data-testid="cta-slab-mobile"]').element.parentElement!
+      expect(ctaWrap.className).toContain('text-aurora')
+    })
+  })
+
   // v0.17.0 act-as: banda persistente mientras un admin actúa como otro
   // usuario (leída del storage al montar; salir recarga vía utils/actAs.ts)
   it('v0.17.0: shows the act-as banner when the mode is stored, hides it otherwise', async () => {

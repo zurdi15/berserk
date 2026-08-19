@@ -4,8 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/client'
-import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, SetIn, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
+import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RotationOut, RoutineOut, SetIn, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
 import { getRotation, listExercises, listMuscleGroups, listRoutines, routineImageUrl } from '@/api/domain'
+import { getViewCache } from '@/utils/viewCache'
 import { resolveNewSetDefaults } from '@/components/workout/setDefaults'
 import { estimateRoutineMinutes } from '@/components/workout/routineEstimate'
 import BkMedia from '@/lib/BkMedia.vue'
@@ -348,6 +349,28 @@ const derivedMuscleGroups = computed(() =>
 const rotationNextId = ref<number | null>(null)
 
 async function loadCatalog() {
+  // v0.21.4 prefetch: hidratar del viewCache COMPARTIDO (las mismas claves
+  // que escriben RoutineList/ExerciseManager/TodayHero y el prefetch de
+  // arranque, ver utils/prefetchSections) — la primera visita a Entreno
+  // pinta la lista de rutinas sin esperar red; el fetch de abajo sigue
+  // refrescando en fondo. Esta vista solo LEE: no escribe las claves porque
+  // no trae todas sus piezas (p.ej. templates de routines:list).
+  const cachedRoutines = getViewCache<{ routines: RoutineOut[] }>('routines:list')?.routines
+  const cachedLibrary = getViewCache<{ exercises: ExerciseOut[]; groups: MuscleGroupOut[] }>('library:all')
+  const cachedRotation = getViewCache<RotationOut>('today:rotation')
+  if (cachedRoutines) routines.value = cachedRoutines
+  if (cachedLibrary) {
+    exercises.value = cachedLibrary.exercises
+    muscleGroups.value = cachedLibrary.groups
+  }
+  if (cachedRoutines && cachedLibrary) catalogReady.value = true
+  if (cachedRotation) {
+    rotationNextId.value =
+      cachedRotation.next_position !== null
+        ? cachedRotation.routines[cachedRotation.next_position]?.id ?? null
+        : null
+  }
+
   // Promise.resolve().then(...): también captura un throw SÍNCRONO (p.ej. un
   // mock parcial de domain en tests sin getRotation) — el hint jamás tumba
   // el catálogo
@@ -370,7 +393,8 @@ async function loadCatalog() {
     exercises.value = exercisesList
     muscleGroups.value = muscleGroupsList
   } catch (error) {
-    toastApiError(error)
+    // con caché hidratada el refresco fallido no molesta (patrón SWR)
+    if (!cachedRoutines) toastApiError(error)
   } finally {
     catalogReady.value = true
   }

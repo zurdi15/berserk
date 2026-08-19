@@ -94,7 +94,11 @@ const mediaKey = computed(() => (showImage.value ? `img-${url.value}` : `rune-${
       <div class="absolute inset-x-0 top-0 h-24 z-0 bg-gradient-to-b from-scrim/80 to-transparent" aria-hidden="true" />
       <div class="absolute inset-x-0 bottom-0 h-40 z-0 bg-gradient-to-t from-scrim via-scrim/40 to-transparent" aria-hidden="true" />
     </template>
-    <div v-if="$slots.corner" class="absolute inset-x-4 top-4 z-10 flex items-start justify-between gap-2 bk-hero-content">
+    <!-- z-20, no z-10: el contenedor de contenido de abajo también es z-10 y
+         viene DESPUÉS en el DOM — con el mismo índice pintaba encima y se
+         COMÍA los clicks del corner (el atrás del pre-inicio "no hacía
+         nada", zurdi v0.21.4) -->
+    <div v-if="$slots.corner" class="absolute inset-x-4 top-4 z-20 flex items-start justify-between gap-2 bk-hero-content">
       <slot name="corner" />
     </div>
     <div class="relative z-10 flex-1 flex flex-col p-5 bk-hero-content">

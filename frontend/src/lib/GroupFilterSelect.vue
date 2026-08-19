@@ -25,10 +25,12 @@ const options = computed(() => [
 </script>
 
 <template>
+  <!-- v0.21.4 (zurdi): pocos grupos — el panel se ve SIEMPRE entero -->
   <BkSelect
     :model-value="modelValue"
     :label="t('library.muscleGroups')"
     :options="options"
+    full-panel
     data-testid="group-filter-select"
     @update:model-value="emit('update:modelValue', $event)"
   />

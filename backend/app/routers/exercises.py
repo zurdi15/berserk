@@ -28,6 +28,9 @@ def exercise_out(exercise: Exercise) -> ExerciseOut:
         owner_id=exercise.owner_id,
         is_public=exercise.is_public,
         has_image=exercise.image_path is not None,
+        image_pos_x=exercise.image_pos_x,
+        image_pos_y=exercise.image_pos_y,
+        image_zoom=exercise.image_zoom,
         owner_username=exercise.owner_username,
         muscle_groups=[
             ExerciseMuscleLink(muscle_group_id=l.muscle_group_id, is_primary=l.is_primary)
@@ -205,6 +208,12 @@ def update_exercise(
         exercise.name_en = payload.name_en
     if payload.is_public is not None:
         exercise.is_public = payload.is_public
+    if payload.image_pos_x is not None:
+        exercise.image_pos_x = payload.image_pos_x
+    if payload.image_pos_y is not None:
+        exercise.image_pos_y = payload.image_pos_y
+    if payload.image_zoom is not None:
+        exercise.image_zoom = payload.image_zoom
     if payload.muscle_groups is not None:
         _apply_links(db, exercise, payload.muscle_groups, user.id)
     db.commit()

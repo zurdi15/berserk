@@ -257,7 +257,7 @@ describe('ExerciseManager', () => {
     expect(row.find('[data-testid="delete-exercise-40"]').exists()).toBe(false)
   })
 
-  it('UNIFIED-LISTINGS: the predefined catalog (owner_id null) rows carry a "Catálogo predefinido" attribution chip, not a BkUser', async () => {
+  it('v0.21.4 (zurdi: "quita la tag de catálogo predefinido"): catalog rows carry NO attribution chip', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       {
@@ -270,9 +270,7 @@ describe('ExerciseManager', () => {
     const wrapper = buildExerciseManager()
     await flushPromises()
 
-    const attribution = wrapper.get('[data-testid="exercise-attribution-1"]')
-    expect(attribution.text()).toBe('Catálogo predefinido')
-    expect(attribution.findComponent({ name: 'BkUser' }).exists()).toBe(false)
+    expect(wrapper.find('[data-testid="exercise-attribution-1"]').exists()).toBe(false)
   })
 
   it('UNIFIED-LISTINGS: own exercises never carry an attribution element', async () => {
@@ -446,7 +444,7 @@ describe('ExerciseManager', () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       {
-        id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null,
+        id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'cardio', owner_id: null,
         is_public: false, owner_username: null, muscle_groups: [],
       },
     ] as never)
@@ -459,17 +457,18 @@ describe('ExerciseManager', () => {
     const nameEl = row.get('p')
     expect(nameEl.text()).toBe('Press banca')
 
-    const chip = row.get('[data-testid="exercise-attribution-1"] span')
-    expect(chip.text()).toBe('Catálogo predefinido')
+    // v0.21.4: sin chip de catálogo — la fila dedicada se comprueba con el
+    // chip de TIPO (cardio), que sigue viviendo fuera del párrafo del nombre
+    const chip = row.get('[data-testid="exercise-measurement-tag-1"]')
     expect(chip.classes()).toContain('text-2xs')
-    // fila DEDICADA: el chip no vive dentro del párrafo del nombre
     expect(nameEl.element.contains(chip.element)).toBe(false)
   })
 
   it('item 2+6 (v0.4.2): when both exist, the group chip and the attribution chip share the SAME chip row', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
-      { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null, muscle_groups: [{ muscle_group_id: 1, is_primary: true }] },
+      // v0.21.4: la atribución queda solo en lo público de OTRO usuario
+      { id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: 9, is_public: true, owner_username: 'loki', muscle_groups: [{ muscle_group_id: 1, is_primary: true }] },
     ] as never)
     vi.mocked(listMuscleGroups).mockResolvedValue([
       { id: 1, slug: 'chest', name_es: 'Pecho', name_en: 'Chest', owner_id: null },

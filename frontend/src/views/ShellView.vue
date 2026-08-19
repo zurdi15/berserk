@@ -14,6 +14,7 @@ import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { useToastStore } from '@/stores/toast'
+import { bootSplashActive, runBootSplash } from '@/utils/bootSplash'
 import { checkNativeShellUpdate, ensureNativeNotificationPermission, isNativeShell } from '@/utils/nativeShell'
 // v0.16.0: la versión del bundle (verdad de build, ver SettingsCard.vue) —
 // contra ella se compara la versionName del shell para avisar de APK nueva
@@ -138,15 +139,21 @@ const workoutGlowOpacity = computed(() => {
   // v0.10.0: el glow sube a tope durante la fase de "descanso terminado" —
   // parte del feedback de fin que pidió zurdi, en cualquier ruta
   if (timerFinished.value) return 1
-  if (route.name === 'workout') return 1
+  if (activeSection.value === 'workout') return 1
   return activeWorkout.workout && !resting.value ? 0.4 : 0
 })
 
 // índice de la sección activa, para el indicador deslizante del bottom bar
 // (móvil): -1 (sin match) cae a 0 en vez de esconder la barra en una posición
 // rara — dentro de este shell siempre hay una ruta hija activa
+// v0.21.4 (zurdi: "en el pre-inicio debería seleccionarse la sección de
+// entrenamiento, no Hoy"): sección efectiva de la ruta — las rutas hija de
+// una sección (workout-start) lo declaran vía meta.section y el nav entero
+// (indicador, glow, resaltado del CTA) las trata como su sección madre
+const activeSection = computed(() => (route.meta.section as string | undefined) ?? (route.name as string))
+
 const activeIndex = computed(() => {
-  const idx = items.findIndex((item) => item.name === route.name)
+  const idx = items.findIndex((item) => item.name === activeSection.value)
   return idx === -1 ? 0 : idx
 })
 
@@ -196,6 +203,13 @@ let disposeBackOnline: (() => void) | null = null
 let disposeDrained: (() => void) | null = null
 
 onMounted(() => {
+  // v0.21.4 (zurdi: "prefetch de las 5 secciones nada más entrar + un
+  // splashart mientras carga"): el splash cubre la app mientras
+  // prefetchSections calienta el viewCache; el RouterView de abajo se monta
+  // al retirarse — la vista de aterrizaje hidrata de caché caliente y pinta
+  // entera de golpe, sin saltos
+  runBootSplash()
+
   updateIndicator()
   window.addEventListener('resize', updateIndicator)
 
@@ -283,7 +297,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
             <div
               v-if="item.name === 'workout'"
               class="flex flex-col items-center gap-1 px-3 py-2"
-              :class="route.name === 'workout' ? 'text-aurora' : 'text-ink-faint hover:text-ink'"
+              :class="activeSection === 'workout' ? 'text-aurora' : 'text-ink-faint hover:text-ink'"
             >
               <span class="text-sm">{{ $t(item.label) }}</span>
               <div class="bk-slab rounded-md relative -mb-5 h-12 flex items-stretch border-aurora text-aurora" data-testid="cta-slab">
@@ -368,7 +382,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
         :style="{
           transform: `translateX(${indicatorLeft}px)`,
           width: `${indicatorWidth}px`,
-          opacity: route.name === 'workout' ? 0 : 1,
+          opacity: activeSection === 'workout' ? 0 : 1,
           transition:
             'transform var(--bk-dur-3) var(--bk-ease-out), width var(--bk-dur-3) var(--bk-ease-out), opacity var(--bk-dur-3) var(--bk-ease-out)',
         }"
@@ -395,7 +409,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
           class="absolute top-0 left-0 h-0.5 w-1/5 rounded-full bg-aurora"
           :style="{
             transform: `translateX(${activeIndex * 100}%)`,
-            opacity: route.name === 'workout' ? 0 : 1,
+            opacity: activeSection === 'workout' ? 0 : 1,
             transition: 'transform var(--bk-dur-3) var(--bk-ease-out), opacity var(--bk-dur-3) var(--bk-ease-out)',
           }"
           aria-hidden="true"
@@ -410,7 +424,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
             <div
               v-if="item.name === 'workout'"
               class="flex flex-col items-center gap-1 py-2.5"
-              :class="route.name === 'workout' ? 'text-aurora' : 'text-ink-faint'"
+              :class="activeSection === 'workout' ? 'text-aurora' : 'text-ink-faint'"
             >
               <div class="bk-slab rounded-md relative -mt-5 h-12 flex items-stretch border-aurora text-aurora" data-testid="cta-slab-mobile">
                 <!-- mismo criterio que en desktop: una capa, opacity 0/1 -->
@@ -462,14 +476,20 @@ watch(activeIndex, () => nextTick(updateIndicator))
                    tamaño exacto (22px) y la etiqueta "Perfil" vuelve siempre
                    — misma anatomía que el resto de items -->
               <span v-if="item.name === 'profile' && navAvatarSrc">
-                <!-- width/height como atributos (no clases): 22px es el
-                     :size exacto de las runas vecinas, fuera de la escala de
-                     Tailwind — mismo criterio que el prop size de BkRune -->
+                <!-- tamaño por STYLE inline, no solo atributos: el preflight
+                     de Tailwind pone height:auto a los img y PISA el
+                     atributo height — una foto no-1:1 se estiraba en
+                     vertical (zurdi). Con la caja fijada a 22×22, object-cover
+                     recorta y rounded-full la deja circular, como en la
+                     propia vista de Perfil. 22px = :size de las runas
+                     vecinas, fuera de la escala de Tailwind (mismo criterio
+                     que el prop size de BkRune). -->
                 <img
                   :src="navAvatarSrc"
                   alt=""
                   width="22"
                   height="22"
+                  style="width: 22px; height: 22px"
                   class="relative rounded-full object-cover border"
                   :class="route.name === 'profile' ? 'border-aurora' : 'border-line-strong'"
                   data-testid="nav-avatar"
@@ -535,12 +555,31 @@ watch(activeIndex, () => nextTick(updateIndicator))
              vistas siguen remontando (su reset de scroll/estado por remount
              es comportamiento deseado). WorkoutView refresca en fondo vía
              onActivated (ver esa vista). -->
-        <RouterView v-slot="{ Component }">
+        <!-- v0.21.4: la vista espera al splash — montarla con la caché ya
+             caliente es lo que garantiza el pintado sin saltos -->
+        <RouterView v-if="!bootSplashActive" v-slot="{ Component }">
           <KeepAlive include="WorkoutView">
             <component :is="Component" />
           </KeepAlive>
         </RouterView>
       </div>
     </main>
+
+    <!-- v0.21.4 SPLASH de arranque: pantalla completa con la runa
+         tallándose mientras el prefetch calienta las secciones (bg-void es
+         tematizado: nocturno en oscuro, niebla en claro). Por encima de nav
+         y sheets (z-toast); el grano (z-noise) queda encima, como en toda
+         superficie. Sale con fundido al terminar (ver utils/bootSplash). -->
+    <Transition name="bk-fade">
+      <div
+        v-if="bootSplashActive"
+        class="fixed inset-0 z-(--bk-z-toast) bg-void flex flex-col items-center justify-center gap-5"
+        data-testid="boot-splash"
+        aria-hidden="true"
+      >
+        <BkRune name="berserk" :size="96" carve tone="aurora" />
+        <p class="font-display font-semibold tracking-widest text-ink-muted text-lg">ᛒᛖᚱᛋᛖᚱᚲ</p>
+      </div>
+    </Transition>
   </div>
 </template>

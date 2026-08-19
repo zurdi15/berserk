@@ -450,3 +450,29 @@ def test_create_exercise_without_english_name(client: TestClient):
     assert client.patch(f"/api/v1/exercises/{eid}", json={"name_en": ""}).status_code == 200
     listed = next(e for e in client.get("/api/v1/exercises").json() if e["id"] == eid)
     assert listed["name_en"] == ""
+
+
+def test_image_framing_round_trips_and_validates(client: TestClient):
+    """v0.21.4 — encuadre WYSIWYG de la foto: defaults 50/50/1, PATCH por
+    campo (independiente del resto del form) y límites del schema."""
+    group_id = client.get("/api/v1/muscle-groups").json()[0]["id"]
+    exercise = client.post(
+        "/api/v1/exercises",
+        json={
+            "name_es": "Encuadre",
+            "name_en": "Framing",
+            "measurement": "strength",
+            "muscle_groups": [{"muscle_group_id": group_id, "is_primary": True}],
+        },
+    ).json()
+    assert (exercise["image_pos_x"], exercise["image_pos_y"], exercise["image_zoom"]) == (50, 50, 1)
+
+    patched = client.patch(
+        f"/api/v1/exercises/{exercise['id']}",
+        json={"image_pos_x": 20.5, "image_pos_y": 80, "image_zoom": 2.2},
+    ).json()
+    assert (patched["image_pos_x"], patched["image_pos_y"], patched["image_zoom"]) == (20.5, 80, 2.2)
+
+    # fuera de rango: posición 0-100, zoom 1-3
+    assert client.patch(f"/api/v1/exercises/{exercise['id']}", json={"image_pos_x": 101}).status_code == 422
+    assert client.patch(f"/api/v1/exercises/{exercise['id']}", json={"image_zoom": 0.5}).status_code == 422

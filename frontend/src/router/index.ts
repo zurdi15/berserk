@@ -30,8 +30,10 @@ export const router = createRouter({
         { path: 'workout', name: 'workout', component: WorkoutView },
         // facelift: pantalla de pre-inicio de una rutina (hero + bloques +
         // "Empezar entrenamiento"). OJO keep-alive: NUNCA añadir esta vista
-        // al include de ShellView (solo WorkoutView sobrevive navegaciones)
-        { path: 'workout/start/:routineId', name: 'workout-start', component: WorkoutStartView },
+        // al include de ShellView (solo WorkoutView sobrevive navegaciones).
+        // meta.section: el nav resalta la sección de ENTRENO aquí, no Hoy
+        // (v0.21.4, zurdi) — ver activeSection en ShellView
+        { path: 'workout/start/:routineId', name: 'workout-start', component: WorkoutStartView, meta: { section: 'workout' } },
         { path: 'workout/:id/edit', name: 'workout-edit', component: WorkoutEditView },
         { path: 'progress', name: 'progress', component: ProgressView },
         { path: 'profile', name: 'profile', component: ProfileView },

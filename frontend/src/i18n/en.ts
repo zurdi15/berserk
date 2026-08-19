@@ -264,6 +264,7 @@ export const en = {
   library: {
     image: 'Image',
     imageAdd: 'Add image',
+    imageFrameHint: 'Drag to frame and adjust the zoom — this is exactly how it will look in the app.',
     imageReplace: 'Replace image',
     exercises: 'Exercises',
     muscleGroups: 'Muscle groups',

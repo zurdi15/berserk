@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { exerciseImageUrl, type ExerciseOut } from '@/api/domain'
+import { imageFramingStyle } from '@/utils/imageFraming'
 import BkRune from './BkRune.vue'
 import type { RuneName } from './runes'
 
@@ -16,7 +17,9 @@ import type { RuneName } from './runes'
 // fill: el padre es dueño del aspect-ratio y del recorte (hero, celdas).
 const props = withDefaults(
   defineProps<{
-    exercise?: Pick<ExerciseOut, 'id' | 'has_image'> | null
+    // v0.21.4: el pick incluye el encuadre — los llamadores pasan el
+    // ExerciseOut entero y el estilo WYSIWYG sale gratis (ver imageFraming)
+    exercise?: Pick<ExerciseOut, 'id' | 'has_image' | 'image_pos_x' | 'image_pos_y' | 'image_zoom'> | null
     src?: string
     cacheBust?: string | number
     rune?: RuneName | null
@@ -46,6 +49,10 @@ watch(url, () => {
 const showImage = computed(() => url.value !== null && !errored.value)
 const runeName = computed<RuneName>(() => props.rune ?? 'berserk')
 
+// v0.21.4: encuadre WYSIWYG — solo aplica a fotos de EJERCICIO (src suelto
+// = fotos corporales/rutina, sin encuadre por ahora)
+const framing = computed(() => (props.src ? {} : imageFramingStyle(props.exercise)))
+
 // facelift v4 (zurdi: "las fotos de ejercicios son verticales, 9:16"):
 // tamaños VERTICALES para las superficies donde la foto es protagonista —
 // tallSm en listados (biblioteca, pre-inicio), tall junto a las series del
@@ -71,6 +78,7 @@ const runeSizes = { xs: 18, sm: 22, md: 28, lg: 40, tallSm: 30, tall: 40, fill: 
       :src="url!"
       :alt="alt"
       class="w-full h-full object-cover"
+      :style="framing"
       loading="lazy"
       decoding="async"
       @error="errored = true"

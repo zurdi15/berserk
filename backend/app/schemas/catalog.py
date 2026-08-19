@@ -80,6 +80,11 @@ class ExercisePatchIn(BaseModel):
     # sin min_length: '' explícito BORRA la traducción EN (None = no tocar)
     name_en: str | None = Field(None, max_length=80)
     muscle_groups: list[ExerciseMuscleLink] | None = Field(None, min_length=1)
+    # v0.21.4: encuadre de la foto — se guarda al soltar el arrastre/zoom en
+    # el editor de biblioteca, independiente del botón Guardar del form
+    image_pos_x: float | None = Field(None, ge=0, le=100)
+    image_pos_y: float | None = Field(None, ge=0, le=100)
+    image_zoom: float | None = Field(None, ge=1, le=3)
     # anulable a nivel de tipo por consistencia, pero None = "no lo toques"
     # (ver update_exercise: solo se aplica si no es None), nunca "vuelve a
     # privado" — para eso hay que mandar is_public=False explícito
@@ -106,4 +111,8 @@ class ExerciseOut(BaseModel):
     # v0.12.0: True si el ejercicio tiene imagen — el fichero real se sirve
     # por GET /exercises/{id}/image, el cliente solo necesita saber si pedirla
     has_image: bool = False
+    # v0.21.4 encuadre de la foto (ver models.Exercise)
+    image_pos_x: float = 50
+    image_pos_y: float = 50
+    image_zoom: float = 1
     muscle_groups: list[ExerciseMuscleLink]
