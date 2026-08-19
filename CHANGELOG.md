@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.19.0 - 2026-08-19
+
+### Changed
+- Lavado de cara integral ("facelift"): misma alma nórdica (runas, aurora, glows, animaciones talladas), estructura nueva mucho más amable — cards grandes y redondeadas (24px), tipografía grande en caja mixta con la voz en mayúsculas relegada a eyebrows ("HOY", "BLOQUE 3"), botones pill de 48px, pestañas segmentadas, y las fotos de los ejercicios como protagonistas en toda la app (con pozo rúnico de respaldo donde no hay foto).
+- Hoy se reorganiza: saludo grande con la fecha, la racha como chip ember al lado, y un HERO del entreno que toca (foto o runa con glow, "Hoy toca", duración estimada y CTA "Vamos a entrenar") con flechas ‹ › para fijar otra rutina del plan; la sesión planificada del día aparece como chip dentro del hero.
+- El player se rediseña entero: header limpio (crono grande + nombre del entreno + kebab), barra de progreso segmentada por bloques con punto en el actual, título "Bloque n" y filas de serie estilo checklist; la gestión (reordenar, descanso, bloque, quitar, descartar, auto-descanso, grupos musculares) se muda a sheets kebab del entreno y de cada ejercicio, y borrar una serie vive ahora en el pie de su cajón de edición.
+- Perfil pasa de pestañas a hub: avatar con anillo de tu color, "Tu actividad reciente" con los 7 puntos de la semana y una fila rúnica por sección (Ajustes, Rutinas, Biblioteca, Compartir, Admin); los enlaces #routines/#library/#admin siguen funcionando.
+- Calendario y Progresión heredan el lenguaje nuevo: mes grande con chevrons circulares, celdas más aireadas, heatmap en su card, tiles de totales grandes y el picker de ejercicios con las fotos de la biblioteca.
+- El cierre de entreno es ahora celebratorio: la runa de la casa tallándose, "¡Entreno terminado!" y la duración como métrica protagonista, con sets/volumen en tiles.
+
+### Added
+- Series pendientes con check de un toque: las series que faltan hasta el objetivo de la rutina aparecen prefijadas (esta sesión > última sesión > objetivo) como filas fantasma — tocar el check la registra al instante por el mismo camino de siempre (descanso, PRs y neón incluidos, también sin conexión); tocar la fila abre el cajón para ajustarla.
+- "Completar todo el bloque": registra de un toque todas las series pendientes con objetivo del bloque visible.
+- Pantalla de pre-inicio de rutina: hero con foto, "N bloques · N ejercicios · ~N min" (duración estimada nueva) y la lista de ejercicios por bloque antes de "Empezar entrenamiento" — tocar una rutina en Hoy o en Entreno lleva aquí en vez de arrancar a ciegas.
+
 ## 0.18.1 - 2026-08-19
 
 ### Added
