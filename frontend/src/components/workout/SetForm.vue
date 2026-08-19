@@ -233,9 +233,11 @@ function submit(keepOpen: boolean) {
         </div>
       </div>
       <!-- v0.12.0: calculadora de discos — abre con el peso actual como
-           objetivo; solo tiene sentido con barra (fuerza en kg) -->
-      <div v-if="!isLevel" class="flex justify-center">
-        <BkButton type="button" variant="ghost" size="sm" data-testid="plate-calc-open" @click="plateCalcOpen = true">
+           objetivo; solo tiene sentido con barra (fuerza en kg).
+           v0.25.0 (zurdi): en modo nivel se DESHABILITA en vez de ocultarse
+           — que el layout no salte al cambiar de modo -->
+      <div class="flex justify-center">
+        <BkButton type="button" variant="ghost" size="sm" :disabled="isLevel" data-testid="plate-calc-open" @click="plateCalcOpen = true">
           {{ t('workout.plates.open') }}
         </BkButton>
       </div>

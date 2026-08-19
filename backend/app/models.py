@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     Date,
@@ -7,7 +7,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     String,
-    Time,
     UniqueConstraint,
     text,
 )
@@ -411,27 +410,6 @@ class PersonalRecord(Base):
     # frontend lo pinta plano sin unidad
     load_mode: Mapped[str] = mapped_column(String(10), default="weight")
     achieved_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-
-
-class ScheduledSession(Base):
-    __tablename__ = "scheduled_sessions"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    owner_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
-    date: Mapped[date] = mapped_column(Date, index=True)
-    # nullable explícito: el nombre del campo colisiona con datetime.time en su
-    # propia anotación y SQLAlchemy no infiere Optional del Mapped[time | None]
-    time: Mapped[time | None] = mapped_column(Time, nullable=True, default=None)
-    routine_id: Mapped[int | None] = mapped_column(
-        ForeignKey("routines.id", ondelete="SET NULL"), default=None
-    )
-    status: Mapped[str] = mapped_column(String(8), default="planned")
-    workout_id: Mapped[int | None] = mapped_column(
-        ForeignKey("workouts.id", ondelete="SET NULL"), default=None
-    )
-    note: Mapped[str | None] = mapped_column(String(300), default=None)
 
 
 class RotationEntry(Base):

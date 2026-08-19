@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/api/domain', () => ({
   getStreak: vi.fn(async () => ({ weeks: 3 })),
-  getMonth: vi.fn(async () => ({ scheduled: [{ id: 1 }], workouts: [] })),
+  getMonth: vi.fn(async () => ({ workouts: [] })),
   listWorkouts: vi.fn(async () => [
     { id: 1, date: '2026-08-18' },
     { id: 2, date: '2026-08-19' },
@@ -44,7 +44,7 @@ describe('prefetchSections', () => {
     const today = getViewCache<Record<string, unknown>>('today:me')
     expect(today).toBeDefined()
     expect(Object.keys(today!).sort()).toEqual(
-      ['distribution', 'exercises', 'muscleGroups', 'records', 'schedules', 'streak', 'workouts'].sort(),
+      ['distribution', 'exercises', 'muscleGroups', 'records', 'streak', 'workouts'].sort(),
     )
     expect(today!.streak).toEqual({ weeks: 3 })
     expect(getViewCache('today:rotation')).toEqual({ routines: [], next_position: null })
@@ -52,7 +52,7 @@ describe('prefetchSections', () => {
 
     // CALENDARIO
     expect(getViewCache('mgroups:me')).toEqual([{ id: 1, slug: 'chest' }])
-    expect(getViewCache(`cal:me:${year}-${month}`)).toEqual({ scheduled: [{ id: 1 }], workouts: [] })
+    expect(getViewCache(`cal:me:${year}-${month}`)).toEqual({ workouts: [] })
     expect(getViewCache(`heatmap:me:${year}`)).toEqual([{ date: '2026-08-19', count: 1 }])
 
     // PROGRESIÓN

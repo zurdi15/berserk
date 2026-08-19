@@ -88,18 +88,21 @@ describe('SetForm', () => {
     it('prefills the mode from the initial set (last set was a level one)', () => {
       wrapper = build('strength', 'kg', { initialSet: { weight_kg: 14, reps: 10, load_mode: 'level' } })
       expect(wrapper.get('[data-testid="load-mode-level"]').attributes('aria-pressed')).toBe('true')
-      // el valor precarga el nivel tal cual y sin sufijo kg ni discos
+      // el valor precarga el nivel tal cual, sin sufijo kg y con los
+      // discos deshabilitados (v0.25.0: disabled, no oculto)
       expect(wrapper.get('[data-testid="stepper-edit"]').text()).toContain('14')
-      expect(wrapper.find('[data-testid="plate-calc-open"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="plate-calc-open"]').attributes('disabled')).toBeDefined()
     })
 
-    it('level mode hides the plate calculator; switching back to weight restores it', async () => {
+    // v0.25.0 (zurdi): en nivel el botón se DESHABILITA, no se oculta — el
+    // layout no salta al cambiar de modo
+    it('level mode disables the plate calculator button; switching back to weight re-enables it', async () => {
       wrapper = build('strength', 'kg')
-      expect(wrapper.find('[data-testid="plate-calc-open"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="plate-calc-open"]').attributes('disabled')).toBeUndefined()
       await wrapper.get('[data-testid="load-mode-level"]').trigger('click')
-      expect(wrapper.find('[data-testid="plate-calc-open"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="plate-calc-open"]').attributes('disabled')).toBeDefined()
       await wrapper.get('[data-testid="load-mode-weight"]').trigger('click')
-      expect(wrapper.find('[data-testid="plate-calc-open"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="plate-calc-open"]').attributes('disabled')).toBeUndefined()
     })
 
     it('switching modes resets the value (80 kg is not "level 80"), restoring the prefill when it matches', async () => {

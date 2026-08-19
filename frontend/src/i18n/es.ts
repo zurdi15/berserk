@@ -62,7 +62,6 @@ export const es = {
     // cual lo reporta pydantic (snake_case) cuando no hay una etiqueta legible.
     validation: 'Valor no válido en {field}.',
     workout_already_active: 'Ya tienes un entreno activo.',
-    session_already_done: 'Esta sesión ya está completada.',
     workout_already_finished: 'Este entreno ya ha terminado.',
     workout_not_finished: 'Este entreno todavía no ha terminado.',
     started_at_required: 'Este entreno no tiene hora de inicio.',
@@ -357,8 +356,6 @@ export const es = {
     weekDots: 'Tu semana',
     todaySession: 'Sesión de Hoy',
     noSession: 'Sin sesiones programadas para hoy',
-    scheduleSession: 'Programar Sesión',
-    startWorkout: 'Empezar Entreno',
     weekSummary: 'Esta Semana',
     workoutDays: 'Días Entrenados',
     effectiveSets: 'Series Efectivas',
@@ -379,20 +376,8 @@ export const es = {
     prevMonth: 'Mes anterior',
     nextMonth: 'Mes siguiente',
     yearActivity: 'Actividad del año',
-    skip: 'Omitir',
-    replan: 'Replanificar',
     optional: 'Opcional',
-    routine: 'Rutina',
-    selectRoutine: 'Selecciona una rutina',
-    newSession: 'Nueva sesión',
-    time: 'Hora',
     date: 'Fecha',
-    note: 'Nota',
-    schedule: 'Programar',
-    confirmSkip: 'Omitir sesión',
-    confirmSkipMessage: '¿Seguro que quieres omitir esta sesión?',
-    confirmDelete: 'Borrar sesión',
-    confirmDeleteMessage: '¿Estás seguro de que quieres borrar esta sesión?',
     runeLegend: 'Leyenda de runas',
     logPastWorkout: 'Registrar entreno',
     // item 3 (v0.4.0): picker de "Registrar entreno" — "Entreno libre" +
@@ -401,7 +386,6 @@ export const es = {
     logPastWorkoutFree: 'Entreno libre',
     logPastWorkoutOr: 'o',
     prsOfDay: 'Récords del día',
-    plannedEyebrow: 'Planificado',
     // item 1b (v0.4.2): pestaña "yo" del sheet del día, siempre primera y
     // por defecto — solo aparece la tira si hay usuarios compartidos con
     // entreno ese día (ver ScheduleSheet.vue sharedUsersToday). item 9

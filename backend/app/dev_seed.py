@@ -23,7 +23,6 @@ from .models import (
     PersonalRecord,
     Routine,
     RoutineExercise,
-    ScheduledSession,
     ShareGrant,
     User,
     Workout,
@@ -406,68 +405,6 @@ def _generate_history(
     return workouts
 
 
-def _schedule_sessions(
-    db: Session,
-    rng: random.Random,
-    owner: User,
-    workouts: list[Workout],
-    routines: list[Routine],
-    end_date: date,
-) -> int:
-    """~80% de los entrenos generados quedan enlazados como sesión 'done';
-    unas pocas quedan 'skipped' (día planeado sin entreno real); y 3 quedan
-    'planned' en los próximos 7 días para poblar el buzón de "hoy"."""
-    count = 0
-    linked = set(rng.sample(range(len(workouts)), k=max(1, round(len(workouts) * 0.8))))
-    for idx, workout in enumerate(workouts):
-        if idx not in linked:
-            continue
-        db.add(
-            ScheduledSession(
-                owner_id=owner.id,
-                date=workout.date,
-                time=workout.started_at.time() if workout.started_at else None,
-                routine_id=workout.routine_id,
-                status="done",
-                workout_id=workout.id,
-            )
-        )
-        count += 1
-
-    existing_dates = {w.date for w in workouts}
-    span_days = (end_date - workouts[0].date).days
-    free_dates = [
-        workouts[0].date + timedelta(days=i)
-        for i in range(span_days + 1)
-        if workouts[0].date + timedelta(days=i) not in existing_dates
-    ]
-    for i, d in enumerate(rng.sample(free_dates, k=min(3, len(free_dates)))):
-        db.add(
-            ScheduledSession(
-                owner_id=owner.id, date=d, routine_id=routines[i % len(routines)].id, status="skipped"
-            )
-        )
-        count += 1
-
-    next_idx = len(workouts) % len(routines)
-    today = end_date + timedelta(days=1)
-    # sesión de "hoy" siempre presente, no una moneda al aire: el buzón de la
-    # portada de athlete-mode necesita algo que mostrar sin depender del azar
-    first_offset = 0
-    for i, offset in enumerate((first_offset, 3, 6)):
-        db.add(
-            ScheduledSession(
-                owner_id=owner.id,
-                date=today + timedelta(days=offset),
-                routine_id=routines[(next_idx + i) % len(routines)].id,
-                status="planned",
-            )
-        )
-        count += 1
-
-    db.commit()
-    return count
-
 
 def _body_entries(db: Session, rng: random.Random, owner: User, weeks: int, end_date: date) -> None:
     """Peso semanal con deriva realista 84.0->81.5kg y ruido; la cintura solo
@@ -519,11 +456,9 @@ def run(db: Session, weeks: int = 12) -> dict:
         db, rng, freyja, freyja_routines, by_id, freyja_dates, 0.65, extra_pool, cardio_exercise
     )
 
-    scheduled_count = _schedule_sessions(db, rng, target, target_workouts, target_routines, end_date)
     _body_entries(db, rng, target, weeks, end_date)
     # freyja es la atleta compartida de demo (athlete-mode); sin esto tiene
     # entrenos pero ni sesiones programadas ni peso, y esa vista queda vacía
-    _schedule_sessions(db, rng, freyja, freyja_workouts, freyja_routines, end_date)
     _body_entries(db, rng, freyja, weeks, end_date)
 
     pr_count = db.scalar(
@@ -537,7 +472,6 @@ def run(db: Session, weeks: int = 12) -> dict:
         "workouts": len(target_workouts),
         "freyja_workouts": len(freyja_workouts),
         "personal_records": pr_count,
-        "scheduled_sessions": scheduled_count,
     }
 
 
@@ -554,7 +488,6 @@ def _print_summary(result: dict) -> None:
     print(f"  entrenos (admin):    {result['workouts']}")
     print(f"  entrenos (freyja):   {result['freyja_workouts']}")
     print(f"  personal records:    {result['personal_records']}")
-    print(f"  sesiones programadas:{result['scheduled_sessions']}")
 
 
 if __name__ == "__main__":

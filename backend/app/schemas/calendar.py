@@ -1,35 +1,11 @@
 from datetime import date as date_type
-from datetime import time as time_type
-from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-
-class ScheduleIn(BaseModel):
-    date: date_type
-    time: time_type | None = None
-    routine_id: int | None = None
-    note: str | None = Field(None, max_length=300)
-
-
-class SchedulePatchIn(BaseModel):
-    date: date_type | None = None
-    time: time_type | None = None
-    routine_id: int | None = None
-    note: str | None = Field(None, max_length=300)
-    status: Literal["planned", "skipped"] | None = None
-
-
-class ScheduledOut(BaseModel):
-    id: int
-    date: date_type
-    time: time_type | None
-    routine_id: int | None
-    status: str
-    workout_id: int | None
-    note: str | None
-
-    model_config = {"from_attributes": True}
+# (v0.25.0: los schemas de planificación de sesiones — ScheduleIn/
+# SchedulePatchIn/ScheduledOut — MURIERON con la feature entera: zurdi,
+# "teniendo las rutinas y planes rotatorios, planificar un entrenamiento ya
+# no aporta nada")
 
 
 class WorkoutSummaryOut(BaseModel):
@@ -51,7 +27,6 @@ class SharedUserOut(BaseModel):
 
 
 class CalendarMonthOut(BaseModel):
-    scheduled: list[ScheduledOut]
     workouts: list[WorkoutSummaryOut]
     # solo viajan cuando se ve el PROPIO calendario (nunca en modo atleta, ver
     # calendar.py::month_view) — None + response_model_exclude_unset hace que

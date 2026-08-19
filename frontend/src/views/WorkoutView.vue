@@ -682,20 +682,6 @@ function stopTicker() {
   ticker = null
 }
 
-// arranque desde ?session= (calendario → "Empezar"): compartido entre el
-// montaje inicial y las re-activaciones del keep-alive — el query param
-// puede llegar en cualquiera de los dos caminos
-async function maybeStartFromSession() {
-  if (activeWorkout.workout) return
-  const sessionParam = route.query.session
-  if (!sessionParam) return
-  try {
-    await activeWorkout.start({ scheduled_session_id: Number(sessionParam) })
-  } catch (error) {
-    toastApiError(error)
-  }
-}
-
 onMounted(async () => {
   await loadCatalog()
   try {
@@ -703,7 +689,6 @@ onMounted(async () => {
   } catch (error) {
     toastApiError(error)
   }
-  await maybeStartFromSession()
   // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: después de que activeWorkout.workout
   // ya refleje su estado final para este montaje (resume, y el auto-start
   // desde ?session si aplicaba) — antes de esto, un countdown "todavía
@@ -737,8 +722,7 @@ onActivated(() => {
       // refresco de fondo: el estado retenido sigue siendo válido — nunca un
       // toast por volver a la pestaña
     }
-    await maybeStartFromSession()
-    await checkPersistedCardioCountdown()
+      await checkPersistedCardioCountdown()
   })()
   startTicker()
 })

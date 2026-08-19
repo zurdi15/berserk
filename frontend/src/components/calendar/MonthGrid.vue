@@ -36,12 +36,10 @@ const today = computed(() => todayIso())
 // tampoco dejaba runa abajo. Ahora el dot RELLENO sale de workouts[] (uno
 // por entreno, exista o no una sesión detrás, tenga o no ejercicios), y el
 // dot HUECO sigue reservado a lo que de verdad está solo planificado
-// (status 'planned': algo que aún no ha pasado). 'skipped' no deja dot
-// arriba — ni es un entreno ni es algo pendiente, y ya tiene su propia fila
-// en el sheet del día.
+// (v0.25.0: el dot HUECO de planificadas murió con la feature entera).
 type DayDot = {
   key: string
-  kind: 'done' | 'planned'
+  kind: 'done'
   // color inline SOLO en dots del overlay compartido (dato de usuario, no
   // token del sistema de diseño — mismo criterio de exención que BkUser.vue):
   // los dots PROPIOS siguen pintándose vía la clase bg-[var(--bk-day-dot)],
@@ -55,11 +53,6 @@ const ownDotsByDate = computed(() => {
   for (const workout of props.month.workouts) {
     const existing = map.get(workout.date) ?? []
     map.set(workout.date, [...existing, { key: `w-${workout.id}`, kind: 'done' }])
-  }
-  for (const session of props.month.scheduled) {
-    if (session.status !== 'planned') continue
-    const existing = map.get(session.date) ?? []
-    map.set(session.date, [...existing, { key: `s-${session.id}`, kind: 'planned' }])
   }
   return map
 })

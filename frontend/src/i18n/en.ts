@@ -62,7 +62,6 @@ export const en = {
     // pydantic reports it (snake_case) when there's no readable label.
     validation: 'Invalid value in {field}.',
     workout_already_active: 'You already have an active workout.',
-    session_already_done: 'This session is already done.',
     workout_already_finished: 'This workout has already finished.',
     workout_not_finished: 'This workout hasn\'t finished yet.',
     started_at_required: 'This workout has no start time.',
@@ -352,8 +351,6 @@ export const en = {
     weekDots: 'Your week',
     todaySession: 'Today\'s Session',
     noSession: 'No sessions scheduled for today',
-    scheduleSession: 'Schedule Session',
-    startWorkout: 'Start Workout',
     weekSummary: 'This Week',
     workoutDays: 'Training Days',
     effectiveSets: 'Effective Sets',
@@ -374,20 +371,8 @@ export const en = {
     prevMonth: 'Previous Month',
     nextMonth: 'Next Month',
     yearActivity: 'Year Activity',
-    skip: 'Skip',
-    replan: 'Replan',
     optional: 'Optional',
-    routine: 'Routine',
-    selectRoutine: 'Select a routine',
-    newSession: 'New session',
-    time: 'Time',
     date: 'Date',
-    note: 'Note',
-    schedule: 'Schedule',
-    confirmSkip: 'Skip session',
-    confirmSkipMessage: 'Are you sure you want to skip this session?',
-    confirmDelete: 'Delete session',
-    confirmDeleteMessage: 'Are you sure you want to delete this session?',
     runeLegend: 'Rune legend',
     logPastWorkout: 'Log workout',
     // item 3 (v0.4.0): "Registrar entreno" picker — free workout + the
@@ -396,7 +381,6 @@ export const en = {
     logPastWorkoutFree: 'Free workout',
     logPastWorkoutOr: 'or',
     prsOfDay: 'PRs of the day',
-    plannedEyebrow: 'Planned',
     // item 1b (v0.4.2): the day sheet's "self" tab label, always first and
     // the default — the strip only shows up when shared users have a
     // workout that day (see ScheduleSheet.vue sharedUsersToday). item 9

@@ -3,19 +3,16 @@
 // una sola pieza estilo referencia (foto/runa de fondo, "Hoy toca", nombre
 // grande, CTA dominante). Estados, en orden:
 //   (a) entreno en curso → eyebrow "Entrenando" + CTA continuar
-//   (b) rutina de rotación ("te toca", zurdi v0.14.1: SIEMPRE encima de la
-//       programada) con carrusel ‹ › para fijar otra (putRotationNext, el
-//       mismo gesto "fijar como la de hoy" de RotationPlanCard) — la sesión
-//       planificada de hoy aparece como fila-chip DENTRO del hero
-//   (c) sin plan pero con sesión planificada → hero de sesión
-//   (d) nada → hero compacto "Entreno libre" + programar
-// En modo atleta (viendo a otro) no hay rotación propia ni CTAs: solo la
-// card de sesiones de hoy en lectura.
+//   (b) rutina de rotación ("te toca") con carrusel ‹ › para fijar otra
+//       (putRotationNext, el mismo gesto de RotationPlanCard)
+//   (c) nada → card compacta "Entreno libre"
+// (v0.25.0: los estados de SESIÓN PLANIFICADA murieron con la feature; en
+// modo atleta este componente no pinta nada)
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
-import type { ExerciseOut, RotationOut, ScheduledOut } from '@/api/domain'
+import type { ExerciseOut, RotationOut } from '@/api/domain'
 import { getRotation, putRotationNext, routineImageUrl } from '@/api/domain'
 import BkAnimatedNumber from '@/lib/BkAnimatedNumber.vue'
 import BkAnimatedText from '@/lib/BkAnimatedText.vue'
@@ -28,13 +25,9 @@ import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAthleteStore } from '@/stores/athlete'
 import { toastApiError } from '@/utils/apiErrors'
 import { getViewCache, setViewCache } from '@/utils/viewCache'
-import { formatTimeShort, todayIso } from '@/utils/dates'
 import { estimateRoutineMinutes } from '@/components/workout/routineEstimate'
 
-const props = withDefaults(
-  defineProps<{ schedules: ScheduledOut[]; exercises: ExerciseOut[] }>(),
-  { schedules: () => [], exercises: () => [] },
-)
+const props = withDefaults(defineProps<{ exercises: ExerciseOut[] }>(), { exercises: () => [] })
 
 const { t } = useI18n()
 const router = useRouter()
@@ -103,18 +96,6 @@ const heroMinutes = computed(() => {
 })
 const heroExerciseCount = computed(() => displayRoutine.value?.exercises.length ?? 0)
 
-const today = computed(() => todayIso())
-const todaySessions = computed(() => props.schedules.filter((s) => s.date === today.value))
-const plannedSession = computed(() => todaySessions.value.find((s) => s.status === 'planned'))
-
-// mismos puntos de estado que la vieja TodaySessionCard (specs los cubren)
-const statusClasses = (status: string) => {
-  if (status === 'planned') return 'border-2 border-aurora rounded-full'
-  if (status === 'done') return 'bg-aurora rounded-full'
-  if (status === 'skipped') return 'bg-ink-faint rounded-full'
-  return 'bg-ink-faint rounded-full'
-}
-
 // ‹ ›: fijar otra rutina del plan como la de hoy — persiste al momento
 // (putRotationNext); las flechas se deshabilitan mientras viaja el PUT para
 // no encolar carreras
@@ -148,48 +129,15 @@ function start() {
   router.push({ name: 'workout-start', params: { routineId: displayRoutine.value.id } })
 }
 
-function startSession() {
-  if (plannedSession.value) {
-    router.push({ name: 'workout', query: { session: plannedSession.value.id } })
-  }
-}
-
 function startFree() {
   router.push({ name: 'workout' })
-}
-
-// polish wave item 8: aterrizar en el calendario CON el día de hoy en query
-// para que abra su sheet directamente
-function goToCalendar() {
-  router.push({ name: 'calendar', query: { day: today.value } })
 }
 </script>
 
 <template>
-  <!-- modo atleta: solo lectura de las sesiones de hoy -->
-  <BkCard v-if="athlete.isViewing" :title="t('today.todaySession')">
-    <p v-if="todaySessions.length === 0" class="text-ink-muted">{{ t('today.noSession') }}</p>
-    <div v-else class="space-y-3">
-      <div
-        v-for="session in todaySessions"
-        :key="session.id"
-        class="flex items-center gap-3"
-        :data-testid="`session-${session.status}`"
-      >
-        <span :class="['w-2.5 h-2.5', statusClasses(session.status)]" />
-        <div class="flex-1 min-w-0">
-          <p v-if="formatTimeShort(session.time)" class="font-medium text-ink">{{ formatTimeShort(session.time) }}</p>
-          <p v-if="session.note" class="text-sm text-ink-muted truncate">{{ session.note }}</p>
-          <!-- sin hora ni nota: etiqueta de estado, que el punto no quede solo -->
-          <p v-if="!formatTimeShort(session.time) && !session.note && session.status === 'planned'" class="text-sm text-ink-muted">
-            {{ t('calendar.plannedEyebrow') }}
-          </p>
-        </div>
-      </div>
-    </div>
-  </BkCard>
-
-  <template v-else-if="ready">
+  <!-- v0.25.0: en modo atleta no hay hero (la card de sesiones del día
+       murió con la planificación) — Hoy muestra directamente el resto -->
+  <template v-if="!athlete.isViewing && ready">
     <!-- facelift v3: la Transition externa solo cubre el cambio de RAMA
          (claves estáticas) — las flechas del carrusel ya NO remontan la
          card: animan solo el interior (título/meta con sus Transitions
@@ -261,22 +209,6 @@ function goToCalendar() {
         >
           {{ workoutActive ? t('rotation.continue') : t('today.heroCta') }}
         </BkButton>
-        <!-- sesión planificada de hoy, como fila-chip dentro del hero -->
-        <div v-if="todaySessions.length > 0" class="flex flex-wrap items-center justify-center gap-2">
-          <component
-            :is="session.status === 'planned' ? 'button' : 'span'"
-            v-for="session in todaySessions"
-            :key="session.id"
-            :type="session.status === 'planned' ? 'button' : undefined"
-            class="inline-flex items-center gap-1.5 rounded-full border bk-hero-line px-2.5 py-1 text-xs bk-hero-muted transition-colors"
-            :class="session.status === 'planned' && 'bk-press hover:border-aurora'"
-            :data-testid="`session-${session.status}`"
-            @click="session.status === 'planned' && startSession()"
-          >
-            <span :class="['w-2.5 h-2.5', statusClasses(session.status)]" />
-            {{ t('calendar.plannedEyebrow') }}<template v-if="formatTimeShort(session.time)"> · {{ formatTimeShort(session.time) }}</template>
-          </component>
-        </div>
         <div v-if="routines.length > 1" class="flex items-center justify-center gap-1.5" aria-hidden="true">
           <span
             v-for="(routine, i) in routines"
@@ -288,47 +220,12 @@ function goToCalendar() {
       </div>
     </BkHero>
 
-    <!-- (c) sin plan, con sesiones hoy (planificadas, hechas u omitidas) -->
-    <BkHero v-else-if="todaySessions.length > 0" key="session" rune="berserk">
-      <div class="flex-1 flex flex-col gap-3">
-        <p v-if="plannedSession" class="bk-eyebrow bk-hero-accent">
-          {{ t('calendar.plannedEyebrow') }}<template v-if="formatTimeShort(plannedSession.time)"> · {{ formatTimeShort(plannedSession.time) }}</template>
-        </p>
-        <h2 class="bk-display">{{ t('today.todaySession') }}</h2>
-        <div class="flex-1 min-h-10" aria-hidden="true" />
-        <div class="space-y-2">
-          <div
-            v-for="session in todaySessions"
-            :key="session.id"
-            class="flex items-center gap-3"
-            :data-testid="`session-${session.status}`"
-          >
-            <span :class="['w-2.5 h-2.5', statusClasses(session.status)]" />
-            <div class="flex-1 min-w-0">
-              <p v-if="formatTimeShort(session.time)" class="font-medium">{{ formatTimeShort(session.time) }}</p>
-              <p v-if="session.note" class="text-sm bk-hero-muted truncate">{{ session.note }}</p>
-              <!-- sin hora ni nota: etiqueta de estado, que el punto no quede solo -->
-              <p v-if="!formatTimeShort(session.time) && !session.note && session.status === 'planned'" class="text-sm bk-hero-muted">
-                {{ t('calendar.plannedEyebrow') }}
-              </p>
-            </div>
-          </div>
-        </div>
-        <BkButton v-if="plannedSession" variant="primary" size="lg" block @click="startSession">
-          {{ t('today.startWorkout') }}
-        </BkButton>
-      </div>
-    </BkHero>
-
-    <!-- (d) nada programado: entreno libre + programar -->
+    <!-- (c) sin plan: entreno libre a secas (v0.25.0: "programar" murió) -->
     <BkCard v-else key="empty" :title="t('today.todaySession')">
       <div class="space-y-3">
         <p class="text-ink-muted">{{ t('today.noSession') }}</p>
         <BkButton variant="primary" size="lg" block @click="startFree">
           {{ workoutActive ? t('rotation.continue') : t('today.heroFree') }}
-        </BkButton>
-        <BkButton variant="ghost" block @click="goToCalendar">
-          {{ t('today.scheduleSession') }}
         </BkButton>
       </div>
     </BkCard>

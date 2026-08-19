@@ -82,10 +82,3 @@ def test_only_one_active_workout_per_owner(db_session):
         db_session.commit()
 
 
-def test_scheduled_session_defaults(db_session):
-    user = make_user_row(db_session)
-    session = models.ScheduledSession(owner_id=user.id, date=date(2026, 8, 7))
-    db_session.add(session)
-    db_session.commit()
-    assert session.status == "planned"
-    assert session.workout_id is None

@@ -22,7 +22,7 @@ vi.mock('vue-router', async (importOriginal) => ({
 
 function build(props: Record<string, unknown> = {}) {
   return mount(TodayHero, {
-    props: { schedules: [], exercises: [], ...props },
+    props: { exercises: [], ...props },
     global: { plugins: [createI18nInstance()] },
   })
 }
@@ -66,9 +66,9 @@ describe('TodayHero (rotación, antes RotationNextCard v0.14.0)', () => {
     const wrapper = build()
     await flushPromises()
     expect(wrapper.find('[data-testid="rotation-next-card"]').exists()).toBe(false)
-    // el estado vacío ofrece entreno libre + programar
+    // v0.25.0: el estado vacío ofrece SOLO entreno libre (programar murió)
     expect(wrapper.text()).toContain('Entreno libre')
-    expect(wrapper.text()).toContain('Programar Sesión')
+    expect(wrapper.text()).not.toContain('Programar')
   })
 
   it('with an active workout the button navigates without starting another', async () => {

@@ -3,43 +3,37 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
-import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
-import BkSelect from '@/lib/BkSelect.vue'
-import BkField from '@/lib/BkField.vue'
 import BkTimeField from '@/lib/BkTimeField.vue'
-import BkDateField from '@/lib/BkDateField.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkUser from '@/lib/BkUser.vue'
 import WorkoutDayInfo from './WorkoutDayInfo.vue'
-import { statusClasses } from './statusClasses'
 import { isValidRuneName } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 import { useAuthStore } from '@/stores/auth'
-import type { ExerciseOut, PersonalRecordOut, RoutineOut, ScheduledOut, SharedUserOut, WorkoutOut } from '@/api/domain'
+import type { ExerciseOut, PersonalRecordOut, RoutineOut, SharedUserOut, WorkoutOut } from '@/api/domain'
 import {
-  deleteSchedule,
   deleteWorkout,
   getRecords,
   listExercises,
   listRoutines,
   listWorkouts,
-  schedule,
   startWorkout,
-  updateSchedule,
 } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
-import { formatDayLabel, formatTimeShort, isoDate, todayIso } from '@/utils/dates'
+import { formatDayLabel, isoDate, todayIso } from '@/utils/dates'
 import { parseUtc } from '@/utils/datetime'
 import { formatWeight, formatWeightInt } from '@/utils/units'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { useAthleteStore } from '@/stores/athlete'
 
+// v0.25.0: la PLANIFICACIÓN murió (zurdi: "teniendo rutinas y plan
+// rotatorio no aporta nada") — este sheet (antes ScheduleSheet) queda como
+// el sheet del DÍA: entrenos, PRs, retro-registro y pestañas de compartidos
 const props = defineProps<{
   date: string
-  scheduled: ScheduledOut[]
   // item 1b (v0.4.2): el payload `shared` del mes (CalendarMonthOut.shared),
   // reenviado tal cual desde CalendarView — undefined en modo atleta (el
   // backend omite la clave, ver api/domain.ts), igual que en MonthGrid
@@ -62,11 +56,6 @@ const isViewingSelf = computed(() => !athlete.isViewing)
 // date, pero para un futuro sí hay date: se oculta en el cliente para no
 // ofrecer una acción que no encaja conceptualmente)
 const isPastOrToday = computed(() => props.date <= todayIso())
-// item 1 (round 10): "programar rutina" solo tiene sentido hoy/futuro — un
-// día pasado ya ofrece registrar/editar el entreno (arriba), "programar"
-// no encaja conceptualmente ahí
-const isTodayOrFuture = computed(() => props.date >= todayIso())
-const isToday = computed(() => props.date === todayIso())
 const loggingPastWorkout = ref(false)
 // item 3 (v0.4.0): "Registrar entreno" ya no crea directamente un entreno
 // libre — abre este picker primero (Entreno libre + rutinas propias)
@@ -161,41 +150,8 @@ async function selectTab(tab: 'self' | SharedTab) {
   }
 }
 
-// amendment D: ya no hay título genérico de sheet ("Sesiones Programadas");
-// las sesiones planificadas se agrupan bajo un eyebrow ligero solo cuando
-// hay alguna PLANIFICADA de verdad (una lista solo de omitidas no lo lleva,
-// "Planificado" sería engañoso ahí)
-const plannedSessions = computed(() => props.scheduled.filter((s) => s.status !== 'done'))
-const showPlannedEyebrow = computed(() => plannedSessions.value.some((s) => s.status === 'planned'))
-
-// item 1: al programar HOY, las horas/minutos ya pasados se deshabilitan en
-// el BkTimeField (min). Un día futuro no pasa min (cualquier hora vale).
-const minTimeToday = computed(() => {
-  if (!isToday.value) return undefined
-  const now = new Date()
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-})
-
-// Form state for creating new session
-// null (no ''): BkTimeField emite null al limpiar/nunca elegir hora — el ''
-// del campo de hora nativo que sustituye ya no aplica
-const newTime = ref<string | null>(null)
-const newRoutineId = ref<string>('')
-const newNote = ref('')
-
-// Replan state
-const editingId = ref<number | null>(null)
-const editDate = ref('')
-const editTime = ref<string | null>(null)
-
-// Confirm dialog state: 'kind' distingue qué API llamar en un delete —
-// amendment A unifica la tarjeta de entreno con la de sesión, pero borrar
-// cada una sigue siendo una operación distinta (deleteWorkout vs deleteSchedule)
-const confirmAction = ref<
-  | { type: 'skip'; id: number }
-  | { type: 'delete'; id: number; kind: 'session' | 'workout' }
-  | null
->(null)
+// confirmación de borrado de un entreno del día
+const confirmAction = ref<{ id: number } | null>(null)
 
 async function loadRoutines() {
   try {
@@ -245,86 +201,18 @@ function formatRecordValue(record: PersonalRecordOut): string {
     : formatWeightInt(record.value, units.value)
 }
 
-async function skipSession(id: number) {
-  confirmAction.value = { type: 'skip', id }
-}
-
-async function confirmSkip() {
-  if (!confirmAction.value || confirmAction.value.type !== 'skip') return
-  const id = confirmAction.value.id
-  confirmAction.value = null
-
-  try {
-    loading.value = true
-    await updateSchedule(id, { status: 'skipped' })
-    emit('updated')
-  } catch (error) {
-    toastApiError(error)
-  } finally {
-    loading.value = false
-  }
-}
-
-function deleteSession(id: number) {
-  confirmAction.value = { type: 'delete', id, kind: 'session' }
-}
-
 function deleteWorkoutEntry(id: number) {
-  confirmAction.value = { type: 'delete', id, kind: 'workout' }
-}
-
-function startReplan(session: ScheduledOut) {
-  editingId.value = session.id
-  editDate.value = session.date
-  // I1: pydantic serializa la hora con segundos ("18:00:00") — pasarla tal
-  // cual al trigger de BkTimeField enseñaría "18:00:00" en vez de "18:00"
-  editTime.value = formatTimeShort(session.time)
-}
-
-async function saveReplan() {
-  if (!editingId.value) return
-  try {
-    loading.value = true
-    await updateSchedule(editingId.value, {
-      date: editDate.value,
-      time: editTime.value,
-    })
-    editingId.value = null
-    editDate.value = ''
-    editTime.value = null
-    emit('updated')
-  } catch (error) {
-    toastApiError(error)
-  } finally {
-    loading.value = false
-  }
-}
-
-function cancelReplan() {
-  editingId.value = null
-  editDate.value = ''
-  editTime.value = null
+  confirmAction.value = { id }
 }
 
 async function confirmDelete() {
-  if (!confirmAction.value || confirmAction.value.type !== 'delete') return
-  const { id, kind } = confirmAction.value
+  if (!confirmAction.value) return
+  const { id } = confirmAction.value
   confirmAction.value = null
-
   try {
     loading.value = true
-    if (kind === 'workout') {
-      // amendment A: borrar la tarjeta unificada borra el ENTRENO. El
-      // backend revierte la sesión vinculada (si la había) a 'planned' —
-      // comportamiento menos sorprendente: tras recargar el mes, esa sesión
-      // vuelve a aparecer en la lista de planificadas de arriba, como si el
-      // entreno nunca se hubiera registrado. Un standalone (sin sesión) solo
-      // desaparece, sin nada que reaparezca.
-      await deleteWorkout(id)
-      await loadDayInfo()
-    } else {
-      await deleteSchedule(id)
-    }
+    await deleteWorkout(id)
+    await loadDayInfo()
     emit('updated')
   } catch (error) {
     toastApiError(error)
@@ -377,26 +265,6 @@ async function logPastWorkout(routineId?: number) {
 // futhark válida (columna dedicada, con fallback a slug — ver runeResolve)
 function routineRune(routine: RoutineOut): RuneName | null {
   return routine.rune && isValidRuneName(routine.rune) ? (routine.rune as RuneName) : null
-}
-
-async function createSession() {
-  try {
-    loading.value = true
-    await schedule({
-      date: props.date,
-      time: newTime.value,
-      routine_id: newRoutineId.value ? Number(newRoutineId.value) : null,
-      note: newNote.value || null,
-    })
-    newTime.value = null
-    newRoutineId.value = ''
-    newNote.value = ''
-    emit('updated')
-  } catch (error) {
-    toastApiError(error)
-  } finally {
-    loading.value = false
-  }
 }
 
 // el sheet no se remonta al cambiar de día con el sheet ya abierto (el
@@ -501,56 +369,6 @@ loadDayInfo()
         </div>
       </div>
 
-      <!-- Sesiones planificadas/omitidas: las completadas ya se muestran arriba
-           como tarjeta unificada (amendment A), no aquí -->
-      <div v-if="plannedSessions.length" class="space-y-3">
-        <p v-if="showPlannedEyebrow" class="bk-eyebrow">{{ $t('calendar.plannedEyebrow') }}</p>
-        <div
-          v-for="session in plannedSessions"
-          :key="session.id"
-          class="border border-line rounded-sm p-3 space-y-2"
-        >
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <p class="font-medium text-ink">{{ formatTimeShort(session.time) || '–' }}</p>
-              <p v-if="session.note" class="text-sm text-ink-muted">{{ session.note }}</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <span
-                :data-status="session.status"
-                :class="['w-2.5 h-2.5', statusClasses(session.status)]"
-              />
-            </div>
-          </div>
-
-          <!-- Actions: v0.3.0 item 5 — "Botón en calendario de borrar, omitir y
-               replanificar con iconos", mismo patrón icon-only que las tarjetas
-               de entreno (WorkoutDayInfo) en vez de botones de texto -->
-          <div v-if="isViewingSelf" class="flex items-center gap-1">
-            <BkActionBtn
-              v-if="session.status === 'planned'"
-              icon="replan"
-              :data-testid="`replan-session-${session.id}`"
-              :aria-label="$t('calendar.replan')"
-              @click="startReplan(session)"
-            />
-            <BkActionBtn
-              v-if="session.status === 'planned'"
-              icon="skip"
-              :data-testid="`skip-session-${session.id}`"
-              :aria-label="$t('calendar.skip')"
-              @click="skipSession(session.id)"
-            />
-            <BkActionBtn
-              icon="delete"
-              :data-testid="`delete-session-${session.id}`"
-              :aria-label="$t('common.delete')"
-              @click="deleteSession(session.id)"
-            />
-          </div>
-        </div>
-      </div>
-
       <!-- Registrar un entreno pasado: solo hoy/pasado (ver isPastOrToday).
            amendment B: variant primary, como toda acción de "añadir algo".
            item 3 (v0.4.0): ya no registra directo — abre el picker de abajo -->
@@ -614,37 +432,6 @@ loadDayInfo()
         </div>
       </BkSheet>
 
-      <!-- Create new session form: solo hoy/futuro (item 1) -->
-      <div v-if="isViewingSelf && isTodayOrFuture" class="border border-line rounded-sm p-3 space-y-3">
-        <h4 class="font-medium text-ink">{{ $t('calendar.newSession') }}</h4>
-        <div class="space-y-2">
-          <BkTimeField
-            v-model="newTime"
-            :label="$t('calendar.time')"
-            :hint="$t('calendar.optional')"
-            :min="minTimeToday"
-          />
-          <BkSelect
-            v-model="newRoutineId"
-            :options="[{ value: '', label: $t('calendar.selectRoutine'), disabled: true }, ...routines.map(r => ({ value: String(r.id), label: r.name }))]"
-            :label="$t('calendar.routine')"
-          />
-          <BkField
-            v-model="newNote"
-            type="text"
-            :label="$t('calendar.note')"
-            :hint="$t('calendar.optional')"
-          />
-          <BkButton
-            variant="primary"
-            block
-            :disabled="loading"
-            @click="createSession"
-          >
-            {{ $t('calendar.schedule') }}
-          </BkButton>
-        </div>
-      </div>
     </template>
 
     <!-- item 1b (v0.4.2): pestaña de un usuario compartido — SOLO LECTURA,
@@ -680,50 +467,14 @@ loadDayInfo()
       </div>
     </template>
 
-    <!-- Replan sheet -->
-    <BkSheet :open="editingId !== null" :title="$t('calendar.replan')" @close="cancelReplan">
-      <div v-if="editingId !== null" class="space-y-3">
-        <BkDateField
-          v-model="editDate"
-          :label="$t('calendar.date')"
-        />
-        <BkTimeField
-          v-model="editTime"
-          :label="$t('calendar.time')"
-          :hint="$t('calendar.optional')"
-        />
-        <div class="flex gap-2">
-          <BkButton
-            variant="ghost"
-            block
-            @click="cancelReplan"
-          >
-            {{ $t('common.cancel') }}
-          </BkButton>
-          <BkButton
-            variant="primary"
-            block
-            :disabled="loading"
-            @click="saveReplan"
-          >
-            {{ $t('common.save') }}
-          </BkButton>
-        </div>
-      </div>
-    </BkSheet>
-
-    <!-- Confirm sheet -->
+    <!-- Confirmar borrado de un entreno del día -->
     <BkSheet
       :open="confirmAction !== null"
-      :title="confirmAction?.type === 'skip' ? $t('calendar.confirmSkip') : (confirmAction?.kind === 'workout' ? $t('workout.discardTitle') : $t('calendar.confirmDelete'))"
+      :title="$t('workout.discardTitle')"
       @close="confirmAction = null"
     >
       <div v-if="confirmAction" class="space-y-4">
-        <p class="text-ink-muted">
-          {{ confirmAction.type === 'skip'
-            ? $t('calendar.confirmSkipMessage')
-            : (confirmAction.kind === 'workout' ? $t('workout.discardHint') : $t('calendar.confirmDeleteMessage')) }}
-        </p>
+        <p class="text-ink-muted">{{ $t('workout.discardHint') }}</p>
         <div class="flex gap-2">
           <BkButton
             variant="ghost"
@@ -733,11 +484,11 @@ loadDayInfo()
             {{ $t('common.cancel') }}
           </BkButton>
           <BkButton
-            :data-testid="`confirm-${confirmAction.type}`"
+            data-testid="confirm-delete"
             variant="primary"
             block
             :disabled="loading"
-            @click="confirmAction.type === 'skip' ? confirmSkip() : confirmDelete()"
+            @click="confirmDelete()"
           >
             {{ $t('common.confirm') }}
           </BkButton>

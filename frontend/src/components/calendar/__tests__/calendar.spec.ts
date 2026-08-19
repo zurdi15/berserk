@@ -5,13 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/api/domain', () => ({
   getMonth: vi.fn(async () => ({
-    scheduled: [
-      { id: 1, date: '2026-08-01', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-      { id: 2, date: '2026-08-02', time: '10:00', routine_id: 2, status: 'done', workout_id: 5, note: null },
-      { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'skipped', workout_id: null, note: 'Too busy' },
-      { id: 4, date: '2026-08-01', time: '19:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-      { id: 5, date: '2026-08-02', time: '15:00', routine_id: 2, status: 'done', workout_id: 5, note: null },
-    ],
     workouts: [
       { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [1, 3] },
       { id: 2, date: '2026-08-02', feeling: 5, muscle_group_ids: [2] },
@@ -79,7 +72,7 @@ beforeEach(() => {
 
 import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
-import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
+import DaySheet from '@/components/calendar/DaySheet.vue'
 import BkUser from '@/lib/BkUser.vue'
 import * as domain from '@/api/domain'
 import type { SharedUserOut } from '@/api/domain'
@@ -148,33 +141,10 @@ describe('MonthGrid', () => {
     return map
   }
 
-  it('renders planned session dot as a hollow ring (border, no fill) colored by --bk-day-dot', async () => {
-    const wrapper = mount(MonthGrid, {
-      props: {
-        month: {
-          scheduled: [
-            { id: 1, date: '2026-08-01', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-          ],
-          workouts: [],
-        },
-        year: 2026,
-        monthNum: 8,
-        groupMap: createGroupMap(),
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    const dot = wrapper.get('[data-status="planned"]')
-    expect(dot.classes()).toContain('border-2')
-    expect(dot.classes()).toContain('border-[var(--bk-day-dot)]')
-    expect(dot.classes()).not.toContain('bg-[var(--bk-day-dot)]')
-  })
-
   it('v0.3.0 item 3 (bug fix): a workout dot ("done") comes from workouts[], not from a scheduled session status — a standalone workout (no schedule behind it) still gets a filled dot', async () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
-          scheduled: [],
           workouts: [
             { id: 5, date: '2026-08-02', feeling: null, muscle_group_ids: [] },
           ],
@@ -195,7 +165,6 @@ describe('MonthGrid', () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
-          scheduled: [],
           workouts: [
             { id: 9, date: '2026-08-09', feeling: null, muscle_group_ids: [] },
           ],
@@ -213,52 +182,10 @@ describe('MonthGrid', () => {
     expect(cell.findComponent({ name: 'BkRune' }).exists()).toBe(false)
   })
 
-  it('v0.3.0 item 3 (bug fix): a skipped session leaves no top dot (it is neither a workout nor still pending)', async () => {
-    const wrapper = mount(MonthGrid, {
-      props: {
-        month: {
-          scheduled: [
-            { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'skipped', workout_id: null, note: 'Too busy' },
-          ],
-          workouts: [],
-        },
-        year: 2026,
-        monthNum: 8,
-        groupMap: createGroupMap(),
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    const cell = wrapper.get('[data-testid="day-cell-2026-08-03"]')
-    expect(cell.find('[data-status]').exists()).toBe(false)
-  })
-
-  it('renders multiple planned-session dots per day', async () => {
-    const wrapper = mount(MonthGrid, {
-      props: {
-        month: {
-          scheduled: [
-            { id: 1, date: '2026-08-01', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-            { id: 4, date: '2026-08-01', time: '19:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-          ],
-          workouts: [],
-        },
-        year: 2026,
-        monthNum: 8,
-        groupMap: createGroupMap(),
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    const plannedDots = wrapper.findAll('[data-status="planned"]')
-    expect(plannedDots.length).toBe(2)
-  })
-
   it('v0.3.0 item 3: "si hay más de un entreno, más de un dot en línea horizontal" — one dot per workout, in a horizontal row', async () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
-          scheduled: [],
           workouts: [
             { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [] },
             { id: 2, date: '2026-08-01', feeling: 3, muscle_group_ids: [] },
@@ -283,7 +210,6 @@ describe('MonthGrid', () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
-          scheduled: [],
           workouts: [
             { id: 1, date: '2026-08-01', feeling: null, muscle_group_ids: [] },
             { id: 2, date: '2026-08-01', feeling: null, muscle_group_ids: [] },
@@ -306,7 +232,6 @@ describe('MonthGrid', () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
-          scheduled: [],
           workouts: [
             { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [1, 3] },
           ],
@@ -332,7 +257,6 @@ describe('MonthGrid', () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
-          scheduled: [],
           workouts: [
             { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [1, 3] },
           ],
@@ -358,9 +282,6 @@ describe('MonthGrid', () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
-          scheduled: [
-            { id: 1, date: '2026-08-01', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-          ],
           workouts: [
             { id: 1, date: '2026-08-01', feeling: 4, muscle_group_ids: [1, 3] },
           ],
@@ -374,7 +295,7 @@ describe('MonthGrid', () => {
     await flushPromises()
 
     const cell = wrapper.get('[data-testid="day-cell-2026-08-01"]')
-    const dotContainer = cell.get('[data-status="planned"]').element.parentElement as HTMLElement
+    const dotContainer = cell.get('[data-status="done"]').element.parentElement as HTMLElement
     const runeContainer = cell.findComponent({ name: 'BkRune' }).element.parentElement as HTMLElement
 
     expect(dotContainer.className).toContain('top-1')
@@ -447,7 +368,6 @@ describe('MonthGrid', () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
-          scheduled: [],
           workouts: [],
         },
         year: 2026,
@@ -471,7 +391,6 @@ describe('MonthGrid', () => {
     const wrapper = mount(MonthGrid, {
       props: {
         month: {
-          scheduled: [],
           workouts: [{ id: 9, date: '2026-08-05', feeling: 3, muscle_group_ids: [2] }],
         },
         year: 2026,
@@ -486,7 +405,6 @@ describe('MonthGrid', () => {
     // combinada de runas trae un duplicado real (chest, back, chest)
     await wrapper.setProps({
       month: {
-        scheduled: [],
         workouts: [
           { id: 1, date: '2026-08-05', feeling: 4, muscle_group_ids: [1, 2] },
           { id: 2, date: '2026-08-05', feeling: 3, muscle_group_ids: [1, 3] },
@@ -516,7 +434,6 @@ describe('MonthGrid', () => {
       const wrapper = mount(MonthGrid, {
         props: {
           month: {
-            scheduled: [],
             workouts: [],
             shared: [
               { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
@@ -540,7 +457,6 @@ describe('MonthGrid', () => {
       const wrapper = mount(MonthGrid, {
         props: {
           month: {
-            scheduled: [],
             workouts: [],
             shared: [{ user_id: 7, username: 'freyja', color: null, dates: ['2026-08-05'] }],
           },
@@ -560,7 +476,6 @@ describe('MonthGrid', () => {
       const wrapper = mount(MonthGrid, {
         props: {
           month: {
-            scheduled: [],
             workouts: [{ id: 1, date: '2026-08-05', feeling: null, muscle_group_ids: [] }],
             shared: [
               { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
@@ -586,7 +501,6 @@ describe('MonthGrid', () => {
       const wrapper = mount(MonthGrid, {
         props: {
           month: {
-            scheduled: [],
             workouts: [
               { id: 1, date: '2026-08-05', feeling: null, muscle_group_ids: [] },
               { id: 2, date: '2026-08-05', feeling: null, muscle_group_ids: [] },
@@ -614,7 +528,6 @@ describe('MonthGrid', () => {
       const wrapper = mount(MonthGrid, {
         props: {
           month: {
-            scheduled: [],
             workouts: [],
             shared: [
               { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
@@ -640,7 +553,6 @@ describe('MonthGrid', () => {
       const wrapper = mount(MonthGrid, {
         props: {
           month: {
-            scheduled: [],
             workouts: [],
             shared: [{ user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] }],
           },
@@ -660,7 +572,6 @@ describe('MonthGrid', () => {
       const wrapper = mount(MonthGrid, {
         props: {
           month: {
-            scheduled: [],
             workouts: [{ id: 1, date: '2026-08-05', feeling: null, muscle_group_ids: [] }],
             // sin `shared`: exactamente lo que envía el backend en modo atleta
           },
@@ -679,278 +590,20 @@ describe('MonthGrid', () => {
   })
 })
 
-describe('ScheduleSheet', () => {
+describe('DaySheet (antes ScheduleSheet — v0.25.0: sin planificación)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     push.mockClear()
   })
 
-  it('create: picking a time and scheduling calls the API with it, then the trigger resets to the placeholder (I2: null, not the old "" that rendered blank)', async () => {
-    vi.mocked(domain.schedule).mockClear()
-    const wrapper = mount(ScheduleSheet, {
-      props: { date: '2026-08-20', scheduled: [] },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-
-    // BkTimeField (hora) va antes que BkSelect (rutina) en "Nueva sesión":
-    // el primer role=combobox del formulario es el de hora
-    const timeTrigger = wrapper.findAll('[role="combobox"]')[0]
-    expect(timeTrigger.text()).toContain('--:--')
-
-    await timeTrigger.trigger('click')
-    await flushPromises()
-    const [hourList, minuteList] = document.querySelectorAll('[role="listbox"]')
-    const hour9 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '09')!
-    const minute15 = Array.from(minuteList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '15')!
-    hour9.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    minute15.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    const applyBtn = document.querySelector('[data-testid="time-field-apply"]') as HTMLElement
-    applyBtn.click()
-    await flushPromises()
-    expect(timeTrigger.text()).toContain('09:15')
-
-    const scheduleBtn = wrapper.findAll('button').find((b) => b.text() === 'Programar')!
-    await scheduleBtn.trigger('click')
-    await flushPromises()
-
-    expect(vi.mocked(domain.schedule)).toHaveBeenCalledWith(expect.objectContaining({ time: '09:15' }))
-    // I2: tras crear, newTime vuelve a null (no '' — con el '' antiguo el
-    // trigger se quedaba en blanco en vez de mostrar el placeholder)
-    expect(timeTrigger.text()).toContain('--:--')
-  })
-
-  it('skip: click skip button → confirm → updateSchedule called with status skipped', async () => {
-    vi.mocked(domain.updateSchedule).mockClear()
-    const wrapper = mount(ScheduleSheet, {
-      props: {
-        date: '2026-08-20',
-        scheduled: [
-          { id: 7, date: '2026-08-20', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-        ],
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-
-    const skipButton = wrapper.find('[data-testid="skip-session-7"]')
-    expect(skipButton.exists()).toBe(true)
-    await skipButton.trigger('click')
-    await flushPromises()
-
-    const confirmButtonEl = document.querySelector('[data-testid="confirm-skip"]') as HTMLElement
-    expect(confirmButtonEl).not.toBeNull()
-    confirmButtonEl?.click()
-    await flushPromises()
-
-    expect(vi.mocked(domain.updateSchedule)).toHaveBeenCalledWith(7, { status: 'skipped' })
-  })
-
-  it('delete: click delete button → confirm → deleteSchedule called', async () => {
-    vi.mocked(domain.deleteSchedule).mockClear()
-    const wrapper = mount(ScheduleSheet, {
-      props: {
-        date: '2026-08-20',
-        scheduled: [
-          { id: 7, date: '2026-08-20', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-        ],
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-
-    const deleteButton = wrapper.find('[data-testid="delete-session-7"]')
-    expect(deleteButton.exists()).toBe(true)
-    await deleteButton.trigger('click')
-    await flushPromises()
-
-    const confirmButtonEl = document.querySelector('[data-testid="confirm-delete"]') as HTMLElement
-    expect(confirmButtonEl).not.toBeNull()
-    confirmButtonEl?.click()
-    await flushPromises()
-
-    expect(vi.mocked(domain.deleteSchedule)).toHaveBeenCalledWith(7)
-  })
-
-  it('delete: click delete → cancel → deleteSchedule not called', async () => {
-    vi.mocked(domain.deleteSchedule).mockClear()
-    const wrapper = mount(ScheduleSheet, {
-      props: {
-        date: '2026-08-20',
-        scheduled: [
-          { id: 7, date: '2026-08-20', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-        ],
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-
-    const deleteButton = wrapper.find('[data-testid="delete-session-7"]')
-    await deleteButton.trigger('click')
-    await flushPromises()
-
-    // Find cancel button - first Cancel button in the confirm sheet
-    const allButtons = Array.from(document.querySelectorAll('button'))
-    const cancelButton = allButtons.find(b => b.textContent?.includes('Cancel') && b.closest('[role="dialog"]'))
-    expect(cancelButton).not.toBeUndefined()
-    cancelButton?.click()
-    await flushPromises()
-
-    expect(vi.mocked(domain.deleteSchedule)).not.toHaveBeenCalled()
-  })
-
-  it('replan: click replan → set date/time → save → updateSchedule called with date and time', async () => {
-    vi.mocked(domain.updateSchedule).mockClear()
-    const wrapper = mount(ScheduleSheet, {
-      props: {
-        date: '2026-08-20',
-        scheduled: [
-          // I1: pydantic serializa con segundos de verdad ("18:00:00") — la
-          // fixture usa el formato REAL de la API, no el "18:00" cómodo
-          { id: 7, date: '2026-08-20', time: '18:00:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-        ],
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-
-    const replanButton = wrapper.find('[data-testid="replan-session-7"]')
-    expect(replanButton.exists()).toBe(true)
-    await replanButton.trigger('click')
-    await flushPromises()
-
-    // BkDateField/BkTimeField (round 7): ya no son <input type="date|time">
-    // nativos. El sheet de replan monta BkDateField (fecha) antes que
-    // BkTimeField (hora) — mismo orden que en el template.
-    const dialog = document.querySelector('[role="dialog"]') as HTMLElement
-    const [dateTrigger, timeTrigger] = dialog.querySelectorAll('[role="combobox"]')
-
-    // I1: el trigger de hora precargado muestra "18:00", nunca los segundos
-    // crudos de la API ("18:00:00") — startReplan() pasa por formatTimeShort
-    expect(timeTrigger.textContent).toContain('18:00')
-    expect(timeTrigger.textContent).not.toContain('18:00:00')
-
-    // sesión original del 2026-08-20: el panel de fecha abre ya en agosto,
-    // así que el día 25 se puede clicar directamente sin navegar de mes
-    dateTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await flushPromises()
-    const day25 = Array.from(document.querySelectorAll('[role="gridcell"]'))
-      .find((c) => c.id.endsWith('2026-08-25')) as HTMLElement
-    expect(day25).not.toBeUndefined()
-    day25.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await flushPromises()
-
-    timeTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await flushPromises()
-    const [hourList, minuteList] = document.querySelectorAll('[role="listbox"]')
-    const hour19 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '19')!
-    const minute30 = Array.from(minuteList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '30')!
-    hour19.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    minute30.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    const applyBtn = document.querySelector('[data-testid="time-field-apply"]') as HTMLElement
-    applyBtn.click()
-    await flushPromises()
-
-    // Find and click the Save button in the teleported replan sheet
-    const allButtons = Array.from(document.querySelectorAll('button'))
-    const saveButton = allButtons.find(b => b.textContent?.includes('Guardar') && b.closest('[role="dialog"]'))
-    expect(saveButton).not.toBeUndefined()
-    saveButton?.click()
-    await flushPromises()
-
-    expect(vi.mocked(domain.updateSchedule)).toHaveBeenCalledWith(
-      7,
-      expect.objectContaining({ date: '2026-08-25', time: '19:30' }),
-    )
-  })
-
-  it('v0.3.0 item 5: planned-session actions are icon-only (BkActionBtn), with an accessible aria-label instead of visible text', async () => {
-    const wrapper = mount(ScheduleSheet, {
-      props: {
-        date: '2026-08-20',
-        scheduled: [
-          { id: 7, date: '2026-08-20', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-        ],
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-
-    const replanBtn = wrapper.get('[data-testid="replan-session-7"]')
-    const skipBtn = wrapper.get('[data-testid="skip-session-7"]')
-    const deleteBtn = wrapper.get('[data-testid="delete-session-7"]')
-
-    expect(replanBtn.element.tagName).toBe('BUTTON')
-    expect(replanBtn.find('svg').exists()).toBe(true)
-    expect(replanBtn.text()).toBe('')
-    expect(replanBtn.attributes('aria-label')).toBe('Replanificar')
-
-    expect(skipBtn.find('svg').exists()).toBe(true)
-    expect(skipBtn.text()).toBe('')
-    expect(skipBtn.attributes('aria-label')).toBe('Omitir')
-
-    expect(deleteBtn.find('svg').exists()).toBe(true)
-    expect(deleteBtn.text()).toBe('')
-    expect(deleteBtn.attributes('aria-label')).toBe('Borrar')
-  })
-
-  it('hides all action buttons when athlete is viewing another user', async () => {
-    const athlete = useAthleteStore()
-    athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
-    const wrapper = mount(ScheduleSheet, {
-      props: {
-        date: '2026-08-03',
-        scheduled: [
-          { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'planned', workout_id: null, note: 'Too busy' },
-        ],
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    expect(wrapper.find('[data-testid="skip-session-3"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="delete-session-3"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="replan-session-3"]').exists()).toBe(false)
-  })
-
-  it('still renders session list when in read-only mode', async () => {
-    const athlete = useAthleteStore()
-    athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
-    const wrapper = mount(ScheduleSheet, {
-      props: {
-        date: '2026-08-03',
-        scheduled: [
-          { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'planned', workout_id: null, note: 'Too busy' },
-        ],
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    expect(wrapper.text()).toContain('Too busy')
-  })
-
   it('renders a localized day label in the header, not the raw ISO date', async () => {
-    const wrapper = mount(ScheduleSheet, {
+    const wrapper = mount(DaySheet, {
       props: { date: '2026-08-25', scheduled: [] },
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
     expect(wrapper.text()).toContain('agosto')
     expect(wrapper.text()).not.toContain('2026-08-25')
-  })
-
-  it('renders a session time without seconds', async () => {
-    const wrapper = mount(ScheduleSheet, {
-      props: {
-        date: '2026-08-20',
-        scheduled: [
-          { id: 7, date: '2026-08-20', time: '19:30:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-        ],
-      },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    expect(wrapper.text()).toContain('19:30')
-    expect(wrapper.text()).not.toContain('19:30:00')
   })
 
   describe('round 8: retro workout entry points', () => {
@@ -966,7 +619,7 @@ describe('ScheduleSheet', () => {
         },
       ] as never)
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -979,7 +632,7 @@ describe('ScheduleSheet', () => {
 
     it('"Registrar entreno" opens a picker (free workout + own routines) instead of logging directly', async () => {
       vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
         attachTo: document.body,
@@ -1006,7 +659,7 @@ describe('ScheduleSheet', () => {
         routine_id: null, note: null, feeling: null, exercises: [], muscle_tag_ids: [],
       } as never)
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
         attachTo: document.body,
@@ -1037,7 +690,7 @@ describe('ScheduleSheet', () => {
         routine_id: 1, note: null, feeling: null, exercises: [], muscle_tag_ids: [],
       } as never)
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
         attachTo: document.body,
@@ -1059,7 +712,7 @@ describe('ScheduleSheet', () => {
 
     it('"Registrar entreno" is present for today', async () => {
       vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-06', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1070,7 +723,7 @@ describe('ScheduleSheet', () => {
 
     it('"Registrar entreno" is absent on a future day', async () => {
       vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-20', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1084,7 +737,7 @@ describe('ScheduleSheet', () => {
       const athlete = useAthleteStore()
       athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1095,67 +748,6 @@ describe('ScheduleSheet', () => {
     })
   })
 
-  describe('item 1 (round 10): "programar rutina" date/time guards', () => {
-    afterEach(() => vi.useRealTimers())
-
-    it('a past day shows no "programar rutina" form (retro-log/edit already cover it)', async () => {
-      vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
-      const wrapper = mount(ScheduleSheet, {
-        props: { date: '2026-08-01', scheduled: [] },
-        global: { plugins: [createI18nInstance()] },
-      })
-      await flushPromises()
-
-      expect(wrapper.text()).not.toContain('Nueva sesión')
-    })
-
-    it('today shows the form, with hours before "now" disabled in its time field', async () => {
-      // Europe/Madrid en agosto es CEST (UTC+2): 12:30 UTC -> 14:30 locales
-      vi.useFakeTimers({ now: new Date('2026-08-06T12:30:00Z'), toFake: ['Date'] })
-      const wrapper = mount(ScheduleSheet, {
-        props: { date: '2026-08-06', scheduled: [] },
-        global: { plugins: [createI18nInstance()] },
-      })
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('Nueva sesión')
-
-      // BkTimeField (hora) va antes que BkSelect (rutina): primer combobox
-      const timeTrigger = wrapper.findAll('[role="combobox"]')[0]
-      await timeTrigger.trigger('click')
-      await flushPromises()
-
-      const hourList = document.querySelectorAll('[role="listbox"]')[0]
-      const hour13 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '13')!
-      const hour15 = Array.from(hourList.querySelectorAll('[role="option"]')).find((o) => o.textContent === '15')!
-      expect(hour13.getAttribute('aria-disabled')).toBe('true')
-      expect(hour15.getAttribute('aria-disabled')).toBeNull()
-
-      // limpieza: cierra el panel (Escape) para no dejar un listbox huérfano
-      // en document.body que confunda al siguiente test
-      document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-      await flushPromises()
-    })
-
-    it('a future day shows the form with no disabled hour at all (no floor applies)', async () => {
-      vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
-      const wrapper = mount(ScheduleSheet, {
-        props: { date: '2026-08-20', scheduled: [] },
-        global: { plugins: [createI18nInstance()] },
-      })
-      await flushPromises()
-
-      const timeTrigger = wrapper.findAll('[role="combobox"]')[0]
-      await timeTrigger.trigger('click')
-      await flushPromises()
-
-      const hourList = document.querySelectorAll('[role="listbox"]')[0]
-      expect(hourList.querySelector('[aria-disabled="true"]')).toBeNull()
-
-      document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-      await flushPromises()
-    })
-  })
 
   describe('item 2 (round 10): day info card', () => {
     it('shows the routine name, per-exercise lines, total sets/volume and the feeling for a logged workout', async () => {
@@ -1184,7 +776,7 @@ describe('ScheduleSheet', () => {
         { id: 10, name_es: 'Press de banca', name_en: 'Bench Press', measurement: 'strength', owner_id: null, muscle_groups: [] },
       ] as never)
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1213,7 +805,7 @@ describe('ScheduleSheet', () => {
       ] as never)
       vi.mocked(domain.listExercises).mockResolvedValueOnce([] as never)
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1227,7 +819,7 @@ describe('ScheduleSheet', () => {
         { id: 43, date: '2026-08-01', started_at: null, ended_at: null, routine_id: null, note: null, feeling: null, exercises: [], muscle_tag_ids: [] },
       ] as never)
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1242,7 +834,7 @@ describe('ScheduleSheet', () => {
         { id: 2, exercise_id: 10, kind: 'max_weight', value: 90, achieved_at: '2026-08-02T10:00:00' },
       ] as never)
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1260,7 +852,7 @@ describe('ScheduleSheet', () => {
         { id: 42, date: '2026-08-01', started_at: null, ended_at: null, routine_id: 1, note: null, feeling: null, exercises: [], muscle_tag_ids: [] },
       ] as never)
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-01', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1273,38 +865,14 @@ describe('ScheduleSheet', () => {
   })
 
   describe('amendment A (round 10): unified session + workout card', () => {
-    it('a done session with a linked workout renders as ONE card (edit + delete together), not a separate session row', async () => {
-      vi.mocked(domain.listWorkouts).mockResolvedValueOnce([
-        { id: 42, date: '2026-08-02', started_at: '2026-08-02T10:00:00', ended_at: '2026-08-02T10:45:00', routine_id: 2, note: null, feeling: null, exercises: [], muscle_tag_ids: [] },
-      ] as never)
-
-      const wrapper = mount(ScheduleSheet, {
-        props: {
-          date: '2026-08-02',
-          scheduled: [
-            { id: 5, date: '2026-08-02', time: '10:00:00', routine_id: 2, status: 'done', workout_id: 42, note: null },
-          ],
-        },
-        global: { plugins: [createI18nInstance()] },
-      })
-      await flushPromises()
-
-      // sin fila de sesión "completada" aparte
-      expect(wrapper.find('[data-status="done"]').exists()).toBe(false)
-      // una única tarjeta con editar Y borrar
-      expect(wrapper.find('[data-testid="edit-workout-42"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="delete-workout-42"]').exists()).toBe(true)
-    })
-
-    it('deleting the unified card calls deleteWorkout (not deleteSchedule), confirmed with the workout-discard copy', async () => {
+    it('deleting the workout card calls deleteWorkout, confirmed with the workout-discard copy', async () => {
       vi.mocked(domain.deleteWorkout).mockClear()
-      vi.mocked(domain.deleteSchedule).mockClear()
       vi.mocked(domain.listWorkouts).mockResolvedValueOnce([
         { id: 42, date: '2026-08-02', started_at: null, ended_at: null, routine_id: null, note: null, feeling: null, exercises: [], muscle_tag_ids: [] },
       ] as never)
 
-      const wrapper = mount(ScheduleSheet, {
-        props: { date: '2026-08-02', scheduled: [] },
+      const wrapper = mount(DaySheet, {
+        props: { date: '2026-08-02' },
         global: { plugins: [createI18nInstance()] },
       })
       await flushPromises()
@@ -1321,7 +889,6 @@ describe('ScheduleSheet', () => {
       await flushPromises()
 
       expect(domain.deleteWorkout).toHaveBeenCalledWith(42)
-      expect(domain.deleteSchedule).not.toHaveBeenCalled()
     })
   })
 
@@ -1330,7 +897,7 @@ describe('ScheduleSheet', () => {
 
     it('renders with the primary (aurora) variant, like other add-affordances in the sheet', async () => {
       vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-06', scheduled: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1340,37 +907,6 @@ describe('ScheduleSheet', () => {
     })
   })
 
-  describe('amendment D (round 10): lighter "Planificado" eyebrow, no umbrella title', () => {
-    it('shows the eyebrow above a planned session', async () => {
-      const wrapper = mount(ScheduleSheet, {
-        props: {
-          date: '2026-08-01',
-          scheduled: [
-            { id: 1, date: '2026-08-01', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-          ],
-        },
-        global: { plugins: [createI18nInstance()] },
-      })
-      await flushPromises()
-
-      expect(wrapper.text()).toContain('Planificado')
-    })
-
-    it('does not show the eyebrow when the day only has skipped sessions', async () => {
-      const wrapper = mount(ScheduleSheet, {
-        props: {
-          date: '2026-08-03',
-          scheduled: [
-            { id: 3, date: '2026-08-03', time: null, routine_id: 3, status: 'skipped', workout_id: null, note: 'Too busy' },
-          ],
-        },
-        global: { plugins: [createI18nInstance()] },
-      })
-      await flushPromises()
-
-      expect(wrapper.text()).not.toContain('Planificado')
-    })
-  })
 
   // item 1b (v0.4.2): zurdi: "cuando abro un día, aparte de ver mi
   // entrenamiento molaría que hubiese una pestaña en ese drawer POR USUARIO
@@ -1398,7 +934,7 @@ describe('ScheduleSheet', () => {
     })
 
     it('item 9: renders a tab per shared user alongside a uniform, same-shaped self tab (own username+color via BkUser)', async () => {
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1426,7 +962,7 @@ describe('ScheduleSheet', () => {
     })
 
     it('no tab strip when there are no shared users at all', async () => {
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-05', scheduled: [], shared: [] },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1436,7 +972,7 @@ describe('ScheduleSheet', () => {
     })
 
     it('no tab strip when a shared user has no workout on THIS day (date absent from their `dates`)', async () => {
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-06', scheduled: [], shared: sharedUsers },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1448,7 +984,7 @@ describe('ScheduleSheet', () => {
     it('athlete mode: no tab strip even with a `shared` prop present (self-view only, defensive)', async () => {
       const athlete = useAthleteStore()
       athlete.view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1479,7 +1015,7 @@ describe('ScheduleSheet', () => {
         return [] as never
       })
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1510,7 +1046,7 @@ describe('ScheduleSheet', () => {
           : Promise.resolve([] as never),
       )
 
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1529,7 +1065,7 @@ describe('ScheduleSheet', () => {
     })
 
     it('flipping back to an already-loaded user tab does not refetch (cache per user per open)', async () => {
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-05', scheduled: [], shared: sharedUsers },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1555,7 +1091,7 @@ describe('ScheduleSheet', () => {
       const twoDaysShared: SharedUserOut[] = [
         { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05', '2026-08-06'] },
       ]
-      const wrapper = mount(ScheduleSheet, {
+      const wrapper = mount(DaySheet, {
         props: { date: '2026-08-05', scheduled: [], shared: twoDaysShared },
         global: { plugins: [createI18nInstance()] },
       })
@@ -1583,7 +1119,7 @@ describe('ScheduleSheet', () => {
   })
 })
 
-describe('CalendarView schedule sheet (amendment D, round 10)', () => {
+describe('CalendarView day sheet (amendment D, round 10)', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
   it('opening the day sheet shows no generic umbrella title', async () => {
@@ -1667,11 +1203,16 @@ describe('CalendarView heatmap refetch on mutation (v0.3.0 item 2)', () => {
   beforeEach(() => setActivePinia(createPinia()))
   afterEach(() => vi.useRealTimers())
 
-  it('deleting a scheduled session from the day sheet refetches the heatmap, not just the month (bug: "Actividad del año no parece actualizarse")', async () => {
+  // v0.25.0: la mutación del sheet es ahora borrar un ENTRENO (la
+  // planificación murió) — mismo bug cubierto: el heatmap debe refrescarse
+  it('deleting a workout from the day sheet refetches the heatmap, not just the month (bug: "Actividad del año no parece actualizarse")', async () => {
     vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
     vi.mocked(domain.getHeatmap).mockClear()
     vi.mocked(domain.getMonth).mockClear()
-    vi.mocked(domain.deleteSchedule).mockClear()
+    vi.mocked(domain.deleteWorkout).mockClear()
+    vi.mocked(domain.listWorkouts).mockResolvedValue([
+      { id: 42, date: '2026-08-01', started_at: null, ended_at: null, routine_id: null, note: null, feeling: null, exercises: [], muscle_tag_ids: [] },
+    ] as never)
 
     const wrapper = mount(CalendarView, {
       global: { plugins: [createI18nInstance()] },
@@ -1685,7 +1226,7 @@ describe('CalendarView heatmap refetch on mutation (v0.3.0 item 2)', () => {
     await dayCell.trigger('click')
     await flushPromises()
 
-    const deleteButton = document.querySelector('[data-testid="delete-session-1"]') as HTMLElement
+    const deleteButton = document.querySelector('[data-testid="delete-workout-42"]') as HTMLElement
     expect(deleteButton).not.toBeNull()
     deleteButton.click()
     await flushPromises()
@@ -1695,7 +1236,7 @@ describe('CalendarView heatmap refetch on mutation (v0.3.0 item 2)', () => {
     confirmButtonEl.click()
     await flushPromises()
 
-    expect(domain.deleteSchedule).toHaveBeenCalledWith(1)
+    expect(domain.deleteWorkout).toHaveBeenCalledWith(42)
     // el bug: solo se recargaba el mes, el heatmap se quedaba con los datos
     // con los que se montó la vista
     expect(domain.getHeatmap).toHaveBeenCalledTimes(2)
@@ -1918,11 +1459,8 @@ describe('CalendarView item 8: opens today\'s day sheet from a ?day= query', () 
 describe('CalendarView athlete mode (item 4): renders dots from the target athlete\'s data', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('mounts already viewing an athlete and paints dots from the workouts/scheduled the API returns for them', async () => {
+  it('mounts already viewing an athlete and paints dots from the workouts the API returns for them', async () => {
     vi.mocked(domain.getMonth).mockResolvedValueOnce({
-      scheduled: [
-        { id: 9, date: '2026-08-11', time: null, routine_id: null, status: 'planned', workout_id: null, note: null },
-      ],
       workouts: [
         { id: 42, date: '2026-08-05', feeling: 4, muscle_group_ids: [] },
       ],
@@ -1935,8 +1473,6 @@ describe('CalendarView athlete mode (item 4): renders dots from the target athle
     expect(domain.getMonth).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), 7)
     const doneDot = wrapper.get('[data-testid="day-cell-2026-08-05"] [data-status="done"]')
     expect(doneDot.classes()).toContain('bg-[var(--bk-day-dot)]')
-    const plannedDot = wrapper.get('[data-testid="day-cell-2026-08-11"] [data-status="planned"]')
-    expect(plannedDot.classes()).toContain('border-[var(--bk-day-dot)]')
   })
 })
 
@@ -1949,7 +1485,6 @@ describe('CalendarView shared legend (v0.4.1)', () => {
 
   it('renders a BkUser dot per shared user, with their color and username, when shared is non-empty', async () => {
     vi.mocked(domain.getMonth).mockResolvedValueOnce({
-      scheduled: [],
       workouts: [],
       shared: [
         { user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] },
@@ -1971,7 +1506,6 @@ describe('CalendarView shared legend (v0.4.1)', () => {
   // de dots (BkUser ya lleva color+nombre) queda sola, sin muletilla de texto
   it('item 1a: drops the "shared with you" label text, leaving only the BkUser dots', async () => {
     vi.mocked(domain.getMonth).mockResolvedValueOnce({
-      scheduled: [],
       workouts: [],
       shared: [{ user_id: 7, username: 'freyja', color: '#3b82f6', dates: ['2026-08-05'] }],
     })
@@ -1985,7 +1519,7 @@ describe('CalendarView shared legend (v0.4.1)', () => {
   })
 
   it('does not render the legend when shared is an empty array (no one has shared with me)', async () => {
-    vi.mocked(domain.getMonth).mockResolvedValueOnce({ scheduled: [], workouts: [], shared: [] })
+    vi.mocked(domain.getMonth).mockResolvedValueOnce({ workouts: [], shared: [] })
 
     const wrapper = mount(CalendarView, { global: { plugins: [createI18nInstance()] } })
     await flushPromises()
@@ -1995,7 +1529,7 @@ describe('CalendarView shared legend (v0.4.1)', () => {
 
   it('does not render the legend when shared is absent (athlete mode: the field is omitted, not sent empty)', async () => {
     useAthleteStore().view({ id: 7, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
-    vi.mocked(domain.getMonth).mockResolvedValueOnce({ scheduled: [], workouts: [] })
+    vi.mocked(domain.getMonth).mockResolvedValueOnce({ workouts: [] })
 
     const wrapper = mount(CalendarView, { global: { plugins: [createI18nInstance()] } })
     await flushPromises()

@@ -13,7 +13,9 @@ import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import { formatDateTimeShort } from '@/utils/dates'
 import { formatWeightInt } from '@/utils/units'
 import { exerciseName } from '@/components/routines/exerciseName'
+import { formatDuration } from '@/components/workout/duration'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
+import BkMedia from '@/lib/BkMedia.vue'
 import BkRune from '@/lib/BkRune.vue'
 
 const props = defineProps<{
@@ -47,12 +49,34 @@ const durationLabel = computed(() => {
   return h > 0 ? `${h}h ${m}min` : `${m}min`
 })
 
+// v0.25.0 (zurdi: "adáptalo a la nueva estética: mete las imágenes y,
+// aparte del número de series, pon las reps — 4×8"): cada línea lleva su
+// thumb 9:16 y el resumen series×reps (rango si varían; duración total en
+// cardio/tiempo)
+function setsMeta(sets: WorkoutOut['exercises'][number]['sets'], measurement?: string): string {
+  const effective = sets.filter((set) => !set.is_warmup)
+  if (!effective.length) return '0'
+  if (measurement === 'cardio' || measurement === 'timed') {
+    const total = effective.reduce((sum, set) => sum + (set.duration_seconds ?? 0), 0)
+    return formatDuration(total)
+  }
+  const reps = effective.map((set) => set.reps).filter((r): r is number => r != null)
+  if (!reps.length) return String(effective.length)
+  const min = Math.min(...reps)
+  const max = Math.max(...reps)
+  return min === max ? `${effective.length}×${min}` : `${effective.length}×${min}-${max}`
+}
+
 const exerciseLines = computed(() =>
-  props.workout.exercises.map((exercise) => ({
-    id: exercise.id,
-    name: exerciseName(resolveExercise(exercise.exercise_id), locale.value),
-    setCount: exercise.sets.filter((set) => !set.is_warmup).length,
-  })),
+  props.workout.exercises.map((exercise) => {
+    const catalogExercise = resolveExercise(exercise.exercise_id) ?? null
+    return {
+      id: exercise.id,
+      exercise: catalogExercise,
+      name: exerciseName(catalogExercise ?? undefined, locale.value),
+      meta: setsMeta(exercise.sets, catalogExercise?.measurement),
+    }
+  }),
 )
 
 const totalSets = computed(() =>
@@ -72,7 +96,7 @@ const totalVolume = computed(() =>
 </script>
 
 <template>
-  <div class="border border-line rounded-sm p-3 space-y-3" :data-testid="`workout-card-${workout.id}`">
+  <div class="bk-slab p-3 space-y-3" :data-testid="`workout-card-${workout.id}`">
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0">
         <h4 class="font-semibold text-ink truncate">{{ routineName ?? t('workout.freeWorkout') }}</h4>
@@ -97,10 +121,11 @@ const totalVolume = computed(() =>
       </div>
     </div>
 
-    <div v-if="exerciseLines.length" class="space-y-1 border-t border-line pt-2">
-      <div v-for="line in exerciseLines" :key="line.id" class="flex items-center justify-between gap-3 text-sm">
-        <span class="text-ink truncate">{{ line.name }}</span>
-        <span class="text-ink-muted shrink-0">{{ line.setCount }}</span>
+    <div v-if="exerciseLines.length" class="space-y-2 border-t border-line pt-2">
+      <div v-for="line in exerciseLines" :key="line.id" class="flex items-center gap-2.5 text-sm">
+        <BkMedia :exercise="line.exercise" :rune="null" size="tallSm" />
+        <span class="text-ink flex-1 min-w-0 break-words">{{ line.name }}</span>
+        <span class="bk-metric text-ink-muted shrink-0" :data-testid="`day-exercise-meta-${line.id}`">{{ line.meta }}</span>
       </div>
     </div>
 

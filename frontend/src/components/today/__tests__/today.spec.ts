@@ -23,7 +23,6 @@ vi.mock('@/api/domain', () => ({
 const push = vi.fn()
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
 
-import type { ScheduledOut } from '@/api/domain'
 import * as domain from '@/api/domain'
 import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
@@ -132,106 +131,8 @@ describe('TodayView', () => {
   })
 })
 
-describe('TodayHero session status dots (antes TodaySessionCard, absorbida por el hero)', () => {
-  // reloj pineado: todaySessions filtra props.schedules por fecha === HOY, y
-  // las fixtures de este bloque usan '2026-08-06' — sin pinear, estos tests
-  // se vuelven fecha-dependientes del reloj real (ya han roto así antes)
-  beforeEach(() => {
-    setActivePinia(createPinia())
-    vi.useFakeTimers({ now: new Date('2026-08-06T12:00:00Z'), toFake: ['Date'] })
-    push.mockClear()
-  })
-  afterEach(() => vi.useRealTimers())
+// (v0.25.0: el describe de session status dots murió con la planificación)
 
-  it('renders planned session with aurora border dot', async () => {
-    const schedules: ScheduledOut[] = [
-      { id: 1, date: '2026-08-06', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-    ]
-    const wrapper = mount(TodayHero, {
-      props: { schedules, exercises: [] },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    const plannedDot = wrapper.find('[data-testid="session-planned"]').find('span')
-    expect(plannedDot.classes()).toContain('border-2')
-    expect(plannedDot.classes()).toContain('border-aurora')
-  })
-
-  it('renders done session with solid aurora dot', async () => {
-    const schedules: ScheduledOut[] = [
-      { id: 2, date: '2026-08-06', time: '10:00', routine_id: 2, status: 'done', workout_id: 5, note: null },
-    ]
-    const wrapper = mount(TodayHero, {
-      props: { schedules, exercises: [] },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    const doneDot = wrapper.find('[data-testid="session-done"]').find('span')
-    expect(doneDot.classes()).toContain('bg-aurora')
-    expect(doneDot.classes()).not.toContain('border-2')
-  })
-
-  it('renders skipped session with faint dot', async () => {
-    const schedules: ScheduledOut[] = [
-      { id: 3, date: '2026-08-06', time: null, routine_id: 3, status: 'skipped', workout_id: null, note: 'Too busy' },
-    ]
-    const wrapper = mount(TodayHero, {
-      props: { schedules, exercises: [] },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    const skippedDot = wrapper.find('[data-testid="session-skipped"]').find('span')
-    expect(skippedDot.classes()).toContain('bg-ink-faint')
-    expect(skippedDot.classes()).not.toContain('bg-aurora')
-  })
-
-  it('renders the session time without seconds', async () => {
-    const schedules: ScheduledOut[] = [
-      { id: 1, date: '2026-08-06', time: '18:00:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
-    ]
-    const wrapper = mount(TodayHero, {
-      props: { schedules, exercises: [] },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    expect(wrapper.text()).toContain('18:00')
-    expect(wrapper.text()).not.toContain('18:00:00')
-  })
-
-  it('polish wave item 9: omits the time line entirely when the session has no time (no em-dash placeholder)', async () => {
-    const schedules: ScheduledOut[] = [
-      { id: 3, date: '2026-08-06', time: null, routine_id: 3, status: 'skipped', workout_id: null, note: 'Too busy' },
-    ]
-    const wrapper = mount(TodayHero, {
-      props: { schedules, exercises: [] },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-    expect(wrapper.text()).not.toContain('–')
-    expect(wrapper.text()).not.toContain('—')
-    expect(wrapper.text()).toContain('Too busy')
-  })
-
-  it('polish wave item 8: "Programar Sesión" pushes to the calendar with today\'s date as a query (so it auto-opens the day sheet)', async () => {
-    const wrapper = mount(TodayHero, {
-      props: { schedules: [], exercises: [] },
-      global: { plugins: [createI18nInstance()] },
-    })
-    await flushPromises()
-
-    const scheduleBtn = wrapper.findAll('button').find((b) => b.text() === 'Programar Sesión')!
-    expect(scheduleBtn).not.toBeUndefined()
-    await scheduleBtn.trigger('click')
-
-    expect(push).toHaveBeenCalledWith({ name: 'calendar', query: { day: '2026-08-06' } })
-  })
-})
-
-// item 4 (v0.4.2): barWidth y DistributionBars, mudados aquí desde
-// progress.spec.ts junto con el propio componente/helper (relocation de
-// components/progress/DistributionBars.vue + distribution.ts a
-// components/today/) — contenido de los tests SIN CAMBIOS, solo la ruta de
-// import y el archivo que los aloja
 describe('barWidth', () => {
   it('computes the percentage relative to the max', () => {
     expect(barWidth(31, 50)).toBe('62%')

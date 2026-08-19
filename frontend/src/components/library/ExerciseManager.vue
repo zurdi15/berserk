@@ -518,7 +518,7 @@ async function confirmDelete() {
             v-for="exercise in filteredExercises"
             :key="exercise.id"
             :data-testid="exercise.kind === 'own' ? `exercise-row-${exercise.id}` : `catalog-exercise-row-${exercise.id}`"
-            class="flex items-start justify-between gap-2 p-2 rounded border border-line text-sm"
+            class="flex items-start justify-between gap-2 p-2 text-sm"
           >
             <!-- v0.12.0 → facelift v4 (zurdi: "que la imagen se vea más y
                  con aspect ratio vertical"): thumb 9:16 con pozo rúnico de

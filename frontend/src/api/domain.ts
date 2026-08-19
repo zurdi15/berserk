@@ -231,16 +231,6 @@ export interface RoutineExerciseIn {
 }
 
 // Calendar types
-export interface ScheduledOut {
-  id: number
-  date: string
-  time: string | null
-  routine_id: number | null
-  status: 'planned' | 'done' | 'skipped'
-  workout_id: number | null
-  note: string | null
-}
-
 export interface WorkoutSummaryOut {
   id: number
   date: string
@@ -259,7 +249,6 @@ export interface SharedUserOut {
 }
 
 export interface CalendarMonthOut {
-  scheduled: ScheduledOut[]
   workouts: WorkoutSummaryOut[]
   // ausente (undefined) en modo atleta: el backend OMITE la clave del JSON
   // en vez de mandar [] o null (ver backend schemas/calendar.py) — así el
@@ -466,7 +455,6 @@ export const copyRoutine = (id: number) =>
 export const startWorkout = (body: {
   date?: string
   routine_id?: number
-  scheduled_session_id?: number
   // entreno retroactivo: crea ya cerrado (ver backend WorkoutStartIn) — date
   // pasa a ser obligatorio en ese caso, el backend 422 si falta
   finished?: boolean
@@ -559,28 +547,8 @@ export const deleteSet = (wid: number, weid: number, sid: number) =>
   api<void>(`/workouts/${wid}/exercises/${weid}/sets/${sid}`, { method: 'DELETE' })
 
 // Calendar endpoints
-export const schedule = (body: {
-  date: string
-  time?: string | null
-  routine_id?: number | null
-  note?: string | null
-}) =>
-  api<ScheduledOut>('/calendar', { method: 'POST', body })
-
 export const getMonth = (year: number, month: number, userId?: number) =>
   api<CalendarMonthOut>(`/calendar/${year}/${month}${qs({ userId })}`)
-
-export const updateSchedule = (id: number, body: {
-  date?: string
-  time?: string | null
-  routine_id?: number | null
-  note?: string | null
-  status?: 'planned' | 'skipped'
-}) =>
-  api<ScheduledOut>(`/calendar/${id}`, { method: 'PATCH', body })
-
-export const deleteSchedule = (id: number) =>
-  api<void>(`/calendar/${id}`, { method: 'DELETE' })
 
 // Progress endpoints
 export const getSeries = (exerciseId: number, userId?: number) =>

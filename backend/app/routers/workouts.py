@@ -12,7 +12,6 @@ from ..models import (
     Exercise,
     PersonalRecord,
     Routine,
-    ScheduledSession,
     Workout,
     WorkoutExercise,
     WorkoutMuscleGroup,
@@ -96,15 +95,7 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
         if active:
             raise HTTPException(status_code=409, detail="workout_already_active")
 
-    session = None
     routine_id = payload.routine_id
-    if payload.scheduled_session_id is not None:
-        session = db.get(ScheduledSession, payload.scheduled_session_id)
-        if session is None or session.owner_id != user.id:
-            raise HTTPException(status_code=404, detail="not_found")
-        if session.status == "done":
-            raise HTTPException(status_code=409, detail="session_already_done")
-        routine_id = routine_id or session.routine_id
 
     routine = None
     if routine_id is not None:
@@ -170,9 +161,6 @@ def start_workout(payload: WorkoutStartIn, user: CurrentUser, db: Session = Depe
         # instante en que trae ejercicios de la rutina, no solo al añadirlos
         # uno a uno luego
         sync_derived_muscle_groups(db, workout.id)
-    if session is not None:
-        session.status = "done"
-        session.workout_id = workout.id
     # el chequeo de arriba es el camino feliz; el índice único parcial es el
     # árbitro real ante dos requests concurrentes ganando la carrera del CTA
     try:
@@ -310,24 +298,6 @@ def delete_workout(workout_id: int, user: CurrentUser, db: Session = Depends(get
         WorkoutExercise.workout_id == workout.id
     )
     db.execute(delete(PersonalRecord).where(PersonalRecord.set_id.in_(set_ids)))
-    # borrar el entreno de una sesión de HOY/futuro la devuelve a planificada:
-    # un "done" colgando (con workout_id a NULL por el SET NULL de la FK)
-    # bloquearía reutilizarla. Pero un "planned" en el PASADO no tiene ningún
-    # sentido — ese hueco ya no se puede "hacer" retroactivamente, así que la
-    # sesión se borra entera en vez de revivirla zombie (v0.3.0, item 1: "al
-    # borrar un entreno anterior, se pone como programado. Mal.")
-    linked_sessions = db.scalars(
-        select(ScheduledSession).where(
-            ScheduledSession.workout_id == workout.id,
-            ScheduledSession.owner_id == user.id,
-        )
-    ).all()
-    for linked in linked_sessions:
-        if linked.date < date_type.today():
-            db.delete(linked)
-        else:
-            linked.status = "planned"
-            linked.workout_id = None
     db.delete(workout)
     db.commit()
 

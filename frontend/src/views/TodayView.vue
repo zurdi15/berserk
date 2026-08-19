@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { PersonalRecordOut, WorkoutOut, ScheduledOut, ExerciseOut, MuscleGroupOut, DistributionItem } from '@/api/domain'
+import type { PersonalRecordOut, WorkoutOut, ExerciseOut, MuscleGroupOut, DistributionItem } from '@/api/domain'
 import { getStreak, getMonth, listWorkouts, getRecords, listExercises, listMuscleGroups, getDistribution } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { todayIso, getMondayOfWeek } from '@/utils/dates'
@@ -23,7 +23,6 @@ const athlete = useAthleteStore()
 const auth = useAuthStore()
 
 const streak = ref<{ weeks: number } | null>(null)
-const schedules = ref<ScheduledOut[]>([])
 const workouts = ref<WorkoutOut[]>([])
 const records = ref<PersonalRecordOut[]>([])
 const exercises = ref<ExerciseOut[]>([])
@@ -46,7 +45,6 @@ const ready = ref(false)
 
 type TodaySnapshot = {
   streak: { weeks: number } | null
-  schedules: ScheduledOut[]
   workouts: WorkoutOut[]
   records: PersonalRecordOut[]
   exercises: ExerciseOut[]
@@ -65,7 +63,6 @@ function hydrate() {
     return
   }
   streak.value = cached.streak
-  schedules.value = cached.schedules
   workouts.value = cached.workouts
   records.value = cached.records
   exercises.value = cached.exercises
@@ -117,7 +114,6 @@ async function load() {
     ])
 
     streak.value = streakData
-    schedules.value = monthData.scheduled
     workouts.value = workoutsList
     records.value = recordsList
     exercises.value = exercisesList
@@ -125,7 +121,6 @@ async function load() {
     distribution.value = distributionData
     setViewCache<TodaySnapshot>(cacheKey(), {
       streak: streakData,
-      schedules: monthData.scheduled,
       workouts: workoutsList,
       records: recordsList,
       exercises: exercisesList,
@@ -175,7 +170,7 @@ watch(
     <!-- v0.14.1 (zurdi): "te toca" ENCIMA de la programada — el hero abre
          con qué hacer AHORA y absorbe la sesión planificada como chip -->
     <div :style="{ '--bk-stagger-i': 1 }">
-      <TodayHero :schedules="schedules" :exercises="exercises" />
+      <TodayHero :exercises="exercises" />
     </div>
     <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 2 }">
       <SocialFeedCard />

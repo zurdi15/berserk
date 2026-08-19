@@ -83,18 +83,6 @@ def test_dev_seed_generates_coherent_history(db_session):
     for exercise_id, values in by_exercise.items():
         assert all(b > a for a, b in zip(values, values[1:])), (exercise_id, values)
 
-    # 3 sesiones planificadas en el futuro
-    today = date.today()
-    future = db_session.scalars(
-        select(models.ScheduledSession).where(
-            models.ScheduledSession.owner_id == target.id,
-            models.ScheduledSession.status == "planned",
-            models.ScheduledSession.date >= today,
-        )
-    ).all()
-    assert len(future) == 3
-    assert all(f.date <= today + timedelta(days=7) for f in future)
-
     # body entries del objetivo: drift de peso semanal
     body_entries = db_session.scalars(
         select(models.BodyEntry).where(models.BodyEntry.owner_id == target.id).order_by(models.BodyEntry.date)
@@ -189,36 +177,15 @@ def test_dev_seed_personal_records_span_multiple_dates(db_session):
     assert len(distinct_dates) >= 4
 
 
-def test_dev_seed_freyja_has_schedule_and_body_entries(db_session):
-    """freyja es la atleta compartida de demo: sin sesiones programadas ni peso
-    registrado, su vista en athlete-mode aparece medio vacía frente al objetivo."""
+def test_dev_seed_freyja_has_body_entries(db_session):
+    """freyja es la atleta compartida de demo: sin peso registrado, su vista
+    en athlete-mode aparece medio vacía frente al objetivo."""
     run(db_session)
     freyja = db_session.scalar(select(models.User).where(models.User.username == "freyja"))
-    scheduled = db_session.scalar(
-        select(func.count(models.ScheduledSession.id)).where(models.ScheduledSession.owner_id == freyja.id)
-    )
     body_entries = db_session.scalar(
         select(func.count(models.BodyEntry.id)).where(models.BodyEntry.owner_id == freyja.id)
     )
-    assert scheduled > 0
     assert body_entries > 0
-
-
-def test_dev_seed_target_has_planned_session_today(db_session):
-    """La sesión de "hoy" debe existir siempre determinista (first_offset ya no
-    es un rng.choice((0, 1))), no depender de una moneda al aire que a veces
-    deja el buzón de la portada sin nada que mostrar."""
-    run(db_session)
-    target = db_session.scalar(select(models.User).where(models.User.is_admin.is_(True)))
-    today = date.today()
-    planned_today = db_session.scalars(
-        select(models.ScheduledSession).where(
-            models.ScheduledSession.owner_id == target.id,
-            models.ScheduledSession.status == "planned",
-            models.ScheduledSession.date == today,
-        )
-    ).all()
-    assert len(planned_today) == 1
 
 
 def test_dev_seed_some_date_has_two_workouts(db_session):

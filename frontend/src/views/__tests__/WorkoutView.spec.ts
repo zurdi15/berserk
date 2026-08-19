@@ -393,18 +393,6 @@ describe('WorkoutView', () => {
     })
   })
 
-  it('auto-starts from the ?session= query when there is no active workout (start({scheduled_session_id}))', async () => {
-    routeQuery.session = '42'
-    const activeWorkout = useActiveWorkoutStore()
-    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
-    const startSpy = vi.spyOn(activeWorkout, 'start').mockResolvedValue(undefined)
-
-    build()
-    await flushPromises()
-
-    expect(startSpy).toHaveBeenCalledWith({ scheduled_session_id: 42 })
-  })
-
   it('does not auto-start when resume already found an active workout', async () => {
     const activeWorkout = useActiveWorkoutStore()
     routeQuery.session = '42'

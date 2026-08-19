@@ -11,7 +11,7 @@ import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkUser from '@/lib/BkUser.vue'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
-import ScheduleSheet from '@/components/calendar/ScheduleSheet.vue'
+import DaySheet from '@/components/calendar/DaySheet.vue'
 import { isValidRuneName } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 import { useAthleteStore } from '@/stores/athlete'
@@ -32,7 +32,7 @@ const month = ref(today.getMonth() + 1)
 // (ver también MonthGrid.vue, mismo criterio para los headers de días)
 const label = computed(() => monthLabel(year.value, month.value, locale.value))
 
-const monthData = ref<CalendarMonthOut>({ scheduled: [], workouts: [] })
+const monthData = ref<CalendarMonthOut>({ workouts: [] })
 const heatmapData = ref<{ date: string; count: number }[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
 const loading = ref(false)
@@ -86,7 +86,7 @@ async function loadMuscleGroups() {
 async function loadMonth() {
   const cached = getViewCache<CalendarMonthOut>(monthKey())
   if (cached) monthData.value = cached
-  else monthData.value = { scheduled: [], workouts: [] }
+  else monthData.value = { workouts: [] }
   try {
     loading.value = true
     monthData.value = await getMonth(year.value, month.value, athlete.userId)
@@ -315,10 +315,9 @@ watch(() => athlete.userId, () => {
          formulario) ya no encaja bajo un único "Sesiones Programadas";
          cada sección se etiqueta a su propia altura si hace falta -->
     <BkSheet :open="selectedDate !== null" @close="closeScheduleSheet">
-      <ScheduleSheet
+      <DaySheet
         v-if="selectedDate"
         :date="selectedDate"
-        :scheduled="monthData.scheduled.filter(s => s.date === selectedDate)"
         :shared="monthData.shared"
         @updated="reloadCalendar"
       />

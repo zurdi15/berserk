@@ -27,7 +27,6 @@ import type {
   PersonalRecordOut,
   RotationOut,
   RoutineOut,
-  ScheduledOut,
   StatsOut,
   WorkoutOut,
 } from '@/api/domain'
@@ -110,7 +109,6 @@ export async function prefetchSections(): Promise<void> {
   if (streak && monthData && weekWorkouts && records && exercises && muscleGroups && distribution) {
     setViewCache<{
       streak: { weeks: number } | null
-      schedules: ScheduledOut[]
       workouts: WorkoutOut[]
       records: PersonalRecordOut[]
       exercises: ExerciseOut[]
@@ -118,7 +116,6 @@ export async function prefetchSections(): Promise<void> {
       distribution: DistributionItem[]
     }>('today:me', {
       streak,
-      schedules: monthData.scheduled,
       workouts: weekWorkouts,
       records,
       exercises,
