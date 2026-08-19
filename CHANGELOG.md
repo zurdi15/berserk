@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.22.1 - 2026-08-19
+
+### Changed
+- El editor de rutinas replica el layout del entrenamiento: la foto del ejercicio en vertical (9:16, con su encuadre) a la izquierda y los objetivos (series, reps, peso, descanso y bloque) a la derecha.
+- El selector de ejercicios se ve como la biblioteca: imagen de cada ejercicio (o su runa) y un chip del grupo muscular bajo el nombre.
+
 ## 0.22.0 - 2026-08-19
 
 ### Added
