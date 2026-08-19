@@ -3,8 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut, MuscleGroupOut } from '@/api/domain'
-import { exerciseImageUrl } from '@/api/domain'
-import { imageFramingStyle } from '@/utils/imageFraming'
+import BkMedia from '@/lib/BkMedia.vue'
 import { displayToKg, kgToDisplay } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -102,17 +101,9 @@ const restOptions = [
     <!-- cabecera: runa + nombre + mover/quitar — misma anatomía que la card
          del entreno (el chip de superserie vive en el contenedor del bloque) -->
     <div class="flex items-center gap-2">
-      <!-- v0.12.0: mismo thumb que la card del entreno (paridad de flujos) -->
-      <!-- v0.21.4: mismo encuadre WYSIWYG que el resto de superficies; el
-           wrapper con overflow recorta el zoom del scale -->
-      <span v-if="exercise?.has_image" class="w-9 h-9 rounded-sm overflow-hidden shrink-0">
-        <img
-          :src="exerciseImageUrl(exercise.id)"
-          alt=""
-          class="w-full h-full object-cover"
-          :style="imageFramingStyle(exercise)"
-        />
-      </span>
+      <!-- v0.22.1 (zurdi: "mismo layout que en entrenamiento"): el thumb
+           pequeño de cabecera muere — la foto VERTICAL vive en el cuerpo,
+           a la izquierda de los objetivos (espejo del player) -->
       <BkRune v-if="rune" :name="rune" :size="14" />
       <span class="text-sm font-medium text-ink truncate">
         {{ exerciseName(exercise, locale) }}
@@ -142,60 +133,74 @@ const restOptions = [
       </div>
     </div>
 
-    <div>
-      <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetSets') }}</label>
-      <BkStepper
-        :model-value="row.target_sets"
-        :min="1"
-        :max="10"
-        @update:model-value="row.target_sets = $event"
-      />
-    </div>
+    <!-- v0.22.1 (zurdi: "que tenga las mismas proporciones que en
+         entrenamiento — la imagen a la izquierda y la info a la derecha"):
+         espejo EXACTO de la zona media del player (BkMedia tall 9:16 con
+         encuadre WYSIWYG + pozo rúnico, self-start) con la columna de
+         objetivos donde el player pone las series. Steppers compactos: la
+         columna es más estrecha que la card entera -->
+    <div class="flex items-start gap-3">
+      <BkMedia :exercise="exercise" :rune="rune" size="tall" class="self-start" />
+      <div class="flex-1 min-w-0 space-y-2">
+        <div>
+          <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetSets') }}</label>
+          <BkStepper
+            :model-value="row.target_sets"
+            size="compact"
+            :min="1"
+            :max="10"
+            @update:model-value="row.target_sets = $event"
+          />
+        </div>
 
-    <div v-if="!isCardio">
-      <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetReps') }}</label>
-      <BkStepper
-        :model-value="row.target_reps || 0"
-        :min="0"
-        :max="100"
-        @update:model-value="row.target_reps = $event"
-      />
-    </div>
+        <div v-if="!isCardio">
+          <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetReps') }}</label>
+          <BkStepper
+            :model-value="row.target_reps || 0"
+            size="compact"
+            :min="0"
+            :max="100"
+            @update:model-value="row.target_reps = $event"
+          />
+        </div>
 
-    <div v-if="!isCardio">
-      <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetWeight') }}</label>
-      <!-- v0.17.1 (zurdi): el objetivo también admite entrada directa -->
-      <BkStepper
-        :model-value="kgToDisplay(row.target_weight_kg || 0, units)"
-        :min="0"
-        :max="kgToDisplay(300, units)"
-        :step="2.5"
-        :suffix="units"
-        editable
-        @update:model-value="row.target_weight_kg = $event > 0 ? displayToKg($event, units) : null"
-      />
-    </div>
+        <div v-if="!isCardio">
+          <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetWeight') }}</label>
+          <!-- v0.17.1 (zurdi): el objetivo también admite entrada directa -->
+          <BkStepper
+            :model-value="kgToDisplay(row.target_weight_kg || 0, units)"
+            size="compact"
+            :min="0"
+            :max="kgToDisplay(300, units)"
+            :step="2.5"
+            :suffix="units"
+            editable
+            @update:model-value="row.target_weight_kg = $event > 0 ? displayToKg($event, units) : null"
+          />
+        </div>
 
-    <BkSelect
-      v-if="!isCardio"
-      :model-value="row.rest_seconds || '60'"
-      :label="t('routines.restSeconds')"
-      :options="restOptions"
-      @update:model-value="row.rest_seconds = $event"
-    />
+        <BkSelect
+          v-if="!isCardio"
+          :model-value="row.rest_seconds || '60'"
+          :label="t('routines.restSeconds')"
+          :options="restOptions"
+          @update:model-value="row.rest_seconds = $event"
+        />
 
-    <!-- v0.17.2 (zurdi): mover el ejercicio a un bloque existente o estrenar
-         uno nuevo desde la propia fila — clave para rutinas creadas antes de
-         los bloques, donde todo nació sin etiqueta -->
-    <!-- testid SIN el prefijo routine-row-: los specs de secciones cuentan
-         filas por ese prefijo y este wrapper no es una fila -->
-    <div :data-testid="`row-block-select-${index}`">
-      <BkSelect
-        :model-value="row.block_label ?? ''"
-        :label="t('routines.blockField')"
-        :options="blockOptions"
-        @update:model-value="onBlockPick"
-      />
+        <!-- v0.17.2 (zurdi): mover el ejercicio a un bloque existente o
+             estrenar uno nuevo desde la propia fila — clave para rutinas
+             creadas antes de los bloques, donde todo nació sin etiqueta -->
+        <!-- testid SIN el prefijo routine-row-: los specs de secciones
+             cuentan filas por ese prefijo y este wrapper no es una fila -->
+        <div :data-testid="`row-block-select-${index}`">
+          <BkSelect
+            :model-value="row.block_label ?? ''"
+            :label="t('routines.blockField')"
+            :options="blockOptions"
+            @update:model-value="onBlockPick"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>

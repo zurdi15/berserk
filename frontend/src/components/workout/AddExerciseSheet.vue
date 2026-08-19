@@ -7,12 +7,13 @@ import { listExercises, listMuscleGroups } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { useAuthStore } from '@/stores/auth'
+import BkMedia from '@/lib/BkMedia.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSearchList from '@/lib/BkSearchList.vue'
 import BkCheck from '@/lib/BkCheck.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import GroupFilterSelect from '@/lib/GroupFilterSelect.vue'
-import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
+import { groupRune, primaryMuscleGroup, primaryRune } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 import type { WorkoutActions } from './workoutActions'
 
@@ -51,6 +52,12 @@ function groupLabel(group: MuscleGroupOut): string {
 
 function primaryGroup(exercise: ExerciseOut): MuscleGroupOut | undefined {
   return primaryMuscleGroup(exercise, muscleGroups.value)
+}
+
+// v0.22.1: runa del pozo de fallback de BkMedia (rune ?? slug, el resolver
+// central) — misma que la del chip de grupo de debajo del nombre
+function mediaRune(exercise: ExerciseOut): RuneName | null {
+  return primaryRune(exercise, muscleGroups.value)
 }
 
 function labelFor(exercise: ExerciseOut): string {
@@ -186,26 +193,40 @@ watch(
       max-height-class="flex-1 min-h-0"
       @select="pick"
     >
+      <!-- v0.22.1 (zurdi: "que se parezca al de la biblioteca — que se vean
+           las imágenes, y bajo el nombre un chip del grupo muscular"):
+           misma anatomía de fila que ExerciseManager — thumb 9:16 con pozo
+           rúnico + nombre multilínea + chip runa+grupo debajo -->
       <template #item="{ item: exercise }">
         <div
           :data-testid="`exercise-result-${exercise.id}`"
-          class="w-full flex items-center justify-between gap-2 text-left p-2 text-sm"
+          class="w-full flex items-center gap-3 text-left p-2 text-sm"
           :class="firstPick?.id === exercise.id ? 'text-aurora border border-aurora/50 rounded-sm' : 'text-ink'"
         >
-          <span class="truncate">{{ labelFor(exercise) }}</span>
-          <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
-          <span
-            v-if="primaryGroup(exercise)"
-            class="inline-flex items-center gap-1 text-ink-faint shrink-0"
-            :data-testid="`exercise-group-tag-${exercise.id}`"
-          >
-            <BkRune
-              v-if="isValidRuneName(primaryGroup(exercise)!.slug)"
-              :name="(primaryGroup(exercise)!.slug as RuneName)"
-              :size="14"
-            />
-            <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
-          </span>
+          <!-- testid SIN el prefijo exercise-result-: los specs (y el E2E)
+               listan filas por ese prefijo y el thumb no es una fila -->
+          <BkMedia
+            :exercise="exercise"
+            :rune="mediaRune(exercise)"
+            size="tallSm"
+            :data-testid="`result-thumb-${exercise.id}`"
+          />
+          <div class="min-w-0 flex-1">
+            <p class="break-words">{{ labelFor(exercise) }}</p>
+            <div v-if="primaryGroup(exercise)" class="mt-1">
+              <span
+                class="inline-flex items-center gap-1 rounded-full border border-line px-1.5 py-0.5 text-2xs text-ink-faint"
+                :data-testid="`exercise-group-tag-${exercise.id}`"
+              >
+                <BkRune
+                  v-if="groupRune(primaryGroup(exercise))"
+                  :name="groupRune(primaryGroup(exercise))!"
+                  :size="12"
+                />
+                <span>{{ groupLabel(primaryGroup(exercise)!) }}</span>
+              </span>
+            </div>
+          </div>
         </div>
       </template>
     </BkSearchList>
