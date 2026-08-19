@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.21.1 - 2026-08-19
+
+### Changed
+- El hero de Hoy pierde la card cuando no hay foto: fondo completamente transparente — el contenido y la runa flotan sobre la página con la tinta del tema (en oscuro la card negra-sobre-negro parecía no existir; en claro era un bloque demasiado oscuro). Con foto de rutina sigue siendo la isla nocturna de siempre.
+- La runa de fondo del hero va ahora tenue y con un blur suave: deja de competir con el texto.
+- Las filas de opciones (Perfil y demás listas) llevan borde: en tema claro ya no se funden con el fondo.
+
 ## 0.21.0 - 2026-08-19
 
 ### Added
