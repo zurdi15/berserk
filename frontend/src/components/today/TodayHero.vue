@@ -203,36 +203,40 @@ function goToCalendar() {
       data-testid="rotation-next-card"
     >
       <div class="flex-1 flex flex-col gap-3">
+        <!-- v0.21.3 (zurdi: "las chevron ponlas justo en el medio de la card,
+             alineadas verticalmente — a la altura del nombre quedaba todo muy
+             junto"): las flechas dejan la fila del título y se anclan
+             ABSOLUTAS al centro vertical de la card entera (el ancestro
+             posicionado es el contenedor de contenido de BkHero, que cubre
+             todo el hero), sobre el hueco central donde respira la runa -->
+        <button
+          v-if="routines.length > 1"
+          type="button"
+          class="bk-press absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border bk-hero-line flex items-center justify-center"
+          :disabled="switching || undefined"
+          :aria-label="t('today.heroPrev')"
+          data-testid="hero-prev"
+          @click="selectDelta(-1)"
+        >
+          <span aria-hidden="true">‹</span>
+        </button>
+        <button
+          v-if="routines.length > 1"
+          type="button"
+          class="bk-press absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border bk-hero-line flex items-center justify-center"
+          :disabled="switching || undefined"
+          :aria-label="t('today.heroNext')"
+          data-testid="hero-next"
+          @click="selectDelta(1)"
+        >
+          <span aria-hidden="true">›</span>
+        </button>
         <p class="bk-eyebrow bk-hero-accent">{{ workoutActive ? t('today.heroInProgress') : t('today.heroEyebrow') }}</p>
-        <div class="flex items-center gap-2">
-          <button
-            v-if="routines.length > 1"
-            type="button"
-            class="bk-press shrink-0 w-9 h-9 rounded-full border bk-hero-line flex items-center justify-center"
-            :disabled="switching || undefined"
-            :aria-label="t('today.heroPrev')"
-            data-testid="hero-prev"
-            @click="selectDelta(-1)"
-          >
-            <span aria-hidden="true">‹</span>
-          </button>
-          <Transition name="bk-pop-soft" mode="out-in">
-            <h2 :key="displayRoutine.id" class="flex-1 min-w-0 bk-display truncate text-center" data-testid="rotation-next-name">
-              {{ displayRoutine.name }}
-            </h2>
-          </Transition>
-          <button
-            v-if="routines.length > 1"
-            type="button"
-            class="bk-press shrink-0 w-9 h-9 rounded-full border bk-hero-line flex items-center justify-center"
-            :disabled="switching || undefined"
-            :aria-label="t('today.heroNext')"
-            data-testid="hero-next"
-            @click="selectDelta(1)"
-          >
-            <span aria-hidden="true">›</span>
-          </button>
-        </div>
+        <Transition name="bk-pop-soft" mode="out-in">
+          <h2 :key="displayRoutine.id" class="min-w-0 bk-display truncate text-center" data-testid="rotation-next-name">
+            {{ displayRoutine.name }}
+          </h2>
+        </Transition>
         <Transition name="bk-fade" mode="out-in">
           <p v-if="heroMeta" :key="displayRoutine.id" class="text-sm bk-hero-muted text-center">{{ heroMeta }}</p>
         </Transition>

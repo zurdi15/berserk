@@ -151,9 +151,11 @@ const activeIndex = computed(() => {
 })
 
 // facelift v4 (zurdi: "si hay foto de perfil, que se muestre en el
-// bottombar en vez de la runa de Perfil"): el avatar sustituye a la runa —
-// y en móvil también a la etiqueta "Perfil" (avatar con etiqueta debajo
-// quedaría raro). El computed se reevalúa cuando refreshMe reemplaza
+// bottombar en vez de la runa de Perfil"): el avatar sustituye a la runa.
+// v0.21.3 (zurdi: "pon de nuevo la tag de Perfil aunque haya avatar, y al
+// mismo tamaño que las runas"): la etiqueta vuelve SIEMPRE y el avatar mide
+// exactamente lo que la runa (22px móvil / 20px desktop) — mismo footprint,
+// nada desentona. El computed se reevalúa cuando refreshMe reemplaza
 // auth.user (subir/quitar foto), y el Date.now() de ese momento rompe la
 // cache del <img> — no es un bust por render: computed cachea por identidad
 const auth = useAuthStore()
@@ -347,7 +349,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
                   v-if="item.name === 'profile' && navAvatarSrc"
                   :src="navAvatarSrc"
                   alt=""
-                  class="relative w-6 h-6 rounded-full object-cover border"
+                  class="relative w-5 h-5 rounded-full object-cover border"
                   :class="route.name === 'profile' ? 'border-aurora' : 'border-line-strong'"
                   data-testid="nav-avatar-desktop"
                 />
@@ -456,22 +458,28 @@ watch(activeIndex, () => nextTick(updateIndicator))
               class="flex flex-col items-center gap-1 py-2.5 text-ink-faint"
               active-class="text-aurora"
             >
-              <span v-if="item.name === 'profile' && navAvatarSrc" class="flex items-center justify-center h-10">
+              <!-- v0.21.3 (zurdi): el avatar ocupa el hueco de la runa a SU
+                   tamaño exacto (22px) y la etiqueta "Perfil" vuelve siempre
+                   — misma anatomía que el resto de items -->
+              <span v-if="item.name === 'profile' && navAvatarSrc">
+                <!-- width/height como atributos (no clases): 22px es el
+                     :size exacto de las runas vecinas, fuera de la escala de
+                     Tailwind — mismo criterio que el prop size de BkRune -->
                 <img
                   :src="navAvatarSrc"
                   alt=""
-                  class="relative w-8 h-8 rounded-full object-cover border-2"
+                  width="22"
+                  height="22"
+                  class="relative rounded-full object-cover border"
                   :class="route.name === 'profile' ? 'border-aurora' : 'border-line-strong'"
                   data-testid="nav-avatar"
                 />
               </span>
-              <template v-else>
-                <span><BkRune :name="item.rune" :size="22" :carve="false" class="relative" /></span>
-                <!-- revertido (round 7, zurdi): se probó ocultar las inactivas
-                     (sr-only + fade solo en la activa), pero con el token a
-                     0.7rem las 5 etiquetas leen bien tal cual — vuelta al clásico -->
-                <span class="text-2xs tracking-wide">{{ $t(item.label) }}</span>
-              </template>
+              <span v-else><BkRune :name="item.rune" :size="22" :carve="false" class="relative" /></span>
+              <!-- revertido (round 7, zurdi): se probó ocultar las inactivas
+                   (sr-only + fade solo en la activa), pero con el token a
+                   0.7rem las 5 etiquetas leen bien tal cual — vuelta al clásico -->
+              <span class="text-2xs tracking-wide">{{ $t(item.label) }}</span>
             </RouterLink>
           </li>
         </ul>
