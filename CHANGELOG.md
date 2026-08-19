@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.21.0 - 2026-08-19
+
+### Added
+- Las rutinas pueden tener imagen propia: súbela, cámbiala o quítala desde el editor de la rutina. El hero de Hoy y el pre-inicio usan ESA imagen (o la runa si no hay) — ya no toman prestada la foto del primer ejercicio.
+- La gráfica por ejercicio entiende niveles: pestaña "Nivel" (solo si el ejercicio tiene series en modo nivel) y chips con el peso y/o nivel máximo conseguidos, sin ir a Récords. Si el ejercicio es solo-nivel, la gráfica abre directamente en "Nivel".
+- Si tienes foto de perfil, la barra inferior muestra tu avatar en lugar de la runa de Perfil (sin etiqueta, con anillo aurora cuando estás dentro).
+
+### Changed
+- Las fotos de ejercicio son ahora verticales (9:16) y más grandes: en la biblioteca cada fila luce su foto, y en el player la imagen acompaña a las series a su izquierda.
+- Todas las secciones cargan al instante al volver: lo último que viste aparece de inmediato (con su animación de entrada) mientras el dato fresco llega en background y se actualiza de forma reactiva.
+- El hero de Hoy se redistribuye: "HOY TOCA" arriba con su margen, nombre y flechas en la parte alta y el CTA abajo; las flechas del carrusel animan solo el contenido (nombre, runa, meta), nunca la card entera. En tema claro la card es una isla nocturna: siempre oscura, con letras blancas y sombra.
+- El bloque "Última vez" del player queda siempre visible, también después de marcar series.
+- "Nuevo ejercicio" vive ahora arriba, pegado a la derecha del título de la biblioteca.
+- Todos los ejercicios son de catálogo global: desaparece la privacidad por ejercicio (ser el autor solo importa para editarlo o borrarlo).
+- Checkbox y radios propios de la casa en grupos musculares, modo superserie y editor de rutina — fuera el azul genérico del navegador.
+
+### Fixed
+- El sheet "Añadir ejercicio" recarga el catálogo al abrirse: un ejercicio creado a mitad de entreno ya aparece en la lista sin salir del player.
+
 ## 0.20.0 - 2026-08-19
 
 ### Added
