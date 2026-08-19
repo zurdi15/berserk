@@ -204,16 +204,19 @@ function selectDay(date: string) {
           />
         </div>
 
-        <!-- Muscle group runes (max 3 per day): abajo, como antes -->
+        <!-- Muscle group runes (max 3 per day): abajo, como antes.
+             facelift v2 (zurdi): con las esquinas más redondas (rounded-md),
+             el grupo tiene que ser más COMPACTO — sin gap y runas un punto
+             más pequeñas, para que las de los extremos no rocen el radio -->
         <div
           v-if="runesByDate.has(cell.date)"
-          class="absolute inset-x-0 bottom-1 flex justify-center gap-0.5"
+          class="absolute inset-x-0 bottom-1 flex justify-center"
         >
           <BkRune
             v-for="(runeName, i) in runesByDate.get(cell.date)!"
             :key="`rune-${cell.date}-${i}`"
             :name="runeName"
-            :size="12"
+            :size="11"
           />
         </div>
       </button>

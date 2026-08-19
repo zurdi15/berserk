@@ -12,6 +12,8 @@ export interface UserOut {
   color?: string | null
   // v0.11.0: objetivo de peso corporal (kg canónicos), null = sin objetivo
   goal_weight_kg?: number | null
+  // v0.19.x: foto de perfil — el fichero vive en /users/{id}/avatar
+  has_avatar?: boolean
 }
 
 export const getStatus = () => api<{ bootstrapped: boolean }>('/auth/status')

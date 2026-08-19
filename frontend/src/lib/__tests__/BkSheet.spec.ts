@@ -1,4 +1,4 @@
-import { mount, type VueWrapper } from '@vue/test-utils'
+import { DOMWrapper, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -247,5 +247,43 @@ describe('BkToast', () => {
 
     expect(dismissSpy).toHaveBeenCalledWith(toastId)
     expect(document.querySelector('output')).toBeNull()
+  })
+})
+
+// facelift v2: asa arrastrable + modo scroll=false (un único scroller)
+describe('BkSheet facelift v2', () => {
+  it('dragging the grabber past the threshold emits close; a short drag does not', async () => {
+    const wrapper = mount(BkSheet, {
+      props: { open: true, title: 'Arrastra' },
+      attachTo: document.body,
+    })
+    await nextTick()
+    const grabber = new DOMWrapper(document.body.querySelector('[data-testid="sheet-grabber"]') as Element)
+
+    // arrastre corto: vuelve a su sitio sin cerrar
+    await grabber.trigger('pointerdown', { clientY: 100, pointerId: 1 })
+    await grabber.trigger('pointermove', { clientY: 140, pointerId: 1 })
+    await grabber.trigger('pointerup', { clientY: 140, pointerId: 1 })
+    expect(wrapper.emitted('close')).toBeUndefined()
+
+    // arrastre largo: cierra
+    await grabber.trigger('pointerdown', { clientY: 100, pointerId: 1 })
+    await grabber.trigger('pointermove', { clientY: 260, pointerId: 1 })
+    await grabber.trigger('pointerup', { clientY: 260, pointerId: 1 })
+    expect(wrapper.emitted('close')).toBeTruthy()
+
+    wrapper.unmount()
+  })
+
+  it('scroll=false hands scrolling to the content (panel overflow-hidden, no overflow-y-auto)', async () => {
+    const wrapper = mount(BkSheet, {
+      props: { open: true, scroll: false },
+      attachTo: document.body,
+    })
+    await nextTick()
+    const panel = document.querySelector('[role="dialog"]') as HTMLElement
+    expect(panel.classList.contains('overflow-hidden')).toBe(true)
+    expect(panel.classList.contains('overflow-y-auto')).toBe(false)
+    wrapper.unmount()
   })
 })

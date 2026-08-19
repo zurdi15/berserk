@@ -1251,6 +1251,17 @@ describe('WorkoutExerciseCard', () => {
       expect(document.body.querySelector('form')).not.toBeNull()
     })
 
+    it('facelift v2: unchecking a logged set deletes it through actions.deleteSet', async () => {
+      const actions = makeActions()
+      mountCard({ actions })
+      await flushPromises()
+
+      await byTestId('uncheck-set-1').trigger('click')
+      await flushPromises()
+
+      expect(actions.deleteSet).toHaveBeenCalledWith(20, 1)
+    })
+
     it('cardio never renders ghosts (its model is the two actions)', async () => {
       mountCard({ workoutExercise: cardioWorkoutExercise, exercise: cardioExercise, exerciseIds: [30] })
       await flushPromises()

@@ -522,6 +522,18 @@ function formatCardioEntry(entry: { date: string; duration_seconds: number | nul
   return entry.distance_m ? `${base} · ${entry.distance_m} m` : base
 }
 
+// facelift v2 (zurdi: "que se puedan des-seleccionar"): quitar el check de
+// una serie HECHA la borra — el gesto simétrico del check que la creó. Va
+// por el store (outbox) y la fila sale con la animación bk-remove; volver a
+// marcarla es un toque en el ghost que reaparece.
+async function uncheckSet(setId: number) {
+  try {
+    await props.actions.deleteSet(props.workoutExercise.id, setId)
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
 async function onDeleteSet(setId: number) {
   deleteConfirming.value = null
   try {
@@ -724,12 +736,14 @@ async function moveDown() {
         <span v-else class="flex-1 min-w-0 bk-metric text-base px-2 py-1.5">
           <template v-if="!isCardio">{{ set.set_number }}. </template>{{ formatSetValue(set) }}
         </span>
-        <!-- check lleno SIN listener: el estado "hecha" no se des-marca (eso
-             sería borrar — vive en el pie del cajón de edición) -->
+        <!-- des-marcar = borrar la serie (facelift v2) — el pie del cajón
+             de edición sigue existiendo como camino explícito -->
         <BkCheck
           :model-value="true"
           size="lg"
           :aria-label="t('workout.setDone', { n: set.set_number })"
+          :data-testid="`uncheck-set-${set.id}`"
+          @update:model-value="uncheckSet(set.id)"
         />
       </div>
       </TransitionGroup>
@@ -741,8 +755,8 @@ async function moveDown() {
         v-for="g in pendingGhostCount"
         :key="`ghost-${g}`"
         :data-testid="`ghost-set-${workoutExercise.id}-${g - 1}`"
-        class="flex items-center gap-2 rounded-md"
-        :class="g === 1 && 'bg-aurora/5 outline outline-1 outline-aurora/30'"
+        class="flex items-center gap-2 rounded-lg"
+        :class="g === 1 && 'bg-aurora/5 outline outline-1 outline-aurora/30 p-1.5 -mx-1.5'"
       >
         <button
           v-if="exercise"

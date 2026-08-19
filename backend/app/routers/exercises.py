@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser
@@ -173,7 +173,12 @@ def list_exercises(
         query = query.join(ExerciseMuscleGroup).where(
             ExerciseMuscleGroup.muscle_group_id == muscle_group_id
         )
-    exercises = db.scalars(query.order_by(Exercise.name_en)).all()
+    # name_en puede ser '' (opcional desde v0.19.x): ordenar por la EN si
+    # existe y si no por la ES, para que los sin-traducción no se apelotonen
+    # al principio
+    exercises = db.scalars(
+        query.order_by(func.coalesce(func.nullif(Exercise.name_en, ""), Exercise.name_es))
+    ).all()
     return [exercise_out(e) for e in exercises]
 
 

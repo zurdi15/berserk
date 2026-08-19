@@ -711,6 +711,21 @@ export const deleteExerciseImage = (exerciseId: number) =>
 export const exerciseImageUrl = (exerciseId: number, cacheBust?: number) =>
   `/api/v1/exercises/${exerciseId}/image${cacheBust ? `?v=${cacheBust}` : ''}`
 
+// v0.19.x (zurdi: "que se pueda poner foto de perfil") — mismo esquema que
+// la imagen de ejercicio: subir/borrar la propia, GET por id de usuario
+// (identidad de la instancia, visible autenticado)
+export const uploadAvatar = (file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return apiForm<void>('/users/me/avatar', form)
+}
+
+export const deleteAvatar = () => api<void>('/users/me/avatar', { method: 'DELETE' })
+
+// mismo criterio de cache-bust que exerciseImageUrl
+export const avatarUrl = (userId: number, cacheBust?: number) =>
+  `/api/v1/users/${userId}/avatar${cacheBust ? `?v=${cacheBust}` : ''}`
+
 export const listBodyPhotos = () => api<BodyPhotoOut[]>('/body/photos')
 
 export const uploadBodyPhoto = (date: string, file: File) => {

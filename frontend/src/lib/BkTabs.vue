@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 // item 2 (v0.3.2): overflow-x-auto se queda como red de seguridad
 // (histórico: sin él, 4 pestañas anchas ensanchaban la PÁGINA entera,
@@ -28,6 +28,35 @@ function select(value: string, event: MouseEvent) {
   scrollTabIntoView(event.currentTarget as HTMLElement)
 }
 
+// facelift v2 (zurdi: "que la pill de la sección seleccionada esté
+// animada"): la pastilla activa es UN indicador deslizante medido en px
+// (offsetLeft/offsetWidth del botón activo, mismo patrón que el nav de
+// escritorio de ShellView) que se traslada con transición — los botones ya
+// no pintan su propio bg. offsetParent = el tablist (relative), así que la
+// medida ya viene en su sistema de coordenadas.
+const indicatorLeft = ref(0)
+const indicatorWidth = ref(0)
+const indicatorReady = ref(false)
+
+const activeIndex = computed(() => props.tabs.findIndex((t) => t.value === props.modelValue))
+
+function updateIndicator() {
+  const el = tabRefs.value[activeIndex.value]
+  if (!el) return
+  indicatorLeft.value = el.offsetLeft
+  indicatorWidth.value = el.offsetWidth
+  indicatorReady.value = true
+}
+
+onMounted(() => {
+  updateIndicator()
+  window.addEventListener('resize', updateIndicator)
+})
+onBeforeUnmount(() => window.removeEventListener('resize', updateIndicator))
+// nextTick: los refs del v-for solo son fiables tras el render (ver arriba);
+// también cubre cambios en la LISTA de tabs (labels/anchos nuevos)
+watch([activeIndex, () => props.tabs], () => nextTick(updateIndicator), { deep: true })
+
 function move(delta: number) {
   const index = props.tabs.findIndex((t) => t.value === props.modelValue)
   const nextIndex = (index + delta + props.tabs.length) % props.tabs.length
@@ -46,11 +75,25 @@ function move(delta: number) {
 <template>
   <div
     role="tablist"
-    class="flex w-full gap-1 rounded-full border border-line bg-stone p-1 overflow-x-auto overscroll-x-contain no-scrollbar"
+    class="relative flex w-full gap-1 rounded-full border border-line bg-stone p-1 overflow-x-auto overscroll-x-contain no-scrollbar"
     tabindex="0"
     @keydown.arrow-right.prevent="move(1)"
     @keydown.arrow-left.prevent="move(-1)"
   >
+    <!-- pastilla deslizante: SIEMPRE montada (opacity gobierna su aparición),
+         mismos tokens de movimiento que el indicador del nav -->
+    <span
+      class="absolute top-1 bottom-1 left-0 rounded-full bg-slab"
+      :style="{
+        transform: `translateX(${indicatorLeft}px)`,
+        width: `${indicatorWidth}px`,
+        opacity: indicatorReady ? 1 : 0,
+        transition:
+          'transform var(--bk-dur-3) var(--bk-ease-out), width var(--bk-dur-3) var(--bk-ease-out)',
+      }"
+      aria-hidden="true"
+      data-testid="tabs-indicator"
+    />
     <!-- facelift: de subrayado uppercase a pill segmentada (la referencia) —
          la activa se realza con bg-slab (el token ES el nivel "elevado", ver
          base.css). flex-1 reparte el ancho entre pestañas; la aritmética de
@@ -67,9 +110,9 @@ function move(delta: number) {
       role="tab"
       type="button"
       :aria-selected="tab.value === modelValue ? 'true' : 'false'"
-      class="bk-press flex-1 rounded-full px-2 sm:px-3 py-2 font-display font-semibold text-2xs sm:text-sm shrink-0 whitespace-nowrap transition-colors"
+      class="bk-press relative flex-1 rounded-full px-2 sm:px-3 py-2 font-display font-semibold text-2xs sm:text-sm shrink-0 whitespace-nowrap transition-colors"
       :class="tab.value === modelValue
-        ? 'bg-slab text-aurora'
+        ? 'text-aurora'
         : 'text-ink-muted hover:text-ink'"
       @click="select(tab.value, $event)"
     >

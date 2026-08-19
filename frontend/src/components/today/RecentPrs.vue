@@ -31,7 +31,8 @@ const exerciseMap = computed(() => new Map(props.exercises.map((e) => [e.id, e])
 function getExerciseName(exerciseId: number): string {
   const ex = exerciseMap.value.get(exerciseId)
   if (!ex) return ''
-  return locale.value === 'es' ? ex.name_es : ex.name_en
+  // v0.19.x: name_en opcional — sin traducción se cae al ES
+  return locale.value === 'es' ? ex.name_es : ex.name_en || ex.name_es
 }
 
 // los 3 kinds de PR son magnitudes en kg: todos pasan por formatWeight/Int

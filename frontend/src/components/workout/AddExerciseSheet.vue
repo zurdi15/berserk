@@ -131,7 +131,9 @@ watch(
 </script>
 
 <template>
-  <BkSheet :open="open" :title="t('workout.addExercise')" @close="emit('close')">
+  <!-- facelift v2 (zurdi: doble scroll): el panel NO scrollea (scroll=false),
+       solo la lista — el sheet reparte con flex y la lista toma el resto -->
+  <BkSheet :open="open" :title="t('workout.addExercise')" :scroll="false" @close="emit('close')">
     <!-- v0.8.0: check de superserie sobre la lista (solo si el store de esta
          superficie sabe añadir pares — el editor retroactivo no lo enseña) -->
     <div v-if="actions.addSupersetPair" class="px-1 pb-2 space-y-1">
@@ -158,12 +160,13 @@ watch(
     <BkSearchList
       v-if="catalogReady"
       v-model="query"
+      class="flex-1 min-h-0 flex flex-col"
       :items="groupFiltered"
       :label-fn="labelFor"
       :search-fn="searchTextFor"
       :key-fn="(exercise: ExerciseOut) => exercise.id"
       :label="t('workout.searchExercise')"
-      max-height-class="max-h-[55dvh]"
+      max-height-class="flex-1 min-h-0"
       @select="pick"
     >
       <template #item="{ item: exercise }">

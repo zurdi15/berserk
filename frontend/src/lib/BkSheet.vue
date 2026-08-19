@@ -2,8 +2,49 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { isTopLayer, popLayer, pushLayer } from './layerStack'
 
-const props = defineProps<{ open: boolean; title?: string }>()
+// facelift v2 (zurdi): `scroll: false` para sheets cuyo CONTENIDO ya tiene
+// su propio scroller (la lista de añadir ejercicio) — el panel deja de
+// scrollear (flex + overflow-hidden) y evita el doble scroll anidado; el
+// slot debe repartirse con flex-1 min-h-0.
+const props = withDefaults(defineProps<{ open: boolean; title?: string; scroll?: boolean }>(), {
+  scroll: true,
+})
 const emit = defineEmits<{ close: [] }>()
+
+// facelift v2 (zurdi: "la rayita no es interactuable"): arrastrar el asa
+// hacia abajo cierra el sheet — el panel sigue al dedo (transform inline,
+// sin transición mientras se arrastra) y al soltar, pasado el umbral, se
+// cierra; si no, vuelve a su sitio con transition-transform. Pointer events
+// con captura: el gesto no se pierde aunque el dedo salga del asa.
+const DRAG_CLOSE_PX = 90
+const dragging = ref(false)
+const dragY = ref(0)
+let dragStartY = 0
+
+function onDragStart(event: PointerEvent) {
+  dragging.value = true
+  dragY.value = 0
+  dragStartY = event.clientY
+  // captura del puntero si el entorno la soporta (happy-dom no) — sin ella
+  // el arrastre sigue funcionando mientras el dedo no salga del asa
+  try {
+    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  } catch {
+    /* no-op */
+  }
+}
+
+function onDragMove(event: PointerEvent) {
+  if (!dragging.value) return
+  dragY.value = Math.max(0, event.clientY - dragStartY)
+}
+
+function onDragEnd() {
+  if (!dragging.value) return
+  dragging.value = false
+  if (dragY.value > DRAG_CLOSE_PX) emit('close')
+  dragY.value = 0
+}
 
 const id = Symbol()
 const titleId = useId()
@@ -68,13 +109,32 @@ watch(
         aria-modal="true"
         tabindex="-1"
         :aria-labelledby="title ? titleId : undefined"
-        class="fixed inset-x-0 bottom-0 z-(--bk-z-sheet) bk-slab rounded-t-xl rounded-b-none border-b-0 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto"
+        class="fixed inset-x-0 bottom-0 z-(--bk-z-sheet) bk-slab rounded-t-xl rounded-b-none border-b-0 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] max-h-[85dvh]"
+        :class="[
+          scroll ? 'overflow-y-auto' : 'flex flex-col overflow-hidden',
+          !dragging && 'transition-transform',
+        ]"
+        :style="{ transform: `translateY(${dragY}px)` }"
       >
-        <div class="mx-auto mb-4 h-1.5 w-12 rounded-full bg-line-strong" aria-hidden="true" />
-        <h2 v-if="title" :id="titleId" class="bk-title text-ink mb-4">
+        <!-- asa arrastrable: zona de toque generosa alrededor de la rayita
+             (touch-action none: el gesto es nuestro, no un scroll) -->
+        <div
+          class="shrink-0 -mt-4 -mx-5 px-5 pt-3 pb-2 flex justify-center cursor-grab select-none"
+          style="touch-action: none"
+          data-testid="sheet-grabber"
+          @pointerdown="onDragStart"
+          @pointermove="onDragMove"
+          @pointerup="onDragEnd"
+          @pointercancel="onDragEnd"
+        >
+          <div class="h-1.5 w-12 rounded-full bg-line-strong" aria-hidden="true" />
+        </div>
+        <h2 v-if="title" :id="titleId" class="bk-title text-ink mb-4 shrink-0">
           {{ title }}
         </h2>
-        <slot />
+        <div :class="scroll ? undefined : 'flex-1 min-h-0 flex flex-col'">
+          <slot />
+        </div>
       </div>
     </Transition>
   </Teleport>

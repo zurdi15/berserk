@@ -356,6 +356,20 @@
   animation: bk-check-pop var(--bk-dur-2) var(--bk-ease-spring);
 }
 
+/* facelift v2 (BkSparks, "confeti mágico" al terminar el entreno): cada
+   chispa sube y deriva según sus CSS vars (fijadas por chispa en el setup
+   del componente — el aleatorio vive en JS, el CSS solo interpola) y se
+   apaga por el camino. transform/opacity puros, fill both: invisible
+   durante su delay y sin resurrección al acabar. */
+@keyframes bk-spark {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.4); }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--bk-spark-dx, 0px), var(--bk-spark-dy, -40vh), 0) scale(1); }
+}
+.bk-spark {
+  animation: bk-spark var(--bk-spark-dur, var(--bk-dur-5)) var(--bk-ease-out) var(--bk-spark-delay, 0s) both;
+}
+
 .bk-grow-x {
   transform-origin: left;
   animation: bk-grow-x var(--bar-dur, var(--bk-dur-4)) var(--bk-ease-out) backwards;

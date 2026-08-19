@@ -124,6 +124,8 @@ export const en = {
     sharingTab: 'Sharing',
     activity: 'Your recent activity',
     editProfile: 'Edit',
+    changeAvatar: 'Change profile photo',
+    removeAvatar: 'Remove photo',
     routinesTab: 'Routines',
     libraryTab: 'Library',
     adminTab: 'Admin',
@@ -269,7 +271,7 @@ export const en = {
     newExercise: 'New exercise',
     newGroup: 'New group',
     nameEs: 'Name (ES)',
-    nameEn: 'Name (EN)',
+    nameEn: 'Name (EN, optional)',
     measurement: 'Measurement type',
     measurements: {
       strength: 'Strength',

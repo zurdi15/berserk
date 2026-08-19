@@ -33,6 +33,8 @@ import FinishSummary from '@/components/workout/FinishSummary.vue'
 import NeonPulse from '@/components/workout/NeonPulse.vue'
 import WorkoutExerciseCard from '@/components/workout/WorkoutExerciseCard.vue'
 import BkCelebration from '@/components/celebration/BkCelebration.vue'
+import BkSparks from '@/components/celebration/BkSparks.vue'
+import { resetMainScroll } from '@/composables/useMainScroll'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -408,6 +410,11 @@ function routineMeta(routine: RoutineOut): string {
   })
 }
 
+// facelift v2 (zurdi): terminar es un momento de CELEBRACIÓN — scroll de
+// <main> arriba ANTES de pintar el resumen (que la runa berserk se talle a
+// la vista, no bajo el pliegue), pulso neón de borde y ráfaga de chispas
+const finishSparks = ref(false)
+
 async function onFinish() {
   try {
     finishedWorkout.value = await activeWorkout.finish()
@@ -416,6 +423,9 @@ async function onFinish() {
     // montar (mismatches se limpian ahí), así que si queda algo es
     // literalmente de este entreno — limpiar sin condicionar es seguro
     clearPersistedCardioCountdown()
+    resetMainScroll()
+    finishSparks.value = true
+    triggerNeonPulse()
   } catch (error) {
     toastApiError(error)
   }
@@ -744,6 +754,8 @@ onBeforeUnmount(stopTicker)
     />
 
     <NeonPulse :show="neonPulse" @done="neonPulse = false" />
+
+    <BkSparks v-if="finishSparks" @done="finishSparks = false" />
 
     <FinishSummary
       v-if="finishedWorkout"

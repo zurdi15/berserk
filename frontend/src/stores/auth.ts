@@ -33,6 +33,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // v0.19.x: re-leer /auth/me tras mutar el perfil (subir/quitar avatar) —
+  // el resto de la app lee user.has_avatar de este store
+  async function refreshMe() {
+    user.value = await authApi.me()
+  }
+
   async function login(username: string, password: string) {
     user.value = await authApi.login(username, password)
     applyLocale(user.value.locale)
@@ -79,5 +85,5 @@ export const useAuthStore = defineStore('auth', () => {
     clearActAsStorage()
   }
 
-  return { user, bootstrapped, ready, isAuthenticated, init, login, bootstrapAccount, redeemAccount, logout }
+  return { user, bootstrapped, ready, isAuthenticated, init, refreshMe, login, bootstrapAccount, redeemAccount, logout }
 })

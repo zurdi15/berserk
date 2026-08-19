@@ -43,6 +43,8 @@ class UserOut(BaseModel):
     color: str | None
     # v0.11.0: objetivo de peso corporal (kg canónicos), null = sin objetivo
     goal_weight_kg: float | None = None
+    # v0.19.x: foto de perfil — el fichero vive en /users/{id}/avatar
+    has_avatar: bool = False
 
     model_config = {"from_attributes": True}
 

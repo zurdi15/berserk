@@ -178,9 +178,14 @@ function goToCalendar() {
   </BkCard>
 
   <template v-else-if="ready">
+    <!-- facelift v2: las tres ramas comparten una Transition out-in — las
+         flechas del carrusel cambian la :key y el hero entero se remonta con
+         pop suave (y la runa del fallback se RE-TALLA con cada rutina) -->
+    <Transition name="bk-pop-soft" mode="out-in">
     <!-- (b) hero de rotación -->
     <BkHero
       v-if="displayRoutine"
+      :key="`rot-${displayRoutine.id}`"
       :exercise="heroExercise"
       :rune="heroRune"
       data-testid="rotation-next-card"
@@ -252,7 +257,7 @@ function goToCalendar() {
     </BkHero>
 
     <!-- (c) sin plan, con sesiones hoy (planificadas, hechas u omitidas) -->
-    <BkHero v-else-if="todaySessions.length > 0" rune="berserk">
+    <BkHero v-else-if="todaySessions.length > 0" key="session" rune="berserk">
       <div class="space-y-3">
         <p v-if="plannedSession" class="bk-eyebrow text-aurora">
           {{ t('calendar.plannedEyebrow') }}<template v-if="formatTimeShort(plannedSession.time)"> · {{ formatTimeShort(plannedSession.time) }}</template>
@@ -283,7 +288,7 @@ function goToCalendar() {
     </BkHero>
 
     <!-- (d) nada programado: entreno libre + programar -->
-    <BkCard v-else :title="t('today.todaySession')">
+    <BkCard v-else key="empty" :title="t('today.todaySession')">
       <div class="space-y-3">
         <p class="text-ink-muted">{{ t('today.noSession') }}</p>
         <BkButton variant="primary" size="lg" block @click="startFree">
@@ -294,5 +299,6 @@ function goToCalendar() {
         </BkButton>
       </div>
     </BkCard>
+    </Transition>
   </template>
 </template>

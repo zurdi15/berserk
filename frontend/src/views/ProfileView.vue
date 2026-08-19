@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
-import { listWorkouts } from '@/api/domain'
+import { avatarUrl, deleteAvatar, listWorkouts, uploadAvatar } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { getMondayOfWeek, todayIso } from '@/utils/dates'
 import { useTabHash } from '@/composables/useTabHash'
@@ -103,6 +103,45 @@ const weekDots = computed(() => {
 
 const initial = computed(() => (auth.user?.username?.[0] ?? '?').toUpperCase())
 
+// v0.19.x (zurdi: "que se pueda poner foto de perfil"): tocar el avatar abre
+// el picker; subir refresca /auth/me (has_avatar) y rompe la cache del
+// <img> con ?v= (mismo criterio que exerciseImageUrl)
+const avatarInput = ref<HTMLInputElement | null>(null)
+const avatarBust = ref(Date.now())
+const avatarBusy = ref(false)
+
+function pickAvatar() {
+  avatarInput.value?.click()
+}
+
+async function onAvatarPicked(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  ;(event.target as HTMLInputElement).value = ''
+  if (!file) return
+  try {
+    avatarBusy.value = true
+    await uploadAvatar(file)
+    await auth.refreshMe()
+    avatarBust.value = Date.now()
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    avatarBusy.value = false
+  }
+}
+
+async function removeAvatar() {
+  try {
+    avatarBusy.value = true
+    await deleteAvatar()
+    await auth.refreshMe()
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    avatarBusy.value = false
+  }
+}
+
 function openSection(tab: ProfileTab) {
   activeTab.value = tab
 }
@@ -148,20 +187,53 @@ async function handleLogout() {
       <!-- cabecera de identidad: avatar con anillo del color de usuario
            (dato, no token — style inline como BkUser) + nombre grande -->
       <div class="flex flex-col items-center gap-2 pt-2" :style="{ '--bk-stagger-i': 0 }" data-testid="profile-identity">
-        <span
-          class="flex items-center justify-center w-18 h-18 rounded-full bg-slab border-2 font-display font-bold text-3xl text-ink"
-          :style="{ borderColor: auth.user?.color || 'var(--bk-accent-aurora)' }"
-          aria-hidden="true"
-        >{{ initial }}</span>
-        <h1 class="bk-title text-ink">{{ auth.user?.username }}</h1>
+        <!-- tocar el avatar cambia/pone la foto (input file oculto) -->
         <button
           type="button"
-          class="bk-press text-sm text-aurora underline decoration-dotted"
-          data-testid="profile-edit-link"
-          @click="openSection('settings')"
+          class="bk-press relative flex items-center justify-center w-18 h-18 rounded-full bg-slab border-2 font-display font-bold text-3xl text-ink overflow-hidden"
+          :style="{ borderColor: auth.user?.color || 'var(--bk-accent-aurora)' }"
+          :disabled="avatarBusy || undefined"
+          :aria-label="t('profile.changeAvatar')"
+          data-testid="profile-avatar-btn"
+          @click="pickAvatar"
         >
-          {{ t('profile.editProfile') }}
+          <img
+            v-if="auth.user?.has_avatar && auth.user"
+            :src="avatarUrl(auth.user.id, avatarBust)"
+            alt=""
+            class="absolute inset-0 w-full h-full object-cover"
+            data-testid="profile-avatar-img"
+          />
+          <template v-else>{{ initial }}</template>
         </button>
+        <input
+          ref="avatarInput"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          class="hidden"
+          data-testid="profile-avatar-input"
+          @change="onAvatarPicked"
+        />
+        <h1 class="bk-title text-ink">{{ auth.user?.username }}</h1>
+        <div class="flex items-center gap-4">
+          <button
+            type="button"
+            class="bk-press text-sm text-aurora underline decoration-dotted"
+            data-testid="profile-edit-link"
+            @click="openSection('settings')"
+          >
+            {{ t('profile.editProfile') }}
+          </button>
+          <button
+            v-if="auth.user?.has_avatar"
+            type="button"
+            class="bk-press text-sm text-ink-faint underline decoration-dotted"
+            data-testid="profile-avatar-remove"
+            @click="removeAvatar"
+          >
+            {{ t('profile.removeAvatar') }}
+          </button>
+        </div>
       </div>
 
       <!-- actividad reciente: 7 puntos de la semana -->

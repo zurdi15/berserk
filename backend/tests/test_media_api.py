@@ -107,3 +107,39 @@ def test_body_photos_are_private(client: TestClient, app):
 
     assert client.delete(f"/api/v1/body/photos/{photo['id']}").status_code == 204
     assert client.get("/api/v1/body/photos").json() == []
+
+
+# ---------- v0.19.x: foto de perfil ----------
+
+
+def test_avatar_roundtrip_visibility_and_delete(client: TestClient, app):
+    me = client.get("/api/v1/auth/me").json()
+    assert me["has_avatar"] is False
+
+    resp = client.post(
+        "/api/v1/users/me/avatar",
+        files={"file": ("cara.png", PNG, "image/png")},
+    )
+    assert resp.status_code == 204, resp.text
+    assert client.get("/api/v1/auth/me").json()["has_avatar"] is True
+
+    got = client.get(f"/api/v1/users/{me['id']}/avatar")
+    assert got.status_code == 200
+    assert got.content == PNG
+
+    # identidad de la instancia: otro usuario autenticado también lo ve
+    make_user(client, "freyja")
+    freyja = login(app, "freyja")
+    assert freyja.get(f"/api/v1/users/{me['id']}/avatar").status_code == 200
+
+    assert client.delete("/api/v1/users/me/avatar").status_code == 204
+    assert client.get("/api/v1/auth/me").json()["has_avatar"] is False
+    assert client.get(f"/api/v1/users/{me['id']}/avatar").status_code == 404
+
+
+def test_avatar_rejects_non_images(client: TestClient):
+    resp = client.post(
+        "/api/v1/users/me/avatar",
+        files={"file": ("malo.txt", b"hola", "text/plain")},
+    )
+    assert resp.status_code == 422

@@ -33,10 +33,20 @@ class User(Base):
     timezone: Mapped[str] = mapped_column(String(50), default="Europe/Madrid")
     # NULL = sin color propio; el frontend cae al aurora del tema como default
     color: Mapped[str | None] = mapped_column(String(7), default=None)
+    # v0.19.x (zurdi: "que se pueda poner foto de perfil"): nombre de fichero
+    # (uuid.ext) bajo BK_DATA_DIR/uploads/avatars — mismo esquema que
+    # Exercise.image_path (el nombre en disco jamás viene del cliente)
+    avatar_path: Mapped[str | None] = mapped_column(String(80), default=None)
     # v0.11.0 (zurdi: "objetivos de peso — cuánto te queda al añadir un
     # peso"): peso corporal objetivo, en kg canónicos; NULL = sin objetivo
     goal_weight_kg: Mapped[float | None] = mapped_column(Float, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    @property
+    def has_avatar(self) -> bool:
+        # bandera para UserOut (from_attributes lee properties): el cliente
+        # pide el fichero a /users/{id}/avatar solo si esto es True
+        return self.avatar_path is not None
 
     sessions: Mapped[list["AuthSession"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True

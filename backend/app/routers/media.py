@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from ..auth import CurrentUser
 from ..config import get_settings
 from ..db import get_db
-from ..models import BodyPhoto, Exercise, ExerciseNote
+from ..models import BodyPhoto, Exercise, ExerciseNote, User
 from ..schemas.media import BodyPhotoOut, ExerciseNoteIn, ExerciseNoteOut
 from .exercises import _can_edit, get_visible_exercise
 
@@ -98,6 +98,46 @@ def delete_exercise_image(exercise_id: int, user: CurrentUser, db: Session = Dep
     if exercise.image_path:
         _delete_quietly(_uploads_dir("exercises") / exercise.image_path)
         exercise.image_path = None
+        db.commit()
+
+
+# ---------- foto de perfil ----------
+
+
+@router.post("/users/me/avatar", response_model=None, status_code=204)
+async def upload_avatar(file: UploadFile, user: CurrentUser, db: Session = Depends(get_db)):
+    # v0.19.x (zurdi: "que se pueda poner foto de perfil") — mismo esquema
+    # que la imagen de ejercicio: uuid.ext en disco, columna con el nombre
+    data, ext = await _read_image(file)
+    filename = f"{uuid.uuid4().hex}{ext}"
+    (_uploads_dir("avatars") / filename).write_bytes(data)
+    db_user = db.get(User, user.id)
+    assert db_user is not None
+    if db_user.avatar_path:
+        _delete_quietly(_uploads_dir("avatars") / db_user.avatar_path)
+    db_user.avatar_path = filename
+    db.commit()
+
+
+@router.get("/users/{user_id}/avatar")
+def get_avatar(user_id: int, user: CurrentUser, db: Session = Depends(get_db)):
+    # visible para cualquier usuario autenticado de la instancia: el avatar
+    # es identidad (perfil hoy; feed/compartidos mañana), no dato de entreno
+    target = db.get(User, user_id)
+    if target is None or not target.avatar_path:
+        raise HTTPException(status_code=404, detail="not_found")
+    path = _uploads_dir("avatars") / target.avatar_path
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="not_found")
+    return FileResponse(path)
+
+
+@router.delete("/users/me/avatar", status_code=204)
+def delete_avatar(user: CurrentUser, db: Session = Depends(get_db)):
+    db_user = db.get(User, user.id)
+    if db_user is not None and db_user.avatar_path:
+        _delete_quietly(_uploads_dir("avatars") / db_user.avatar_path)
+        db_user.avatar_path = None
         db.commit()
 
 

@@ -439,3 +439,28 @@ def test_catalog_rows_carry_no_owner_username(client: TestClient):
     bench = next(e for e in client.get("/api/v1/exercises").json() if e["name_en"] == "Bench press")
     assert bench["owner_id"] is None
     assert bench["owner_username"] is None
+
+
+def test_create_exercise_without_english_name(client: TestClient):
+    # v0.19.x (zurdi): name_en es opcional — se guarda '' y el cliente cae
+    # al name_es cuando la app está en inglés
+    chest = group_id(client, "chest")
+    resp = client.post(
+        "/api/v1/exercises",
+        json={
+            "name_es": "Press inventado", "measurement": "strength",
+            "muscle_groups": [{"muscle_group_id": chest, "is_primary": True}],
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    created = resp.json()
+    assert created["name_en"] == ""
+
+    # el patch con '' explícito BORRA la traducción; None (omitir) no toca
+    eid = created["id"]
+    assert client.patch(
+        f"/api/v1/exercises/{eid}", json={"name_en": "Made-up press"}
+    ).status_code == 200
+    assert client.patch(f"/api/v1/exercises/{eid}", json={"name_en": ""}).status_code == 200
+    listed = next(e for e in client.get("/api/v1/exercises").json() if e["id"] == eid)
+    assert listed["name_en"] == ""

@@ -53,7 +53,11 @@ def _exactly_one_primary(links: list[ExerciseMuscleLink]) -> list[ExerciseMuscle
 
 class ExerciseIn(BaseModel):
     name_es: str = Field(min_length=1, max_length=80)
-    name_en: str = Field(min_length=1, max_length=80)
+    # v0.19.x (zurdi): el nombre EN es OPCIONAL — '' = sin traducción, y el
+    # cliente cae al name_es cuando la app está en inglés (ver
+    # frontend exerciseName). Columna no-nullable: se guarda '' tal cual,
+    # sin migración.
+    name_en: str = Field("", max_length=80)
     measurement: Literal["strength", "bodyweight", "timed", "cardio"]
     muscle_groups: list[ExerciseMuscleLink] = Field(min_length=1)
     # item 3: ejercicio global (owner_id null, visible a todo el mundo) —
@@ -73,7 +77,8 @@ class ExerciseIn(BaseModel):
 
 class ExercisePatchIn(BaseModel):
     name_es: str | None = Field(None, min_length=1, max_length=80)
-    name_en: str | None = Field(None, min_length=1, max_length=80)
+    # sin min_length: '' explícito BORRA la traducción EN (None = no tocar)
+    name_en: str | None = Field(None, max_length=80)
     muscle_groups: list[ExerciseMuscleLink] | None = Field(None, min_length=1)
     # anulable a nivel de tipo por consistencia, pero None = "no lo toques"
     # (ver update_exercise: solo se aplica si no es None), nunca "vuelve a
