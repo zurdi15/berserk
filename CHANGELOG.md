@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.23.0 - 2026-08-19
+
+### Añadido
+- Tiempo objetivo para cardio en rutinas: el editor cambia "Series objetivo" por "Tiempo objetivo" (stepper mm:ss), se muestra en el pre-inicio en vez de "x series", viaja al duplicar rutinas y al guardar un entreno como rutina, y alimenta el tiempo por defecto de "Empezar".
+- Progreso de cardio por tiempos: en Entrenos, los ejercicios de cardio/tiempo muestran una única métrica "Tiempo" (minutos totales por sesión) en lugar de peso/volumen/est. 1RM.
+- Tooltip en las gráficas: tocar cerca de un punto lo resalta y muestra la fecha y el valor exacto; el drag-zoom accidental desaparece.
+- El selector de rutinas del plan rotatorio indica de quién es cada rutina (chip de usuario o "Global").
+- Chip del grupo muscular bajo el nombre de cada ejercicio en el picker de Entrenos.
+
+### Cambiado
+- Entreno: el header muestra solo el cronómetro y el nombre de la rutina (la fecha se va); la card de cardio pierde el acento lateral y sus dos acciones ocupan la fila a partes iguales; las filas de series son un poco más compactas.
+- Rutinas: "Nueva rutina" vive arriba (como en la biblioteca) y el plan rotatorio adopta la estética del facelift, con espacio real tras "Te toca:".
+- Biblioteca y editor de rutina unifican sus footers: Cancelar a la izquierda y Guardar a la derecha, a fila completa; los botones de imagen quedan centrados bajo el marco.
+- Entrenos: las imágenes del picker pasan a 9:16, como el resto de la app.
+- Hoy: la etiqueta "~min · ejercicios" del hero es más legible sobre foto (píldora con scrim + blur y un punto más de tamaño).
+
+### Arreglado
+- Asumiendo otro usuario como admin, las imágenes de rutinas y las fotos de cuerpo del usuario asumido no cargaban (los <img> no llevan la cabecera de act-as; ahora un admin puede pedir cualquier media).
+
 ## 0.22.1 - 2026-08-19
 
 ### Changed
