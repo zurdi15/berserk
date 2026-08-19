@@ -516,6 +516,60 @@ describe('WorkoutExerciseCard', () => {
     })
   })
 
+  // v0.24.0: sugerencia de progresión — chip solo cuando la última sesión
+  // cumplió el objetivo entero; tocarla abre el cajón con el peso sugerido
+  describe('v0.24.0: progression suggestion chip', () => {
+    const freshExercise = { ...pushExercise, id: 21, sets: [] }
+    const metSet = { reps: 8, weight_kg: 60, duration_seconds: null, distance_m: null, is_warmup: false, load_mode: 'weight' }
+    const metHistory = { workout_id: 9, date: '2026-08-12', sets: [metSet, metSet, { ...metSet, reps: 9 }] }
+
+    it('renders the chip with the suggested weight and taps open the drawer prefilled with it', async () => {
+      const actions = makeActions({ exerciseHistory: vi.fn(async () => metHistory) })
+      const wrapper = mountCard({
+        workoutExercise: freshExercise as never,
+        actions,
+        live: true,
+        routineId: 1,
+        routines: routines as never,
+      })
+      await flushPromises()
+
+      const chip = wrapper.get('[data-testid="progression-hint-21"]')
+      expect(chip.text()).toContain('62.5')
+
+      await chip.trigger('click')
+      await flushPromises()
+      // el cajón abre con el peso sugerido ya puesto (valor del stepper)
+      const stepperValues = [...document.body.querySelectorAll('[data-testid="stepper-edit"]')].map((el) => el.textContent)
+      expect(stepperValues.some((v) => v?.includes('62.5'))).toBe(true)
+    })
+
+    it('stays hidden when the last session missed the target, and once an effective set exists today', async () => {
+      const missedHistory = { ...metHistory, sets: [metSet, metSet, { ...metSet, reps: 6 }] }
+      const actions = makeActions({ exerciseHistory: vi.fn(async () => missedHistory) })
+      const missed = mountCard({
+        workoutExercise: freshExercise as never,
+        actions,
+        live: true,
+        routineId: 1,
+        routines: routines as never,
+      })
+      await flushPromises()
+      expect(missed.find('[data-testid="progression-hint-21"]').exists()).toBe(false)
+
+      // con una serie efectiva de HOY el chip tampoco pinta (ya empezó)
+      const started = mountCard({
+        workoutExercise: pushExercise as never,
+        actions: makeActions({ exerciseHistory: vi.fn(async () => metHistory) }),
+        live: true,
+        routineId: 1,
+        routines: routines as never,
+      })
+      await flushPromises()
+      expect(started.find('[data-testid="progression-hint-20"]').exists()).toBe(false)
+    })
+  })
+
   describe('item 6: cardio block', () => {
     function mountCardio(overrides: Partial<Record<string, unknown>> = {}) {
       return mountCard({

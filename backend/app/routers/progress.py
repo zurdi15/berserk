@@ -11,6 +11,7 @@ from ..permissions import TargetUser
 from ..schemas.progress import (
     DistributionItem,
     ExerciseHistoryOut,
+    ExerciseSessionOut,
     HeatmapDay,
     SeriesOut,
     StatsOut,
@@ -21,6 +22,7 @@ from ..schemas.workouts import PersonalRecordOut
 from ..services.progress import (
     annual_heatmap,
     exercise_series,
+    exercise_sessions,
     latest_exercise_session,
     recent_cardio_entries,
     lifetime_stats,
@@ -61,6 +63,19 @@ def exercise_history(
         else []
     )
     return ExerciseHistoryOut(**result, recent_cardio=recent)
+
+
+@router.get("/exercise-sessions/{exercise_id}", response_model=list[ExerciseSessionOut])
+def sessions(
+    exercise_id: int,
+    target: TargetUser,
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=200),
+):
+    # v0.24.0: historial completo por sesión para la vista detalle
+    if get_visible_exercise(db, target.id, exercise_id) is None:
+        raise HTTPException(status_code=404, detail="not_found")
+    return exercise_sessions(db, target.id, exercise_id, limit)
 
 
 @router.get("/records", response_model=list[PersonalRecordOut])

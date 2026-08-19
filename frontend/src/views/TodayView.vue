@@ -14,6 +14,7 @@ import StreakCard from '@/components/today/StreakCard.vue'
 import TodayHero from '@/components/today/TodayHero.vue'
 import WeekSummaryCard from '@/components/today/WeekSummaryCard.vue'
 import DistributionBars from '@/components/today/DistributionBars.vue'
+import BkBodyMap from '@/lib/BkBodyMap.vue'
 import RecentPrs from '@/components/today/RecentPrs.vue'
 import SocialFeedCard from '@/components/today/SocialFeedCard.vue'
 
@@ -191,7 +192,10 @@ watch(
          key progress.distribution ya existente — se reusa, no se duplica -->
     <div :style="{ '--bk-stagger-i': 4 }">
       <BkCard :title="t('progress.distribution')">
-        <DistributionBars :items="distribution" :groups="muscleGroups" />
+        <!-- v0.24.0: mapa muscular — la lectura de un vistazo encima de
+             las barras (que siguen siendo el listado completo) -->
+        <BkBodyMap :items="distribution" :groups="muscleGroups" />
+        <DistributionBars :items="distribution" :groups="muscleGroups" class="mt-3" />
       </BkCard>
     </div>
     <div :style="{ '--bk-stagger-i': 5 }">

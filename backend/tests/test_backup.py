@@ -56,6 +56,22 @@ def _log_a_set(client) -> dict:
     return workout
 
 
+PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+    "0000000d49444154789c626001000000ffff03000006000557bfabd40000000049454e44ae426082"
+)
+
+
+def _upload_exercise_image(client) -> int:
+    exercise_id = client.get("/api/v1/exercises").json()[0]["id"]
+    resp = client.post(
+        f"/api/v1/exercises/{exercise_id}/image",
+        files={"file": ("foto.png", PNG, "image/png")},
+    )
+    assert resp.status_code == 204, resp.text
+    return exercise_id
+
+
 def _zip(entries: dict[str, bytes]) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
@@ -83,7 +99,7 @@ def test_export_contains_db_and_manifest(backup_client, tmp_path):
         assert "manifest.json" in names
         manifest = json.loads(zf.read("manifest.json"))
         assert manifest["app"] == "berserk"
-        assert manifest["format"] == 1
+        assert manifest["format"] == 2
         assert manifest["alembic_revision"] is not None
 
         db_path = tmp_path / "exported.db"
@@ -259,3 +275,73 @@ def test_non_admin_cannot_export_or_restore(backup_client):
         files={"file": ("backup.zip", io.BytesIO(b"whatever"), "application/zip")},
     )
     assert resp.status_code == 403
+
+
+# ---------- v0.24.0: los assets viajan con la copia (formato 2) ----------
+
+
+def test_export_includes_uploads(backup_client):
+    client, data_dir = backup_client
+    _upload_exercise_image(client)
+
+    resp = client.get("/api/v1/backup/export")
+    assert resp.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+        uploads = [n for n in zf.namelist() if n.startswith("uploads/")]
+        assert len(uploads) == 1
+        assert uploads[0].startswith("uploads/exercises/")
+        assert zf.read(uploads[0]) == PNG
+
+
+def test_restore_roundtrip_brings_assets_back(backup_client):
+    client, data_dir = backup_client
+    exercise_id = _upload_exercise_image(client)
+    exported = client.get("/api/v1/backup/export").content
+
+    # borrar la imagen (DB y fichero) — el restore debe devolver AMBOS
+    assert client.delete(f"/api/v1/exercises/{exercise_id}/image").status_code == 204
+    assert client.get(f"/api/v1/exercises/{exercise_id}/image").status_code == 404
+    assert list((data_dir / "uploads" / "exercises").glob("*")) == []
+
+    resp = client.post(
+        "/api/v1/backup/restore", files={"file": ("backup.zip", exported, "application/zip")}
+    )
+    assert resp.status_code == 200, resp.text
+    got = client.get(f"/api/v1/exercises/{exercise_id}/image")
+    assert got.status_code == 200
+    assert got.content == PNG
+
+
+def test_format1_restore_leaves_current_uploads_intact(backup_client):
+    """Una copia vieja (solo DB) no debe BORRAR los assets de la instancia."""
+    client, data_dir = backup_client
+    exercise_id = _upload_exercise_image(client)
+    image_file = next((data_dir / "uploads" / "exercises").glob("*"))
+
+    exported = client.get("/api/v1/backup/export").content
+    with zipfile.ZipFile(io.BytesIO(exported)) as zf:
+        db_bytes = zf.read("berserk.db")
+    old_zip = _zip({"berserk.db": db_bytes, "manifest.json": _valid_manifest()})
+
+    resp = client.post(
+        "/api/v1/backup/restore", files={"file": ("old.zip", old_zip, "application/zip")}
+    )
+    assert resp.status_code == 200, resp.text
+    assert image_file.exists()
+    assert client.get(f"/api/v1/exercises/{exercise_id}/image").status_code == 200
+
+
+def test_zip_with_traversal_upload_entry_rejected(backup_client):
+    client, _data_dir = backup_client
+    exported = client.get("/api/v1/backup/export").content
+    with zipfile.ZipFile(io.BytesIO(exported)) as zf:
+        db_bytes = zf.read("berserk.db")
+        manifest = zf.read("manifest.json")
+
+    for evil in ["uploads/../evil.png", "otracosa/evil.png", "/uploads/abs.png"]:
+        bad = _zip({"berserk.db": db_bytes, "manifest.json": manifest, evil: PNG})
+        resp = client.post(
+            "/api/v1/backup/restore", files={"file": ("bad.zip", bad, "application/zip")}
+        )
+        assert resp.status_code == 400, evil
+        assert resp.json()["detail"] == "backup_invalid"

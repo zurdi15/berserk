@@ -99,7 +99,7 @@ vi.mock('@/api/domain', () => ({
   deleteBody: vi.fn(async () => undefined),
 }))
 
-import { seriesFor } from '@/components/progress/series'
+import { filterRange, metricOptionsFor, seriesFor } from '@/components/progress/series'
 import BodySection from '@/components/progress/BodySection.vue'
 import ExercisePicker from '@/components/progress/ExercisePicker.vue'
 import PrList from '@/components/progress/PrList.vue'
@@ -142,6 +142,45 @@ describe('seriesFor', () => {
   // v0.23.0: la métrica de cardio — segundos por sesión → minutos con 1
   // decimal, sin pasar por unidades de peso (units es irrelevante aquí);
   // las sesiones a cero se caen, igual que en el resto de métricas
+  // v0.24.0: Distancia en km (2 decimales) y Ritmo en min/km (1 decimal)
+  it('distance maps distance_m to km and pace derives min/km, both dropping incomplete days', () => {
+    const points = [
+      { date: '2026-07-01', duration_seconds: 900, distance_m: 3000 },
+      { date: '2026-07-08', duration_seconds: 600 },
+    ]
+    expect(seriesFor(points as never, 'distance', 'kg')).toEqual([
+      { date: '2026-07-01', value: 3 },
+    ])
+    // ritmo: 15 min / 3 km = 5 min/km; el día sin distancia se cae
+    expect(seriesFor(points as never, 'pace', 'kg')).toEqual([
+      { date: '2026-07-01', value: 5 },
+    ])
+  })
+
+  it('metricOptionsFor: duration-based gains distance/pace only when the data has them; strength gains level only with level series', () => {
+    const durOnly = [{ date: 'a', duration_seconds: 600 }]
+    const durDist = [{ date: 'a', duration_seconds: 600, distance_m: 2000 }]
+    expect(metricOptionsFor(durOnly as never, true)).toEqual(['duration'])
+    expect(metricOptionsFor(durDist as never, true)).toEqual(['duration', 'distance', 'pace'])
+    const strength = [{ date: 'a', top_weight: 80, volume: 400, est_1rm: 90, top_level: 0 }]
+    const withLevel = [{ date: 'a', top_weight: 0, volume: 0, est_1rm: 0, top_level: 10 }]
+    expect(metricOptionsFor(strength as never, false)).toEqual(['top_weight', 'volume', 'est_1rm'])
+    expect(metricOptionsFor(withLevel as never, false)).toEqual(['top_weight', 'volume', 'est_1rm', 'top_level'])
+  })
+
+  // v0.24.0 (zurdi: rango temporal): el filtro corta por fecha, 'all' no toca
+  it('filterRange keeps only points within the window, and all passes everything through', () => {
+    const points = [
+      { date: '2026-01-05', value: 1 },
+      { date: '2026-06-01', value: 2 },
+      { date: '2026-08-10', value: 3 },
+    ]
+    const today = new Date('2026-08-19T12:00:00Z')
+    expect(filterRange(points, 'all', today)).toEqual(points)
+    expect(filterRange(points, '3m', today).map((p) => p.value)).toEqual([2, 3])
+    expect(filterRange(points, '1y', today).map((p) => p.value)).toEqual([1, 2, 3])
+  })
+
   it('duration maps duration_seconds to minutes with 1 decimal, ignoring units and dropping zero days', () => {
     const points = [
       { date: '2026-07-01', duration_seconds: 900 },

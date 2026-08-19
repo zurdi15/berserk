@@ -42,11 +42,9 @@ const createIsAdmin = ref(false)
 const createError = ref('')
 const isCreatingUser = ref(false)
 const createUserOpen = ref(false)
-const resetPasswordOpen = ref(false)
-const resetUserId = ref<number | null>(null)
-const resetNewPassword = ref('')
-const resetError = ref('')
-const isResettingPassword = ref(false)
+// v0.24.0 (zurdi: "el botón de cambiar contraseña debería estar en el mismo
+// formulario de editar"): el sheet/icono de reset aparte murió — el editor
+// gana un campo de contraseña OPCIONAL (vacío = no tocarla)
 
 // item (v0.4.0): validación de cliente ANTES de someter, en los DOS
 // formularios que piden una contraseña aquí — mismo arreglo que
@@ -56,9 +54,10 @@ const createPasswordError = computed(() => {
   const key = passwordErrorKey(createPassword.value)
   return key ? t(key) : ''
 })
-const resetPasswordFieldError = computed(() => {
-  const key = passwordErrorKey(resetNewPassword.value)
-  return key ? t(key) : resetError.value
+const editPasswordFieldError = computed(() => {
+  if (!editNewPassword.value) return ''
+  const key = passwordErrorKey(editNewPassword.value)
+  return key ? t(key) : ''
 })
 
 // Edit user sheet (item, v0.4.0): username/color/is_admin en un único sheet
@@ -68,6 +67,7 @@ const resetPasswordFieldError = computed(() => {
 const editUserOpen = ref(false)
 const editUserId = ref<number | null>(null)
 const editUsername = ref('')
+const editNewPassword = ref('')
 const editColor = ref<string | null>(null)
 const editIsAdmin = ref(false)
 const editError = ref('')
@@ -158,39 +158,12 @@ async function handleCreateUser() {
   }
 }
 
-function handleResetPassword(userId: number) {
-  resetUserId.value = userId
-  resetNewPassword.value = ''
-  resetError.value = ''
-  resetPasswordOpen.value = true
-}
-
-async function confirmResetPassword() {
-  if (resetUserId.value === null) return
-  if (!isPasswordValid(resetNewPassword.value)) return
-
-  resetError.value = ''
-  isResettingPassword.value = true
-
-  try {
-    await adminUpdateUser(resetUserId.value, {
-      password: resetNewPassword.value,
-    })
-    resetPasswordOpen.value = false
-    await loadUsers()
-    toast.push('info', t('common.saved'))
-  } catch (error) {
-    toastApiError(error)
-  } finally {
-    isResettingPassword.value = false
-  }
-}
-
 function openEditUser(user: UserOut) {
   editUserId.value = user.id
   editUsername.value = user.username
   editColor.value = user.color ?? null
   editIsAdmin.value = user.is_admin
+  editNewPassword.value = ''
   editError.value = ''
   editUserOpen.value = true
 }
@@ -201,6 +174,12 @@ async function confirmEditUser() {
   editError.value = ''
   isSavingEdit.value = true
 
+  // contraseña opcional: si se escribió algo, tiene que ser válida
+  if (editNewPassword.value && !isPasswordValid(editNewPassword.value)) {
+    isSavingEdit.value = false
+    return
+  }
+
   try {
     await adminUpdateUser(editUserId.value, {
       username: editUsername.value,
@@ -210,6 +189,8 @@ async function confirmEditUser() {
       // inicial (true) cuando es la fila propia, así que reenviarlo tal
       // cual es siempre un no-op seguro, nunca un intento de demote
       is_admin: editIsAdmin.value,
+      // v0.24.0: vacía = no tocarla (el campo vive ahora en este sheet)
+      ...(editNewPassword.value ? { password: editNewPassword.value } : {}),
     })
     editUserOpen.value = false
     await loadUsers()
@@ -436,18 +417,6 @@ function redeemUrl(token: string): string {
                       data-testid="act-as-user-btn"
                       @click="actAsUser(user)"
                     />
-                    <!-- resetear contraseña se queda como su propio icono/
-                         sheet, no dentro del de editar: es una acción de
-                         seguridad deliberada (echa al usuario de todos sus
-                         dispositivos) — mezclarla con "corregir el nombre"
-                         invitaría a tocarla sin querer al editar otra cosa -->
-                    <BkActionBtn
-                      v-if="!isOwnUser(user.id)"
-                      icon="key"
-                      :aria-label="$t('admin.resetPassword')"
-                      data-testid="reset-password-btn"
-                      @click="handleResetPassword(user.id)"
-                    />
                     <BkActionBtn
                       v-if="!isOwnUser(user.id)"
                       icon="delete"
@@ -657,42 +626,8 @@ function redeemUrl(token: string): string {
       </div>
     </BkSheet>
 
-    <!-- Password reset sheet -->
-    <BkSheet
-      :open="resetPasswordOpen"
-      :title="$t('admin.resetPassword')"
-      @close="resetPasswordOpen = false"
-    >
-      <div class="space-y-4 p-4">
-        <BkField
-          v-model="resetNewPassword"
-          type="password"
-          :label="$t('admin.newPassword')"
-          :error="resetPasswordFieldError"
-          data-testid="reset-password-field"
-        />
-        <div class="flex gap-2">
-          <BkButton
-            variant="ghost"
-            @click="resetPasswordOpen = false"
-          >
-            {{ $t('common.cancel') }}
-          </BkButton>
-          <BkButton
-            :loading="isResettingPassword"
-            :disabled="!isPasswordValid(resetNewPassword)"
-            data-testid="confirm-reset-password-btn"
-            @click="confirmResetPassword"
-          >
-            {{ $t('common.save') }}
-          </BkButton>
-        </div>
-      </div>
-    </BkSheet>
-
-    <!-- Edit user sheet (item, v0.4.0): username/color/is_admin — el
-         reseteo de contraseña se queda fuera a propósito (ver el
-         why-comment junto al icono "key" arriba, en la fila de la tabla) -->
+    <!-- Edit user sheet (item, v0.4.0 → v0.24.0): username/color/is_admin
+         + contraseña opcional (zurdi pidió unificar el reset aquí) -->
     <BkSheet
       :open="editUserOpen"
       :title="$t('admin.editUser')"
@@ -706,6 +641,17 @@ function redeemUrl(token: string): string {
           data-testid="edit-username-field"
         />
         <ColorSwatchPicker v-model="editColor" :label="$t('profile.color')" />
+        <!-- v0.24.0 (zurdi): la contraseña se cambia AQUÍ, no en un sheet
+             aparte — vacía = no tocarla. Solo filas ajenas: la propia se
+             cambia desde Ajustes, como siempre -->
+        <BkField
+          v-if="editUserId !== null && !isOwnUser(editUserId)"
+          v-model="editNewPassword"
+          type="password"
+          :label="$t('admin.newPasswordOptional')"
+          :error="editPasswordFieldError"
+          data-testid="edit-password-field"
+        />
         <!-- item: el checkbox de admin se OCULTA (no solo se deshabilita)
              en la propia fila — mismo criterio visual que resetear/borrar,
              que ya desaparecen del todo para uno mismo en vez de quedar
@@ -732,6 +678,7 @@ function redeemUrl(token: string): string {
           </BkButton>
           <BkButton
             :loading="isSavingEdit"
+            :disabled="!!editNewPassword && !isPasswordValid(editNewPassword)"
             data-testid="save-edit-user-btn"
             @click="confirmEditUser"
           >

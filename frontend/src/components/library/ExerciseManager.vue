@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 
 import type { ExerciseOut, Measurement, MuscleGroupOut } from '@/api/domain'
 import { createExercise, deleteExercise, listExercises, listMuscleGroups, updateExercise } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
-import { deleteExerciseImage, exerciseImageUrl, uploadExerciseImage } from '@/api/domain'
+import { deleteExerciseImage, exerciseImageUrl, importExerciseImage, searchExerciseImages, uploadExerciseImage } from '@/api/domain'
+import type { ImageSearchResult } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { imageFramingStyle } from '@/utils/imageFraming'
 import { getViewCache, setViewCache } from '@/utils/viewCache'
+import { navigateWithSharedMedia } from '@/utils/viewTransition'
 import { foldSearchText } from '@/utils/searchFold'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
@@ -197,6 +200,20 @@ function openCreate() {
   formOpen.value = true
 }
 
+// v0.24.0: tocar la fila abre la vista detalle — el thumb (BkMedia) hace
+// morph hacia la foto grande del detalle vía view transition (si el
+// navegador la soporta; si no, navegación normal)
+const router = useRouter()
+function openDetail(exercise: ExerciseOut, event: MouseEvent) {
+  const thumb =
+    (event.currentTarget as HTMLElement | null)?.querySelector<HTMLElement>(
+      '[data-testid^="exercise-thumb-"]',
+    ) ?? null
+  navigateWithSharedMedia(thumb, () =>
+    router.push({ name: 'exercise-detail', params: { exerciseId: exercise.id } }),
+  )
+}
+
 function openEdit(exercise: ExerciseOut) {
   editingId.value = exercise.id
   editingOwnerId.value = exercise.owner_id
@@ -316,6 +333,59 @@ async function onImageChosen(event: Event) {
   } finally {
     imageUploading.value = false
     input.value = ''
+  }
+}
+
+// v0.24.0 (zurdi: "búsqueda con una API a una base de datos conocida de
+// ejercicios para poner la imagen directamente"): sheet de búsqueda contra
+// free-exercise-db (proxied por el backend) — elegir una la DESCARGA al
+// servidor como imagen del ejercicio y resetea el encuadre
+const imageSearchOpen = ref(false)
+const imageSearchQuery = ref('')
+const imageSearchResults = ref<ImageSearchResult[]>([])
+const imageSearchLoading = ref(false)
+const imageSearchDone = ref(false)
+const imageImporting = ref<string | null>(null)
+
+function openImageSearch() {
+  // la base de datos está en inglés: el nombre EN es el mejor prefill
+  imageSearchQuery.value = nameEn.value.trim() || nameEs.value.trim()
+  imageSearchResults.value = []
+  imageSearchDone.value = false
+  imageSearchOpen.value = true
+  if (imageSearchQuery.value.length >= 2) void runImageSearch()
+}
+
+async function runImageSearch() {
+  if (imageSearchQuery.value.trim().length < 2) return
+  try {
+    imageSearchLoading.value = true
+    imageSearchResults.value = await searchExerciseImages(imageSearchQuery.value.trim())
+    imageSearchDone.value = true
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    imageSearchLoading.value = false
+  }
+}
+
+async function pickSearchImage(url: string) {
+  if (editingId.value === null) return
+  try {
+    imageImporting.value = url
+    await importExerciseImage(editingId.value, url)
+    editingHasImage.value = true
+    // el backend resetea el encuadre al importar — el editor lo refleja
+    framePosX.value = 50
+    framePosY.value = 50
+    frameZoom.value = 1
+    imageBust.value = Date.now()
+    imageSearchOpen.value = false
+    await loadAll()
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    imageImporting.value = null
   }
 }
 
@@ -461,6 +531,15 @@ async function confirmDelete() {
             <!-- v0.12.0 → facelift v4 (zurdi: "que la imagen se vea más y
                  con aspect ratio vertical"): thumb 9:16 con pozo rúnico de
                  fallback, en TODAS las filas -->
+            <!-- v0.24.0: tocar el cuerpo de la fila abre la VISTA DETALLE del
+                 ejercicio, con morph del thumb (view transition) — las
+                 acciones de editar/borrar quedan fuera del botón -->
+            <button
+              type="button"
+              class="bk-press flex items-start gap-2 flex-1 min-w-0 text-left"
+              :data-testid="`exercise-detail-link-${exercise.id}`"
+              @click="openDetail(exercise, $event)"
+            >
             <BkMedia
               :exercise="exercise"
               :cache-bust="imageBust"
@@ -529,6 +608,7 @@ async function confirmDelete() {
                 </span>
               </div>
             </div>
+            </button>
             <!-- item 1: icon-only, como en RoutineList/AdminCard. item 5: un
                  admin puede editar/borrar filas predefinidas (owner_id
                  null), mismo sheet/flow que los ejercicios propios. W2
@@ -678,6 +758,15 @@ async function confirmDelete() {
                izquierda quedaban descolgados del encuadre -->
           <div class="flex justify-center gap-2">
             <BkButton
+              v-if="editingId !== null"
+              variant="ghost"
+              size="sm"
+              data-testid="exercise-image-search"
+              @click="openImageSearch"
+            >
+              {{ $t('library.imageSearch') }}
+            </BkButton>
+            <BkButton
               variant="ghost"
               size="sm"
               :loading="imageUploading"
@@ -721,6 +810,55 @@ async function confirmDelete() {
             {{ $t('common.save') }}
           </BkButton>
         </div>
+      </div>
+    </BkSheet>
+
+    <!-- v0.24.0: buscador de imágenes (free-exercise-db vía backend) -->
+    <BkSheet
+      :open="imageSearchOpen"
+      :title="$t('library.imageSearch')"
+      @close="imageSearchOpen = false"
+    >
+      <div class="space-y-3 p-4" data-testid="image-search-sheet">
+        <form class="flex items-end gap-2" @submit.prevent="runImageSearch">
+          <BkField
+            v-model="imageSearchQuery"
+            :label="$t('library.imageSearchQuery')"
+            class="flex-1 min-w-0"
+            data-testid="image-search-field"
+          />
+          <BkButton type="submit" size="sm" :loading="imageSearchLoading" data-testid="image-search-run">
+            {{ $t('library.imageSearchRun') }}
+          </BkButton>
+        </form>
+        <p class="text-xs text-ink-faint">{{ $t('library.imageSearchHint') }}</p>
+        <div v-if="imageSearchResults.length" class="space-y-3 max-h-96 overflow-y-auto">
+          <div
+            v-for="result in imageSearchResults"
+            :key="result.name"
+            :data-testid="`image-search-result-${result.name}`"
+          >
+            <p class="text-xs text-ink-muted mb-1">{{ result.name }}</p>
+            <div class="flex gap-2 overflow-x-auto">
+              <button
+                v-for="url in result.image_urls"
+                :key="url"
+                type="button"
+                class="bk-press shrink-0 rounded-md overflow-hidden border border-line"
+                :data-testid="`image-search-pick`"
+                :disabled="imageImporting !== null"
+                :class="imageImporting === url && 'opacity-50'"
+                @click="pickSearchImage(url)"
+              >
+                <img :src="url" alt="" class="h-28 w-auto object-cover" loading="lazy" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <BkEmpty
+          v-else-if="imageSearchDone && !imageSearchLoading"
+          :message="$t('common.noResults')"
+        />
       </div>
     </BkSheet>
 

@@ -16,6 +16,20 @@ vi.mock('@/api/domain', () => ({
   createMuscleGroup: vi.fn(),
   updateMuscleGroup: vi.fn(),
   deleteMuscleGroup: vi.fn(),
+  // v0.24.0: búsqueda/importación de imágenes + helpers de imagen que el
+  // editor toca al abrir (el mock parcial explotaría si faltaran)
+  searchExerciseImages: vi.fn(async () => []),
+  importExerciseImage: vi.fn(async () => {}),
+  uploadExerciseImage: vi.fn(async () => {}),
+  deleteExerciseImage: vi.fn(async () => {}),
+  exerciseImageUrl: vi.fn((id: number) => `/api/v1/exercises/${id}/image`),
+  updateExerciseFraming: vi.fn(async () => {}),
+}))
+
+// v0.24.0: la fila navega a la vista detalle (openDetail usa useRouter)
+const detailPush = vi.fn()
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: detailPush }),
 }))
 
 function setUser(overrides: Partial<{ id: number; is_admin: boolean }> = {}) {
@@ -325,6 +339,54 @@ describe('ExerciseManager', () => {
     const deleteBtn = wrapper.get('[data-testid="delete-exercise-12"]')
     expect(deleteBtn.attributes('aria-label')).toBe('Borrar')
     expect(deleteBtn.classes()).toContain('text-danger')
+  })
+
+  // v0.24.0: sheet de búsqueda de imágenes (free-exercise-db vía backend)
+  it('v0.24.0: the image-search sheet searches and picking a result imports it into the exercise', async () => {
+    const { listExercises, listMuscleGroups, searchExerciseImages, importExerciseImage } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    vi.mocked(searchExerciseImages).mockResolvedValue([
+      { name: 'Arnold Press', image_urls: ['https://raw.githubusercontent.com/x/Arnold_Press/0.jpg'] },
+    ] as never)
+
+    const wrapper = mount(ExerciseManager, {
+      global: { plugins: [createI18nInstance()] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-exercise-12"]').trigger('click')
+    await flushPromises()
+    const searchBtn = new DOMWrapper(document.body.querySelector('[data-testid="exercise-image-search"]'))
+    await searchBtn.trigger('click')
+    await flushPromises()
+
+    // prefill con el nombre EN y búsqueda lanzada sola al abrir
+    expect(searchExerciseImages).toHaveBeenCalledWith('Arnold press')
+    const pick = new DOMWrapper(document.body.querySelector('[data-testid="image-search-pick"]'))
+    await pick.trigger('click')
+    await flushPromises()
+    expect(importExerciseImage).toHaveBeenCalledWith(12, 'https://raw.githubusercontent.com/x/Arnold_Press/0.jpg')
+    wrapper.unmount()
+  })
+
+  // v0.24.0: tocar el cuerpo de la fila navega a la vista detalle
+  it('v0.24.0: tapping the row body pushes the exercise-detail route', async () => {
+    const { listExercises, listMuscleGroups } = await import('@/api/domain')
+    vi.mocked(listExercises).mockResolvedValue([
+      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+    ] as never)
+    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
+    detailPush.mockClear()
+
+    const wrapper = buildExerciseManager()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="exercise-detail-link-12"]').trigger('click')
+    expect(detailPush).toHaveBeenCalledWith({ name: 'exercise-detail', params: { exerciseId: 12 } })
   })
 
   it('UNIFIED-LISTINGS: predefined (owner_id null) rows render inline, no collapsible catalog section left', async () => {

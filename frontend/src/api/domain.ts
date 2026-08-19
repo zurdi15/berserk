@@ -281,6 +281,8 @@ export interface SeriesPoint {
   // segundos — el progreso de cardio es por tiempos. Opcional en el tipo
   // (fixtures viejos siguen tipando), resolución vía `?? 0`.
   duration_seconds?: number
+  // v0.24.0: distancia TOTAL efectiva (m) — métrica Distancia y Ritmo
+  distance_m?: number
 }
 
 export interface HeatmapDay {
@@ -598,6 +600,29 @@ export const getStreak = (userId?: number) =>
 
 export const getDistribution = (weeks?: number, userId?: number) =>
   api<DistributionItem[]>(`/progress/muscle-distribution${qs({ weeks, userId })}`)
+
+// v0.24.0 (vista detalle por ejercicio): sesiones terminadas con sus series
+export interface ExerciseSessionOut {
+  workout_id: number
+  date: string
+  sets: ExerciseHistorySetOut[]
+}
+
+export const getExerciseSessions = (exerciseId: number, userId?: number) =>
+  api<ExerciseSessionOut[]>(`/progress/exercise-sessions/${exerciseId}${qs({ userId })}`)
+
+// v0.24.0: búsqueda de imágenes (free-exercise-db, proxied por el backend) —
+// el import DESCARGA la elegida al servidor y resetea el encuadre
+export interface ImageSearchResult {
+  name: string
+  image_urls: string[]
+}
+
+export const searchExerciseImages = (q: string) =>
+  api<ImageSearchResult[]>(`/exercise-image-search?q=${encodeURIComponent(q)}`)
+
+export const importExerciseImage = (exerciseId: number, url: string) =>
+  api<void>(`/exercises/${exerciseId}/image/from-url`, { method: 'POST', body: { url } })
 
 export const getTrainedExercises = (userId?: number) =>
   api<{ exercise_ids: number[] }>(`/progress/trained-exercises${qs({ userId })}`)

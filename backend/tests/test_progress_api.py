@@ -256,3 +256,58 @@ def test_cardio_series_reports_total_duration_per_session(client: TestClient):
     assert len(series) == 1
     assert series[0]["duration_seconds"] == 900
     assert series[0]["top_weight"] == 0.0
+
+
+def test_cardio_series_reports_total_distance_per_session(client: TestClient):
+    """v0.24.0 — distancia TOTAL efectiva por sesión (métrica Distancia y,
+    con duración, el Ritmo derivado en cliente)."""
+    exercises = client.get("/api/v1/exercises").json()
+    cardio = next(e for e in exercises if e["measurement"] == "cardio")
+    workout = client.post("/api/v1/workouts", json={"date": "2026-08-11", "finished": True}).json()
+    wex = client.post(
+        f"/api/v1/workouts/{workout['id']}/exercises", json={"exercise_id": cardio["id"]}
+    ).json()
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+    assert client.post(url, json={"duration_seconds": 600, "distance_m": 2000}).status_code == 201
+    assert client.post(url, json={"duration_seconds": 300, "distance_m": 1500}).status_code == 201
+
+    series = client.get(f"/api/v1/progress/exercises/{cardio['id']}").json()["series"]
+    point = next(p for p in series if p["date"] == "2026-08-11")
+    assert point["distance_m"] == 3500.0
+    assert point["duration_seconds"] == 900
+
+
+def test_exercise_sessions_lists_finished_sessions_with_sets(client: TestClient):
+    """v0.24.0 — la vista detalle: sesiones terminadas (recientes primero)
+    con TODAS sus series; un entreno sin terminar no aparece."""
+    exercises = client.get("/api/v1/exercises").json()
+    bench = next(e for e in exercises if e["name_en"] == "Bench press")
+
+    for day, weight in [("2026-08-01", 60), ("2026-08-03", 62.5)]:
+        workout = client.post("/api/v1/workouts", json={"date": day, "finished": True}).json()
+        wex = client.post(
+            f"/api/v1/workouts/{workout['id']}/exercises", json={"exercise_id": bench["id"]}
+        ).json()
+        url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+        assert client.post(url, json={"reps": 8, "weight_kg": weight}).status_code == 201
+        assert client.post(url, json={"reps": 6, "weight_kg": weight}).status_code == 201
+
+    # entreno VIVO (sin terminar): no cuenta como historia
+    live = client.post("/api/v1/workouts", json={"date": "2026-08-05"}).json()
+    live_wex = client.post(
+        f"/api/v1/workouts/{live['id']}/exercises", json={"exercise_id": bench["id"]}
+    ).json()
+    client.post(
+        f"/api/v1/workouts/{live['id']}/exercises/{live_wex['id']}/sets",
+        json={"reps": 5, "weight_kg": 70},
+    )
+
+    sessions = client.get(f"/api/v1/progress/exercise-sessions/{bench['id']}").json()
+    assert [s["date"] for s in sessions] == ["2026-08-03", "2026-08-01"]
+    assert [len(s["sets"]) for s in sessions] == [2, 2]
+    assert sessions[0]["sets"][0]["weight_kg"] == 62.5
+    assert sessions[0]["sets"][0]["load_mode"] == "weight"
+
+    # limit respeta el tope
+    limited = client.get(f"/api/v1/progress/exercise-sessions/{bench['id']}?limit=1").json()
+    assert [s["date"] for s in limited] == ["2026-08-03"]

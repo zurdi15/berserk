@@ -53,6 +53,7 @@ def exercise_series(db: Session, owner_id: int, exercise_id: int) -> list[dict]:
             WorkoutSet.weight_kg,
             WorkoutSet.load_mode,
             WorkoutSet.duration_seconds,
+            WorkoutSet.distance_m,
         )
         .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
         .join(WorkoutSet, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
@@ -64,16 +65,21 @@ def exercise_series(db: Session, owner_id: int, exercise_id: int) -> list[dict]:
         .order_by(Workout.date, Workout.id)
     ).all()
     by_workout: dict[int, dict] = {}
-    for workout_id, workout_date, reps, weight, load_mode, duration in rows:
+    for workout_id, workout_date, reps, weight, load_mode, duration, distance in rows:
         entry = by_workout.setdefault(
             workout_id,
             {"workout_id": workout_id, "date": workout_date, "top_weight": 0.0,
-             "volume": 0.0, "est_1rm": 0.0, "top_level": 0.0, "duration_seconds": 0},
+             "volume": 0.0, "est_1rm": 0.0, "top_level": 0.0, "duration_seconds": 0,
+             "distance_m": 0.0},
         )
         # v0.23.0 (zurdi: "el progreso de cardio debería ser por tiempos"):
-        # duración TOTAL efectiva de la sesión — cardio/timed no tienen kg
+        # duración TOTAL efectiva de la sesión — cardio/timed no tienen kg.
+        # v0.24.0: la distancia total viaja igual (métrica Distancia y, con
+        # ambas, Ritmo — derivado en cliente)
         if duration is not None:
             entry["duration_seconds"] += duration
+        if distance is not None:
+            entry["distance_m"] += distance
         if weight is None:
             continue
         if (load_mode or "weight") == "level":
@@ -131,6 +137,45 @@ def latest_exercise_session(
         .order_by(WorkoutSet.completed_at, WorkoutSet.id)
     ).all()
     return {"workout_id": workout_id, "date": workout_date, "sets": sets}
+
+
+def exercise_sessions(db: Session, owner_id: int, exercise_id: int, limit: int = 50) -> list[dict]:
+    """v0.24.0 (vista detalle por ejercicio): las últimas `limit` sesiones
+    TERMINADAS con este ejercicio, la más reciente primero, cada una con
+    TODAS sus series (mismo criterio multi-entrada que
+    latest_exercise_session: si el ejercicio aparece dos veces en la sesión,
+    sus series van juntas ordenadas por completed_at)."""
+    workout_rows = db.execute(
+        select(Workout.id, Workout.date)
+        .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
+        .where(
+            Workout.owner_id == owner_id,
+            Workout.ended_at.is_not(None),
+            WorkoutExercise.exercise_id == exercise_id,
+        )
+        .group_by(Workout.id, Workout.date)
+        .order_by(Workout.date.desc(), Workout.id.desc())
+        .limit(limit)
+    ).all()
+    if not workout_rows:
+        return []
+    workout_ids = [workout_id for workout_id, _ in workout_rows]
+    set_rows = db.execute(
+        select(WorkoutExercise.workout_id, WorkoutSet)
+        .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .where(
+            WorkoutExercise.workout_id.in_(workout_ids),
+            WorkoutExercise.exercise_id == exercise_id,
+        )
+        .order_by(WorkoutSet.completed_at, WorkoutSet.id)
+    ).all()
+    by_workout: dict[int, list] = {workout_id: [] for workout_id in workout_ids}
+    for workout_id, wset in set_rows:
+        by_workout[workout_id].append(wset)
+    return [
+        {"workout_id": workout_id, "date": workout_date, "sets": by_workout[workout_id]}
+        for workout_id, workout_date in workout_rows
+    ]
 
 
 def recent_cardio_entries(

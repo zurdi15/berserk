@@ -7,6 +7,7 @@ import LoginView from '@/views/LoginView.vue'
 import RedeemView from '@/views/RedeemView.vue'
 import TodayView from '@/views/TodayView.vue'
 import CalendarView from '@/views/CalendarView.vue'
+import ExerciseDetailView from '@/views/ExerciseDetailView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import ProgressView from '@/views/ProgressView.vue'
 import ShellView from '@/views/ShellView.vue'
@@ -36,6 +37,9 @@ export const router = createRouter({
         { path: 'workout/start/:routineId', name: 'workout-start', component: WorkoutStartView, meta: { section: 'workout' } },
         { path: 'workout/:id/edit', name: 'workout-edit', component: WorkoutEditView },
         { path: 'progress', name: 'progress', component: ProgressView },
+        // v0.24.0: vista detalle por ejercicio — superficie de progresión
+        // (el nav resalta esa sección venga de donde venga)
+        { path: 'exercises/:exerciseId', name: 'exercise-detail', component: ExerciseDetailView, meta: { section: 'progress' } },
         { path: 'profile', name: 'profile', component: ProfileView },
       ],
     },

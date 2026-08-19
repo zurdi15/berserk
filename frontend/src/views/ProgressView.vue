@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 
 import type { ExerciseOut, PersonalRecordOut, SeriesPoint, StatsOut } from '@/api/domain'
 import { getRecords, getSeries, getStats, listExercises } from '@/api/domain'
@@ -8,8 +9,15 @@ import { exerciseName } from '@/components/routines/exerciseName'
 import BodySection from '@/components/progress/BodySection.vue'
 import ExercisePicker from '@/components/progress/ExercisePicker.vue'
 import PrList from '@/components/progress/PrList.vue'
-import type { MetricKey } from '@/components/progress/series'
-import { seriesFor } from '@/components/progress/series'
+import type { MetricKey, RangeKey } from '@/components/progress/series'
+import {
+  METRIC_LABEL_KEY,
+  filterRange,
+  metricOptionsFor,
+  metricSuffix,
+  seriesFor,
+} from '@/components/progress/series'
+import RangeChips from '@/components/progress/RangeChips.vue'
 import { formatWeight } from '@/utils/units'
 import StatsGrid from '@/components/progress/StatsGrid.vue'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
@@ -26,6 +34,7 @@ import { getViewCache, setViewCache } from '@/utils/viewCache'
 
 const { t } = useI18n()
 const athlete = useAthleteStore()
+const router = useRouter()
 
 type ProgressTab = 'training' | 'records' | 'stats' | 'body'
 const PROGRESS_TABS: readonly ProgressTab[] = ['stats', 'body', 'training', 'records']
@@ -109,42 +118,26 @@ const mainTabs = computed(() => [
   { value: 'records', label: t('progress.records') },
 ])
 
-// (v0.18.0: la pestaña única "Nivel" de la v0.17.x murió con el modo
-// por-ejercicio — el backend excluye las series en modo nivel de la serie
-// temporal, así que el chart es siempre kg puro con las 3 métricas)
-// v0.20.x (zurdi: "la gráfica solo muestra peso, pero tenemos niveles"): la
-// pestaña Nivel solo aparece si el ejercicio TIENE series en modo nivel
-const hasLevelSeries = computed(() => series.value.some((p) => (p.top_level ?? 0) > 0))
-
-// v0.23.0 (zurdi: "las gráficas de cardio con la tab peso no tienen
-// sentido — ese progreso debería ser por tiempos, sin volumen ni 1RM"):
-// cardio y timed progresan SOLO por tiempo (duración total por sesión)
+// v0.23.0 (zurdi: cardio por tiempos) + v0.24.0 (Distancia/Ritmo): el set de
+// métricas válido lo deriva components/progress/series.ts::metricOptionsFor
+// a partir del measurement y de los DATOS reales (Nivel solo si hay series
+// de nivel; Distancia/Ritmo solo si hay distancias) — compartido con la
+// vista detalle por ejercicio
 const selectedIsDurationBased = computed(() => {
   const measurement = exercises.value.find((e) => e.id === exerciseId.value)?.measurement
   return measurement === 'cardio' || measurement === 'timed'
 })
 
+const metricOptions = computed(() => metricOptionsFor(series.value, selectedIsDurationBased.value))
+
 const metricTabs = computed(() =>
-  selectedIsDurationBased.value
-    ? [{ value: 'duration', label: t('progress.metric.duration') }]
-    : [
-        { value: 'top_weight', label: t('progress.metric.weight') },
-        { value: 'volume', label: t('progress.metric.volume') },
-        { value: 'est_1rm', label: t('progress.metric.est1rm') },
-        ...(hasLevelSeries.value ? [{ value: 'top_level', label: t('progress.metric.level') }] : []),
-      ],
+  metricOptions.value.map((m) => ({ value: m, label: t(`progress.metric.${METRIC_LABEL_KEY[m]}`) })),
 )
 
-// si el ejercicio nuevo no tiene niveles, la métrica seleccionada no puede
-// quedarse colgada en una pestaña que ya no existe
-watch(hasLevelSeries, (has) => {
-  if (!has && metric.value === 'top_level' && !selectedIsDurationBased.value) metric.value = 'top_weight'
-})
-
-// cambiar entre un ejercicio de fuerza y uno de tiempo re-encaja la métrica
-watch(selectedIsDurationBased, (durationBased) => {
-  if (durationBased) metric.value = 'duration'
-  else if (metric.value === 'duration') metric.value = 'top_weight'
+// la métrica seleccionada no puede quedarse colgada en una pestaña que ya no
+// existe (cambio de ejercicio, datos sin nivel/distancia…)
+watch(metricOptions, (options) => {
+  if (!options.includes(metric.value)) metric.value = options[0]
 })
 
 // v0.20.x (zurdi: "el nivel/peso máximo en un chip, para no ir a Récords"):
@@ -164,6 +157,11 @@ const maxLevelRecord = computed(() => {
 })
 
 const chartPoints = computed(() => seriesFor(series.value, metric.value, units.value))
+
+// v0.24.0: rango temporal del chart (3M/6M/1A/Todo) — sticky entre
+// ejercicios; el chart pinta solo los puntos dentro del rango
+const chartRange = ref<RangeKey>('all')
+const rangedPoints = computed(() => filterRange(chartPoints.value, chartRange.value))
 
 // item 4 (v0.4.2): antes cargaba también grupos musculares + distribución
 // para DistributionBars, que se mudó a Hoy (ver TodayView.vue) — aquí ya
@@ -210,7 +208,8 @@ async function loadSeries() {
     // ejercicios solo-nivel (máquinas): abrir el drawer en "Peso" enseñaría
     // el vacío teniendo datos — arranca en la métrica que sí los tiene
     const hasWeight = series.value.some((p) => p.top_weight > 0)
-    if (!hasWeight && hasLevelSeries.value) metric.value = 'top_level'
+    const hasLevel = series.value.some((p) => (p.top_level ?? 0) > 0)
+    if (!hasWeight && hasLevel && !selectedIsDurationBased.value) metric.value = 'top_level'
   } catch (error) {
     toastApiError(error)
   }
@@ -339,6 +338,19 @@ watch(exerciseId, () => {
     >
       <div class="space-y-3 p-4" data-testid="chart-sheet-body">
         <BkTabs v-model="metric" :tabs="metricTabs" />
+        <!-- v0.24.0: rango temporal — filtra los puntos, no remonta el chart -->
+        <div class="flex items-center justify-between gap-2">
+          <RangeChips v-model="chartRange" />
+          <button
+            v-if="exerciseId !== null"
+            type="button"
+            class="bk-press text-xs text-aurora shrink-0"
+            data-testid="open-exercise-detail"
+            @click="router.push({ name: 'exercise-detail', params: { exerciseId } })"
+          >
+            {{ t('progress.detail.open') }}
+          </button>
+        </div>
         <!-- v0.20.x: los máximos del ejercicio a la vista, sin ir a Récords -->
         <div v-if="maxWeightRecord || maxLevelRecord" class="flex flex-wrap gap-2">
           <span
@@ -358,11 +370,11 @@ watch(exerciseId, () => {
              actualiza :points sin remontar (el spec de metric-sin-remontar
              fija justo eso) -->
         <BkChart
-          v-if="chartPoints.length"
+          v-if="rangedPoints.length"
           :key="exerciseId ?? 0"
-          :points="chartPoints"
+          :points="rangedPoints"
           color="aurora"
-          :suffix="metric === 'top_level' ? '' : metric === 'duration' ? ' min' : ` ${units}`"
+          :suffix="metricSuffix(metric, units)"
         />
         <BkEmpty v-else :message="t('progress.noSeries')" />
       </div>

@@ -185,24 +185,22 @@ describe('AdminCard', () => {
     expect(adminRow.find('[data-testid="admin-badge"]').exists()).toBe(true)
   })
 
-  it('item 3a/3b: action buttons are right-aligned and reset-password shows a key SVG icon, not a glyph', async () => {
+  it('item 3a: action buttons are right-aligned; v0.24.0: the key icon is gone (password lives in the edit sheet)', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
 
     // 3a: la celda de acciones alinea su contenido a la derecha
-    const actionsCell = wrapper.find('[data-testid="reset-password-btn"]').element.closest('td')!
+    const actionsCell = wrapper.find('[data-testid="delete-user-btn"]').element.closest('td')!
     const actionsWrapper = actionsCell.querySelector('div')!
     expect(actionsWrapper.className).toContain('justify-end')
 
-    // 3b: icono SVG (llave), no el glifo de texto anterior
-    const resetBtn = wrapper.find('[data-testid="reset-password-btn"]')
-    expect(resetBtn.find('svg').exists()).toBe(true)
-    expect(resetBtn.text()).not.toContain('⟳')
-    expect(resetBtn.attributes('aria-label')).toBe('Restablecer contraseña')
+    // v0.24.0: el icono de reset por fila murió — la contraseña se cambia
+    // desde el propio formulario de editar
+    expect(wrapper.find('[data-testid="reset-password-btn"]').exists()).toBe(false)
   })
 
-  it('hides delete and reset buttons on own row (id=1), but keeps the edit pencil available for self too', async () => {
+  it('hides delete button on own row (id=1), but keeps the edit pencil available for self too', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
@@ -584,7 +582,9 @@ describe('AdminCard', () => {
       expect(document.querySelector('[data-testid="edit-is-admin-checkbox"]')).toBeNull()
     })
 
-    it('the password-reset action stays as its own row icon and sheet, untouched by the edit sheet', async () => {
+    // v0.24.0 (zurdi): la contraseña vive EN el formulario de editar —
+    // vacía no viaja en el payload; con valor válido sí
+    it('the edit sheet carries an optional password field: empty stays out of the payload, a value goes in it', async () => {
       const { adminUpdateUser } = await import('@/api/domain')
       wrapper = mount(AdminCard, {
         global: { plugins: [createI18nInstance()] },
@@ -594,14 +594,41 @@ describe('AdminCard', () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
 
       const otherRow = wrapper.get('[data-testid="user-row-2"]')
-      // el sheet de editar no trae ningún campo de contraseña
       await otherRow.get('[data-testid="edit-user-btn"]').trigger('click')
       await wrapper.vm.$nextTick()
-      expect(document.querySelector('[data-testid="edit-username-field"]')).not.toBeNull()
-      expect(document.querySelector('input[type="password"]')).toBeNull()
+      const field = document.querySelector<HTMLInputElement>('[data-testid="edit-password-field"] input')
+      expect(field).not.toBeNull()
+      expect(field!.type).toBe('password')
+
+      // 1) sin tocarla: el payload NO lleva password
       document.querySelector<HTMLElement>('[data-testid="save-edit-user-btn"]')?.click()
       await new Promise((resolve) => setTimeout(resolve, 0))
-      expect(adminUpdateUser).not.toHaveBeenCalledWith(2, expect.objectContaining({ password: expect.anything() }))
+      expect(adminUpdateUser).toHaveBeenCalledWith(2, expect.not.objectContaining({ password: expect.anything() }))
+
+      // 2) con una contraseña válida: viaja en el payload
+      vi.mocked(adminUpdateUser).mockClear()
+      await otherRow.get('[data-testid="edit-user-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+      const input = document.querySelector<HTMLInputElement>('[data-testid="edit-password-field"] input')!
+      input.value = 'supersecreta1'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await wrapper.vm.$nextTick()
+      document.querySelector<HTMLElement>('[data-testid="save-edit-user-btn"]')?.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(adminUpdateUser).toHaveBeenCalledWith(2, expect.objectContaining({ password: 'supersecreta1' }))
+    })
+
+    it('the own-row edit sheet hides the password field (self password changes live in Settings)', async () => {
+      wrapper = mount(AdminCard, {
+        global: { plugins: [createI18nInstance()] },
+        attachTo: document.body,
+      })
+      await wrapper.vm.$nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      await wrapper.get('[data-testid="user-row-1"] [data-testid="edit-user-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(document.querySelector('[data-testid="edit-password-field"]')).toBeNull()
     })
   })
 

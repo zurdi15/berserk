@@ -35,6 +35,7 @@ import CardioCountdown from './CardioCountdown.vue'
 import CardioStartSheet from './CardioStartSheet.vue'
 import { formatDuration } from './duration'
 import { REST_MAX_SECONDS, REST_MIN_SECONDS, REST_PRESETS, REST_STEP_SECONDS, restFor } from './rest'
+import { suggestNextLoad } from './progression'
 import { resolveNewSetDefaults } from './setDefaults'
 import { formatHistorySetLines } from './setHistoryFormat'
 import SetForm from './SetForm.vue'
@@ -268,17 +269,44 @@ const historyDateLabel = computed(() => {
   )
 })
 
+// v0.24.0 — sugerencia de progresión (doble progresión): solo en vivo, solo
+// fuerza, solo ANTES de la primera serie efectiva de hoy (la sugerencia es
+// el peso con el que empezar). Ver progression.ts para las reglas.
+const routineTargetRow = computed(() => {
+  const routine = props.routineId ? props.routines.find((r) => r.id === props.routineId) : undefined
+  return routine?.exercises.find((e) => e.exercise_id === props.workoutExercise.exercise_id)
+})
+
+const progressionSuggestion = computed<number | null>(() => {
+  if (!props.live || props.exercise?.measurement !== 'strength') return null
+  if (props.workoutExercise.sets.some((s) => !s.is_warmup)) return null
+  return suggestNextLoad(history.value?.sets, routineTargetRow.value ?? undefined)
+})
+
+// la chip abre el cajón YA prefijado con el peso sugerido — se aplica solo
+// mientras ese cajón está abierto (cerrar restablece el prefill normal)
+const suggestionActive = ref(false)
+
+function openSuggested() {
+  suggestionActive.value = true
+  openNew()
+}
+
 // item 2: prioridad de defaults para una serie NUEVA; en edición, los
 // valores EXACTOS de la serie que se corrige (ver setDefaults.ts)
 const drawerDefaults = computed(() => {
   if (editingSet.value) return editingSet.value
-  return resolveNewSetDefaults(
+  const base = resolveNewSetDefaults(
     props.workoutExercise.sets,
     history.value?.sets,
     props.routineId,
     props.routines,
     props.workoutExercise.exercise_id,
   )
+  if (suggestionActive.value && progressionSuggestion.value != null) {
+    return { ...(base ?? {}), weight_kg: progressionSuggestion.value, load_mode: 'weight' as const }
+  }
+  return base
 })
 
 function formatSetValue(set: SetOut): string {
@@ -312,6 +340,7 @@ function openEdit(set: SetOut) {
 function closeDrawer() {
   drawerOpen.value = false
   editingSet.value = null
+  suggestionActive.value = false
 }
 
 // item 1: "Registrar serie" (keepOpen=false) cierra el cajón; "Registrar y
@@ -361,10 +390,7 @@ async function submitNewSet(value: SetIn) {
 // PR, neón — ver submitNewSet); tocar la FILA abre el cajón para ajustarla.
 // Ejercicios libres (sin objetivo) y el editor retro pintan UNA ghost (la
 // "siguiente serie"); cardio nunca (su modelo son las dos acciones).
-const targetSets = computed<number | null>(() => {
-  const routine = props.routineId ? props.routines.find((r) => r.id === props.routineId) : undefined
-  return routine?.exercises.find((e) => e.exercise_id === props.workoutExercise.exercise_id)?.target_sets ?? null
-})
+const targetSets = computed<number | null>(() => routineTargetRow.value?.target_sets ?? null)
 
 const pendingGhostCount = computed(() => {
   if (isCardio.value || !props.exercise) return 0
@@ -739,6 +765,21 @@ async function moveDown() {
         :data-testid="`exercise-image-${workoutExercise.id}`"
       />
       <div class="relative space-y-1.5" :class="!isCardio && 'flex-1 min-w-0 max-w-48'">
+      <!-- v0.24.0: sugerencia de progresión — cumplido el objetivo entero la
+           última sesión, la chip propone subir; tocarla abre el cajón con el
+           peso sugerido ya puesto -->
+      <button
+        v-if="progressionSuggestion != null"
+        type="button"
+        class="bk-press w-full flex items-center gap-1.5 rounded-lg border border-aurora/40 bg-aurora/5 px-2 py-1 text-left"
+        :title="t('workout.progressionTitle')"
+        :data-testid="`progression-hint-${workoutExercise.id}`"
+        @click="openSuggested"
+      >
+        <span class="text-aurora text-xs" aria-hidden="true">↑</span>
+        <span class="bk-metric text-sm text-aurora">{{ formatLoad(progressionSuggestion, units, 'weight') }}</span>
+        <span class="text-2xs text-ink-faint">{{ t('workout.progressionHint') }}</span>
+      </button>
       <TransitionGroup name="bk-remove">
       <div
         v-for="set in workoutExercise.sets"

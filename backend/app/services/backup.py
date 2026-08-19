@@ -2,8 +2,13 @@
 
 El snapshot usa el API de backup de sqlite3 sobre la conexión del propio
 engine — nunca se copia el fichero a pelo (WAL podría dejarlo corrupto).
-berserk no tiene directorio de uploads: el ZIP contiene solo la DB y un
-manifest (mismo método que turtletrips, sin la parte de ficheros).
+
+v0.24.0 (zurdi: "la copia de seguridad no mantiene los assets"): formato 2 —
+el ZIP lleva ADEMÁS todo data_dir/uploads/** (fotos de ejercicios/rutinas,
+avatares, fotos de cuerpo) bajo entradas uploads/<kind>/<fichero>. Un backup
+de formato 1 (solo DB) sigue restaurando: sin entradas de uploads, el
+directorio actual se deja INTACTO (mejor imágenes posiblemente huérfanas que
+borrar las de la instancia).
 """
 
 import json
@@ -28,9 +33,10 @@ from ..seed import ensure_catalog
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 APP_NAME = "berserk"
-BACKUP_FORMAT = 1
+BACKUP_FORMAT = 2
 DB_ENTRY = "berserk.db"
 MANIFEST_ENTRY = "manifest.json"
+UPLOADS_PREFIX = "uploads/"
 MAX_RESTORE_BYTES = 256 * 1024 * 1024  # 256 MiB comprimidos: las DBs de berserk son pequeñas
 MAX_EXTRACTED_BYTES = 1024**3  # 1 GiB descomprimido (anti zip-bomb)
 
@@ -98,6 +104,15 @@ def create_backup_zip(engine: Engine) -> Path:
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.write(db_snapshot, DB_ENTRY, compress_type=zipfile.ZIP_DEFLATED)
             zf.writestr(MANIFEST_ENTRY, json.dumps(manifest))
+            # formato 2: los assets viajan con la DB — sin ellos, restaurar
+            # en una instancia nueva dejaba todas las fotos rotas
+            uploads_root = settings.data_dir / "uploads"
+            if uploads_root.is_dir():
+                for file in sorted(uploads_root.rglob("*")):
+                    if file.is_file():
+                        arcname = UPLOADS_PREFIX + file.relative_to(uploads_root).as_posix()
+                        # ya comprimidos (jpg/png/webp): STORED, no re-deflate
+                        zf.write(file, arcname, compress_type=zipfile.ZIP_STORED)
     return zip_path
 
 
@@ -114,8 +129,19 @@ def validate_backup_zip(zip_path: Path) -> str | None:
         raise BackupValidationError("El fichero no es un ZIP válido")
     with zipfile.ZipFile(zip_path) as zf:
         names = set(zf.namelist())
-        if names != {DB_ENTRY, MANIFEST_ENTRY}:
+        if DB_ENTRY not in names or MANIFEST_ENTRY not in names:
             raise BackupValidationError("La copia no tiene las entradas esperadas")
+        for name in names - {DB_ENTRY, MANIFEST_ENTRY}:
+            # formato 2: SOLO entradas de uploads, con path relativo sano —
+            # nada de traversal ni rutas absolutas dentro del zip
+            if (
+                not name.startswith(UPLOADS_PREFIX)
+                or name.endswith("/")
+                or ".." in name.split("/")
+                or name.startswith("/")
+                or "\\" in name
+            ):
+                raise BackupValidationError("La copia contiene entradas inesperadas")
 
         total = 0
         for info in zf.infolist():
@@ -162,12 +188,42 @@ def validate_backup_zip(zip_path: Path) -> str | None:
     return revision
 
 
-def restore_backup(app: FastAPI, zip_path: Path) -> dict:
-    """Sustituye la DB por la del ZIP (ya validado).
+def _restore_uploads(zip_path: Path, uploads_root: Path, pre_restore_uploads: Path) -> bool:
+    """Formato 2: sustituye uploads/ por el contenido del ZIP (si trae).
 
-    El estado anterior queda en <db_path>.pre-restore como red de seguridad
-    de una sola generación (se pisa si ya existía una copia previa); si algo
-    falla a mitad, se restaura ese estado y se relanza la excepción.
+    Devuelve True si el zip traía uploads (y por tanto el directorio se
+    reemplazó). El estado anterior se mueve a pre_restore_uploads — misma
+    red de una generación que la DB. Un backup de formato 1 (sin uploads)
+    devuelve False y NO toca nada: borrar los assets de la instancia por
+    restaurar una copia vieja sería peor que dejar huérfanos.
+    Los paths del zip llegan YA validados (validate_backup_zip); el
+    resolve+is_relative_to de aquí es el cinturón además de los tirantes.
+    """
+    with zipfile.ZipFile(zip_path) as zf:
+        upload_names = [n for n in zf.namelist() if n.startswith(UPLOADS_PREFIX) and not n.endswith("/")]
+        if not upload_names:
+            return False
+        if pre_restore_uploads.exists():
+            shutil.rmtree(pre_restore_uploads)
+        if uploads_root.exists():
+            shutil.move(str(uploads_root), str(pre_restore_uploads))
+        for name in upload_names:
+            target = (uploads_root / name[len(UPLOADS_PREFIX):]).resolve()
+            if not target.is_relative_to(uploads_root.resolve()):
+                raise BackupValidationError("La copia contiene entradas inesperadas")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with zf.open(name) as src, open(target, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+        return True
+
+
+def restore_backup(app: FastAPI, zip_path: Path) -> dict:
+    """Sustituye la DB (y, en formato 2, los uploads) por lo del ZIP.
+
+    El estado anterior queda en <db_path>.pre-restore (+ uploads.pre-restore
+    si aplica) como red de seguridad de una sola generación (se pisa si ya
+    existía una copia previa); si algo falla a mitad, se restaura ese estado
+    y se relanza la excepción.
     """
     lock = app.state.backup_lock
     if not lock.acquire(blocking=False):
@@ -177,6 +233,9 @@ def restore_backup(app: FastAPI, zip_path: Path) -> dict:
     wal_path = db_path.with_name(db_path.name + "-wal")
     shm_path = db_path.with_name(db_path.name + "-shm")
     pre_restore = db_path.with_name(db_path.name + ".pre-restore")
+    uploads_root = settings.data_dir / "uploads"
+    pre_restore_uploads = settings.data_dir / "uploads.pre-restore"
+    uploads_replaced = False
     try:
         # snapshot consistente del estado actual (incluye lo que solo vive en
         # el WAL) antes de tocar nada — una sola generación, se pisa la anterior
@@ -190,6 +249,8 @@ def restore_backup(app: FastAPI, zip_path: Path) -> dict:
         try:
             with zipfile.ZipFile(zip_path) as zf, zf.open(DB_ENTRY) as src, open(db_path, "wb") as dst:
                 shutil.copyfileobj(src, dst)
+            # v0.24.0: los assets van y vuelven con la DB (formato 2)
+            uploads_replaced = _restore_uploads(zip_path, uploads_root, pre_restore_uploads)
 
             previous_revision = _db_revision(db_path)
             cfg = _alembic_config()
@@ -218,6 +279,10 @@ def restore_backup(app: FastAPI, zip_path: Path) -> dict:
             shm_path.unlink(missing_ok=True)
             if pre_restore.exists():
                 shutil.move(str(pre_restore), str(db_path))
+            if uploads_replaced and pre_restore_uploads.exists():
+                if uploads_root.exists():
+                    shutil.rmtree(uploads_root)
+                shutil.move(str(pre_restore_uploads), str(uploads_root))
             engine = make_engine(settings.db_url)
             app.state.engine = engine
             app.state.sessionmaker = make_sessionmaker(engine)

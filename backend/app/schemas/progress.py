@@ -16,6 +16,7 @@ class SeriesPoint(BaseModel):
     # v0.23.0: duración TOTAL efectiva de la sesión (cardio/timed) — el
     # progreso de cardio es por tiempos, no por kg
     duration_seconds: int = 0
+    distance_m: float = 0.0
 
 
 class SeriesOut(BaseModel):
@@ -72,6 +73,13 @@ class ExerciseHistoryOut(BaseModel):
     sets: list[ExerciseHistorySetOut]
     # solo se puebla para ejercicios de cardio (ver routers/progress.py)
     recent_cardio: list[CardioEntryOut] = []
+
+
+# v0.24.0 (vista detalle por ejercicio): una sesión terminada con sus series
+class ExerciseSessionOut(BaseModel):
+    workout_id: int
+    date: date_type
+    sets: list[ExerciseHistorySetOut]
 
 
 class StatsOut(BaseModel):
