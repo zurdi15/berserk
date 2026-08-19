@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { PersonalRecordOut, WorkoutOut, ScheduledOut, ExerciseOut, MuscleGroupOut, DistributionItem } from '@/api/domain'
@@ -7,17 +7,18 @@ import { getStreak, getMonth, listWorkouts, getRecords, listExercises, listMuscl
 import { toastApiError } from '@/utils/apiErrors'
 import { todayIso, getMondayOfWeek } from '@/utils/dates'
 import { useAthleteStore } from '@/stores/athlete'
+import { useAuthStore } from '@/stores/auth'
 import BkCard from '@/lib/BkCard.vue'
 import StreakCard from '@/components/today/StreakCard.vue'
-import TodaySessionCard from '@/components/today/TodaySessionCard.vue'
+import TodayHero from '@/components/today/TodayHero.vue'
 import WeekSummaryCard from '@/components/today/WeekSummaryCard.vue'
 import DistributionBars from '@/components/today/DistributionBars.vue'
 import RecentPrs from '@/components/today/RecentPrs.vue'
-import RotationNextCard from '@/components/today/RotationNextCard.vue'
 import SocialFeedCard from '@/components/today/SocialFeedCard.vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const athlete = useAthleteStore()
+const auth = useAuthStore()
 
 const streak = ref<{ weeks: number } | null>(null)
 const schedules = ref<ScheduledOut[]>([])
@@ -35,6 +36,18 @@ const distribution = ref<DistributionItem[]>([])
 // arranca ya sobre ese valor. true también en error (finally) para no dejar
 // la vista en blanco si la carga falla.
 const ready = ref(false)
+
+// facelift: saludo grande estilo referencia — con el propio nombre en vista
+// propia, "Viendo a X" en modo atleta
+const greeting = computed(() =>
+  athlete.isViewing
+    ? t('today.greetingViewing', { name: athlete.viewing?.username ?? '' })
+    : t('today.greeting', { name: auth.user?.username ?? '' }),
+)
+
+const todayLabel = computed(() =>
+  new Intl.DateTimeFormat(locale.value, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()),
+)
 
 async function load() {
   try {
@@ -97,19 +110,22 @@ watch(() => athlete.userId, () => load(), { immediate: true })
 
 <template>
   <div v-if="ready" class="space-y-4 bk-stagger">
-    <div :style="{ '--bk-stagger-i': 0 }">
+    <!-- facelift: saludo grande + fecha, con la racha degradada a chip al
+         lado — el primer h1 real de la app -->
+    <div :style="{ '--bk-stagger-i': 0 }" class="flex items-start justify-between gap-3 pt-1">
+      <div class="min-w-0">
+        <h1 class="bk-display text-ink">{{ greeting }}</h1>
+        <p class="text-sm text-ink-muted capitalize">{{ todayLabel }}</p>
+      </div>
       <StreakCard :streak="streak" />
     </div>
-    <!-- v0.14.1 (zurdi): "te toca" ENCIMA de la programada, y la actividad
-         social justo debajo del te toca — Hoy abre con qué hacer AHORA -->
-    <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 1 }">
-      <RotationNextCard />
+    <!-- v0.14.1 (zurdi): "te toca" ENCIMA de la programada — el hero abre
+         con qué hacer AHORA y absorbe la sesión planificada como chip -->
+    <div :style="{ '--bk-stagger-i': 1 }">
+      <TodayHero :schedules="schedules" :exercises="exercises" />
     </div>
     <div v-if="!athlete.isViewing" :style="{ '--bk-stagger-i': 2 }">
       <SocialFeedCard />
-    </div>
-    <div :style="{ '--bk-stagger-i': 3 }">
-      <TodaySessionCard :schedules="schedules" />
     </div>
     <div :style="{ '--bk-stagger-i': 3 }">
       <WeekSummaryCard :workouts="workouts" :exercises="exercises" :muscle-groups="muscleGroups" />

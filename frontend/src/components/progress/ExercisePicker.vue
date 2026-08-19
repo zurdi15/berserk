@@ -9,6 +9,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { foldSearchText } from '@/utils/searchFold'
 import { useAthleteStore } from '@/stores/athlete'
 import BkField from '@/lib/BkField.vue'
+import BkMedia from '@/lib/BkMedia.vue'
 import BkRune from '@/lib/BkRune.vue'
 import GroupFilterSelect from '@/lib/GroupFilterSelect.vue'
 import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
@@ -122,12 +123,19 @@ watch(() => athlete.userId, load)
         :key="exercise.id"
         type="button"
         :data-testid="`exercise-option-${exercise.id}`"
-        class="w-full text-left p-2 rounded-sm hover:bg-stone transition-colors text-sm border border-transparent hover:border-line flex items-center justify-between gap-1.5"
+        class="w-full text-left p-2 rounded-md hover:bg-stone transition-colors text-sm border border-transparent hover:border-line flex items-center gap-2.5"
         :class="modelValue === exercise.id ? 'text-aurora' : 'text-ink'"
         @click="select(exercise.id)"
       >
-        <span class="truncate">{{ exerciseName(exercise, locale) }}</span>
-        <span class="flex items-center gap-1.5 shrink-0">
+        <!-- facelift ("fotos protagonistas"): la biblioteca por fin enseña
+             sus fotos aquí — thumb con pozo rúnico de fallback -->
+        <BkMedia
+          :exercise="exercise"
+          :rune="primaryGroup(exercise) && isValidRuneName(primaryGroup(exercise)!.slug) ? (primaryGroup(exercise)!.slug as RuneName) : null"
+          size="xs"
+        />
+        <span class="flex-1 min-w-0 truncate text-base">{{ exerciseName(exercise, locale) }}</span>
+        <span class="flex items-center gap-1.5 shrink-0 justify-end">
           <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
           <span
             v-if="primaryGroup(exercise)"

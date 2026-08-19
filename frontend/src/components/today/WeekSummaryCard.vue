@@ -8,6 +8,7 @@ import { useAnimatedNumber } from '@/composables/useAnimatedNumber'
 import BkCard from '@/lib/BkCard.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkTooltip from '@/lib/BkTooltip.vue'
+import { getMondayOfWeek, todayIso } from '@/utils/dates'
 
 const props = withDefaults(
   defineProps<{
@@ -22,7 +23,7 @@ const props = withDefaults(
   },
 )
 
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 
 const validRunes = new Set<string>(['chest', 'back', 'biceps', 'triceps', 'shoulders', 'legs', 'core'])
 
@@ -93,19 +94,52 @@ const muscleGroupsInWeek = computed(() => {
 
 const animatedWorkoutDays = useAnimatedNumber(() => workoutDays.value)
 const animatedEffectiveSets = useAnimatedNumber(() => effectiveSets.value)
+
+// facelift: fila de 7 puntos (lunes→domingo) estilo referencia — un punto
+// lleno por día CON entreno; los días futuros van atenuados. Fechas locales
+// a mano (no Date.toISOString: eso pasa por UTC y desplaza el día en según
+// qué huso, ver utils/dates).
+const trainedDates = computed(() => new Set(props.workouts.map((w) => w.date)))
+const weekDots = computed(() => {
+  const monday = getMondayOfWeek()
+  const [y, m, d] = monday.split('-').map(Number)
+  const today = todayIso()
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(y, m - 1, d + i)
+    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    return {
+      iso,
+      label: new Intl.DateTimeFormat(locale.value, { weekday: 'narrow' }).format(date),
+      trained: trainedDates.value.has(iso),
+      future: iso > today,
+      isToday: iso === today,
+    }
+  })
+})
 </script>
 
 <template>
   <BkCard :title="$t('today.weekSummary')">
     <div class="space-y-4">
-      <div class="flex justify-between text-sm">
-        <div>
-          <p class="text-ink-muted">{{ $t('today.workoutDays') }}</p>
-          <p class="text-xl font-semibold text-ink tabular-nums">{{ animatedWorkoutDays ?? 0 }}</p>
+      <!-- facelift: fila de 7 puntos de la semana (estilo referencia) -->
+      <div class="flex justify-between gap-1" :aria-label="t('today.weekDots')" data-testid="week-dots">
+        <div v-for="dot in weekDots" :key="dot.iso" class="flex flex-col items-center gap-1.5 flex-1">
+          <span class="text-2xs uppercase" :class="dot.isToday ? 'text-ink font-semibold' : 'text-ink-faint'">{{ dot.label }}</span>
+          <span
+            class="w-2.5 h-2.5 rounded-full"
+            :class="dot.trained ? 'bg-aurora' : dot.future ? 'bg-line/50' : 'bg-line-strong'"
+          />
         </div>
-        <div>
-          <p class="text-ink-muted">{{ $t('today.effectiveSets') }}</p>
-          <p class="text-xl font-semibold text-ink tabular-nums">{{ animatedEffectiveSets ?? 0 }}</p>
+      </div>
+      <!-- facelift: tiles grandes en vez de dos líneas pequeñas -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="rounded-md bg-slab p-3">
+          <p class="text-sm text-ink-muted">{{ $t('today.workoutDays') }}</p>
+          <p class="bk-metric text-3xl text-ink">{{ animatedWorkoutDays ?? 0 }}</p>
+        </div>
+        <div class="rounded-md bg-slab p-3">
+          <p class="text-sm text-ink-muted">{{ $t('today.effectiveSets') }}</p>
+          <p class="bk-metric text-3xl text-ink">{{ animatedEffectiveSets ?? 0 }}</p>
         </div>
       </div>
 

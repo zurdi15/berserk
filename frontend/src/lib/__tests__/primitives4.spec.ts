@@ -33,11 +33,11 @@ describe('BkTabs', () => {
   })
 
   describe('item 2 (v0.3.2): compact at phone widths, no elastic scroll feel', () => {
-    it('tabs are compact below sm (px-2, text-2xs) and normal from sm (px-4, text-sm) — see the fit arithmetic comment in BkTabs.vue', () => {
+    it('tabs are compact below sm (px-2, text-2xs) and normal from sm (px-3, text-sm) — see the fit arithmetic comment in BkTabs.vue', () => {
       const wrapper = mount(BkTabs, { props: { modelValue: 'a', tabs } })
       for (const tabEl of wrapper.findAll('[role="tab"]')) {
         expect(tabEl.classes()).toEqual(
-          expect.arrayContaining(['px-2', 'sm:px-4', 'text-2xs', 'sm:text-sm']),
+          expect.arrayContaining(['px-2', 'sm:px-3', 'text-2xs', 'sm:text-sm']),
         )
       }
     })

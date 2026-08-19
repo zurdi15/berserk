@@ -19,7 +19,7 @@ vi.mock('@/api/domain', () => ({
   getDistribution: vi.fn(async () => []),
 }))
 // push compartido (no un vi.fn() nuevo por llamada a useRouter): item 8
-// necesita aserir con qué se llamó router.push desde TodaySessionCard
+// necesita aserir con qué se llamó router.push desde TodayHero
 const push = vi.fn()
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
 
@@ -29,7 +29,7 @@ import { createI18nInstance } from '@/i18n'
 import { useAthleteStore } from '@/stores/athlete'
 import { core } from '@/tokens'
 import TodayView from '@/views/TodayView.vue'
-import TodaySessionCard from '@/components/today/TodaySessionCard.vue'
+import TodayHero from '@/components/today/TodayHero.vue'
 import DistributionBars from '@/components/today/DistributionBars.vue'
 import { barWidth } from '@/components/today/distribution'
 
@@ -132,7 +132,7 @@ describe('TodayView', () => {
   })
 })
 
-describe('TodaySessionCard status dots', () => {
+describe('TodayHero session status dots (antes TodaySessionCard, absorbida por el hero)', () => {
   // reloj pineado: todaySessions filtra props.schedules por fecha === HOY, y
   // las fixtures de este bloque usan '2026-08-06' — sin pinear, estos tests
   // se vuelven fecha-dependientes del reloj real (ya han roto así antes)
@@ -147,10 +147,11 @@ describe('TodaySessionCard status dots', () => {
     const schedules: ScheduledOut[] = [
       { id: 1, date: '2026-08-06', time: '18:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
     ]
-    const wrapper = mount(TodaySessionCard, {
-      props: { schedules },
+    const wrapper = mount(TodayHero, {
+      props: { schedules, exercises: [] },
       global: { plugins: [createI18nInstance()] },
     })
+    await flushPromises()
     const plannedDot = wrapper.find('[data-testid="session-planned"]').find('span')
     expect(plannedDot.classes()).toContain('border-2')
     expect(plannedDot.classes()).toContain('border-aurora')
@@ -160,10 +161,11 @@ describe('TodaySessionCard status dots', () => {
     const schedules: ScheduledOut[] = [
       { id: 2, date: '2026-08-06', time: '10:00', routine_id: 2, status: 'done', workout_id: 5, note: null },
     ]
-    const wrapper = mount(TodaySessionCard, {
-      props: { schedules },
+    const wrapper = mount(TodayHero, {
+      props: { schedules, exercises: [] },
       global: { plugins: [createI18nInstance()] },
     })
+    await flushPromises()
     const doneDot = wrapper.find('[data-testid="session-done"]').find('span')
     expect(doneDot.classes()).toContain('bg-aurora')
     expect(doneDot.classes()).not.toContain('border-2')
@@ -173,10 +175,11 @@ describe('TodaySessionCard status dots', () => {
     const schedules: ScheduledOut[] = [
       { id: 3, date: '2026-08-06', time: null, routine_id: 3, status: 'skipped', workout_id: null, note: 'Too busy' },
     ]
-    const wrapper = mount(TodaySessionCard, {
-      props: { schedules },
+    const wrapper = mount(TodayHero, {
+      props: { schedules, exercises: [] },
       global: { plugins: [createI18nInstance()] },
     })
+    await flushPromises()
     const skippedDot = wrapper.find('[data-testid="session-skipped"]').find('span')
     expect(skippedDot.classes()).toContain('bg-ink-faint')
     expect(skippedDot.classes()).not.toContain('bg-aurora')
@@ -186,10 +189,11 @@ describe('TodaySessionCard status dots', () => {
     const schedules: ScheduledOut[] = [
       { id: 1, date: '2026-08-06', time: '18:00:00', routine_id: 1, status: 'planned', workout_id: null, note: null },
     ]
-    const wrapper = mount(TodaySessionCard, {
-      props: { schedules },
+    const wrapper = mount(TodayHero, {
+      props: { schedules, exercises: [] },
       global: { plugins: [createI18nInstance()] },
     })
+    await flushPromises()
     expect(wrapper.text()).toContain('18:00')
     expect(wrapper.text()).not.toContain('18:00:00')
   })
@@ -198,18 +202,19 @@ describe('TodaySessionCard status dots', () => {
     const schedules: ScheduledOut[] = [
       { id: 3, date: '2026-08-06', time: null, routine_id: 3, status: 'skipped', workout_id: null, note: 'Too busy' },
     ]
-    const wrapper = mount(TodaySessionCard, {
-      props: { schedules },
+    const wrapper = mount(TodayHero, {
+      props: { schedules, exercises: [] },
       global: { plugins: [createI18nInstance()] },
     })
+    await flushPromises()
     expect(wrapper.text()).not.toContain('–')
     expect(wrapper.text()).not.toContain('—')
     expect(wrapper.text()).toContain('Too busy')
   })
 
   it('polish wave item 8: "Programar Sesión" pushes to the calendar with today\'s date as a query (so it auto-opens the day sheet)', async () => {
-    const wrapper = mount(TodaySessionCard, {
-      props: { schedules: [] },
+    const wrapper = mount(TodayHero, {
+      props: { schedules: [], exercises: [] },
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()

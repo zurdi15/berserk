@@ -191,7 +191,7 @@ watch(exerciseId, () => {
          Sin h1 de sección (item 3): Hoy nunca tuvo uno, mismo patrón aquí.
          Sin padding lateral propio (item 4): <main> del shell ya pone px-4,
          duplicarlo aquí desalineaba el gutter frente a Hoy. -->
-    <div class="sticky top-0 z-10 bk-chrome-bg -mt-4 -mx-4 px-4 pt-4 pb-1" data-testid="progress-tabs-sticky">
+    <div class="bk-sticky-chrome" data-testid="progress-tabs-sticky">
       <BkTabs v-model="tab" :tabs="mainTabs" />
     </div>
 

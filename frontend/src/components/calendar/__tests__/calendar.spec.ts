@@ -380,7 +380,7 @@ describe('MonthGrid', () => {
     expect(dotContainer.className).toContain('top-1')
     expect(runeContainer.className).toContain('bottom-1')
     // el número del día sigue presente, sin ser desplazado por ninguno de los dos overlays
-    expect(cell.find('.text-xs.font-semibold').exists()).toBe(true)
+    expect(cell.find('.text-sm.font-semibold').exists()).toBe(true)
   })
 
   it('v0.3.0 item 3: wires --bk-day-dot on the grid container, defaulting to the aurora token (so a future wave can recolor per athlete)', async () => {
@@ -433,12 +433,12 @@ describe('MonthGrid', () => {
     const todayCell = wrapper.get('[data-testid="day-cell-2026-08-15"]')
     expect(todayCell.classes()).toContain('border-aurora')
     expect(todayCell.classes()).toContain('border-2')
-    const dayNumber = todayCell.get('.text-xs.font-semibold')
+    const dayNumber = todayCell.get('.text-sm.font-semibold')
     expect(dayNumber.classes()).not.toContain('text-aurora')
 
     const otherCell = wrapper.get('[data-testid="day-cell-2026-08-16"]')
     expect(otherCell.classes()).not.toContain('border-aurora')
-    expect(otherCell.get('.text-xs.font-semibold').classes()).not.toContain('text-aurora')
+    expect(otherCell.get('.text-sm.font-semibold').classes()).not.toContain('text-aurora')
 
     vi.useRealTimers()
   })
@@ -1658,7 +1658,8 @@ describe('CalendarView heatmap empty state', () => {
     // en vez de colar un undefined silencioso
     const heading = wrapper.get('h3')
     expect(heading.text()).toBe('Actividad del año')
-    expect(heading.classes()).toContain('text-center')
+    // facelift: el título vive en su card, alineado a la izquierda (bk-title)
+    expect(heading.classes()).toContain('bk-title')
   })
 })
 
@@ -1707,13 +1708,14 @@ describe('CalendarView heatmap refetch on mutation (v0.3.0 item 2)', () => {
 describe('CalendarView layout (round 6, items 3/4)', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('has no view-level h1 (Hoy never had one) and no horizontal padding of its own on the root', async () => {
+  it('facelift: the month heading is the view h1, and the root adds no horizontal padding of its own', async () => {
     const wrapper = mount(CalendarView, {
       global: { plugins: [createI18nInstance()] },
     })
     await flushPromises()
 
-    expect(wrapper.find('h1').exists()).toBe(false)
+    // facelift: el mes ES el h1 de la vista (título grande a la izquierda)
+    expect(wrapper.get('h1').classes()).toContain('bk-title')
     // <main> del shell ya pone px-4: la raíz de la vista no debe duplicarlo
     expect(wrapper.classes().some((c) => c === 'p-4' || c.startsWith('px-'))).toBe(false)
   })

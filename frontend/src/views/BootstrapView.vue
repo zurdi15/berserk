@@ -47,12 +47,12 @@ async function submit() {
 <template>
   <main class="min-h-dvh flex flex-col items-center justify-center gap-6 px-6">
     <Transition name="bk-pop" appear>
-      <BkRune name="berserk" :size="64" carve tone="aurora" />
+      <BkRune name="berserk" :size="72" carve tone="aurora" />
     </Transition>
     <Transition name="bk-rise" appear>
       <form class="bk-slab w-full max-w-sm p-6 flex flex-col gap-4" @submit.prevent="submit">
         <div>
-          <h2 class="font-display font-semibold uppercase tracking-wider text-sm">
+          <h2 class="bk-title text-ink">
             {{ $t('auth.bootstrapTitle') }}
           </h2>
           <p class="text-sm text-ink-faint mt-1">{{ $t('auth.bootstrapHint') }}</p>

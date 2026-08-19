@@ -148,6 +148,14 @@ async function openDrawer(weid: number) {
   await flushPromises()
 }
 
+// facelift: la gestión (reordenar/descanso/bloque/quitar) vive en el sheet
+// kebab del ejercicio — se abre primero, y sus controles se consultan vía
+// byTestId (el sheet teletransporta a body, wrapper.find no llega)
+async function openMenu(weid: number) {
+  await byTestId(`exercise-menu-${weid}`).trigger('click')
+  await flushPromises()
+}
+
 function drawerForm(): DOMWrapper<HTMLFormElement> {
   return new DOMWrapper(document.body.querySelector('form') as HTMLFormElement)
 }
@@ -161,12 +169,12 @@ describe('WorkoutExerciseCard', () => {
     document.body.innerHTML = ''
   })
 
-  it('renders the exercise name, its primary-group rune (size 14) and the formatted sets as dense rows', () => {
+  it('renders the exercise name, its primary-group rune (in the BkMedia well fallback) and the formatted sets as rows', () => {
     const wrapper = mountCard()
     expect(wrapper.text()).toContain('Press banca')
+    // facelift: el primer BkRune es el pozo de fallback de BkMedia (sin foto)
     const rune = wrapper.findComponent({ name: 'BkRune' })
     expect(rune.props('name')).toBe('chest')
-    expect(rune.props('size')).toBe(14)
     expect(wrapper.text()).toContain('100 kg')
   })
 
@@ -379,31 +387,34 @@ describe('WorkoutExerciseCard', () => {
   // v0.18.1 (zurdi: "los bloques deberían poder cambiarse también mid
   // entreno"): picker "Bloque: X" en la card en vivo
   describe('v0.18.1: per-card block picker', () => {
-    it('is hidden when the actions lack setExerciseBlock (retro editor)', () => {
-      const wrapper = mountCard()
-      expect(wrapper.find('[data-testid="block-toggle-20"]').exists()).toBe(false)
+    it('is hidden when the actions lack setExerciseBlock (retro editor)', async () => {
+      mountCard()
+      await openMenu(20)
+      expect(byTestId('block-toggle-20').exists()).toBe(false)
     })
 
     it('moves the exercise to an existing block via the chips', async () => {
       const setExerciseBlock = vi.fn(async () => {})
       const actions = makeActions({ setExerciseBlock })
-      const wrapper = mountCard({ actions, blockLabels: ['Empuje', 'Tirón'] })
+      mountCard({ actions, blockLabels: ['Empuje', 'Tirón'] })
 
-      await wrapper.get('[data-testid="block-toggle-20"]').trigger('click')
-      await wrapper.get('[data-testid="block-pick-20-Tirón"]').trigger('click')
+      await openMenu(20)
+      await byTestId('block-toggle-20').trigger('click')
+      await byTestId('block-pick-20-Tirón').trigger('click')
       expect(setExerciseBlock).toHaveBeenCalledWith(20, 'Tirón')
       // el picker se cierra tras elegir
-      expect(wrapper.find('[data-testid="block-picker-20"]').exists()).toBe(false)
+      expect(byTestId('block-picker-20').exists()).toBe(false)
     })
 
     it('offers "sin bloque" only when the exercise IS in one, and clears with null', async () => {
       const setExerciseBlock = vi.fn(async () => {})
       const actions = makeActions({ setExerciseBlock })
       const inBlock = { ...pushExercise, block_label: 'Empuje' }
-      const wrapper = mountCard({ actions, workoutExercise: inBlock, blockLabels: ['Empuje'] })
+      mountCard({ actions, workoutExercise: inBlock, blockLabels: ['Empuje'] })
 
-      await wrapper.get('[data-testid="block-toggle-20"]').trigger('click')
-      await wrapper.get('[data-testid="block-pick-none-20"]').trigger('click')
+      await openMenu(20)
+      await byTestId('block-toggle-20').trigger('click')
+      await byTestId('block-pick-none-20').trigger('click')
       expect(setExerciseBlock).toHaveBeenCalledWith(20, null)
     })
 
@@ -411,8 +422,9 @@ describe('WorkoutExerciseCard', () => {
       const actions = makeActions({ setExerciseBlock: vi.fn(async () => {}) })
       const wrapper = mountCard({ actions })
 
-      await wrapper.get('[data-testid="block-toggle-20"]').trigger('click')
-      await wrapper.get('[data-testid="block-new-20"]').trigger('click')
+      await openMenu(20)
+      await byTestId('block-toggle-20').trigger('click')
+      await byTestId('block-new-20').trigger('click')
       expect(wrapper.emitted('newBlock')).toBeTruthy()
     })
   })
@@ -540,9 +552,10 @@ describe('WorkoutExerciseCard', () => {
     })
 
     it('shows no rest control at all, even with restEnabled on', async () => {
-      const wrapper = mountCardio()
+      mountCardio()
       await flushPromises()
-      expect(wrapper.find('[data-testid="rest-toggle-30"]').exists()).toBe(false)
+      await openMenu(30)
+      expect(byTestId('rest-toggle-30').exists()).toBe(false)
     })
 
     it('logging cardio through the drawer never starts the rest timer', async () => {
@@ -894,20 +907,22 @@ describe('WorkoutExerciseCard', () => {
 
   describe('item 11: rest control', () => {
     it('shows the effective rest (workout override > routine target > default) and toggles a preset picker', async () => {
-      const wrapper = mountCard({ routines, routineId: 1 })
-      expect(wrapper.get('[data-testid="rest-toggle-20"]').text()).toContain('120')
+      mountCard({ routines, routineId: 1 })
+      await openMenu(20)
+      expect(byTestId('rest-toggle-20').text()).toContain('120')
 
-      expect(wrapper.find('[data-testid="rest-picker-20"]').exists()).toBe(false)
-      await wrapper.get('[data-testid="rest-toggle-20"]').trigger('click')
-      expect(wrapper.find('[data-testid="rest-picker-20"]').exists()).toBe(true)
+      expect(byTestId('rest-picker-20').exists()).toBe(false)
+      await byTestId('rest-toggle-20').trigger('click')
+      expect(byTestId('rest-picker-20').exists()).toBe(true)
     })
 
     it('picking a preset calls actions.setExerciseRest with that value', async () => {
       const actions = makeActions()
-      const wrapper = mountCard({ actions })
-      await wrapper.get('[data-testid="rest-toggle-20"]').trigger('click')
+      mountCard({ actions })
+      await openMenu(20)
+      await byTestId('rest-toggle-20').trigger('click')
 
-      await wrapper.get('[data-testid="rest-preset-20-120"]').trigger('click')
+      await byTestId('rest-preset-20-120').trigger('click')
       await flushPromises()
 
       expect(actions.setExerciseRest).toHaveBeenCalledWith(20, 120)
@@ -918,10 +933,14 @@ describe('WorkoutExerciseCard', () => {
     it('item 7: the picker also shows a manual stepper (step 5, bounds 5-900) that calls setExerciseRest with the exact resulting seconds, without closing the picker', async () => {
       const actions = makeActions()
       const wrapper = mountCard({ actions })
-      await wrapper.get('[data-testid="rest-toggle-20"]').trigger('click')
+      await openMenu(20)
+      await byTestId('rest-toggle-20').trigger('click')
 
-      const manual = wrapper.get('[data-testid="rest-manual-20"]')
-      const stepper = manual.findComponent({ name: 'BkStepper' })
+      const manual = byTestId('rest-manual-20')
+      // el stepper del descanso es el ÚNICO BkStepper montado (el cajón de
+      // series está cerrado), así que se localiza por el árbol de componentes
+      // (findComponent atraviesa el Teleport del sheet; el DOM no)
+      const stepper = wrapper.findComponent({ name: 'BkStepper' })
       expect(stepper.props('step')).toBe(5)
       expect(stepper.props('min')).toBe(5)
       expect(stepper.props('max')).toBe(900)
@@ -937,18 +956,20 @@ describe('WorkoutExerciseCard', () => {
       expect(actions.setExerciseRest).toHaveBeenCalledWith(20, 65)
       // a diferencia de un preset, el stepper NO cierra el picker (se pulsa
       // varias veces seguidas para afinar)
-      expect(wrapper.find('[data-testid="rest-picker-20"]').exists()).toBe(true)
+      expect(byTestId('rest-picker-20').exists()).toBe(true)
     })
 
-    it('reflects the workout exercise override over the routine target', () => {
+    it('reflects the workout exercise override over the routine target', async () => {
       const overridden = { ...pushExercise, rest_seconds: 60 }
-      const wrapper = mountCard({ workoutExercise: overridden, routines, routineId: 1 })
-      expect(wrapper.get('[data-testid="rest-toggle-20"]').text()).toContain('60')
+      mountCard({ workoutExercise: overridden, routines, routineId: 1 })
+      await openMenu(20)
+      expect(byTestId('rest-toggle-20').text()).toContain('60')
     })
 
-    it('is hidden entirely when restEnabled is false (retro editor)', () => {
-      const wrapper = mountCard({ restEnabled: false })
-      expect(wrapper.find('[data-testid="rest-toggle-20"]').exists()).toBe(false)
+    it('is hidden entirely when restEnabled is false (retro editor)', async () => {
+      mountCard({ restEnabled: false })
+      await openMenu(20)
+      expect(byTestId('rest-toggle-20').exists()).toBe(false)
     })
   })
 
@@ -1023,15 +1044,19 @@ describe('WorkoutExerciseCard', () => {
     expect(wrapper.emitted('logged')![0]).toEqual([false])
   })
 
+  // facelift: borrar la serie vive en el PIE del cajón de edición (la fila
+  // ya no lleva icono) — tocar la fila abre el cajón, y ahí se borra
   it('deletes a set via actions.deleteSet after confirming with a real click', async () => {
     const actions = makeActions()
-    const wrapper = mountCard({ actions })
+    mountCard({ actions })
 
-    await wrapper.find('[data-testid="delete-set-1"]').trigger('click')
+    await byTestId('edit-set-1').trigger('click')
+    await flushPromises()
+    await byTestId('delete-set-1').trigger('click')
     await flushPromises()
     expect(actions.deleteSet).not.toHaveBeenCalled()
 
-    await wrapper.find('[data-testid="confirm-delete-set-1"]').trigger('click')
+    await byTestId('confirm-delete-set-1').trigger('click')
     await flushPromises()
 
     expect(actions.deleteSet).toHaveBeenCalledWith(20, 1)
@@ -1039,17 +1064,19 @@ describe('WorkoutExerciseCard', () => {
 
   it('cancelling the delete-set confirm never calls actions.deleteSet', async () => {
     const actions = makeActions()
-    const wrapper = mountCard({ actions })
+    mountCard({ actions })
 
-    await wrapper.find('[data-testid="delete-set-1"]').trigger('click')
+    await byTestId('edit-set-1').trigger('click')
+    await flushPromises()
+    await byTestId('delete-set-1').trigger('click')
     await flushPromises()
 
-    await wrapper.find('[data-testid="cancel-delete-set-1"]').trigger('click')
+    await byTestId('cancel-delete-set-1').trigger('click')
     await flushPromises()
 
     expect(actions.deleteSet).not.toHaveBeenCalled()
-    // el cancelar debe devolver el botón de borrar, no dejar la fila colgada en confirmación
-    expect(wrapper.find('[data-testid="delete-set-1"]').exists()).toBe(true)
+    // el cancelar debe devolver el botón de borrar, no dejar el pie colgado en confirmación
+    expect(byTestId('delete-set-1').exists()).toBe(true)
   })
 
   describe('item 7: confirm/cancel swap animation', () => {
@@ -1079,7 +1106,9 @@ describe('WorkoutExerciseCard', () => {
 
     it('the delete-set swap enters via bk-pop-soft when confirming', async () => {
       const wrapper = mountReal()
-      await wrapper.find('[data-testid="delete-set-1"]').trigger('click')
+      await byTestId('edit-set-1').trigger('click')
+      await flushPromises()
+      await byTestId('delete-set-1').trigger('click')
       await flushPromises()
 
       const confirmBtn = document.querySelector('[data-testid="confirm-delete-set-1"]')
@@ -1089,7 +1118,9 @@ describe('WorkoutExerciseCard', () => {
 
     it('the remove-exercise swap enters via bk-pop-soft when confirming', async () => {
       const wrapper = mountReal()
-      await wrapper.find('[data-testid="remove-exercise-20"]').trigger('click')
+      await byTestId('exercise-menu-20').trigger('click')
+      await flushPromises()
+      await byTestId('remove-exercise-20').trigger('click')
       await flushPromises()
 
       const confirmBtn = document.querySelector('[data-testid="confirm-remove-exercise-20"]')
@@ -1100,13 +1131,14 @@ describe('WorkoutExerciseCard', () => {
 
   it('removes the exercise via actions.removeExercise after confirming with a real click', async () => {
     const actions = makeActions()
-    const wrapper = mountCard({ actions })
+    mountCard({ actions })
 
-    await wrapper.find('[data-testid="remove-exercise-20"]').trigger('click')
+    await openMenu(20)
+    await byTestId('remove-exercise-20').trigger('click')
     await flushPromises()
     expect(actions.removeExercise).not.toHaveBeenCalled()
 
-    await wrapper.find('[data-testid="confirm-remove-exercise-20"]').trigger('click')
+    await byTestId('confirm-remove-exercise-20').trigger('click')
     await flushPromises()
 
     expect(actions.removeExercise).toHaveBeenCalledWith(20)
@@ -1116,7 +1148,7 @@ describe('WorkoutExerciseCard', () => {
   // cancelar directamente"): confirmar solo protege trabajo ya hecho
   it('removes an exercise with no logged sets straight away, without the confirm step', async () => {
     const actions = makeActions()
-    const wrapper = mountCard({
+    mountCard({
       workoutExercise: cardioWorkoutExercise,
       exercise: cardioExercise,
       exerciseIds: [30],
@@ -1124,16 +1156,17 @@ describe('WorkoutExerciseCard', () => {
     })
     await flushPromises()
 
-    await wrapper.find('[data-testid="remove-exercise-30"]').trigger('click')
+    await openMenu(30)
+    await byTestId('remove-exercise-30').trigger('click')
     await flushPromises()
 
     expect(actions.removeExercise).toHaveBeenCalledWith(30)
-    expect(wrapper.find('[data-testid="confirm-remove-exercise-30"]').exists()).toBe(false)
+    expect(byTestId('confirm-remove-exercise-30').exists()).toBe(false)
   })
 
   it('still asks for confirmation once something is logged (the sets, not the measurement, decide)', async () => {
     const actions = makeActions()
-    const wrapper = mountCard({
+    mountCard({
       workoutExercise: {
         ...cardioWorkoutExercise,
         sets: [{ id: 9, set_number: 1, reps: null, weight_kg: null, duration_seconds: 600, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' }],
@@ -1144,35 +1177,94 @@ describe('WorkoutExerciseCard', () => {
     })
     await flushPromises()
 
-    await wrapper.find('[data-testid="remove-exercise-30"]').trigger('click')
+    await openMenu(30)
+    await byTestId('remove-exercise-30').trigger('click')
     await flushPromises()
 
     expect(actions.removeExercise).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="confirm-remove-exercise-30"]').exists()).toBe(true)
+    expect(byTestId('confirm-remove-exercise-30').exists()).toBe(true)
   })
 
   it('reorders via actions.reorder with the full id list when moving down', async () => {
     const actions = makeActions()
-    const wrapper = mountCard({ actions, exerciseIds: [20, 30] })
+    mountCard({ actions, exerciseIds: [20, 30] })
 
-    await wrapper.find('[data-testid="move-down-20"]').trigger('click')
+    await openMenu(20)
+    await byTestId('move-down-20').trigger('click')
     await flushPromises()
 
     expect(actions.reorder).toHaveBeenCalledWith([30, 20])
   })
 
-  it('hides the move-up control on the first exercise', () => {
-    const wrapper = mountCard({ exerciseIds: [20, 30] })
-    expect(wrapper.find('[data-testid="move-up-20"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="move-down-20"]').exists()).toBe(true)
+  it('hides the move-up control on the first exercise', async () => {
+    mountCard({ exerciseIds: [20, 30] })
+    await openMenu(20)
+    expect(byTestId('move-up-20').exists()).toBe(false)
+    expect(byTestId('move-down-20').exists()).toBe(true)
+  })
+
+  // facelift: GHOST ROWS — las series pendientes del objetivo de rutina como
+  // filas con check de un toque (el gesto central del rediseño)
+  describe('facelift: ghost rows + one-tap check', () => {
+    it('renders max(0, target−efectivas) ghosts from the routine target, with the check only on the first', async () => {
+      mountCard({ routines, routineId: 1 })
+      await flushPromises()
+      // target 3, 1 efectiva → 2 ghosts
+      expect(byTestId('ghost-set-20-0').exists()).toBe(true)
+      expect(byTestId('ghost-set-20-1').exists()).toBe(true)
+      expect(byTestId('ghost-set-20-2').exists()).toBe(false)
+      expect(byTestId('ghost-check-20').exists()).toBe(true)
+    })
+
+    it('a free exercise (no routine target) renders exactly one ghost', async () => {
+      mountCard()
+      await flushPromises()
+      expect(byTestId('ghost-set-20-0').exists()).toBe(true)
+      expect(byTestId('ghost-set-20-1').exists()).toBe(false)
+    })
+
+    it('tapping the check logs the prefilled defaults through actions.logSet (same path as the drawer: emits logged)', async () => {
+      const actions = makeActions()
+      const wrapper = mountCard({ actions, routines, routineId: 1, restEnabled: false })
+      await flushPromises()
+
+      await byTestId('ghost-check-20').trigger('click')
+      await flushPromises()
+
+      // prefill = última serie EFECTIVA de la sesión (5 × 100), item 2
+      expect(actions.logSet).toHaveBeenCalledWith(20, {
+        is_warmup: false,
+        reps: 5,
+        weight_kg: 100,
+        load_mode: 'weight',
+      })
+      expect(wrapper.emitted('logged')![0]).toEqual([false])
+    })
+
+    it('tapping the ghost ROW opens the drawer instead of logging blind', async () => {
+      mountCard({ routines, routineId: 1 })
+      await flushPromises()
+      expect(document.body.querySelector('form')).toBeNull()
+
+      await byTestId('ghost-set-20-0').find('button').trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('form')).not.toBeNull()
+    })
+
+    it('cardio never renders ghosts (its model is the two actions)', async () => {
+      mountCard({ workoutExercise: cardioWorkoutExercise, exercise: cardioExercise, exerciseIds: [30] })
+      await flushPromises()
+      expect(byTestId('ghost-set-30-0').exists()).toBe(false)
+    })
   })
 
   it('a rejected reorder (move-down) surfaces a toast instead of failing silently', async () => {
     const toast = useToastStore()
     const actions = makeActions({ reorder: vi.fn().mockRejectedValueOnce(new Error('conflict')) })
 
-    const wrapper = mountCard({ actions, exerciseIds: [20, 30] })
-    await wrapper.find('[data-testid="move-down-20"]').trigger('click')
+    mountCard({ actions, exerciseIds: [20, 30] })
+    await openMenu(20)
+    await byTestId('move-down-20').trigger('click')
     await flushPromises()
 
     expect(toast.toasts.length).toBeGreaterThan(0)
@@ -1296,12 +1388,15 @@ describe('v0.5.0 superseries: rest gating and chips', () => {
   // v0.9.1 (zurdi: "el descanso debería estar solo al final de la
   // superserie"): el control de descanso ENTERO se esconde en los miembros
   // no finales — el descanso es de la ronda, y la ronda la cierra el último
-  it('v0.9.1: the rest control is hidden on a non-last member and present on the last one', () => {
+  it('v0.9.1: the rest control is hidden on a non-last member and present on the last one', async () => {
     const nonLast = mountCard({ supersetLabel: 'A', supersetLast: false })
-    expect(nonLast.find('[data-testid="rest-toggle-20"]').exists()).toBe(false)
+    await openMenu(20)
+    expect(byTestId('rest-toggle-20').exists()).toBe(false)
     nonLast.unmount()
+    document.body.innerHTML = ''
 
-    const last = mountCard({ supersetLabel: 'A', supersetLast: true })
-    expect(last.find('[data-testid="rest-toggle-20"]').exists()).toBe(true)
+    mountCard({ supersetLabel: 'A', supersetLast: true })
+    await openMenu(20)
+    expect(byTestId('rest-toggle-20').exists()).toBe(true)
   })
 })

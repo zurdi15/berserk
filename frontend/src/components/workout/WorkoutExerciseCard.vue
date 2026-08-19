@@ -12,7 +12,6 @@ import type {
   SetOut,
   WorkoutExerciseOut,
 } from '@/api/domain'
-import { exerciseImageUrl } from '@/api/domain'
 import { primaryRune as resolvePrimaryRune } from '@/lib/runeResolve'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
@@ -24,9 +23,10 @@ import {
   type PersistedCardioCountdown,
 } from '@/utils/uiPrefs'
 import { formatLoad } from '@/utils/units'
-import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
+import BkCheck from '@/lib/BkCheck.vue'
+import BkMedia from '@/lib/BkMedia.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkStepper from '@/lib/BkStepper.vue'
@@ -134,6 +134,9 @@ const drawerOpen = ref(false)
 const editingSet = ref<SetOut | null>(null)
 const restPickerOpen = ref(false)
 const history = ref<ExerciseHistoryOut | null>(null)
+// facelift: sheet kebab del ejercicio — reordenar, descanso, bloque y quitar
+// viven ahí; la card queda para lo que pasa en el banco (series y nota)
+const menuOpen = ref(false)
 
 // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: countdown "resucitado" que esta
 // tarjeta (y no el cajón/SetForm) muestra directamente en el cuerpo de la
@@ -322,24 +325,113 @@ async function onDrawerSubmit(value: SetIn, keepOpen: boolean) {
       closeDrawer()
       return
     }
-    const result = await props.actions.logSet(props.workoutExercise.id, value)
-    // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: cualquier serie logueada para
-    // este ejercicio limpia un countdown persistido para él — venga del
-    // countdown recién terminado solo (onCountdownDone → submit) o de un
-    // registro MANUAL mientras corría (el usuario no esperó, logueó a
-    // mano): nunca debe quedar una entrada "zombie" en localStorage tras un
-    // logueo real de este mismo ejercicio
-    clearPersistedCardioCountdownForThisExercise()
-    // v0.9.4 (zurdi): un bloque de cardio no descansa — ni control ni timer
-    if (props.restEnabled && autoRestFires.value && !isCardio.value) {
-      // nombre del ejercicio → cuerpo de la notificación de fin de descanso
-      restTimer.start(effectiveRestSeconds.value, name.value)
-    }
-    if (result.new_records.length) emit('recorded', result.new_records)
-    emit('logged', result.new_records.length > 0)
+    await submitNewSet(value)
     if (!keepOpen) closeDrawer()
   } catch (error) {
     toastApiError(error)
+  }
+}
+
+// núcleo compartido del logueo de una serie NUEVA: cajón (onDrawerSubmit) y
+// check de ghost (quickLog) pasan por aquí — descanso, PRs y NeonPulse salen
+// idénticos vengan de donde vengan
+async function submitNewSet(value: SetIn) {
+  const result = await props.actions.logSet(props.workoutExercise.id, value)
+  // v0.3.2 CARDIO-COUNTDOWN PERSISTENCE: cualquier serie logueada para
+  // este ejercicio limpia un countdown persistido para él — venga del
+  // countdown recién terminado solo (onCountdownDone → submit) o de un
+  // registro MANUAL mientras corría (el usuario no esperó, logueó a
+  // mano): nunca debe quedar una entrada "zombie" en localStorage tras un
+  // logueo real de este mismo ejercicio
+  clearPersistedCardioCountdownForThisExercise()
+  // v0.9.4 (zurdi): un bloque de cardio no descansa — ni control ni timer
+  if (props.restEnabled && autoRestFires.value && !isCardio.value) {
+    // nombre del ejercicio → cuerpo de la notificación de fin de descanso
+    restTimer.start(effectiveRestSeconds.value, name.value)
+  }
+  if (result.new_records.length) emit('recorded', result.new_records)
+  emit('logged', result.new_records.length > 0)
+}
+
+// ── facelift: GHOST ROWS — la serie pendiente como fila con check ─────────
+// La rutina define el objetivo (target_sets); las series que faltan se
+// pintan como filas "fantasma" prefijadas con resolveNewSetDefaults (esta
+// sesión > sesión anterior > objetivo de rutina). Tocar el CHECK registra la
+// serie tal cual, de un toque, por el MISMO camino que el cajón (descanso,
+// PR, neón — ver submitNewSet); tocar la FILA abre el cajón para ajustarla.
+// Ejercicios libres (sin objetivo) y el editor retro pintan UNA ghost (la
+// "siguiente serie"); cardio nunca (su modelo son las dos acciones).
+const targetSets = computed<number | null>(() => {
+  const routine = props.routineId ? props.routines.find((r) => r.id === props.routineId) : undefined
+  return routine?.exercises.find((e) => e.exercise_id === props.workoutExercise.exercise_id)?.target_sets ?? null
+})
+
+const pendingGhostCount = computed(() => {
+  if (isCardio.value || !props.exercise) return 0
+  if (props.live && targetSets.value != null) {
+    return Math.max(0, targetSets.value - effectiveSetCount.value)
+  }
+  return 1
+})
+
+// SetIn listo para el check de un toque; null = el prefill no alcanza para
+// loguear a ciegas (se abre el cajón en su lugar)
+const ghostQuickBody = computed<SetIn | null>(() => {
+  const defaults = drawerDefaults.value
+  if (!defaults || editingSet.value) return null
+  const measurement = props.exercise?.measurement
+  const body: SetIn = { is_warmup: false }
+  if (measurement === 'strength') {
+    if (defaults.reps == null || defaults.weight_kg == null) return null
+    body.reps = defaults.reps
+    body.weight_kg = defaults.weight_kg
+    if (defaults.load_mode) body.load_mode = defaults.load_mode
+  } else if (measurement === 'bodyweight') {
+    if (defaults.reps == null) return null
+    body.reps = defaults.reps
+    if (defaults.weight_kg != null) {
+      body.weight_kg = defaults.weight_kg
+      if (defaults.load_mode) body.load_mode = defaults.load_mode
+    }
+  } else if (measurement === 'timed') {
+    if (defaults.duration_seconds == null) return null
+    body.duration_seconds = defaults.duration_seconds
+  } else {
+    return null
+  }
+  return body
+})
+
+// etiqueta de la fila ghost: el prefill formateado como se formatearía la
+// serie ya hecha (mismo idiom que formatSetValue)
+const ghostLabel = computed(() => {
+  const body = ghostQuickBody.value
+  const measurement = props.exercise?.measurement
+  if (!body) return t('workout.nextSet')
+  if (measurement === 'strength' || (measurement === 'bodyweight' && body.weight_kg != null)) {
+    return `${body.reps} × ${formatLoad(body.weight_kg ?? 0, props.units, body.load_mode ?? 'weight')}`
+  }
+  if (measurement === 'bodyweight') return `${body.reps} ${t('workout.reps')}`
+  if (measurement === 'timed') return formatDuration(body.duration_seconds ?? 0)
+  return t('workout.nextSet')
+})
+
+const quickLogging = ref(false)
+
+async function quickLog() {
+  if (quickLogging.value) return
+  const body = ghostQuickBody.value
+  if (!body) {
+    openNew()
+    return
+  }
+  quickLogging.value = true
+  try {
+    await submitNewSet(body)
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    quickLogging.value = false
   }
 }
 
@@ -434,6 +526,9 @@ async function onDeleteSet(setId: number) {
   deleteConfirming.value = null
   try {
     await props.actions.deleteSet(props.workoutExercise.id, setId)
+    // facelift: borrar vive en el pie del cajón de edición — la serie ya no
+    // existe, así que el cajón se cierra con ella
+    closeDrawer()
   } catch (error) {
     toastApiError(error)
   }
@@ -502,6 +597,7 @@ function onRemoveClick() {
 
 async function confirmRemove() {
   removeConfirming.value = false
+  menuOpen.value = false
   try {
     await props.actions.removeExercise(props.workoutExercise.id)
   } catch (error) {
@@ -541,56 +637,45 @@ async function moveDown() {
          ya no pinta nada de superserie salvo el chip "Siguiente"; el acento
          lateral queda solo para cardio. supersetLabel se conserva como prop
          porque sigue gobernando el gating del auto-descanso (autoRestFires). -->
-    <div class="flex items-center justify-between mb-2">
-      <div class="flex items-center gap-2 min-w-0">
-        <!-- v0.12.0 (zurdi: "que se vea la imagen en la card para mejor
-             visual"): thumb del ejercicio si la biblioteca le puso foto -->
-        <img
-          v-if="exercise?.has_image"
-          :src="exerciseImageUrl(exercise.id)"
-          alt=""
-          class="w-9 h-9 rounded-sm object-cover shrink-0"
+    <!-- facelift: header estilo referencia — la FOTO del ejercicio como
+         protagonista (BkMedia, con pozo rúnico de fallback: v0.12.0 "que se
+         vea la imagen" elevado a pieza central), nombre en caja mixta y una
+         sublínea con runa + progreso de series. Los controles de gestión
+         (reordenar, descanso, bloque, quitar) se mudan al sheet kebab -->
+    <div class="flex items-start justify-between gap-3 mb-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <BkMedia
+          :exercise="exercise"
+          :rune="primaryRune"
+          size="md"
           :data-testid="`exercise-image-${workoutExercise.id}`"
         />
-        <BkRune v-if="primaryRune" :name="primaryRune" :size="14" />
-        <h3 class="font-display font-semibold text-ink truncate">{{ name }}</h3>
-        <span
-          v-if="supersetNext"
-          :data-testid="`superset-next-${workoutExercise.id}`"
-          class="text-xs text-aurora bg-aurora/15 border border-aurora rounded-sm px-1.5 py-0.5 shrink-0"
-        >
-          {{ t('workout.supersetNext') }}
-        </span>
-        <span
-          v-if="effectiveSetCount"
-          class="bk-metric text-xs text-ink-faint shrink-0"
-          :data-testid="`set-count-${workoutExercise.id}`"
-        >
-          · {{ effectiveSetCount }}
-        </span>
+        <div class="min-w-0">
+          <h3 class="bk-subtitle text-lg text-ink truncate">{{ name }}</h3>
+          <p class="flex items-center gap-1.5 text-xs text-ink-faint">
+            <BkRune v-if="primaryRune" :name="primaryRune" :size="12" />
+            <span
+              v-if="effectiveSetCount"
+              class="bk-metric"
+              :data-testid="`set-count-${workoutExercise.id}`"
+            >{{ effectiveSetCount }}<template v-if="live && targetSets != null && targetSets >= effectiveSetCount">/{{ targetSets }}</template></span>
+            <span
+              v-if="supersetNext"
+              :data-testid="`superset-next-${workoutExercise.id}`"
+              class="text-xs text-aurora bg-aurora/15 border border-aurora rounded-full px-1.5 py-0.5 shrink-0"
+            >{{ t('workout.supersetNext') }}</span>
+          </p>
+        </div>
       </div>
-      <div class="flex items-center gap-1 shrink-0">
-        <button
-          v-if="!isFirst"
-          type="button"
-          :data-testid="`move-up-${workoutExercise.id}`"
-          class="bk-press w-8 h-8 text-ink-muted hover:text-ink"
-          :aria-label="t('workout.moveUp')"
-          @click="moveUp"
-        >
-          ↑
-        </button>
-        <button
-          v-if="!isLast"
-          type="button"
-          :data-testid="`move-down-${workoutExercise.id}`"
-          class="bk-press w-8 h-8 text-ink-muted hover:text-ink"
-          :aria-label="t('workout.moveDown')"
-          @click="moveDown"
-        >
-          ↓
-        </button>
-      </div>
+      <button
+        type="button"
+        :data-testid="`exercise-menu-${workoutExercise.id}`"
+        class="bk-press w-10 h-10 rounded-full text-xl text-ink-muted hover:text-ink hover:bg-slab shrink-0"
+        :aria-label="t('workout.exerciseMenu')"
+        @click="menuOpen = true"
+      >
+        ⋯
+      </button>
     </div>
 
     <!-- v0.12.0: nota persistente del ejercicio ("asiento en el 5") — la
@@ -608,178 +693,89 @@ async function moveDown() {
       {{ note || t('workout.noteAdd') }}
     </button>
 
-    <!-- v0.9.1 (zurdi: "el descanso debería estar solo al final de la
-         superserie — ahora aparece después de cada ejercicio"): el control
-         de descanso entero se esconde en los miembros NO finales de un
-         grupo — el descanso es un concepto de la RONDA, y la ronda la cierra
-         el último miembro (autoRestFires, la misma condición que ya gateaba
-         el disparo automático; ahora también gobierna la UI).
-         v0.9.4 (zurdi): un bloque de cardio no tiene descanso — ni este
-         control ni el disparo automático (ver onDrawerSubmit). -->
-    <div v-if="restEnabled && autoRestFires && !isCardio" class="mb-2">
-      <button
-        type="button"
-        class="bk-press text-xs text-ink-faint underline decoration-dotted"
-        :data-testid="`rest-toggle-${workoutExercise.id}`"
-        :aria-expanded="restPickerOpen ? 'true' : 'false'"
-        @click="restPickerOpen = !restPickerOpen"
-      >
-        {{ t('workout.restLabel', { seconds: effectiveRestSeconds }) }}
-      </button>
-      <div
-        v-if="restPickerOpen"
-        class="flex flex-wrap gap-1 mt-1"
-        :data-testid="`rest-picker-${workoutExercise.id}`"
-      >
-        <button
-          v-for="preset in REST_PRESETS"
-          :key="preset"
-          type="button"
-          class="bk-press px-2 py-1 rounded-sm border text-xs"
-          :class="preset === effectiveRestSeconds ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
-          :aria-pressed="preset === effectiveRestSeconds ? 'true' : 'false'"
-          :data-testid="`rest-preset-${workoutExercise.id}-${preset}`"
-          @click="pickRest(preset)"
-        >
-          {{ preset }}s
-        </button>
-      </div>
-      <!-- item 7 (v0.4.3, zurdi): entrada manual además de los presets — un
-           gimnasta puede querer 75s, no solo los saltos de 30 de los chips.
-           Visible junto a los presets (no tras un chip "otro" aparte): ya
-           está detrás del mismo toggle rest-toggle-*, un nivel de revelado
-           es suficiente. w-36 (bounded, item 11): BkStepper es w-full por
-           dentro, así que necesita un contenedor con ancho propio para no
-           estirarse a todo el ancho de la tarjeta — un stepper de descanso
-           no pide ese protagonismo. -->
-      <div v-if="restPickerOpen" class="w-36 mt-2" :data-testid="`rest-manual-${workoutExercise.id}`">
-        <BkStepper
-          :model-value="effectiveRestSeconds"
-          size="compact"
-          :step="REST_STEP_SECONDS"
-          :min="REST_MIN_SECONDS"
-          :max="REST_MAX_SECONDS"
-          suffix="s"
-          @update:model-value="pickRestManual"
-        />
-      </div>
-    </div>
-
-    <!-- v0.18.1 (zurdi: "los bloques deberían poder cambiarse también mid
-         entreno"): picker de bloque con el mismo idiom que el de descanso —
-         línea punteada que revela chips (bloques existentes, sin bloque, o
-         estrenar uno). Solo en vivo: el editor retro no implementa la acción. -->
-    <div v-if="live && actions.setExerciseBlock" class="mb-2">
-      <button
-        type="button"
-        class="bk-press text-xs text-ink-faint underline decoration-dotted"
-        :data-testid="`block-toggle-${workoutExercise.id}`"
-        :aria-expanded="blockPickerOpen ? 'true' : 'false'"
-        @click="blockPickerOpen = !blockPickerOpen"
-      >
-        {{ t('workout.blockLabel', { name: currentBlockName }) }}
-      </button>
-      <div
-        v-if="blockPickerOpen"
-        class="flex flex-wrap gap-1 mt-1"
-        :data-testid="`block-picker-${workoutExercise.id}`"
-      >
-        <button
-          v-if="workoutExercise.block_label != null"
-          type="button"
-          class="bk-press px-2 py-1 rounded-sm border text-xs border-line text-ink-muted"
-          :data-testid="`block-pick-none-${workoutExercise.id}`"
-          @click="pickBlock(null)"
-        >
-          {{ t('routines.blockNone') }}
-        </button>
-        <button
-          v-for="label in blockLabels"
-          :key="label"
-          type="button"
-          class="bk-press px-2 py-1 rounded-sm border text-xs"
-          :class="label === workoutExercise.block_label ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
-          :aria-pressed="label === workoutExercise.block_label ? 'true' : 'false'"
-          :data-testid="`block-pick-${workoutExercise.id}-${label}`"
-          @click="pickBlock(label)"
-        >
-          {{ label }}
-        </button>
-        <button
-          type="button"
-          class="bk-press px-2 py-1 rounded-sm border border-line text-xs text-ink-muted"
-          :data-testid="`block-new-${workoutExercise.id}`"
-          @click="requestNewBlock"
-        >
-          {{ t('routines.newBlockOption') }}
-        </button>
-      </div>
-    </div>
-
     <!-- v0.11.7: borrar una serie difumina su fila mientras las de abajo
          suben a cerrar el hueco (bk-remove) -->
-    <div v-if="workoutExercise.sets.length" class="relative space-y-1 border-b border-line pb-3 mb-3">
+    <!-- facelift: filas de serie estilo referencia — valor grande + CHECK
+         lleno a la derecha; tocar la FILA abre el cajón de edición (borrar
+         vive en el pie del cajón). Las acciones inline de editar/borrar de
+         antes mueren: una fila = un gesto. -->
+    <div v-if="workoutExercise.sets.length || pendingGhostCount" class="relative space-y-1.5 border-b border-line pb-3 mb-3">
       <TransitionGroup name="bk-remove">
       <div
         v-for="set in workoutExercise.sets"
         :key="set.id"
         :data-testid="`set-row-${set.id}`"
-        class="flex items-center justify-between"
+        class="flex items-center gap-2"
         :class="set.is_warmup && 'text-ink-faint'"
       >
-        <span class="bk-metric text-sm">
+        <button
+          v-if="exercise"
+          type="button"
+          :data-testid="`edit-set-${set.id}`"
+          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1.5 hover:bg-slab"
+          :aria-label="t('common.edit')"
+          @click="openEdit(set)"
+        >
+          <span class="bk-metric text-base">
+            <template v-if="!isCardio">{{ set.set_number }}. </template>{{ formatSetValue(set) }}
+            <span v-if="set.rpe" class="text-ink-faint text-sm"> · RPE {{ set.rpe }}</span>
+          </span>
+        </button>
+        <span v-else class="flex-1 min-w-0 bk-metric text-base px-2 py-1.5">
           <template v-if="!isCardio">{{ set.set_number }}. </template>{{ formatSetValue(set) }}
-          <span v-if="set.rpe" class="text-ink-faint"> · RPE {{ set.rpe }}</span>
         </span>
-
-        <!-- item 7: el swap borrar↔confirmar/cancelar anima con el mismo
-             idioma que el resto de swaps de la app (bk-pop-soft, out-in —
-             ver ShellView.vue). :key en ambas ramas porque son del mismo
-             tag (<div>): sin él, Vue las trataría como el mismo nodo
-             parcheado in-place y la Transition nunca dispararía -->
-        <Transition name="bk-pop-soft" mode="out-in">
-          <div v-if="deleteConfirming !== set.id" key="actions" class="flex items-center gap-1 shrink-0">
-            <BkActionBtn
-              v-if="exercise"
-              icon="edit"
-              :data-testid="`edit-set-${set.id}`"
-              :aria-label="t('common.edit')"
-              @click="openEdit(set)"
-            />
-            <BkActionBtn
-              icon="delete"
-              :data-testid="`delete-set-${set.id}`"
-              :aria-label="t('workout.deleteSet')"
-              @click="deleteConfirming = set.id"
-            />
-          </div>
-          <div v-else key="confirm" class="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              :data-testid="`confirm-delete-set-${set.id}`"
-              class="text-danger text-xs px-2 py-1 border border-danger rounded-sm"
-              @click="onDeleteSet(set.id)"
-            >
-              {{ t('common.confirm') }}
-            </button>
-            <button
-              type="button"
-              :data-testid="`cancel-delete-set-${set.id}`"
-              class="text-ink-faint text-xs px-2 py-1"
-              @click="deleteConfirming = null"
-            >
-              {{ t('common.cancel') }}
-            </button>
-          </div>
-        </Transition>
+        <!-- check lleno SIN listener: el estado "hecha" no se des-marca (eso
+             sería borrar — vive en el pie del cajón de edición) -->
+        <BkCheck
+          :model-value="true"
+          size="lg"
+          :aria-label="t('workout.setDone', { n: set.set_number })"
+        />
       </div>
       </TransitionGroup>
+      <!-- GHOSTS: las series que faltan hasta el objetivo de la rutina (o la
+           "siguiente serie" en libres/editor), prefijadas — el check las
+           registra de un toque, la fila abre el cajón para ajustar. La
+           primera es la "serie activa" (resaltada, como en la referencia). -->
+      <div
+        v-for="g in pendingGhostCount"
+        :key="`ghost-${g}`"
+        :data-testid="`ghost-set-${workoutExercise.id}-${g - 1}`"
+        class="flex items-center gap-2 rounded-md"
+        :class="g === 1 && 'bg-aurora/5 outline outline-1 outline-aurora/30'"
+      >
+        <button
+          v-if="exercise"
+          type="button"
+          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1.5"
+          :aria-label="t('workout.nextSet')"
+          @click="openNew"
+        >
+          <!-- numeración continua con set_number (que cuenta TODAS las
+               series, calentamientos incluidos), no con las efectivas -->
+          <span class="bk-metric text-base" :class="g === 1 ? 'text-ink-muted' : 'text-ink-faint'">
+            <template v-if="!isCardio">{{ workoutExercise.sets.length + g }}. </template>{{ ghostLabel }}
+          </span>
+        </button>
+        <BkCheck
+          v-if="g === 1"
+          :model-value="false"
+          size="lg"
+          :disabled="quickLogging || !exercise"
+          :data-testid="`ghost-check-${workoutExercise.id}`"
+          :aria-label="t('workout.logSet')"
+          @update:model-value="quickLog"
+        />
+        <span v-else class="w-9 h-9 shrink-0" aria-hidden="true" />
+      </div>
     </div>
     <!-- v0.17.0 (zurdi): el hint de "última vez" deja la línea densa truncada
          y pasa al mismo bloque multilínea del drawer — fecha en su línea y
-         cada serie en la suya, menos densidad en la card -->
+         cada serie en la suya, menos densidad en la card. facelift: visible
+         mientras no haya NINGUNA serie registrada (las ghosts prefijadas no
+         lo sustituyen: esto es la sesión anterior completa, contexto) -->
     <div
-      v-else-if="historyLines.length"
+      v-if="!workoutExercise.sets.length && historyLines.length"
       class="text-xs text-ink-faint mb-3 space-y-0.5"
       data-testid="card-history-hint"
     >
@@ -826,14 +822,11 @@ async function moveDown() {
         {{ formatCardioEntry(entry) }}
       </p>
     </div>
-    <!-- v0.9.4 (zurdi): añadir serie y quitar ejercicio comparten fila —
-         quitar pasa de botón "Quitar" a BkActionBtn de eliminar (como el
-         resto de sitios), a la derecha; su swap de confirmación (item 7,
-         bk-pop-soft/out-in) queda tal cual. v0.11.2 (zurdi: "quiero lo
-         mismo en cardio, registrar tiempo a la izquierda y el borrar a la
-         derecha en vez de en una fila cada uno"): las acciones de cardio
-         viven en ESTA misma fila, ya no en una propia a ancho completo -->
-    <div class="mt-3 flex items-center justify-between gap-2">
+    <!-- facelift: el pie queda para el trabajo del banco — añadir serie
+         extra (superar el objetivo) o las dos acciones de cardio (v0.10.0
+         "no inline controls y formulario"); quitar el ejercicio vive en el
+         kebab (acción de gestión, no de banco) -->
+    <div class="mt-3 flex items-center gap-2">
       <BkButton
         v-if="exercise && !isCardio"
         variant="ghost"
@@ -866,30 +859,6 @@ async function moveDown() {
           {{ t('workout.cardioStart', { duration: formatDuration(cardioTargetSeconds) }) }}
         </BkButton>
       </div>
-      <span v-else />
-      <Transition name="bk-pop-soft" mode="out-in">
-        <div v-if="!removeConfirming" key="remove" class="shrink-0">
-          <BkActionBtn
-            icon="delete"
-            :data-testid="`remove-exercise-${workoutExercise.id}`"
-            :aria-label="t('workout.remove')"
-            @click="onRemoveClick"
-          />
-        </div>
-        <div v-else key="confirm" class="flex gap-2 shrink-0">
-          <BkButton
-            variant="danger"
-            size="sm"
-            :data-testid="`confirm-remove-exercise-${workoutExercise.id}`"
-            @click="confirmRemove"
-          >
-            {{ t('common.confirm') }}
-          </BkButton>
-          <BkButton variant="ghost" size="sm" @click="removeConfirming = false">
-            {{ t('common.cancel') }}
-          </BkButton>
-        </div>
-      </Transition>
     </div>
 
     <!-- v0.11.5 (zurdi): el "cuánto tiempo" que faltaba antes del countdown —
@@ -902,6 +871,158 @@ async function moveDown() {
       @close="cardioStartOpen = false"
       @start="startCardio"
     />
+
+    <!-- facelift: sheet kebab del ejercicio — la gestión que antes se apilaba
+         en el cuerpo de la card (reordenar, descanso con presets+stepper,
+         bloque, quitar), con los mismos testids/aria de siempre -->
+    <BkSheet :open="menuOpen" :title="t('workout.exerciseMenu')" @close="menuOpen = false">
+      <div class="space-y-4" :data-testid="`exercise-menu-sheet-${workoutExercise.id}`">
+        <!-- reordenar: mismos move-up/move-down, ahora como filas del sheet -->
+        <div v-if="!isFirst || !isLast" class="flex gap-2">
+          <BkButton
+            v-if="!isFirst"
+            variant="ghost"
+            class="flex-1"
+            :data-testid="`move-up-${workoutExercise.id}`"
+            :aria-label="t('workout.moveUp')"
+            @click="moveUp"
+          >
+            ↑ {{ t('workout.moveUp') }}
+          </BkButton>
+          <BkButton
+            v-if="!isLast"
+            variant="ghost"
+            class="flex-1"
+            :data-testid="`move-down-${workoutExercise.id}`"
+            :aria-label="t('workout.moveDown')"
+            @click="moveDown"
+          >
+            ↓ {{ t('workout.moveDown') }}
+          </BkButton>
+        </div>
+
+        <!-- v0.9.1: el control de descanso solo en quien cierra la ronda
+             (autoRestFires); v0.9.4: cardio no descansa. item 7 (v0.4.3):
+             presets + stepper manual, mismo revelado de un nivel. -->
+        <div v-if="restEnabled && autoRestFires && !isCardio">
+          <button
+            type="button"
+            class="bk-press text-sm text-ink-muted underline decoration-dotted"
+            :data-testid="`rest-toggle-${workoutExercise.id}`"
+            :aria-expanded="restPickerOpen ? 'true' : 'false'"
+            @click="restPickerOpen = !restPickerOpen"
+          >
+            {{ t('workout.restLabel', { seconds: effectiveRestSeconds }) }}
+          </button>
+          <div
+            v-if="restPickerOpen"
+            class="flex flex-wrap gap-1 mt-2"
+            :data-testid="`rest-picker-${workoutExercise.id}`"
+          >
+            <button
+              v-for="preset in REST_PRESETS"
+              :key="preset"
+              type="button"
+              class="bk-press px-2 py-1 rounded-full border text-xs transition-colors"
+              :class="preset === effectiveRestSeconds ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+              :aria-pressed="preset === effectiveRestSeconds ? 'true' : 'false'"
+              :data-testid="`rest-preset-${workoutExercise.id}-${preset}`"
+              @click="pickRest(preset)"
+            >
+              {{ preset }}s
+            </button>
+          </div>
+          <div v-if="restPickerOpen" class="w-40 mt-2" :data-testid="`rest-manual-${workoutExercise.id}`">
+            <BkStepper
+              :model-value="effectiveRestSeconds"
+              size="compact"
+              :step="REST_STEP_SECONDS"
+              :min="REST_MIN_SECONDS"
+              :max="REST_MAX_SECONDS"
+              suffix="s"
+              @update:model-value="pickRestManual"
+            />
+          </div>
+        </div>
+
+        <!-- v0.18.1: picker de bloque (solo en vivo) — mismo idiom -->
+        <div v-if="live && actions.setExerciseBlock">
+          <button
+            type="button"
+            class="bk-press text-sm text-ink-muted underline decoration-dotted"
+            :data-testid="`block-toggle-${workoutExercise.id}`"
+            :aria-expanded="blockPickerOpen ? 'true' : 'false'"
+            @click="blockPickerOpen = !blockPickerOpen"
+          >
+            {{ t('workout.blockLabel', { name: currentBlockName }) }}
+          </button>
+          <div
+            v-if="blockPickerOpen"
+            class="flex flex-wrap gap-1 mt-2"
+            :data-testid="`block-picker-${workoutExercise.id}`"
+          >
+            <button
+              v-if="workoutExercise.block_label != null"
+              type="button"
+              class="bk-press px-2 py-1 rounded-full border text-xs border-line text-ink-muted transition-colors"
+              :data-testid="`block-pick-none-${workoutExercise.id}`"
+              @click="pickBlock(null)"
+            >
+              {{ t('routines.blockNone') }}
+            </button>
+            <button
+              v-for="label in blockLabels"
+              :key="label"
+              type="button"
+              class="bk-press px-2 py-1 rounded-full border text-xs transition-colors"
+              :class="label === workoutExercise.block_label ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+              :aria-pressed="label === workoutExercise.block_label ? 'true' : 'false'"
+              :data-testid="`block-pick-${workoutExercise.id}-${label}`"
+              @click="pickBlock(label)"
+            >
+              {{ label }}
+            </button>
+            <button
+              type="button"
+              class="bk-press px-2 py-1 rounded-full border border-line text-xs text-ink-muted transition-colors"
+              :data-testid="`block-new-${workoutExercise.id}`"
+              @click="requestNewBlock"
+            >
+              {{ t('routines.newBlockOption') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- quitar el ejercicio: swap confirmar/cancelar de siempre (item 7);
+             v0.11.5: sin series registradas quita directo, nada que proteger -->
+        <Transition name="bk-pop-soft" mode="out-in">
+          <BkButton
+            v-if="!removeConfirming"
+            key="remove"
+            variant="danger"
+            block
+            :data-testid="`remove-exercise-${workoutExercise.id}`"
+            :aria-label="t('workout.remove')"
+            @click="onRemoveClick"
+          >
+            {{ t('workout.remove') }}
+          </BkButton>
+          <div v-else key="confirm" class="flex gap-2">
+            <BkButton
+              variant="danger"
+              class="flex-1"
+              :data-testid="`confirm-remove-exercise-${workoutExercise.id}`"
+              @click="confirmRemove"
+            >
+              {{ t('common.confirm') }}
+            </BkButton>
+            <BkButton variant="ghost" class="flex-1" @click="removeConfirming = false">
+              {{ t('common.cancel') }}
+            </BkButton>
+          </div>
+        </Transition>
+      </div>
+    </BkSheet>
 
     <!-- v0.12.0: edición de la nota del ejercicio (sheets al FINAL del
          template, la regla de siempre) -->
@@ -937,6 +1058,42 @@ async function moveDown() {
         <div v-if="historyLines.length" class="text-xs text-ink-faint space-y-0.5" data-testid="drawer-history-hint">
           <p class="text-ink-muted">{{ t('workout.lastTime', { date: historyDateLabel }) }}</p>
           <p v-for="(line, i) in historyLines" :key="i" class="bk-metric">{{ line }}</p>
+        </div>
+        <!-- facelift: borrar la serie vive en el PIE del cajón de edición —
+             la fila de la card ya no lleva icono de borrar (una fila = un
+             gesto); mismo swap de confirmación de siempre -->
+        <div v-if="editingSet" class="border-t border-line pt-3">
+          <Transition name="bk-pop-soft" mode="out-in">
+            <BkButton
+              v-if="deleteConfirming !== editingSet.id"
+              key="delete"
+              variant="danger"
+              block
+              :data-testid="`delete-set-${editingSet.id}`"
+              :aria-label="t('workout.deleteSet')"
+              @click="deleteConfirming = editingSet.id"
+            >
+              {{ t('workout.deleteSet') }}
+            </BkButton>
+            <div v-else key="confirm" class="flex gap-2">
+              <BkButton
+                variant="danger"
+                class="flex-1"
+                :data-testid="`confirm-delete-set-${editingSet.id}`"
+                @click="onDeleteSet(editingSet.id)"
+              >
+                {{ t('common.confirm') }}
+              </BkButton>
+              <BkButton
+                variant="ghost"
+                class="flex-1"
+                :data-testid="`cancel-delete-set-${editingSet.id}`"
+                @click="deleteConfirming = null"
+              >
+                {{ t('common.cancel') }}
+              </BkButton>
+            </div>
+          </Transition>
         </div>
       </div>
     </BkSheet>

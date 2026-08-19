@@ -238,7 +238,7 @@ onMounted(() => {
         >
           <span aria-hidden="true">‹</span>
         </button>
-        <h1 class="font-display font-semibold uppercase tracking-wider text-sm text-ink truncate">
+        <h1 class="bk-title text-ink truncate">
           {{ t('workout.editTitle') }}
         </h1>
       </div>

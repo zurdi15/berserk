@@ -106,7 +106,7 @@ onBeforeUnmount(release)
   <div class="w-full flex items-center justify-between gap-2">
     <button
       type="button"
-      class="bk-press bk-slab select-none text-ink-muted hover:text-ink shrink-0"
+      class="bk-press bk-slab rounded-md select-none text-ink-muted hover:text-ink shrink-0"
       :class="size === 'compact' ? 'w-8 h-8 text-lg' : 'w-12 h-12 text-xl'"
       style="touch-action: manipulation"
       :aria-label="$t('common.decrease')"
@@ -157,7 +157,7 @@ onBeforeUnmount(release)
     </span>
     <button
       type="button"
-      class="bk-press bk-slab select-none text-aurora shrink-0"
+      class="bk-press bk-slab rounded-md select-none text-aurora shrink-0"
       :class="size === 'compact' ? 'w-8 h-8 text-lg' : 'w-12 h-12 text-xl'"
       style="touch-action: manipulation"
       :aria-label="$t('common.increase')"

@@ -115,7 +115,7 @@ function onTriggerKeydown(event: KeyboardEvent) {
       :aria-expanded="open ? 'true' : 'false'"
       :aria-controls="open ? gridId : undefined"
       :aria-labelledby="labelId"
-      class="bk-form-control w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink focus:border-aurora"
+      class="bk-form-control w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-3 text-ink focus:border-aurora"
       @click="toggleField"
       @keydown="onTriggerKeydown"
     >
@@ -132,7 +132,7 @@ function onTriggerKeydown(event: KeyboardEvent) {
           v-if="open"
           ref="panelEl"
           :style="panelStyle"
-          class="z-(--bk-z-sheet) bk-slab rounded-sm border border-line-strong overflow-hidden shadow-lg p-2"
+          class="z-(--bk-z-sheet) bk-slab rounded-md border border-line-strong overflow-hidden shadow-(--bk-shadow-float) p-2"
         >
           <div class="flex items-center gap-2 mb-2">
             <BkButton variant="ghost" size="sm" :aria-label="t('calendar.prevMonth')" @click="moveFocusedMonth(-1)">

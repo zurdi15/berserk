@@ -33,6 +33,7 @@ vi.mock('@/api/domain', () => ({
   listRoutines: vi.fn(() => Promise.resolve([])),
   listExercises: vi.fn(() => Promise.resolve([])),
   listMuscleGroups: vi.fn(() => Promise.resolve([])),
+  listWorkouts: vi.fn(() => Promise.resolve([])),
   adminListUsers: vi.fn(() => Promise.resolve([
     { id: 1, username: 'root-admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' },
   ])),
@@ -44,9 +45,12 @@ vi.mock('@/api/domain', () => ({
   adminDeleteInvite: vi.fn(),
 }))
 
+// facelift: Perfil es un HUB de listas (identidad + actividad + filas de
+// sección) — las secciones se abren por su fila (profile-link-{tab}) y
+// vuelven con profile-back; el hash sigue siendo la fuente de verdad
 describe('ProfileView', () => {
   // M9: al menos un test de este archivo abre un panel flotante real
-  // (BkSelect, vía la pestaña de perfil) que se registra en la pila de
+  // (BkSelect, vía la sección de ajustes) que se registra en la pila de
   // capas COMPARTIDA (layerStack.ts) — sin desmontar, ese registro nunca se
   // limpia (solo onBeforeUnmount lo hace) y queda filtrado para el resto de
   // tests del proceso. Un afterEach que desmonta cubre este archivo entero.
@@ -78,9 +82,7 @@ describe('ProfileView', () => {
   // attachTo: document.body (item 5, v0.4.2) — igual que library.spec.ts:
   // wrapper.isVisible() encadena getComputedStyle por el árbol de
   // ancestros, y happy-dom solo lo calcula bien para nodos conectados al
-  // documento real (un nodo detached devuelve display '' en vez de 'none',
-  // falso positivo de "visible"). afterEach ya desmonta con unmount(), que
-  // limpia el nodo adjuntado.
+  // documento real. afterEach ya desmonta con unmount().
   function build(stubs: Record<string, boolean> = {}) {
     return mount(ProfileView, {
       attachTo: document.body,
@@ -95,6 +97,11 @@ describe('ProfileView', () => {
         },
       },
     })
+  }
+
+  async function openSection(w: VueWrapper, tab: string) {
+    await w.get(`[data-testid="profile-link-${tab}"]`).trigger('click')
+    await flushPromises()
   }
 
   it('logout button calls auth.logout() store action', async () => {
@@ -130,62 +137,72 @@ describe('ProfileView', () => {
     expect(logoutBtn.classes()).toContain('border-danger')
   })
 
-  it('item 10: the library tab has no "Biblioteca" heading (the tab already says it — ExerciseManager\'s own "Catálogo predefinido" h2 is unrelated and stays)', async () => {
+  it('item 10: the library section has no "Biblioteca" heading beyond the back-row title', async () => {
     wrapper = build()
     await flushPromises()
 
-    const libraryTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
-    await libraryTab!.trigger('click')
-    await flushPromises()
+    await openSection(wrapper, 'library')
 
     const headings = wrapper.findAll('h2').map((h) => h.text())
     expect(headings).not.toContain('Biblioteca')
   })
 
-  it('renders profile tab by default', async () => {
+  it('facelift: renders the hub by default — identity header, activity dots and one row per section', async () => {
     wrapper = build()
-    await wrapper.vm.$nextTick()
+    await flushPromises()
 
-    // Verify the first tab is profile
-    const tabsText = wrapper.text()
-    expect(tabsText).toContain('Perfil') // First tab should be Perfil
+    expect(wrapper.find('[data-testid="profile-identity"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('test')
+    expect(wrapper.find('[data-testid="profile-activity"]').exists()).toBe(true)
+    for (const tab of ['settings', 'routines', 'library', 'sharing']) {
+      expect(wrapper.find(`[data-testid="profile-link-${tab}"]`).exists()).toBe(true)
+    }
   })
 
-  // item 4/7: cada panel de pestaña anima su entrada — bk-stagger en los que
-  // tienen varios hijos, bk-rise (vía Transition) en los de un único hijo
-  it('item 4: the profile tab panel has bk-stagger on its container', async () => {
+  it('facelift: a section opens from its row and the back row returns to the hub', async () => {
+    wrapper = build()
+    await flushPromises()
+
+    await openSection(wrapper, 'routines')
+    expect(wrapper.findComponent({ name: 'RoutineList' }).exists()).toBe(true)
+    expect(wrapper.find('[data-testid="profile-identity"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="profile-back"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="profile-identity"]').exists()).toBe(true)
+  })
+
+  // item 4/7: cada panel anima su entrada — bk-stagger en los de varios
+  // hijos, bk-rise (vía Transition) en los de un único hijo
+  it('item 4: the hub panel has bk-stagger on its container', async () => {
     wrapper = build()
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('.bk-stagger').exists()).toBe(true)
   })
 
-  it('item 4: the library tab panel gets bk-stagger when switched to', async () => {
+  it('item 4: the library section gets bk-stagger when opened', async () => {
     wrapper = build()
     await flushPromises()
 
-    const libraryTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
-    await libraryTab!.trigger('click')
-    await flushPromises()
+    await openSection(wrapper, 'library')
 
     expect(wrapper.find('.bk-stagger').exists()).toBe(true)
   })
 
-  it('item 4: the routines tab panel (single child, no stagger) still replays entry via bk-rise on switch', async () => {
+  it('item 4: the routines section (single child, no stagger) still replays entry via bk-rise', async () => {
     wrapper = build()
     await flushPromises()
 
-    const routinesTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Rutinas')
-    await routinesTab!.trigger('click')
-    await flushPromises()
+    await openSection(wrapper, 'routines')
 
-    // el panel de rutinas ya no tiene bk-stagger (un único hijo): el
-    // contenedor bk-stagger de "profile" ya no está en el DOM tras el switch
+    // el panel de rutinas no tiene bk-stagger (un único hijo): el contenedor
+    // bk-stagger del hub ya no está en el DOM tras abrir la sección
     expect(wrapper.find('.bk-stagger').exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'RoutineList' }).exists()).toBe(true)
   })
 
-  it('shows admin tab when user is admin', async () => {
+  it('shows the admin row when user is admin', async () => {
     const auth = useAuthStore()
     auth.user = {
       id: 1,
@@ -199,13 +216,11 @@ describe('ProfileView', () => {
     wrapper = build()
     await wrapper.vm.$nextTick()
 
-    // item 2 (v0.3.2): 'Administración' se acortó a 'Admin' (fit de 4
-    // pestañas en 360px, ver BkTabs.vue) — el inglés ya usaba esta forma
-    const tabsText = wrapper.text()
-    expect(tabsText).toContain('Admin')
+    expect(wrapper.find('[data-testid="profile-link-admin"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Admin')
   })
 
-  it('hides admin tab when user is not admin', async () => {
+  it('hides the admin row when user is not admin', async () => {
     const auth = useAuthStore()
     auth.user = {
       id: 2,
@@ -219,17 +234,16 @@ describe('ProfileView', () => {
     wrapper = build()
     await wrapper.vm.$nextTick()
 
-    const tabsText = wrapper.text()
-    expect(tabsText).not.toContain('Administración')
+    expect(wrapper.find('[data-testid="profile-link-admin"]').exists()).toBe(false)
   })
 
-  // C1: BkTabs no tiene slot — este contenido nunca llegó a renderizar antes
-  // del fix. Estas 3 pruebas son la red de seguridad: cada pestaña debe montar
-  // un control hijo real (no un stub, no solo el texto de la pestaña).
-  describe('C1: cada pestaña monta un control hijo real', () => {
-    it('profile tab renders the real settings select (locale/units), not a swallowed slot', async () => {
+  // C1: cada sección debe montar un control hijo real (no un stub, no solo
+  // el título de la sección)
+  describe('C1: cada sección monta un control hijo real', () => {
+    it('settings section renders the real settings select (locale/units), not a swallowed slot', async () => {
       wrapper = build({ SettingsCard: false })
       await flushPromises()
+      await openSection(wrapper, 'settings')
 
       // BkSelect v2 (round 7): ya no es un <select> nativo, sino un botón
       // role=combobox que abre un listbox propio — mismo test-id en la raíz
@@ -241,34 +255,28 @@ describe('ProfileView', () => {
       expect(Array.from(options).some((o) => o.textContent?.includes('English'))).toBe(true)
     })
 
-    it('routines tab renders the real RoutineList with its create-routine control', async () => {
+    it('routines section renders the real RoutineList with its create-routine control', async () => {
       wrapper = build()
       await flushPromises()
 
-      const routinesTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Rutinas')
-      expect(routinesTab).not.toBeUndefined()
-      await routinesTab!.trigger('click')
-      await flushPromises()
+      await openSection(wrapper, 'routines')
 
       const newRoutineBtn = wrapper.findAll('button').find((b) => b.text() === 'Nueva rutina')
       expect(newRoutineBtn).not.toBeUndefined()
     })
 
-    it('library tab renders the real ExerciseManager control, not a swallowed slot', async () => {
+    it('library section renders the real ExerciseManager control, not a swallowed slot', async () => {
       wrapper = build()
       await flushPromises()
 
-      const libraryTab = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
-      expect(libraryTab).not.toBeUndefined()
-      await libraryTab!.trigger('click')
-      await flushPromises()
+      await openSection(wrapper, 'library')
 
       const newExerciseBtn = wrapper.find('[data-testid="new-exercise-btn"]')
       expect(newExerciseBtn.exists()).toBe(true)
       expect(newExerciseBtn.text()).toBe('Nuevo ejercicio')
     })
 
-    it('admin tab renders the real admin table with the mocked admin user row', async () => {
+    it('admin section renders the real admin table with the mocked admin user row', async () => {
       const auth = useAuthStore()
       auth.user = {
         id: 1,
@@ -282,13 +290,7 @@ describe('ProfileView', () => {
       wrapper = build({ AdminCard: false })
       await flushPromises()
 
-      // item 2 (v0.3.2): 'Administración' se acorta a 'Admin' — el inglés ya
-      // usaba esa forma corta; hacía falta para que las 4 pestañas quepan en
-      // 360px (ver la aritmética en BkTabs.vue)
-      const adminTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Admin')
-      expect(adminTab).not.toBeUndefined()
-      await adminTab!.trigger('click')
-      await flushPromises()
+      await openSection(wrapper, 'admin')
 
       const table = wrapper.find('table')
       expect(table.exists()).toBe(true)
@@ -299,86 +301,73 @@ describe('ProfileView', () => {
   })
 
   describe('item 1 (v0.3.2): tab anchored to the URL hash', () => {
-    it('mounting with #routines in the hash activates the routines tab (real RoutineList renders, not just the tab label)', async () => {
+    it('mounting with #routines in the hash lands on the routines section (real RoutineList renders)', async () => {
       mockRoute.hash = '#routines'
       wrapper = build()
       await flushPromises()
 
       const newRoutineBtn = wrapper.findAll('button').find((b) => b.text() === 'Nueva rutina')
       expect(newRoutineBtn).not.toBeUndefined()
-      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Rutinas')?.attributes('aria-selected')).toBe('true')
+      expect(wrapper.find('[data-testid="profile-back"]').exists()).toBe(true)
     })
 
-    it('clicking a tab calls router.replace with the tab hash (not push — no history spam per tap)', async () => {
+    it('opening a section calls router.replace with the tab hash (not push — no history spam per tap)', async () => {
       wrapper = build()
       await flushPromises()
       replace.mockClear()
 
-      const libraryTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')!
-      await libraryTab.trigger('click')
-      await flushPromises()
+      await openSection(wrapper, 'library')
 
       expect(replace).toHaveBeenCalledWith({ hash: '#library' })
       expect(push).not.toHaveBeenCalled()
     })
 
-    it('an invalid/junk hash falls back to the default (profile) tab', async () => {
+    it('an invalid/junk hash falls back to the default hub', async () => {
       mockRoute.hash = '#not-a-real-tab'
       wrapper = build()
       await flushPromises()
 
-      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Perfil')?.attributes('aria-selected')).toBe('true')
+      expect(wrapper.find('[data-testid="profile-identity"]').exists()).toBe(true)
     })
 
-    it('a non-admin loading #admin falls back to the default (profile) tab', async () => {
+    it('a non-admin loading #admin falls back to the default hub', async () => {
       mockRoute.hash = '#admin'
       // auth.user ya es no-admin por el beforeEach
       wrapper = build()
       await flushPromises()
 
-      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Perfil')?.attributes('aria-selected')).toBe('true')
+      expect(wrapper.find('[data-testid="profile-identity"]').exists()).toBe(true)
       expect(wrapper.find('table').exists()).toBe(false)
     })
 
-    it('a hash change after mount (browser back/forward) switches the active tab', async () => {
+    it('a hash change after mount (browser back/forward) switches the active section', async () => {
       wrapper = build()
       await flushPromises()
-      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Perfil')?.attributes('aria-selected')).toBe('true')
+      expect(wrapper.find('[data-testid="profile-identity"]').exists()).toBe(true)
 
       mockRoute.hash = '#library'
       await flushPromises()
 
-      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')?.attributes('aria-selected')).toBe('true')
+      expect(wrapper.find('[data-testid="open-muscle-groups-btn"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="profile-identity"]').exists()).toBe(false)
     })
   })
 
   // v0.5.0 (modelo de scroll único, ver ShellView.vue): la raíz FLUYE contra
-  // <main>, las tiras (principal + sección de biblioteca) viven en UN bloque
-  // sticky con fondo sólido, y los cambios de pestaña/sección resetean el
-  // scroll de <main> explícitamente (el hash no cambia el path, así que el
-  // reset de ShellView no aplica)
-  describe('v0.5.0: single-scroll model (sticky strips, flowing panels)', () => {
-    it('root flows (no bounded chain); the single sticky strip is full-bleed (-mx-4 px-4) and never grows a second strip', async () => {
+  // <main>. facelift: la tira sticky de pestañas murió con el hub — no queda
+  // chrome sticky en esta vista; los cambios de sección resetean el scroll
+  // de <main> explícitamente (el hash no cambia el path)
+  describe('v0.5.0: single-scroll model (flowing panels)', () => {
+    it('root flows (no bounded chain) and the old sticky tab strip is gone', async () => {
       wrapper = build()
       await flushPromises()
 
       expect(wrapper.classes()).not.toContain('h-full')
-
-      const stickyBlock = wrapper.get('[data-testid="profile-tabs-sticky"]')
-      // v0.9.0: a sangre completa — sin esto las cards scrolleadas asomaban
-      // a la derecha de la tira (bug reportado por zurdi con muchas rutinas)
-      expect(stickyBlock.classes()).toEqual(
-        expect.arrayContaining(['sticky', 'top-0', 'bk-chrome-bg', '-mx-4', 'px-4']),
-      )
-
-      // v0.9.0: el sub-selector de biblioteca murió — nunca hay segunda tira
-      const libraryTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')!
-      await libraryTab.trigger('click')
-      await flushPromises()
-      expect(stickyBlock.find('[data-testid="library-section-tabs"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="profile-tabs-sticky"]').exists()).toBe(false)
+      expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
     })
 
-    it('panels flow: no internal scroll containers left in profile, routines, library or admin', async () => {
+    it('panels flow: no internal scroll containers left in hub, routines, library or admin', async () => {
       const auth = useAuthStore()
       auth.user = { id: 1, username: 'root-admin', is_admin: true, locale: 'es', units: 'kg', timezone: 'UTC' }
       wrapper = build()
@@ -388,26 +377,24 @@ describe('ProfileView', () => {
       const panel = w.get('[data-testid="logout-btn"]').element.closest('.bk-stagger')!
       expect(panel.classList.contains('overflow-y-auto')).toBe(false)
 
-      const clickTab = async (name: string) => {
-        const tab = w.findAll('[role="tab"]').find((t) => t.text() === name)!
-        await tab.trigger('click')
-        await flushPromises()
-      }
-
-      await clickTab('Rutinas')
+      await openSection(w, 'routines')
       expect(w.findComponent({ name: 'RoutineList' }).classes()).not.toContain('overflow-y-auto')
+      await w.get('[data-testid="profile-back"]').trigger('click')
+      await flushPromises()
 
-      await clickTab('Biblioteca')
+      await openSection(w, 'library')
       const exerciseManager = w.findComponent({ name: 'ExerciseManager' })
       expect(exerciseManager.element.closest('.overflow-y-auto')).toBeNull()
+      await w.get('[data-testid="profile-back"]').trigger('click')
+      await flushPromises()
 
-      await clickTab('Admin')
+      await openSection(w, 'admin')
       expect(w.findComponent({ name: 'AdminCard' }).classes()).not.toContain('overflow-y-auto')
     })
 
-    // v0.5.0: el scroll vive en <main> — cambiar de pestaña lo resetea vía
+    // v0.5.0: el scroll vive en <main> — cambiar de sección lo resetea vía
     // resetMainScroll (los paneles ya no remontan un scroller propio)
-    it('switching the profile tab resets <main> scrollTop', async () => {
+    it('opening a section resets <main> scrollTop', async () => {
       const mainEl = document.createElement('main')
       document.body.appendChild(mainEl)
 
@@ -415,9 +402,7 @@ describe('ProfileView', () => {
       await flushPromises()
 
       mainEl.scrollTop = 400
-      const libraryTab = wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')!
-      await libraryTab.trigger('click')
-      await flushPromises()
+      await openSection(wrapper, 'library')
       expect(mainEl.scrollTop).toBe(0)
 
       mainEl.remove()
@@ -428,12 +413,6 @@ describe('ProfileView', () => {
   // la biblioteca ES el catálogo de ejercicios; los grupos musculares viven
   // en un sheet abierto por un botón — jerarquía primario/secundario
   describe('v0.9.0: library = exercises + muscle-groups sheet', () => {
-    async function openLibraryTab(w: VueWrapper) {
-      const libraryTab = w.findAll('[role="tab"]').find((tab) => tab.text() === 'Biblioteca')
-      await libraryTab!.trigger('click')
-      await flushPromises()
-    }
-
     afterEach(() => {
       // BkSheet teletransporta a body: limpiar para no heredar sheets huérfanos
       document.body.innerHTML = ''
@@ -442,7 +421,7 @@ describe('ProfileView', () => {
     it('shows ExerciseManager directly (no sub-selector) with the muscle-groups button; the groups manager is NOT mounted', async () => {
       wrapper = build()
       await flushPromises()
-      await openLibraryTab(wrapper)
+      await openSection(wrapper, 'library')
 
       expect(wrapper.find('[data-testid="library-section-tabs"]').exists()).toBe(false)
       expect(wrapper.get('[data-testid="new-exercise-btn"]').isVisible()).toBe(true)
@@ -454,7 +433,7 @@ describe('ProfileView', () => {
     it('the muscle-groups button opens a sheet mounting MuscleGroupManager fresh', async () => {
       wrapper = build()
       await flushPromises()
-      await openLibraryTab(wrapper)
+      await openSection(wrapper, 'library')
 
       await wrapper.get('[data-testid="open-muscle-groups-btn"]').trigger('click')
       await flushPromises()
@@ -469,7 +448,6 @@ describe('ProfileView', () => {
       wrapper = build()
       await flushPromises()
 
-      expect(wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Biblioteca')?.attributes('aria-selected')).toBe('true')
       expect(wrapper.get('[data-testid="new-exercise-btn"]').isVisible()).toBe(true)
       expect(wrapper.findComponent({ name: 'MuscleGroupManager' }).exists()).toBe(false)
     })

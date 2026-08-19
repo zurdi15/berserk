@@ -34,11 +34,11 @@ defineProps<{
 <template>
   <button
     type="button"
-    class="bk-press inline-flex items-center justify-center w-8 h-8 rounded-sm shrink-0"
+    class="bk-press inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0"
     :class="
       icon === 'delete'
         ? 'text-danger hover:bg-danger/10'
-        : 'text-ink-muted hover:text-ink'
+        : 'text-ink-muted hover:text-ink hover:bg-slab'
     "
   >
     <svg

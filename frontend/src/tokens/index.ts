@@ -18,13 +18,26 @@ export const themes = {
     danger: '#E5604F',
     'aurora-glow': 'rgba(79, 216, 196, 0.25)',
     'ember-glow': 'rgba(255, 138, 61, 0.30)',
+    // facelift: glow de baja intensidad para superficies GRANDES (hero rúnico,
+    // check de serie marcada) — el aurora-glow de 0.25 está calibrado para
+    // halos pequeños (CTA del nav); a tamaño hero satura y deslumbra.
+    'aurora-glow-soft': 'rgba(79, 216, 196, 0.12)',
+    // facelift: sombra de elevación para paneles flotantes (BkSelect/BkDate/
+    // BkTime/BkTooltip) — antes usaban el shadow-lg crudo de Tailwind, la
+    // única sombra de la app fuera de tokens. Dos capas (contacto + ambiente)
+    // para que flote de verdad sobre el void casi negro.
+    'shadow-float': '0 4px 10px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.45)',
     // equivalentes exactos de lo que BkSheet.vue / base.css ya pintaban a
     // mano antes de v0.4.0 (bg-void/70 y el inset hardcodeado de .bk-slab) —
     // tokenizados aquí para que el tema claro pueda redefinirlos sin tocar
     // ningún componente. Ver el why-comment largo en el bloque `light` de
     // abajo: ahí es donde estos tres SÍ necesitan una fórmula distinta.
     scrim: 'rgba(10, 12, 15, 0.7)',
-    'slab-shadow': 'inset 0 1px 0 var(--bk-line)',
+    // facelift: la talla (inset con line) se conserva — es la seña "losa" —
+    // pero la card grande y redondeada del rediseño necesita además una
+    // sombra ambiente suave para despegarse del void; sin ella, a 24px de
+    // radio la superficie lee como un parche plano, no como una card.
+    'slab-shadow': 'inset 0 1px 0 var(--bk-line), 0 2px 10px rgba(0, 0, 0, 0.25)',
     'noise-opacity': '0.035',
   },
   // nordic DAY: niebla pálida sobre nieve, NUNCA crema cálido — el void/stone/
@@ -60,6 +73,13 @@ export const themes = {
     // glow de foco/logro siga siendo visible)
     'aurora-glow': 'rgba(25, 125, 110, 0.28)',
     'ember-glow': 'rgba(168, 91, 30, 0.32)',
+    // mismo criterio que sus gemelos oscuros; rgb del aurora claro (ya
+    // oscurecido para AA) y opacidad un punto arriba, como aurora-glow
+    'aurora-glow-soft': 'rgba(25, 125, 110, 0.14)',
+    // elevación sobre niebla pálida: sombras frías de la familia ink
+    // (20,26,35 = el mismo rgb que ya usa slab-shadow claro), mucho más
+    // tenues que en oscuro porque el fondo absorbe menos
+    'shadow-float': '0 4px 10px rgba(20, 26, 35, 0.08), 0 12px 32px rgba(20, 26, 35, 0.14)',
     // v0.4.0 LIGHT THEME — dos tokens nuevos, no-color, que SÍ necesitan
     // variar por tema (no encajan en `core`, que es tema-agnóstico):
     //
@@ -81,7 +101,9 @@ export const themes = {
     // solo un borde. Fórmula propia para claro: sombra de contacto suave
     // hacia abajo (elevación, "papel/hielo levantado") + inset blanco arriba
     // (capta la luz desde encima, mismo lenguaje que "hielo" del brief).
-    'slab-shadow': '0 1px 3px rgba(20, 26, 35, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7)',
+    // facelift: blur 3→10 en paralelo a la ambiente nueva del tema oscuro —
+    // la card de 24px pide una elevación algo más generosa en los dos temas.
+    'slab-shadow': '0 2px 10px rgba(20, 26, 35, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.7)',
     // noise-opacity: el ruido SVG de body::before es turbulencia de escala de
     // grises de bajo contraste — sobre negro casi no se ve (0.035 va bien),
     // pero la MISMA opacidad sobre blanco puro se lee como suciedad/grano de
@@ -92,7 +114,13 @@ export const themes = {
 } as const
 
 export const core = {
-  radius: { xs: '2px', sm: '6px', md: '10px', full: '9999px' },
+  // facelift (rediseño "amable"): la escala entera sube un escalón — la app
+  // pasaba de losa afilada (6px en el 90% de superficies) a card redondeada.
+  // sm sigue siendo el radio de controles inline (los 91 rounded-sm existentes
+  // se suavizan solos, sin tocar templates), md es el "squircle" de controles
+  // táctiles (stepper, check, thumbs), lg es la card (.bk-slab) y xl la
+  // esquina superior de BkSheet / heros a sangre.
+  radius: { xs: '4px', sm: '10px', md: '16px', lg: '24px', xl: '28px', full: '9999px' },
   font: {
     display: "'Chakra Petch', system-ui, sans-serif",
     body: "'Inter Variable', system-ui, sans-serif",
@@ -119,5 +147,8 @@ export const core = {
   shadow: {
     aurora: '0 0 20px var(--bk-aurora-glow)',
     ember: '0 0 24px var(--bk-ember-glow)',
+    // facelift: halo grande y tenue para superficies amplias (hero rúnico sin
+    // foto, BkCheck marcado) — radio mayor + el glow-soft de baja opacidad
+    'aurora-soft': '0 0 32px var(--bk-aurora-glow-soft)',
   },
 } as const

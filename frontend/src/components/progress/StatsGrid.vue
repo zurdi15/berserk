@@ -54,28 +54,28 @@ function formatMinutes(totalMinutes: number): string {
     <BkCard>
       <p class="text-ink-muted text-sm">{{ t('progress.stats.workouts') }}</p>
       <BkAnimatedNumber :value="stats?.total_workouts ?? 0" v-slot="{ value }">
-        <p class="bk-metric text-2xl text-ink" data-testid="stat-workouts">{{ value ?? 0 }}</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="stat-workouts">{{ value ?? 0 }}</p>
       </BkAnimatedNumber>
     </BkCard>
 
     <BkCard>
       <p class="text-ink-muted text-sm">{{ t('progress.stats.gymTime') }}</p>
       <BkAnimatedNumber :value="gymHours" v-slot="{ value }">
-        <p class="bk-metric text-2xl text-ink" data-testid="stat-gym-time">{{ value ?? 0 }} h</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="stat-gym-time">{{ value ?? 0 }} h</p>
       </BkAnimatedNumber>
     </BkCard>
 
     <BkCard>
       <p class="text-ink-muted text-sm">{{ t('progress.stats.cardioTime') }}</p>
       <BkAnimatedNumber :value="cardioHours" v-slot="{ value }">
-        <p class="bk-metric text-2xl text-ink" data-testid="stat-cardio-time">{{ value ?? 0 }} h</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="stat-cardio-time">{{ value ?? 0 }} h</p>
       </BkAnimatedNumber>
     </BkCard>
 
     <BkCard>
       <p class="text-ink-muted text-sm">{{ t('progress.stats.distance') }}</p>
       <BkAnimatedNumber :value="distanceKm" :decimals="1" v-slot="{ value }">
-        <p class="bk-metric text-2xl text-ink" data-testid="stat-distance">{{ (value ?? 0).toFixed(1) }} km</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="stat-distance">{{ (value ?? 0).toFixed(1) }} km</p>
       </BkAnimatedNumber>
     </BkCard>
 
@@ -88,7 +88,7 @@ function formatMinutes(totalMinutes: number): string {
         {{ t('progress.stats.volume') }}
       </p>
       <BkAnimatedNumber :value="stats?.total_volume_kg ?? 0" v-slot="{ value }">
-        <p class="bk-metric text-2xl text-ink" data-testid="stat-volume">{{ formatWeightInt(value ?? 0, units) }}</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="stat-volume">{{ formatWeightInt(value ?? 0, units) }}</p>
       </BkAnimatedNumber>
     </BkCard>
 
@@ -99,14 +99,14 @@ function formatMinutes(totalMinutes: number): string {
         {{ t('progress.stats.sets') }}
       </p>
       <BkAnimatedNumber :value="stats?.total_sets ?? 0" v-slot="{ value }">
-        <p class="bk-metric text-2xl text-ink" data-testid="stat-sets">{{ value ?? 0 }}</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="stat-sets">{{ value ?? 0 }}</p>
       </BkAnimatedNumber>
     </BkCard>
 
     <BkCard>
       <p class="text-ink-muted text-sm">{{ t('progress.stats.reps') }}</p>
       <BkAnimatedNumber :value="stats?.total_reps ?? 0" v-slot="{ value }">
-        <p class="bk-metric text-2xl text-ink" data-testid="stat-reps">{{ value ?? 0 }}</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="stat-reps">{{ value ?? 0 }}</p>
       </BkAnimatedNumber>
     </BkCard>
 
@@ -124,7 +124,7 @@ function formatMinutes(totalMinutes: number): string {
     <BkCard>
       <p class="text-ink-muted text-sm">{{ t('progress.stats.avgSession') }}</p>
       <BkAnimatedNumber :value="avgMinutesTotal" v-slot="{ value }">
-        <p class="bk-metric text-2xl text-ink" data-testid="stat-avg-session">{{ formatMinutes(value ?? 0) }}</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="stat-avg-session">{{ formatMinutes(value ?? 0) }}</p>
       </BkAnimatedNumber>
     </BkCard>
 
@@ -136,7 +136,7 @@ function formatMinutes(totalMinutes: number): string {
         {{ t('progress.stats.streak') }}
       </p>
       <BkAnimatedNumber :value="stats?.longest_streak_weeks ?? 0" v-slot="{ value }">
-        <p class="bk-metric text-2xl text-ink" data-testid="stat-streak">{{ value ?? 0 }} {{ t('progress.stats.streakUnit') }}</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="stat-streak">{{ value ?? 0 }} {{ t('progress.stats.streakUnit') }}</p>
       </BkAnimatedNumber>
     </BkCard>
   </div>

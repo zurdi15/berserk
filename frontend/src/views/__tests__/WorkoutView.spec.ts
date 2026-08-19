@@ -164,6 +164,56 @@ describe('WorkoutView', () => {
       expect(vm.newBlockForWeid).toBeNull()
     })
 
+    // facelift: "Completar todo el bloque" — loguea de un toque los defaults
+    // de cada serie pendiente (con objetivo de rutina) del step visible, vía
+    // el STORE (outbox-aware), nunca la api directa
+    it('facelift: "Completar todo el bloque" logs every pending targeted set of the visible step through the store', async () => {
+      // mockImplementation (no Once): varios hijos (AddExerciseSheet,
+      // SupersetEditSheet) también piden el catálogo al montar y consumirían
+      // los Onces antes que loadCatalog; se restaura al final del test
+      const catalog = [
+        { id: 1, name_es: 'A', name_en: 'A', measurement: 'strength', owner_id: null, muscle_groups: [] },
+        { id: 2, name_es: 'B', name_en: 'B', measurement: 'strength', owner_id: null, muscle_groups: [] },
+        { id: 3, name_es: 'C', name_en: 'C', measurement: 'strength', owner_id: null, muscle_groups: [] },
+      ]
+      vi.mocked(domain.listExercises).mockImplementation(async () => catalog as never)
+      vi.mocked(domain.listRoutines).mockResolvedValueOnce([
+        {
+          id: 8, name: 'Bloques', description: null, rune: null, color: null,
+          exercises: [
+            { id: 91, exercise_id: 1, position: 0, target_sets: 2, target_reps: 8, target_weight_kg: 40, rest_seconds: null, superset_group: null, block_label: 'Empuje' },
+            { id: 92, exercise_id: 2, position: 1, target_sets: 1, target_reps: 10, target_weight_kg: 20, rest_seconds: null, superset_group: null, block_label: 'Empuje' },
+            { id: 93, exercise_id: 3, position: 2, target_sets: 3, target_reps: 5, target_weight_kg: 60, rest_seconds: null, superset_group: null, block_label: 'Tirón' },
+          ],
+        },
+      ] as never)
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+      const workout = workoutWithBlocks()
+      ;(workout as { routine_id: number | null }).routine_id = 8
+      activeWorkout.workout = workout
+      const logSpy = vi.spyOn(activeWorkout, 'logSet').mockResolvedValue({
+        set: { id: 900, set_number: 1, reps: 8, weight_kg: 40, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+        new_records: [],
+      } as never)
+
+      const wrapper = build()
+      await flushPromises()
+
+      // step visible = 'Empuje' (ejercicios 1 y 2): 2 + 1 series pendientes
+      await wrapper.get('[data-testid="complete-block-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(logSpy).toHaveBeenCalledTimes(3)
+      expect(logSpy).toHaveBeenCalledWith(1, { is_warmup: false, reps: 8, weight_kg: 40 })
+      expect(logSpy).toHaveBeenCalledWith(2, { is_warmup: false, reps: 10, weight_kg: 20 })
+      // el step 'Tirón' (ejercicio 3) NO se toca
+      expect(logSpy).not.toHaveBeenCalledWith(3, expect.anything())
+
+      // restaurar el default del módulo para el resto de tests
+      vi.mocked(domain.listExercises).mockImplementation(async () => [] as never)
+    })
+
     it('ad-hoc null-labeled exercises fold into a "General" step alongside the named blocks', async () => {
       const activeWorkout = useActiveWorkoutStore()
       vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
@@ -179,7 +229,9 @@ describe('WorkoutView', () => {
 
       const chips = wrapper.findAll('[data-testid^="block-step-"]')
       expect(chips).toHaveLength(3)
-      expect(chips[2].text()).toContain('General')
+      // facelift: los steps son segmentos de progreso — el nombre del bloque
+      // viaja en aria-label, no como texto visible
+      expect(chips[2].attributes('aria-label')).toContain('General')
     })
   })
 
@@ -249,7 +301,7 @@ describe('WorkoutView', () => {
     expect(startSpy).toHaveBeenCalledWith({})
   })
 
-  it('starts from a routine when clicking a routine button (start({routine_id}))', async () => {
+  it('facelift fase 3: clicking a routine card navigates to its pre-start screen instead of starting blind', async () => {
     const activeWorkout = useActiveWorkoutStore()
     vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
     const startSpy = vi.spyOn(activeWorkout, 'start').mockResolvedValue(undefined)
@@ -260,7 +312,8 @@ describe('WorkoutView', () => {
     await wrapper.find('[data-testid="start-routine-7"]').trigger('click')
     await flushPromises()
 
-    expect(startSpy).toHaveBeenCalledWith({ routine_id: 7 })
+    expect(startSpy).not.toHaveBeenCalled()
+    expect(push).toHaveBeenCalledWith({ name: 'workout-start', params: { routineId: 7 } })
   })
 
   it('gates the "start from routine" list on readiness: absent while listRoutines is pending, present once resolved', async () => {
@@ -294,7 +347,7 @@ describe('WorkoutView', () => {
       expect(wrapper.get('[data-testid="or-separator"]').text()).toBe('o')
     })
 
-    it('shows a BkRune next to a routine name when the routine has a valid rune', async () => {
+    it('shows the routine rune in the card media well when the routine has a valid rune', async () => {
       vi.mocked(domain.listRoutines).mockResolvedValueOnce([
         { id: 7, name: 'Push day', description: null, rune: 'chest', color: null, exercises: [] },
       ] as never)
@@ -309,7 +362,9 @@ describe('WorkoutView', () => {
       expect(rune.props('name')).toBe('chest')
     })
 
-    it('renders no rune next to a routine name when the routine has no rune', async () => {
+    // facelift: la card usa BkMedia — sin runa válida cae al bindrune de la
+    // casa (nunca un hueco vacío), no a "sin runa"
+    it('falls back to the house bindrune in the media well when the routine has no rune', async () => {
       vi.mocked(domain.listRoutines).mockResolvedValueOnce([
         { id: 7, name: 'Push day', description: null, rune: null, color: null, exercises: [] },
       ] as never)
@@ -319,11 +374,11 @@ describe('WorkoutView', () => {
       const wrapper = build()
       await flushPromises()
 
-      const routineButton = wrapper.get('[data-testid="start-routine-7"]')
-      expect(routineButton.findComponent({ name: 'BkRune' }).exists()).toBe(false)
+      const rune = wrapper.get('[data-testid="start-routine-7"]').findComponent({ name: 'BkRune' })
+      expect(rune.props('name')).toBe('berserk')
     })
 
-    it('renders no rune next to a routine name when the routine rune is not a valid rune name', async () => {
+    it('falls back to the house bindrune when the routine rune is not a valid rune name', async () => {
       vi.mocked(domain.listRoutines).mockResolvedValueOnce([
         { id: 7, name: 'Push day', description: null, rune: 'not-a-rune', color: null, exercises: [] },
       ] as never)
@@ -333,8 +388,8 @@ describe('WorkoutView', () => {
       const wrapper = build()
       await flushPromises()
 
-      const routineButton = wrapper.get('[data-testid="start-routine-7"]')
-      expect(routineButton.findComponent({ name: 'BkRune' }).exists()).toBe(false)
+      const rune = wrapper.get('[data-testid="start-routine-7"]').findComponent({ name: 'BkRune' })
+      expect(rune.props('name')).toBe('berserk')
     })
   })
 
@@ -571,14 +626,16 @@ describe('WorkoutView', () => {
     // v0.9.4: la fila cronómetro+fecha es un hijo del slab del header (los
     // chips de grupos musculares viven debajo, ver el test de abajo) — el pin
     // se comprueba sobre ESA fila, no sobre el slab entero
-    it('pins flex-wrap (plus items-center/justify-between/gap-3) on the elapsed+date row', async () => {
+    it('facelift: the header row holds the timer block and the kebab (items-center/justify-between/gap-3); the date lives under the timer', async () => {
       wrapper = mountLive()
       await flushPromises()
 
-      const row = wrapper.get('[data-testid="elapsed"]').element.parentElement!
-      for (const cls of ['flex', 'flex-wrap', 'items-center', 'justify-between', 'gap-3']) {
+      // elapsed vive en el bloque de título; su abuelo es la fila del header
+      const row = wrapper.get('[data-testid="elapsed"]').element.parentElement!.parentElement!
+      for (const cls of ['flex', 'items-center', 'justify-between', 'gap-3']) {
         expect(Array.from(row.classList)).toContain(cls)
       }
+      expect(row.querySelector('[data-testid="workout-menu-btn"]')).not.toBeNull()
     })
 
     // v0.9.4 (zurdi): los grupos musculares derivados viven en el HEADER,
@@ -594,19 +651,23 @@ describe('WorkoutView', () => {
       wrapper = build()
       await flushPromises()
 
-      const header = wrapper.get('[data-testid="workout-header"]')
-      const tags = header.get('[data-testid="workout-header-muscle-tags"]')
-      expect(tags.find('[data-testid="muscle-tag-1"]').text()).toBe('Pecho')
+      // facelift: los chips viven en el sheet kebab del entreno
+      await wrapper.get('[data-testid="workout-menu-btn"]').trigger('click')
+      await flushPromises()
+      const tags = document.body.querySelector('[data-testid="workout-header-muscle-tags"]')
+      expect(tags?.querySelector('[data-testid="muscle-tag-1"]')?.textContent?.trim()).toBe('Pecho')
     })
 
-    // v0.9.5 (zurdi): el toggle de descanso automático también vive en el
-    // header, bajo la fila cronómetro+fecha — ya no en una fila propia fuera
-    it('v0.9.5: the auto-rest toggle renders inside the header slab', async () => {
+    // v0.9.5 → facelift: el toggle de descanso automático vive en el sheet
+    // kebab del entreno (workout-menu-sheet)
+    it('facelift: the auto-rest toggle renders inside the workout kebab sheet', async () => {
       wrapper = mountLive()
       await flushPromises()
 
-      const header = wrapper.get('[data-testid="workout-header"]')
-      expect(header.find('[data-testid="rest-auto-toggle"]').exists()).toBe(true)
+      await wrapper.get('[data-testid="workout-menu-btn"]').trigger('click')
+      await flushPromises()
+      const sheet = document.body.querySelector('[data-testid="workout-menu-sheet"]')
+      expect(sheet?.querySelector('[data-testid="rest-auto-toggle"]')).not.toBeNull()
     })
 
     it('the header shows only the elapsed timer and the date — no discard/finish buttons in it', async () => {
@@ -619,18 +680,23 @@ describe('WorkoutView', () => {
       expect(header.find('[data-testid="discard-workout"]').exists()).toBe(false)
     })
 
-    it('discard/finish now live at the bottom of the workout content, after a divider, below "Añadir ejercicio"', async () => {
+    it('facelift: finish lives at the bottom after a divider; discard moved into the kebab sheet', async () => {
       wrapper = mountLive()
       await flushPromises()
 
       const actions = wrapper.get('[data-testid="workout-actions"]')
       expect(actions.classes()).toEqual(expect.arrayContaining(['border-t', 'border-line']))
-      expect(actions.find('[data-testid="discard-workout"]').exists()).toBe(true)
+      expect(actions.find('[data-testid="discard-workout"]').exists()).toBe(false)
       expect(actions.text()).toContain('Terminar')
 
       // orden real en el DOM: "Añadir ejercicio" antes que el bloque de acciones
       const html = wrapper.html()
       expect(html.indexOf('Añadir ejercicio')).toBeLessThan(html.indexOf('data-testid="workout-actions"'))
+
+      // descartar vive en el kebab del entreno
+      await wrapper.get('[data-testid="workout-menu-btn"]').trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('[data-testid="workout-menu-sheet"] [data-testid="discard-workout"]')).not.toBeNull()
     })
   })
 
@@ -673,10 +739,13 @@ describe('WorkoutView', () => {
       })
       await flushPromises()
 
-      await wrapper.find('[data-testid="discard-workout"]').trigger('click')
+      // facelift: descartar vive en el sheet kebab del entreno
+      await wrapper.find('[data-testid="workout-menu-btn"]').trigger('click')
+      await flushPromises()
+      await byTestId('discard-workout').trigger('click')
       await flushPromises()
 
-      expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('¿Descartar el entreno?')
+      expect(document.body.querySelector('[data-testid="discard-confirm-sheet"]')?.closest('[role="dialog"]')?.textContent).toContain('¿Descartar el entreno?')
 
       await byTestId('discard-confirm-btn').trigger('click')
       await flushPromises()
@@ -720,10 +789,13 @@ describe('WorkoutView', () => {
       wrapper = build()
       await flushPromises()
 
-      const tag = wrapper.get('[data-testid="muscle-tag-1"]')
-      expect(tag.element.tagName).toBe('SPAN')
-      expect(tag.text()).toBe('Pecho')
-      expect(wrapper.find('[data-testid="muscle-tag-2"]').exists()).toBe(false)
+      // facelift: los chips viven en el sheet kebab
+      await wrapper.get('[data-testid="workout-menu-btn"]').trigger('click')
+      await flushPromises()
+      const tag = document.body.querySelector('[data-testid="muscle-tag-1"]') as HTMLElement
+      expect(tag.tagName).toBe('SPAN')
+      expect(tag.textContent?.trim()).toBe('Pecho')
+      expect(document.body.querySelector('[data-testid="muscle-tag-2"]')).toBeNull()
     })
 
     it('renders nothing when muscle_tag_ids is empty (no exercises added yet)', async () => {
@@ -975,10 +1047,12 @@ describe('WorkoutView', () => {
       wrapper = mountLive()
       await flushPromises()
 
-      const toggle = wrapper.get('[data-testid="rest-auto-toggle"]')
-      // única hija de su fila: nada a su lado que duplique el texto
-      expect(toggle.element.parentElement?.children).toHaveLength(1)
-      expect(toggle.attributes('aria-label')).toBe('Descanso automático')
+      await wrapper.get('[data-testid="workout-menu-btn"]').trigger('click')
+      await flushPromises()
+      const toggle = document.body.querySelector('[data-testid="rest-auto-toggle"]') as HTMLElement
+      expect(toggle.getAttribute('aria-label')).toBe('Descanso automático')
+      // el propio botón lleva el texto; nada fuera lo duplica
+      expect(toggle.textContent).toContain('Descanso automático')
     })
 
     it('tapping the auto-rest toggle off, then logging a set, starts NO timer', async () => {
@@ -986,10 +1060,16 @@ describe('WorkoutView', () => {
       await flushPromises()
       const restTimer = useRestTimerStore()
 
-      const toggle = wrapper.get('[data-testid="rest-auto-toggle"]')
+      await wrapper.get('[data-testid="workout-menu-btn"]').trigger('click')
+      await flushPromises()
+      const toggle = new DOMWrapper(document.body.querySelector('[data-testid="rest-auto-toggle"]') as Element)
       expect(toggle.attributes('aria-pressed')).toBe('true')
       await toggle.trigger('click')
       expect(toggle.attributes('aria-pressed')).toBe('false')
+      // cerrar el sheet antes de loguear (Escape sobre el top layer)
+      await wrapper.get('[data-testid="workout-menu-btn"]').trigger('keydown.esc')
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
 
       await logASet(wrapper)
 
@@ -1008,15 +1088,20 @@ describe('WorkoutView', () => {
       wrapper = mountLive()
       await flushPromises()
 
-      await wrapper.get('[data-testid="rest-auto-toggle"]').trigger('click')
+      await wrapper.get('[data-testid="workout-menu-btn"]').trigger('click')
+      await flushPromises()
+      await new DOMWrapper(document.body.querySelector('[data-testid="rest-auto-toggle"]') as Element).trigger('click')
       expect(store.get('berserk:rest-auto-enabled')).toBe('false')
 
       // "recarga": un montaje nuevo, mismo backing store — debe arrancar ya en OFF
       wrapper.unmount()
+      document.body.innerHTML = ''
       wrapper = mountLive()
       await flushPromises()
 
-      expect(wrapper.get('[data-testid="rest-auto-toggle"]').attributes('aria-pressed')).toBe('false')
+      await wrapper.get('[data-testid="workout-menu-btn"]').trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('[data-testid="rest-auto-toggle"]')?.getAttribute('aria-pressed')).toBe('false')
     })
   })
 
@@ -1235,7 +1320,10 @@ describe('WorkoutView', () => {
       wrapper = mountLiveWithStorage(storage)
       await flushPromises()
 
-      await wrapper.find('[data-testid="discard-workout"]').trigger('click')
+      await wrapper.find('[data-testid="workout-menu-btn"]').trigger('click')
+      await flushPromises()
+      const discardBtn = document.body.querySelector('[data-testid="discard-workout"]') as HTMLElement
+      discardBtn.click()
       await flushPromises()
       const confirmBtn = document.body.querySelector('[data-testid="discard-confirm-btn"]') as HTMLElement
       confirmBtn.click()

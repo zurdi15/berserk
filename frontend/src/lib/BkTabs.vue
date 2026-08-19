@@ -46,22 +46,20 @@ function move(delta: number) {
 <template>
   <div
     role="tablist"
-    class="flex gap-1 border-b border-line overflow-x-auto overscroll-x-contain no-scrollbar"
+    class="flex w-full gap-1 rounded-full border border-line bg-stone p-1 overflow-x-auto overscroll-x-contain no-scrollbar"
     tabindex="0"
     @keydown.arrow-right.prevent="move(1)"
     @keydown.arrow-left.prevent="move(-1)"
   >
-    <!-- item 2: compacto por debajo de sm (px-2/text-2xs), tamaño normal
-         desde sm — aritmética del peor caso real (4 pestañas, tracking-wide
-         uppercase, ~7.5px/carácter a text-2xs/11.2px, estimación generosa):
-           Perfil:      "PERFIL"(6)     ×7.5 + 2×8px(px-2) =  61px
-           Progresión:  "RUTINAS"(7)    ×7.5 + 16          =  68.5px
-                        "BIBLIOTECA"(10)×7.5 + 16           =  91px   ← la más larga de las dos vistas
-                        "ADMIN"(5)      ×7.5 + 16           =  53.5px
-           total Perfil = 61+68.5+91+53.5 = 274px + 3×gap-1(4px) = 286px
-           total Progresión (TOTALES/CUERPO/ENTRENOS/RÉCORDS, todas ≤8 car.) ≈ 274px + 12 = 286px
-         Ambos ≤ 328px (360px de viewport − 2×16px de padding del <main> del
-         shell, px-4) con ~42px de margen. -->
+    <!-- facelift: de subrayado uppercase a pill segmentada (la referencia) —
+         la activa se realza con bg-slab (el token ES el nivel "elevado", ver
+         base.css). flex-1 reparte el ancho entre pestañas; la aritmética de
+         anchura del peor caso (item 2, 4 pestañas en 360px) mejora respecto
+         a la versión uppercase: caja mixta a text-2xs mide menos que las
+         mismas etiquetas EN MAYÚSCULAS con tracking-wide, y el reparto
+         flex-1 absorbe la diferencia — overflow-x-auto sigue de red de
+         seguridad (histórico c111487: sin él, 4 pestañas anchas ensanchaban
+         la página y desincronizaban el nav fijo). -->
     <button
       v-for="tab in tabs"
       :key="tab.value"
@@ -69,10 +67,10 @@ function move(delta: number) {
       role="tab"
       type="button"
       :aria-selected="tab.value === modelValue ? 'true' : 'false'"
-      class="bk-press px-2 sm:px-4 py-2 font-display uppercase tracking-wide text-2xs sm:text-sm border-b-2 -mb-px shrink-0 whitespace-nowrap"
+      class="bk-press flex-1 rounded-full px-2 sm:px-3 py-2 font-display font-semibold text-2xs sm:text-sm shrink-0 whitespace-nowrap transition-colors"
       :class="tab.value === modelValue
-        ? 'text-aurora border-aurora'
-        : 'text-ink-faint border-transparent hover:text-ink'"
+        ? 'bg-slab text-aurora'
+        : 'text-ink-muted hover:text-ink'"
       @click="select(tab.value, $event)"
     >
       {{ tab.label }}

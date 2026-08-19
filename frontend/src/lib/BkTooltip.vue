@@ -107,7 +107,7 @@ onBeforeUnmount(close)
         :id="tooltipId"
         role="tooltip"
         :style="style"
-        class="z-(--bk-z-sheet) bk-slab rounded-sm px-2.5 py-1.5 text-xs text-ink whitespace-nowrap shadow-lg pointer-events-none"
+        class="z-(--bk-z-sheet) bk-slab rounded-md px-2.5 py-1.5 text-xs text-ink whitespace-nowrap shadow-(--bk-shadow-float) pointer-events-none"
       >
         {{ props.text }}
       </div>

@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { useAnimatedNumber } from '@/composables/useAnimatedNumber'
-import BkCard from '@/lib/BkCard.vue'
 import BkRune from '@/lib/BkRune.vue'
 
+// facelift: la racha se DEGRADA de card entera a chip junto al saludo — el
+// hero de Hoy es ahora el protagonista y una card completa para un número
+// era jerarquía invertida. Conserva testid, tono ember al estar viva y el
+// roll de useAnimatedNumber; el texto plural de la vieja card sobrevive como
+// aria-label (el chip solo pinta runa + número).
 interface StreakData {
   weeks: number
 }
 
 const props = withDefaults(defineProps<{ streak: StreakData | null }>(), {})
+const { t } = useI18n()
 
 const weeks = computed(() => props.streak?.weeks ?? 0)
 // el tono usa el valor crudo, no el animado: el color final ya debe estar
@@ -20,12 +26,13 @@ const animatedWeeks = useAnimatedNumber(() => weeks.value)
 </script>
 
 <template>
-  <BkCard :title="$t('today.streakWeeks', { n: weeks })" data-testid="streak-card" :class="{ 'text-ember': weeks >= 1 }">
-    <div class="flex items-center justify-between">
-      <div class="bk-metric text-6xl">
-        {{ animatedWeeks ?? 0 }}
-      </div>
-      <BkRune name="streak" :size="48" :tone="tone" />
-    </div>
-  </BkCard>
+  <div
+    data-testid="streak-card"
+    class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 shrink-0"
+    :class="weeks >= 1 ? 'border-ember/50 text-ember' : 'border-line text-ink-muted'"
+    :aria-label="t('today.streakWeeks', { n: weeks }, weeks)"
+  >
+    <BkRune name="streak" :size="20" :tone="tone" />
+    <span class="bk-metric text-xl" aria-hidden="true">{{ animatedWeeks ?? 0 }}</span>
+  </div>
 </template>

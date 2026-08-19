@@ -122,7 +122,7 @@ describe('BkActionBtn', () => {
     expect(replanBtn.find('button').classes()).not.toContain('text-danger')
   })
 
-  it('is a single square button (w-8 h-8) with a type="button" root and a ~w-4 h-4 icon, regardless of variant', () => {
+  it('is a single round button (w-10 h-10, facelift: tap-target real) with a type="button" root and a ~w-4 h-4 icon, regardless of variant', () => {
     const wrapper = mount(BkActionBtn, {
       props: { icon: 'edit' },
       attrs: { 'aria-label': 'Editar' },
@@ -130,8 +130,8 @@ describe('BkActionBtn', () => {
 
     const button = wrapper.find('button')
     expect(button.attributes('type')).toBe('button')
-    expect(button.classes()).toContain('w-8')
-    expect(button.classes()).toContain('h-8')
+    expect(button.classes()).toContain('w-10')
+    expect(button.classes()).toContain('h-10')
     expect(wrapper.find('svg').classes()).toContain('w-4')
     expect(wrapper.find('svg').classes()).toContain('h-4')
   })

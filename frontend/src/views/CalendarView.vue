@@ -6,7 +6,6 @@ import { monthLabel } from '@/utils/dates'
 import { getMonth, getHeatmap, listMuscleGroups } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import BkHeatmap from '@/lib/BkHeatmap.vue'
-import BkButton from '@/lib/BkButton.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkUser from '@/lib/BkUser.vue'
@@ -191,16 +190,26 @@ watch(() => athlete.userId, () => {
          secciones tienen que tener un header fijo"; el sticky de la v0.5.0
          se retira de aquí (queda en las tiras de tabs de Perfil/Progresión
          y el crono del entreno) -->
+    <!-- facelift: mes grande a la izquierda (primer h1 de la vista) y
+         chevrons circulares a la derecha — el patrón de la referencia -->
     <div class="flex items-center gap-2" data-testid="month-nav">
-      <BkButton variant="ghost" size="sm" :aria-label="$t('calendar.prevMonth')" @click="prevMonth">
+      <h1 class="flex-1 bk-title text-ink capitalize">{{ label }}</h1>
+      <button
+        type="button"
+        class="bk-press w-10 h-10 rounded-full border border-line-strong text-ink flex items-center justify-center hover:border-aurora hover:text-aurora"
+        :aria-label="$t('calendar.prevMonth')"
+        @click="prevMonth"
+      >
         <span aria-hidden="true">‹</span>
-        <span class="hidden sm:inline">{{ $t('calendar.prevMonth') }}</span>
-      </BkButton>
-      <h2 class="flex-1 px-2 text-center text-lg font-semibold text-ink">{{ label }}</h2>
-      <BkButton variant="ghost" size="sm" :aria-label="$t('calendar.nextMonth')" @click="nextMonth">
+      </button>
+      <button
+        type="button"
+        class="bk-press w-10 h-10 rounded-full border border-line-strong text-ink flex items-center justify-center hover:border-aurora hover:text-aurora"
+        :aria-label="$t('calendar.nextMonth')"
+        @click="nextMonth"
+      >
         <span aria-hidden="true">›</span>
-        <span class="hidden sm:inline">{{ $t('calendar.nextMonth') }}</span>
-      </BkButton>
+      </button>
     </div>
 
     <!-- v0.5.0: sin región de scroll propia — grid, leyenda de compartidos,
@@ -269,11 +278,12 @@ watch(() => athlete.userId, () => {
       </div>
 
       <!-- Heatmap: siempre visible, incluso con datos vacíos (BkHeatmap ya
-           tolera [] y dibuja la rejilla del año en blanco) -->
-      <div class="mt-8">
-        <h3 class="text-sm font-medium text-ink-muted mb-3 text-center">{{ $t('calendar.yearActivity') }}</h3>
+           tolera [] y dibuja la rejilla del año en blanco). facelift: en su
+           propia card con título a la izquierda -->
+      <section class="bk-slab p-5 mt-4">
+        <h3 class="bk-title text-ink mb-4">{{ $t('calendar.yearActivity') }}</h3>
         <BkHeatmap :data="heatmapData" :year="year" />
-      </div>
+      </section>
     </div>
 
     <!-- Schedule sheet modal: sin título genérico (amendment D, round 10) —

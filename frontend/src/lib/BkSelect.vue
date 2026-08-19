@@ -220,7 +220,7 @@ watch(filterQuery, () => {
       :aria-controls="open ? listboxId : undefined"
       :aria-labelledby="labelId"
       :aria-activedescendant="open && !isFilterable && activeValue !== null ? optionId(activeValue) : undefined"
-      class="bk-form-control w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink focus:border-aurora"
+      class="bk-form-control w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-3 text-ink focus:border-aurora"
       @click="onTriggerClick"
       @keydown="onTriggerKeydown"
     >
@@ -242,7 +242,7 @@ watch(filterQuery, () => {
           v-if="open"
           ref="panelEl"
           :style="panelStyle"
-          class="z-(--bk-z-sheet) bk-slab rounded-sm border border-line-strong overflow-hidden shadow-lg"
+          class="z-(--bk-z-sheet) bk-slab rounded-md border border-line-strong overflow-hidden shadow-(--bk-shadow-float)"
         >
           <div v-if="isFilterable" class="p-2 border-b border-line">
             <!-- I3: mientras el filtro existe, ES el elemento con foco real —

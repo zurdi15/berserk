@@ -201,7 +201,7 @@ function submit(keepOpen: boolean) {
           <div class="flex items-center gap-1 mb-2" data-testid="load-mode-toggle">
             <button
               type="button"
-              class="bk-press px-2 py-0.5 rounded-sm border text-xs"
+              class="bk-press px-2 py-0.5 rounded-full border text-xs transition-colors"
               :class="!isLevel ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
               :aria-pressed="!isLevel ? 'true' : 'false'"
               data-testid="load-mode-weight"
@@ -211,7 +211,7 @@ function submit(keepOpen: boolean) {
             </button>
             <button
               type="button"
-              class="bk-press px-2 py-0.5 rounded-sm border text-xs"
+              class="bk-press px-2 py-0.5 rounded-full border text-xs transition-colors"
               :class="isLevel ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
               :aria-pressed="isLevel ? 'true' : 'false'"
               data-testid="load-mode-level"
@@ -249,7 +249,7 @@ function submit(keepOpen: boolean) {
         <div class="flex items-center gap-1 mb-2" data-testid="load-mode-toggle">
           <button
             type="button"
-            class="bk-press px-2 py-0.5 rounded-sm border text-xs"
+            class="bk-press px-2 py-0.5 rounded-full border text-xs transition-colors"
             :class="!isLevel ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
             :aria-pressed="!isLevel ? 'true' : 'false'"
             data-testid="load-mode-weight"
@@ -259,7 +259,7 @@ function submit(keepOpen: boolean) {
           </button>
           <button
             type="button"
-            class="bk-press px-2 py-0.5 rounded-sm border text-xs"
+            class="bk-press px-2 py-0.5 rounded-full border text-xs transition-colors"
             :class="isLevel ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
             :aria-pressed="isLevel ? 'true' : 'false'"
             data-testid="load-mode-level"
@@ -309,7 +309,7 @@ function submit(keepOpen: boolean) {
     <button
       type="button"
       data-testid="warmup-toggle"
-      class="bk-press px-3 py-1.5 rounded-sm border text-sm"
+      class="bk-press px-3 py-1.5 rounded-full border text-sm transition-colors"
       :class="isWarmup ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
       :aria-pressed="isWarmup ? 'true' : 'false'"
       @click="isWarmup = !isWarmup"

@@ -576,7 +576,7 @@ watch(
             :data-testid="section.label !== null ? `routine-block-${section.label}` : undefined"
           >
             <div v-if="section.label !== null" class="flex items-center justify-between gap-2 px-1">
-              <span class="text-xs font-display font-semibold uppercase tracking-wider text-ink-muted truncate">
+              <span class="bk-eyebrow truncate">
                 {{ section.label }}
               </span>
               <BkActionBtn

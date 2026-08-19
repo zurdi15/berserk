@@ -41,7 +41,7 @@ async function submit() {
   <main class="min-h-dvh flex flex-col items-center justify-center gap-6 px-6">
     <Transition name="bk-pop" appear>
       <div class="flex flex-col items-center gap-3">
-        <BkRune name="berserk" :size="64" carve tone="aurora" />
+        <BkRune name="berserk" :size="72" carve tone="aurora" />
         <h1 class="font-display font-bold text-3xl tracking-widest uppercase">
           {{ $t('app.name') }}
         </h1>
@@ -49,7 +49,7 @@ async function submit() {
     </Transition>
     <Transition name="bk-rise" appear>
       <form class="bk-slab w-full max-w-sm p-6 flex flex-col gap-4" @submit.prevent="submit">
-        <h2 class="font-display font-semibold uppercase tracking-wider text-sm text-ink-muted">
+        <h2 class="bk-title text-ink-muted">
           {{ $t('auth.loginTitle') }}
         </h2>
         <BkField v-model="username" :label="$t('auth.username')" autocomplete="username" />

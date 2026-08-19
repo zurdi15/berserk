@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
 
       <BkRune class="relative" :name="runeName" :size="96" carve tone="ember" />
 
-      <h2 :id="titleId" class="relative font-display font-semibold uppercase tracking-wider text-ember text-lg">
+      <h2 :id="titleId" class="relative bk-title text-ember">
         {{ t('workout.newRecord') }}
       </h2>
 

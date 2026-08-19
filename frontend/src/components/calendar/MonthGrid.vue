@@ -142,7 +142,7 @@ function selectDay(date: string) {
          sobreescribirlo aquí mismo para colorear por atleta, sin tocar los
          dots en sí -->
     <div
-      class="grid grid-cols-7 gap-1 bk-stagger"
+      class="grid grid-cols-7 gap-1.5 bk-stagger"
       data-testid="month-grid"
       :style="{ '--bk-day-dot': dotColor ?? 'var(--color-aurora)' }"
     >
@@ -151,7 +151,7 @@ function selectDay(date: string) {
         :key="`day-${cell.date}`"
         :data-testid="`day-cell-${cell.date}`"
         :style="{ '--bk-stagger-i': i % 7 }"
-        class="relative aspect-square rounded-sm border p-1 flex items-center justify-center overflow-hidden transition-colors hover:bg-slab"
+        class="relative aspect-square rounded-md border p-1 flex items-center justify-center overflow-hidden transition-colors hover:bg-slab"
         :class="{
           'border-ink-faint': !cell.inMonth,
           'text-ink-muted': !cell.inMonth,
@@ -175,7 +175,7 @@ function selectDay(date: string) {
              en aurora; zurdi pide que SOLO el borde de la celda brille — el
              número vuelve a su tinta normal, el borde (arriba) es lo único
              que marca "hoy" -->
-        <span class="text-xs font-semibold">
+        <span class="text-sm font-semibold">
           {{ Number(cell.date.slice(8, 10)) }}
         </span>
 

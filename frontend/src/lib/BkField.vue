@@ -32,7 +32,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
       :aria-label="label"
       :autocomplete="autocomplete"
       :aria-invalid="error ? 'true' : undefined"
-      class="bk-form-control w-full rounded-sm border bg-stone px-3 py-2.5 text-ink placeholder:text-ink-faint focus:border-aurora"
+      class="bk-form-control w-full rounded-sm border bg-stone px-3 py-3 text-ink placeholder:text-ink-faint focus:border-aurora"
       :class="[error ? 'border-danger' : 'border-line', mono && 'bk-metric']"
       @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     />

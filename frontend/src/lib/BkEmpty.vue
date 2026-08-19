@@ -16,8 +16,12 @@ const emit = defineEmits<{ action: [] }>()
 
 <template>
   <div class="flex flex-col items-center gap-4 py-10 text-center">
-    <BkRune :name="rune" :size="48" carve class="text-ink-faint" />
-    <p class="text-ink-muted max-w-xs">{{ message }}</p>
+    <!-- facelift: la runa vive en un pozo circular slab — mismo lenguaje que
+         los leading-wells de BkListRow/BkMedia, en vez de flotar suelta -->
+    <div class="flex items-center justify-center w-20 h-20 rounded-full bg-slab">
+      <BkRune :name="rune" :size="40" carve class="text-ink-faint" />
+    </div>
+    <p class="text-base text-ink-muted max-w-xs">{{ message }}</p>
     <BkButton
       v-if="actionLabel"
       variant="primary"

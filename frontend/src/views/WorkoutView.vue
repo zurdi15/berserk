@@ -4,8 +4,12 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/client'
-import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
+import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, SetIn, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
 import { getRotation, listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
+import { resolveNewSetDefaults } from '@/components/workout/setDefaults'
+import { estimateRoutineMinutes } from '@/components/workout/routineEstimate'
+import BkMedia from '@/lib/BkMedia.vue'
+import BkSegmentedProgress from '@/lib/BkSegmentedProgress.vue'
 import { isValidRuneName, primaryRune } from '@/lib/runeResolve'
 import { isLastOfSuperset, nextSupersetIndex, normalizeSupersets, supersetLabels } from '@/lib/supersets'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
@@ -190,11 +194,34 @@ function stepTitle(step: WorkoutStep): string {
   return step.label ?? t('workout.blockGeneral')
 }
 
-// progreso del chip: ejercicios del step con al menos una serie efectiva
-function stepProgress(step: WorkoutStep): string {
+// progreso del step: ejercicios con al menos una serie efectiva — alimenta
+// tanto la barra segmentada como la línea "{done}/{total} ejercicios"
+function stepCounts(step: WorkoutStep): { done: number; total: number } {
   const entries = step.blocks.flatMap((b) => b.entries)
   const done = entries.filter((e) => e.we.sets.some((s) => !s.is_warmup)).length
-  return `${done}/${entries.length}`
+  return { done, total: entries.length }
+}
+
+// facelift: segmentos de BkSegmentedProgress — uno por step, fill = fracción
+// de ejercicios del step con alguna serie efectiva, punto en el actual
+const stepSegments = computed(() =>
+  workoutSteps.value.map((step) => ({ ...stepCounts(step), label: stepTitle(step) })),
+)
+
+// facelift: título del entreno en el header — nombre de la rutina de origen
+// o "Entreno libre"
+const workoutTitle = computed(() => {
+  const routineId = activeWorkout.workout?.routine_id
+  return (routineId && routines.value.find((r) => r.id === routineId)?.name) || t('workout.freeWorkout')
+})
+
+// facelift: sheet kebab del entreno — recoge lo que antes vivía en el header
+// (chips musculares, auto-descanso) y la acción de descartar
+const workoutMenuOpen = ref(false)
+
+function openDiscardFromMenu() {
+  workoutMenuOpen.value = false
+  discardConfirmOpen.value = true
 }
 
 // etiqueta del bloque visible: las altas hechas desde el stepper caen en él
@@ -355,12 +382,30 @@ async function startFree() {
   }
 }
 
-async function startFromRoutine(routineId: number) {
-  try {
-    await activeWorkout.start({ routine_id: routineId })
-  } catch (error) {
-    toastApiError(error)
+// facelift: tocar una rutina ya NO arranca a ciegas — navega a la pantalla
+// de pre-inicio (hero + bloques + "Empezar entrenamiento"). El flujo
+// ?session= del calendario sigue arrancando directo (sesión ya planificada).
+function openPrestart(routineId: number) {
+  router.push({ name: 'workout-start', params: { routineId } })
+}
+
+// media de la card de rutina: primer ejercicio con foto (fallback: runa)
+function routineHeroExercise(routine: RoutineOut): ExerciseOut | null {
+  for (const row of routine.exercises) {
+    const found = exerciseMap.value.get(row.exercise_id)
+    if (found?.has_image) return found
   }
+  return null
+}
+
+function routineMeta(routine: RoutineOut): string {
+  const blocks = Math.max(1, new Set(routine.exercises.map((r) => r.block_label ?? null)).size)
+  const n = routine.exercises.length
+  return t('prestart.summary', {
+    blocks: t('prestart.blocksCount', { n: blocks }, blocks),
+    exercises: t('prestart.exercisesCount', { n }, n),
+    min: estimateRoutineMinutes(routine, exercises.value),
+  })
 }
 
 async function onFinish() {
@@ -500,6 +545,94 @@ function onCelebrationDone() {
   activeWorkout.lastRecords = []
 }
 
+// ── facelift: "Completar todo el bloque" ───────────────────────────────────
+// Registra de un toque los defaults prefijados de cada serie PENDIENTE del
+// step visible: solo ejercicios con objetivo de rutina (target_sets), nunca
+// cardio, y solo si hay un prefill utilizable (última serie del entreno o
+// objetivo de la rutina — el historial de sesiones anteriores vive en cada
+// card y aquí no está; con él tampoco haría falta: si hubo serie previa en
+// esta sesión ya manda ella). Todo pasa por activeWorkout.logSet (outbox,
+// client_id, PRs) — NUNCA por la api directa. Sin auto-descanso (completar
+// en bloque no es una serie en vivo) y UN solo NeonPulse al final.
+const completingBlock = ref(false)
+
+function targetSetsFor(we: WorkoutExerciseOut): number | null {
+  const routineId = activeWorkout.workout?.routine_id
+  const routine = routineId ? routines.value.find((r) => r.id === routineId) : undefined
+  return routine?.exercises.find((e) => e.exercise_id === we.exercise_id)?.target_sets ?? null
+}
+
+function quickSetBody(we: WorkoutExerciseOut): SetIn | null {
+  const exercise = exerciseMap.value.get(we.exercise_id)
+  if (!exercise || exercise.measurement === 'cardio') return null
+  const defaults = resolveNewSetDefaults(
+    we.sets,
+    null,
+    activeWorkout.workout?.routine_id ?? null,
+    routines.value,
+    we.exercise_id,
+  )
+  if (!defaults) return null
+  const body: SetIn = { is_warmup: false }
+  if (exercise.measurement === 'strength') {
+    if (defaults.reps == null || defaults.weight_kg == null) return null
+    body.reps = defaults.reps
+    body.weight_kg = defaults.weight_kg
+    if (defaults.load_mode) body.load_mode = defaults.load_mode
+  } else if (exercise.measurement === 'bodyweight') {
+    if (defaults.reps == null) return null
+    body.reps = defaults.reps
+    if (defaults.weight_kg != null) {
+      body.weight_kg = defaults.weight_kg
+      if (defaults.load_mode) body.load_mode = defaults.load_mode
+    }
+  } else if (exercise.measurement === 'timed') {
+    if (defaults.duration_seconds == null) return null
+    body.duration_seconds = defaults.duration_seconds
+  } else {
+    return null
+  }
+  return body
+}
+
+// pendientes COMPLETABLES del step visible (gatea el botón)
+const completableSetCount = computed(() => {
+  let pending = 0
+  for (const entry of visibleBlocks.value.flatMap((b) => b.entries)) {
+    const target = targetSetsFor(entry.we)
+    if (target == null) continue
+    const effective = entry.we.sets.filter((s) => !s.is_warmup).length
+    if (target > effective && quickSetBody(entry.we) !== null) pending += target - effective
+  }
+  return pending
+})
+
+async function completeBlock() {
+  if (completingBlock.value) return
+  completingBlock.value = true
+  let logged = 0
+  try {
+    for (const entry of visibleBlocks.value.flatMap((b) => b.entries)) {
+      const target = targetSetsFor(entry.we)
+      if (target == null) continue
+      let pending = target - entry.we.sets.filter((s) => !s.is_warmup).length
+      while (pending > 0) {
+        const body = quickSetBody(entry.we)
+        if (!body) break
+        const result = await activeWorkout.logSet(entry.we.id, body)
+        if (result.new_records.length) sessionRecords.value.push(...result.new_records)
+        logged += 1
+        pending -= 1
+      }
+    }
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    completingBlock.value = false
+  }
+  if (logged > 0 && !activeWorkout.lastRecords.length) triggerNeonPulse()
+}
+
 function closeSummary() {
   finishedWorkout.value = null
   sessionRecords.value = []
@@ -630,87 +763,64 @@ onBeforeUnmount(stopTicker)
            v0.5.0: wrapper sticky alrededor del slab — ver el comentario del
            script (crono visible mientras se scrollea la lista). -->
       <div
-        class="sticky top-0 z-10 bk-chrome-bg -mt-4 -mx-4 px-4 pt-4 pb-1"
+        class="bk-sticky-chrome"
         data-testid="workout-header-sticky"
         :style="{ '--bk-stagger-i': 0 }"
       >
-        <div class="bk-slab p-4 space-y-3" data-testid="workout-header">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <p class="bk-metric text-2xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
-            <!-- item 6 (v0.4.3, zurdi): el chip "M:SS ✕" que vivía AQUÍ se retira
-                 — cancelar el descanso se mueve DENTRO del propio CTA del shell
-                 (tocar el CTA mientras se descansa en /workout lo expande y
-                 revela el botón ✕, ver ShellView.vue). El countdown en sí (el
-                 timer.label del header/nav) ya era visible desde ahí; este chip
-                 era la única superficie de CANCELAR fuera del CTA, y con el CTA
-                 ya haciendo de tap-target siempre visible, mantenerla aquí
-                 además duplicaba la acción en dos sitios. -->
-            <p class="text-sm text-ink-muted capitalize" data-testid="workout-date">{{ dateLabel }}</p>
-          </div>
-          <!-- v0.9.4 (zurdi): los grupos musculares derivados suben del slab
-               propio que tenían más abajo a ESTE header, bajo el cronómetro —
-               chips más compactos que los de antes (esto es chrome sticky, no
-               una card de contenido), sin el título "Grupos musculares": los
-               nombres se explican solos.
-               v0.9.5 (zurdi: "el check de descanso automático debería estar
-               en el header, quizá debajo de la fecha"): el toggle (item 4
-               post-0.3.0, mismo idiom que el de calentamiento de SetForm;
-               item 5 v0.4.3: autodescriptivo, sin etiqueta al lado) comparte
-               esta segunda fila con los chips — ml-auto lo pinna a la
-               derecha, bajo la fecha, haya chips o no. -->
-          <div class="flex flex-wrap items-center gap-3">
-            <div
-              v-if="derivedMuscleGroups.length"
-              class="flex flex-wrap gap-1.5"
-              data-testid="workout-header-muscle-tags"
-            >
-              <span
-                v-for="group in derivedMuscleGroups"
-                :key="group.id"
-                :data-testid="`muscle-tag-${group.id}`"
-                class="px-2 py-0.5 rounded-sm border border-line text-xs text-ink-muted"
-              >
-                {{ muscleTagLabel(group) }}
-              </span>
+        <!-- facelift: header limpio estilo referencia — crono grande +
+             título del entreno + kebab; los chips musculares, el toggle de
+             auto-descanso y "Descartar" viven ahora en el sheet kebab
+             (workout-menu-sheet), fuera del chrome permanente. item 6
+             (v0.4.3) sigue vigente: cancelar el descanso vive SOLO en el CTA
+             del shell. -->
+        <div class="bk-slab p-4" data-testid="workout-header">
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="bk-metric text-3xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
+              <p class="text-sm text-ink-muted truncate">
+                <span class="font-medium text-ink">{{ workoutTitle }}</span>
+                <span class="capitalize" data-testid="workout-date"> · {{ dateLabel }}</span>
+              </p>
             </div>
             <button
               type="button"
-              data-testid="rest-auto-toggle"
-              class="bk-press ml-auto px-3 py-1.5 rounded-sm border text-sm shrink-0"
-              :class="restAutoEnabled ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
-              :aria-pressed="restAutoEnabled ? 'true' : 'false'"
-              :aria-label="t('timer.autoRest')"
-              @click="toggleRestAuto"
+              data-testid="workout-menu-btn"
+              class="bk-press w-10 h-10 rounded-full text-xl text-ink-muted hover:text-ink hover:bg-slab shrink-0"
+              :aria-label="t('workout.menu')"
+              @click="workoutMenuOpen = true"
             >
-              {{ t('timer.autoRest') }}
+              ⋯
             </button>
           </div>
         </div>
       </div>
 
-      <!-- v0.17.0 STEPPER POR BLOQUES (zurdi: "cada step del stepper es un
-           bloque molaría"): con bloques definidos en la rutina, la lista se
-           trocea en steps — chips navegables arriba y SOLO el bloque visible
-           renderizado (menos densidad); sin bloques, lista plana de siempre -->
+      <!-- v0.17.0 STEPPER POR BLOQUES + facelift: la fila de chips pasa a la
+           barra de progreso SEGMENTADA de la referencia — un segmento por
+           bloque con su fill y el punto en el actual; tocar un segmento
+           salta a su bloque (mismos testids block-step-{i} de los chips).
+           Sin bloques, lista plana de siempre. -->
       <div
         v-if="stepperActive"
-        class="flex gap-1.5 overflow-x-auto"
         data-testid="block-stepper"
         :style="{ '--bk-stagger-i': 1 }"
       >
-        <button
-          v-for="(step, si) in workoutSteps"
-          :key="step.label ?? '__general__'"
-          type="button"
-          class="bk-press px-3 py-1.5 rounded-sm border text-xs shrink-0 flex items-center gap-1.5"
-          :class="si === currentStepSafe ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
-          :aria-pressed="si === currentStepSafe ? 'true' : 'false'"
-          :data-testid="`block-step-${si}`"
-          @click="currentStep = si"
-        >
-          <span>{{ stepTitle(step) }}</span>
-          <span class="bk-metric text-2xs opacity-80">{{ stepProgress(step) }}</span>
-        </button>
+        <BkSegmentedProgress
+          :segments="stepSegments"
+          :current="currentStepSafe"
+          testid-prefix="block-step"
+          @select="currentStep = $event"
+        />
+      </div>
+
+      <!-- facelift: título del bloque visible — eyebrow "BLOQUE n" + nombre
+           grande + progreso, el patrón del player de la referencia -->
+      <div v-if="stepperActive" data-testid="block-title" :style="{ '--bk-stagger-i': 1 }">
+        <p class="bk-eyebrow">{{ t('workout.blockTitle', { n: currentStepSafe + 1 }) }}</p>
+        <h2 class="bk-title text-ink">{{ stepTitle(workoutSteps[currentStepSafe]) }}</h2>
+        <p class="text-sm text-ink-muted">
+          {{ t('workout.blockProgress', stepCounts(workoutSteps[currentStepSafe])) }}
+        </p>
       </div>
 
       <!-- v0.8.0: bloques de superserie — los miembros van DENTRO de un
@@ -803,8 +913,22 @@ onBeforeUnmount(stopTicker)
       </TransitionGroup>
       </div>
 
+      <!-- facelift: completar de un toque todas las series pendientes (con
+           objetivo de rutina) del bloque visible — ver completeBlock() -->
+      <BkButton
+        v-if="stepperActive && completableSetCount > 0"
+        variant="soft"
+        block
+        :loading="completingBlock"
+        data-testid="complete-block-btn"
+        :style="{ '--bk-stagger-i': visibleBlocks.length + 2 }"
+        @click="completeBlock"
+      >
+        {{ t('workout.completeBlock') }}
+      </BkButton>
+
       <!-- v0.17.0: navegación anterior/siguiente entre bloques, bajo la
-           lista del step visible — complementa los chips de arriba para el
+           lista del step visible — complementa la barra segmentada para el
            flujo natural de "terminé este bloque, al siguiente" -->
       <div
         v-if="stepperActive"
@@ -854,25 +978,60 @@ onBeforeUnmount(stopTicker)
         @swap="swapMember"
       />
 
-      <!-- item 3: Descartar/Terminar salen de la cabecera y bajan al fondo
-           del contenido, tras una línea divisoria — ya no compiten por
-           espacio con la fecha/cronómetro, y quedan lejos del pulgar en el
-           flujo normal de "añadir ejercicio, registrar series", donde una
-           acción destructiva junto al cronómetro invitaba al toque accidental -->
+      <!-- item 3 + facelift: "Terminar" queda como ÚNICA acción del pie,
+           dominante (lg block) — "Descartar" (destructiva y rara) se muda al
+           sheet kebab del header, aún más lejos del pulgar accidental -->
       <div
-        class="border-t border-line pt-4 flex flex-wrap items-center gap-2"
+        class="border-t border-line pt-4"
         data-testid="workout-actions"
         :style="{ '--bk-stagger-i': visibleBlocks.length + 4 }"
       >
-        <BkButton
-          variant="danger"
-          data-testid="discard-workout"
-          @click="discardConfirmOpen = true"
-        >
-          {{ t('workout.discard') }}
-        </BkButton>
-        <BkButton variant="primary" @click="onFinish">{{ t('workout.finish') }}</BkButton>
+        <BkButton variant="primary" size="lg" block @click="onFinish">{{ t('workout.finish') }}</BkButton>
       </div>
+
+      <!-- facelift: sheet kebab del entreno — auto-descanso, grupos derivados,
+           y la acción destructiva de descartar (su confirm sheet no cambia) -->
+      <BkSheet :open="workoutMenuOpen" :title="t('workout.menu')" @close="workoutMenuOpen = false">
+        <div class="space-y-4" data-testid="workout-menu-sheet">
+          <!-- v0.9.5/item 4 post-0.3.0: el toggle de descanso automático
+               (autodescriptivo, aria-pressed) — mudado aquí desde el header -->
+          <button
+            type="button"
+            data-testid="rest-auto-toggle"
+            class="bk-press w-full px-3 py-3 rounded-md border text-sm text-left"
+            :class="restAutoEnabled ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+            :aria-pressed="restAutoEnabled ? 'true' : 'false'"
+            :aria-label="t('timer.autoRest')"
+            @click="toggleRestAuto"
+          >
+            {{ t('timer.autoRest') }}
+          </button>
+          <!-- item 4: grupos musculares derivados (solo lectura, el backend
+               los recalcula) — mudados aquí desde el header -->
+          <div
+            v-if="derivedMuscleGroups.length"
+            class="flex flex-wrap gap-1.5"
+            data-testid="workout-header-muscle-tags"
+          >
+            <span
+              v-for="group in derivedMuscleGroups"
+              :key="group.id"
+              :data-testid="`muscle-tag-${group.id}`"
+              class="px-2 py-0.5 rounded-full border border-line text-xs text-ink-muted"
+            >
+              {{ muscleTagLabel(group) }}
+            </span>
+          </div>
+          <BkButton
+            variant="danger"
+            block
+            data-testid="discard-workout"
+            @click="openDiscardFromMenu"
+          >
+            {{ t('workout.discard') }}
+          </BkButton>
+        </div>
+      </BkSheet>
 
       <!-- v0.18.1: nombre del bloque nuevo pedido desde el picker de una
            card (mismo flujo que el editor de rutinas) -->
@@ -930,7 +1089,7 @@ onBeforeUnmount(stopTicker)
     <!-- item 4: sin bk-stagger propio, esta rama entraba desnuda (nunca tuvo
          entrada propia — dependía del ahora-eliminado Transition de ShellView) -->
     <div v-else class="space-y-4 bk-stagger">
-      <BkButton variant="primary" block data-testid="start-free" :style="{ '--bk-stagger-i': 0 }" @click="startFree">
+      <BkButton variant="primary" size="lg" block data-testid="start-free" :style="{ '--bk-stagger-i': 0 }" @click="startFree">
         {{ t('workout.freeWorkout') }}
       </BkButton>
 
@@ -942,23 +1101,41 @@ onBeforeUnmount(stopTicker)
           <span data-testid="or-separator" class="text-ink-faint text-sm">{{ t('workout.or') }}</span>
           <span class="h-px flex-1 bg-line" />
         </div>
-        <BkButton
+        <!-- facelift: cards de rutina con foto/runa + resumen; tocar navega
+             al pre-inicio (workout-start), ya no arranca directo -->
+        <button
           v-for="routine in routines"
           :key="routine.id"
-          variant="ghost"
-          block
+          type="button"
+          class="bk-press bk-slab w-full flex items-center gap-3 p-3 text-left"
           :data-testid="`start-routine-${routine.id}`"
-          @click="startFromRoutine(routine.id)"
+          @click="openPrestart(routine.id)"
         >
-          <BkRune v-if="routineRune(routine)" :name="routineRune(routine) as RuneName" :size="16" />
-          <span>{{ routine.name }}</span>
-          <!-- v0.14.0: chip del plan rotatorio en la rutina que toca -->
-          <span
-            v-if="routine.id === rotationNextId"
-            class="text-2xs text-aurora border border-aurora/50 bg-aurora/10 rounded-sm px-1.5 py-0.5"
-            :data-testid="`rotation-chip-${routine.id}`"
-          >{{ t('rotation.chip') }}</span>
-        </BkButton>
+          <BkMedia
+            :exercise="routineHeroExercise(routine)"
+            :rune="routineRune(routine)"
+            size="md"
+          />
+          <span class="flex-1 min-w-0 block">
+            <span class="flex items-center gap-2">
+              <span class="text-base font-medium text-ink truncate">{{ routine.name }}</span>
+              <!-- v0.14.0: chip del plan rotatorio en la rutina que toca -->
+              <span
+                v-if="routine.id === rotationNextId"
+                class="text-2xs text-aurora border border-aurora/50 bg-aurora/10 rounded-full px-1.5 py-0.5 shrink-0"
+                :data-testid="`rotation-chip-${routine.id}`"
+              >{{ t('rotation.chip') }}</span>
+            </span>
+            <span class="block text-sm text-ink-muted">{{ routineMeta(routine) }}</span>
+          </span>
+          <svg
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"
+            class="w-5 h-5 shrink-0 text-ink-faint" aria-hidden="true"
+          >
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
       </div>
     </div>
   </div>

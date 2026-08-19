@@ -492,7 +492,7 @@ loadDayInfo()
 
       <!-- PRs del día (nivel día, no por entreno) -->
       <div v-if="infoReady && dayRecords.length" class="space-y-2 border border-line rounded-sm p-3">
-        <h4 class="text-xs uppercase tracking-wide text-ink-faint">{{ $t('calendar.prsOfDay') }}</h4>
+        <h4 class="bk-eyebrow">{{ $t('calendar.prsOfDay') }}</h4>
         <div v-for="record in dayRecords" :key="record.id" :data-testid="`pr-of-day-${record.id}`" class="flex items-center gap-2 text-ember text-sm">
           <BkRune name="pr" :size="18" tone="ember" />
           <span class="font-medium">
@@ -504,7 +504,7 @@ loadDayInfo()
       <!-- Sesiones planificadas/omitidas: las completadas ya se muestran arriba
            como tarjeta unificada (amendment A), no aquí -->
       <div v-if="plannedSessions.length" class="space-y-3">
-        <p v-if="showPlannedEyebrow" class="text-xs uppercase tracking-wide text-ink-faint">{{ $t('calendar.plannedEyebrow') }}</p>
+        <p v-if="showPlannedEyebrow" class="bk-eyebrow">{{ $t('calendar.plannedEyebrow') }}</p>
         <div
           v-for="session in plannedSessions"
           :key="session.id"
@@ -670,7 +670,7 @@ loadDayInfo()
       </div>
 
       <div v-if="activeSharedData.ready && activeSharedData.records.length" class="space-y-2 border border-line rounded-sm p-3">
-        <h4 class="text-xs uppercase tracking-wide text-ink-faint">{{ $t('calendar.prsOfDay') }}</h4>
+        <h4 class="bk-eyebrow">{{ $t('calendar.prsOfDay') }}</h4>
         <div v-for="record in activeSharedData.records" :key="record.id" :data-testid="`pr-of-day-${record.id}`" class="flex items-center gap-2 text-ember text-sm">
           <BkRune name="pr" :size="18" tone="ember" />
           <span class="font-medium">

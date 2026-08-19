@@ -337,6 +337,25 @@
   animation: bk-carve var(--bk-dur-5) var(--bk-ease-carve) backwards;
 }
 
+/* facelift (BkCheck): el tick del check de serie se DIBUJA con el mismo
+   keyframe bk-carve (la única excepción stroke-dashoffset sancionada — no es
+   una excepción nueva), pero a dur-3: el trazo de un tick de 26px a la
+   velocidad de una runa de 200 se sentiría a cámara lenta. El pop del
+   contenedor es transform-only, mismo idiom que bk-timer-done-pop. */
+.bk-check-stroke {
+  stroke-dasharray: var(--bk-carve-length, 26);
+  animation: bk-carve var(--bk-dur-3) var(--bk-ease-carve) backwards;
+}
+
+@keyframes bk-check-pop {
+  0% { transform: scale(0.85); }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+.bk-check-pop {
+  animation: bk-check-pop var(--bk-dur-2) var(--bk-ease-spring);
+}
+
 .bk-grow-x {
   transform-origin: left;
   animation: bk-grow-x var(--bar-dur, var(--bk-dur-4)) var(--bk-ease-out) backwards;

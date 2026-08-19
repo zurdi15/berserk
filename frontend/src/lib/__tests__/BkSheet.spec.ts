@@ -64,7 +64,7 @@ describe('BkSheet', () => {
     await nextTick()
 
     const panel = document.querySelector('[role="dialog"]') as HTMLElement
-    expect(panel.classList.contains('pb-[calc(1rem+env(safe-area-inset-bottom))]')).toBe(true)
+    expect(panel.classList.contains('pb-[calc(1.25rem+env(safe-area-inset-bottom))]')).toBe(true)
 
     wrapper.unmount()
   })

@@ -11,6 +11,7 @@ import ProfileView from '@/views/ProfileView.vue'
 import ProgressView from '@/views/ProgressView.vue'
 import ShellView from '@/views/ShellView.vue'
 import WorkoutEditView from '@/views/WorkoutEditView.vue'
+import WorkoutStartView from '@/views/WorkoutStartView.vue'
 import WorkoutView from '@/views/WorkoutView.vue'
 
 export const router = createRouter({
@@ -27,6 +28,10 @@ export const router = createRouter({
         { path: 'today', name: 'today', component: TodayView },
         { path: 'calendar', name: 'calendar', component: CalendarView },
         { path: 'workout', name: 'workout', component: WorkoutView },
+        // facelift: pantalla de pre-inicio de una rutina (hero + bloques +
+        // "Empezar entrenamiento"). OJO keep-alive: NUNCA añadir esta vista
+        // al include de ShellView (solo WorkoutView sobrevive navegaciones)
+        { path: 'workout/start/:routineId', name: 'workout-start', component: WorkoutStartView },
         { path: 'workout/:id/edit', name: 'workout-edit', component: WorkoutEditView },
         { path: 'progress', name: 'progress', component: ProgressView },
         { path: 'profile', name: 'profile', component: ProfileView },

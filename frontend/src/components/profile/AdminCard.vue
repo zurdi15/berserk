@@ -585,7 +585,7 @@ function redeemUrl(token: string): string {
           :href="BACKUP_EXPORT_URL"
           download
           data-testid="export-backup-link"
-          class="bk-press inline-flex items-center justify-center gap-2 font-display font-semibold uppercase tracking-wide rounded-sm border transition-colors px-5 py-2.5 bg-aurora-deep border-aurora text-ink hover:bg-aurora hover:text-void"
+          class="bk-press inline-flex items-center justify-center gap-2 font-display font-semibold rounded-full transition-colors h-12 px-6 bg-aurora-deep text-void hover:bg-aurora"
         >
           {{ $t('admin.backup.export') }}
         </a>

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 import BkAnimatedNumber from '@/lib/BkAnimatedNumber.vue'
 import BkCard from '@/lib/BkCard.vue'
+import BkRune from '@/lib/BkRune.vue'
 import type { PersonalRecordOut, ExerciseOut } from '@/api/domain'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import { parseUtc } from '@/utils/datetime'
@@ -56,19 +57,22 @@ function formatAchievedDate(dateStr: string): string {
 <template>
   <BkCard v-if="recentRecords.length > 0" :title="$t('today.recentPrs')">
     <div class="space-y-2">
-      <div v-for="record in recentRecords" :key="record.id" class="flex items-center justify-between py-2 px-3 bg-stone rounded">
-        <div class="flex-1">
-          <p class="text-sm font-medium text-ink-muted">
-            {{ $t(`progress.kinds.${record.kind}`) }}
-          </p>
-          <p class="font-medium text-ink">{{ getExerciseName(record.exercise_id) }}</p>
+      <!-- facelift: filas estilo BkListRow (pozo de runa PR + nombre grande),
+           valor ember protagonista a la derecha -->
+      <div v-for="record in recentRecords" :key="record.id" class="flex items-center gap-3 rounded-lg bg-slab p-3">
+        <span class="flex items-center justify-center w-10 h-10 rounded-md bg-stone shrink-0 text-ember">
+          <BkRune name="pr" :size="20" />
+        </span>
+        <div class="flex-1 min-w-0">
+          <p class="text-base font-medium text-ink truncate">{{ getExerciseName(record.exercise_id) }}</p>
+          <p class="text-sm text-ink-muted">{{ $t(`progress.kinds.${record.kind}`) }}</p>
         </div>
-        <div class="text-right">
+        <div class="text-right shrink-0">
           <!-- decimals: max_weight es peso real (1 decimal, formatWeight no
                redondea en kg y el tween pintaría colas de flotante sin esto);
                est_1rm/max_volume son derivados y van a entero (0) -->
           <BkAnimatedNumber :value="record.value" :decimals="record.kind === 'max_weight' ? 1 : 0" v-slot="{ value }">
-            <p class="text-lg font-semibold text-ember tabular-nums">{{ formatRecordValue(value ?? 0, record) }}</p>
+            <p class="bk-metric text-lg text-ember">{{ formatRecordValue(value ?? 0, record) }}</p>
           </BkAnimatedNumber>
           <p class="text-xs text-ink-muted">{{ formatAchievedDate(record.achieved_at) }}</p>
         </div>

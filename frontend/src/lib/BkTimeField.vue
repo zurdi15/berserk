@@ -226,7 +226,7 @@ watch(() => props.modelValue, (value) => {
       :aria-expanded="open ? 'true' : 'false'"
       :aria-controls="open ? hoursId : undefined"
       :aria-labelledby="labelId"
-      class="bk-form-control w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink focus:border-aurora bk-metric"
+      class="bk-form-control w-full flex items-center justify-between gap-2 rounded-sm border border-line bg-stone px-3 py-3 text-ink focus:border-aurora bk-metric"
       @click="toggleField"
       @keydown="onTriggerKeydown"
     >
@@ -244,7 +244,7 @@ watch(() => props.modelValue, (value) => {
           v-if="open"
           ref="panelEl"
           :style="panelStyle"
-          class="z-(--bk-z-sheet) bk-slab rounded-sm border border-line-strong overflow-hidden shadow-lg flex flex-col"
+          class="z-(--bk-z-sheet) bk-slab rounded-md border border-line-strong overflow-hidden shadow-(--bk-shadow-float) flex flex-col"
         >
           <div class="flex divide-x divide-line">
             <ul

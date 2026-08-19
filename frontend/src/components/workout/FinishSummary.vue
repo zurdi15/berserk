@@ -111,37 +111,39 @@ watch(note, () => {
 </script>
 
 <template>
-  <section class="bk-slab p-4 space-y-4">
-    <h2 class="font-display font-semibold uppercase tracking-wider text-sm text-ink">
-      {{ t('workout.summary') }}
-    </h2>
+  <!-- facelift: cierre CELEBRATORIO — la runa de la casa tallándose grande,
+       "¡Entreno terminado!" y la duración como métrica protagonista; sets y
+       volumen en tiles; el resto (PRs, feeling, nota, estirado) debajo -->
+  <section class="bk-slab p-5 space-y-5">
+    <div class="flex flex-col items-center gap-2 text-center pt-2">
+      <BkRune name="berserk" :size="72" carve tone="aurora" />
+      <h2 class="bk-display text-ink">{{ t('workout.finished') }}</h2>
+      <p class="bk-metric text-4xl text-ink" data-testid="summary-duration">{{ durationLabel }}</p>
+      <p class="text-sm text-ink-muted">{{ t('workout.duration') }}</p>
+    </div>
 
-    <div class="grid grid-cols-2 gap-4">
-      <div>
-        <p class="text-ink-muted text-sm">{{ t('workout.duration') }}</p>
-        <p class="bk-metric text-xl text-ink" data-testid="summary-duration">{{ durationLabel }}</p>
-      </div>
-      <div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="rounded-md bg-slab p-3">
         <p class="text-ink-muted text-sm">{{ t('workout.totalSets') }}</p>
-        <p class="bk-metric text-xl text-ink" data-testid="summary-sets">{{ animatedTotalSets ?? 0 }}</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="summary-sets">{{ animatedTotalSets ?? 0 }}</p>
       </div>
-      <div class="col-span-2">
+      <div class="rounded-md bg-slab p-3">
         <p class="text-ink-muted text-sm">{{ t('workout.totalVolume') }}</p>
-        <p class="bk-metric text-xl text-ink" data-testid="summary-volume">{{ formatWeightInt(animatedTotalVolume ?? 0, units) }}</p>
+        <p class="bk-metric text-3xl text-ink" data-testid="summary-volume">{{ formatWeightInt(animatedTotalVolume ?? 0, units) }}</p>
       </div>
     </div>
 
-    <div v-if="records.length" class="space-y-2 border-t border-line pt-3">
+    <div v-if="records.length" class="space-y-2 border-t border-line pt-4">
       <p class="text-sm text-ink-muted">{{ t('workout.newRecords') }}</p>
-      <div v-for="record in records" :key="record.id" class="flex items-center gap-2 text-ember">
-        <BkRune name="pr" :size="20" tone="ember" />
-        <span class="text-sm font-medium">
+      <div v-for="record in records" :key="record.id" class="flex items-center gap-3 rounded-lg bg-slab p-3 text-ember">
+        <BkRune name="pr" :size="24" tone="ember" />
+        <span class="text-base font-medium">
           {{ t(`progress.kinds.${record.kind}`) }} · {{ formatRecordValue(record) }}
         </span>
       </div>
     </div>
 
-    <div class="space-y-2 border-t border-line pt-3">
+    <div class="space-y-2 border-t border-line pt-4">
       <p class="text-sm text-ink-muted">{{ t('workout.feeling') }}</p>
       <div class="flex gap-2">
         <button
@@ -149,31 +151,38 @@ watch(note, () => {
           :key="n"
           type="button"
           :data-testid="`feeling-${n}`"
-          class="p-2 rounded-sm border"
+          class="bk-press flex-1 flex items-center justify-center h-12 rounded-md border transition-colors"
           :class="feeling === n ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
           :aria-label="`${t('workout.feeling')} ${n}`"
           @click="pickFeeling(n)"
         >
-          <BkRune name="berserk" :size="20" />
+          <BkRune name="berserk" :size="22" />
         </button>
       </div>
     </div>
 
     <BkField v-model="note" :label="t('workout.note')" />
 
+    <!-- estirado: mismo contrato (botón con aria-pressed) con el check
+         grande del rediseño como visual — span, no BkCheck: un botón dentro
+         de otro botón sería HTML inválido -->
     <button
       type="button"
       data-testid="stretched-toggle"
-      class="bk-press flex items-center gap-2 text-sm"
+      class="bk-press flex items-center gap-3 text-base"
       :class="stretched ? 'text-aurora' : 'text-ink-muted'"
       :aria-pressed="stretched ? 'true' : 'false'"
       @click="toggleStretched"
     >
       <span
-        class="w-4 h-4 rounded-xs border shrink-0"
-        :class="stretched ? 'border-aurora bg-aurora/20' : 'border-line'"
+        class="flex items-center justify-center w-7 h-7 rounded-md border-2 shrink-0 transition-colors"
+        :class="stretched ? 'border-aurora bg-aurora-deep text-void' : 'border-line-strong text-transparent'"
         aria-hidden="true"
-      />
+      >
+        <svg v-if="stretched" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+          <path d="M4 12.5l5 5L20 7" />
+        </svg>
+      </span>
       {{ t('workout.stretched') }}
     </button>
 
@@ -186,7 +195,7 @@ watch(note, () => {
       {{ t('workout.saveAsRoutine') }}
     </BkButton>
 
-    <BkButton variant="primary" block @click="emit('close')">{{ t('workout.finishClose') }}</BkButton>
+    <BkButton variant="primary" size="lg" block @click="emit('close')">{{ t('workout.finishClose') }}</BkButton>
 
     <SaveAsRoutineSheet :open="saveAsRoutineOpen" :workout="workout" @close="saveAsRoutineOpen = false" />
   </section>

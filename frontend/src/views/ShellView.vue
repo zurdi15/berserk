@@ -6,13 +6,12 @@ import { useI18n } from 'vue-i18n'
 
 import BkRune from '@/lib/BkRune.vue'
 import type { RuneName } from '@/lib/runes'
-import AthleteBanner from '@/components/shell/AthleteBanner.vue'
-import { attachNetListeners, onBackOnline, online } from '@/offline/net'
+import StatusBanners from '@/components/shell/StatusBanners.vue'
+import { attachNetListeners, onBackOnline } from '@/offline/net'
 import * as outbox from '@/offline/outbox'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { useToastStore } from '@/stores/toast'
-import { getActAs, switchActAs } from '@/utils/actAs'
 import { checkNativeShellUpdate, ensureNativeNotificationPermission, isNativeShell } from '@/utils/nativeShell'
 // v0.16.0: la versión del bundle (verdad de build, ver SettingsCard.vue) —
 // contra ella se compara la versionName del shell para avisar de APK nueva
@@ -34,15 +33,6 @@ const router = useRouter()
 const { t } = useI18n()
 const timer = useRestTimerStore()
 const activeWorkout = useActiveWorkoutStore()
-
-// v0.17.0 act-as: leído UNA vez al montar el shell — el modo solo cambia vía
-// switchActAs, que recarga la app entera (ver utils/actAs.ts), así que no
-// hay estado que mantener sincronizado
-const actAs = getActAs()
-
-function exitActAs() {
-  void switchActAs(null)
-}
 
 // v0.5.0 (zurdi revoca el scroll interno por vista del item 14): <main>
 // vuelve a ser el ÚNICO contenedor de scroll de la app y las vistas fluyen.
@@ -280,12 +270,12 @@ watch(activeIndex, () => nextTick(updateIndicator))
               class="flex flex-col items-center gap-1 px-3 py-2"
               :class="route.name === 'workout' ? 'text-aurora' : 'text-ink-faint hover:text-ink'"
             >
-              <span class="text-xs tracking-wide">{{ $t(item.label) }}</span>
-              <div class="bk-slab relative -mb-5 h-12 flex items-stretch border-aurora text-aurora" data-testid="cta-slab">
+              <span class="text-sm">{{ $t(item.label) }}</span>
+              <div class="bk-slab rounded-md relative -mb-5 h-12 flex items-stretch border-aurora text-aurora" data-testid="cta-slab">
                 <!-- sin respirar (revertido): una sola capa, apagada por defecto,
                      que funde a opacity 1 cuando /workout está activo -->
                 <span
-                  class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
+                  class="absolute inset-0 rounded-md shadow-(--bk-shadow-aurora)"
                   :style="{ opacity: workoutGlowOpacity, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
                   aria-hidden="true"
                   data-testid="workout-glow"
@@ -338,7 +328,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
               class="flex flex-col items-center gap-1 px-3 py-2 text-ink-faint hover:text-ink"
               active-class="text-aurora"
             >
-              <span class="text-xs tracking-wide">{{ $t(item.label) }}</span>
+              <span class="text-sm">{{ $t(item.label) }}</span>
               <span><BkRune :name="item.rune" :size="20" :carve="false" class="relative" /></span>
             </RouterLink>
           </li>
@@ -361,40 +351,9 @@ watch(activeIndex, () => nextTick(updateIndicator))
         data-testid="nav-indicator-desktop"
       />
     </header>
-    <AthleteBanner />
-    <!-- v0.17.0 act-as: banda PERSISTENTE mientras un admin actúa como otro
-         usuario — acento ember (no aurora: el modo atleta de arriba es "ver",
-         esto es OPERAR con otra identidad y debe distinguirse de un vistazo);
-         salir purga el estado local y recarga (ver utils/actAs.ts) -->
-    <div
-      v-if="actAs"
-      data-testid="act-as-banner"
-      class="flex items-center justify-between gap-2 px-4 py-2 border-b border-ember bg-stone text-sm"
-    >
-      <span class="text-ember">{{ t('admin.actingAs', { name: actAs.username }) }}</span>
-      <button
-        type="button"
-        data-testid="act-as-exit"
-        class="bk-press text-ink-muted hover:text-ink"
-        @click="exitActAs"
-      >
-        {{ t('admin.actAsExit') }}
-      </button>
-    </div>
-    <!-- v0.6.0 offline: banda de estado — visible sin red o con cola
-         pendiente; desaparece sola al drenar. Informativa, no interactiva:
-         la sincronización es automática (ver onMounted) y un botón de
-         "reintentar" solo duplicaría lo que los triggers ya hacen. -->
-    <div
-      v-if="!online || outbox.pendingCount.value > 0"
-      class="border-b border-line bg-stone px-4 py-1.5 text-center text-xs text-ink-muted"
-      data-testid="offline-chip"
-    >
-      <template v-if="!online">
-        {{ t('offline.badge') }}<template v-if="outbox.pendingCount.value > 0"> · {{ t('offline.pending', { n: outbox.pendingCount.value }) }}</template>
-      </template>
-      <template v-else>{{ t('offline.syncing') }}</template>
-    </div>
+    <!-- facelift: las tres bandas de estado (atleta/act-as/offline) viven
+         agrupadas en StatusBanners — una franja, no tres barras sueltas -->
+    <StatusBanners />
     <!-- Mobile bottom nav: barra inferior fija en móvil; oculta en desktop (por ahora sin cabecera de identidad) -->
     <nav
       class="fixed inset-x-0 bottom-0 z-(--bk-z-nav) border-t border-line bg-stone pb-[env(safe-area-inset-bottom)] sm:hidden"
@@ -425,13 +384,13 @@ watch(activeIndex, () => nextTick(updateIndicator))
                  desktop (ver why-comment del script y de la versión desktop) -->
             <div
               v-if="item.name === 'workout'"
-              class="flex flex-col items-center gap-1 py-2"
+              class="flex flex-col items-center gap-1 py-2.5"
               :class="route.name === 'workout' ? 'text-aurora' : 'text-ink-faint'"
             >
-              <div class="bk-slab relative -mt-5 h-12 flex items-stretch border-aurora text-aurora" data-testid="cta-slab-mobile">
+              <div class="bk-slab rounded-md relative -mt-5 h-12 flex items-stretch border-aurora text-aurora" data-testid="cta-slab-mobile">
                 <!-- mismo criterio que en desktop: una capa, opacity 0/1 -->
                 <span
-                  class="absolute inset-0 rounded-sm shadow-(--bk-shadow-aurora)"
+                  class="absolute inset-0 rounded-md shadow-(--bk-shadow-aurora)"
                   :style="{ opacity: workoutGlowOpacity, transition: 'opacity var(--bk-dur-3) var(--bk-ease-out)' }"
                   aria-hidden="true"
                   data-testid="workout-glow"
@@ -471,10 +430,10 @@ watch(activeIndex, () => nextTick(updateIndicator))
             <RouterLink
               v-else
               :to="{ name: item.name }"
-              class="flex flex-col items-center gap-1 py-2 text-ink-faint"
+              class="flex flex-col items-center gap-1 py-2.5 text-ink-faint"
               active-class="text-aurora"
             >
-              <span><BkRune :name="item.rune" :size="20" :carve="false" class="relative" /></span>
+              <span><BkRune :name="item.rune" :size="22" :carve="false" class="relative" /></span>
               <!-- revertido (round 7, zurdi): se probó ocultar las inactivas
                    (sr-only + fade solo en la activa), pero con el token a
                    0.7rem las 5 etiquetas leen bien tal cual — vuelta al clásico -->

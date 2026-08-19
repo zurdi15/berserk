@@ -1088,7 +1088,7 @@ describe('ProgressView', () => {
     // de scroll único (ver ShellView.vue); la tira de pestañas es sticky
     expect(wrapper.classes()).not.toContain('h-full')
     expect(wrapper.get('[data-testid="progress-tabs-sticky"]').classes()).toEqual(
-      expect.arrayContaining(['sticky', 'top-0', 'bk-chrome-bg']),
+      expect.arrayContaining(['bk-sticky-chrome']),
     )
   })
 
