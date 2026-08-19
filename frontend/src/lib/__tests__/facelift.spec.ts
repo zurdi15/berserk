@@ -108,18 +108,28 @@ describe('BkHero', () => {
     expect(mount(BkHero, { props: { flush: true } }).classes()).not.toContain('rounded-xl')
   })
 
-  // v0.21.2 (zurdi: "en el header del entrenamiento no quiero blur, que se
-  // quede como antes de ese commit"): backdrop fuerza la isla nocturna
-  // también sin foto — runa a plena presencia, sin opacity/blur
-  it('backdrop keeps the night island without a photo and the rune at full presence (no blur)', () => {
+  // v0.21.2/3 (zurdi: sin blur en el pre-inicio, y "en claro se ve negro —
+  // debería ser coherente"): backdrop = isla TEMATIZADA (bk-hero-island, no
+  // la nocturna fija) con la runa a plena presencia y sin scrims
+  it('backdrop renders the THEMED island without a photo: full-presence rune, no blur, no scrims', () => {
     const wrapper = mount(BkHero, {
       props: { backdrop: true },
       slots: { default: '<p>Pre-inicio</p>' },
     })
-    expect(wrapper.classes()).toContain('bk-hero-backdrop')
-    expect(wrapper.html()).toContain('from-scrim')
+    expect(wrapper.classes()).toContain('bk-hero-island')
+    expect(wrapper.classes()).not.toContain('bk-hero-backdrop')
+    expect(wrapper.html()).not.toContain('from-scrim')
     expect(wrapper.html()).not.toContain('blur-xs')
     expect(wrapper.html()).not.toContain('opacity-25')
+  })
+
+  it('backdrop with a PHOTO still uses the fixed night island (scrims included)', () => {
+    const wrapper = mount(BkHero, {
+      props: { backdrop: true, src: '/api/v1/routines/3/image' },
+    })
+    expect(wrapper.classes()).toContain('bk-hero-backdrop')
+    expect(wrapper.classes()).not.toContain('bk-hero-island')
+    expect(wrapper.html()).toContain('from-scrim')
   })
 })
 

@@ -229,6 +229,30 @@ body::before {
       radial-gradient(circle at 50% 45%, var(--bk-aurora-glow-soft), transparent 62%),
       rgb(10, 12, 15);
   }
+  /* v0.21.3 (zurdi: "en claro, el hero del pre-inicio se ve negro — debería
+     ser coherente con el modo claro"): isla TEMATIZADA para el modo backdrop
+     de BkHero sin foto (pre-inicio) — mismo lienzo que la nocturna en
+     oscuro (bg-void oscuro ES el rgb(10,12,15) de arriba) y niebla pálida
+     con glow en claro. Sin la clase .bk-hero-backdrop, así que toda la
+     tinta del hero cae a los valores base (tokens del tema). */
+  .bk-hero-island {
+    background:
+      radial-gradient(circle at 50% 45%, var(--bk-aurora-glow-soft), transparent 62%),
+      var(--bk-bg-void);
+  }
+  /* botón atrás del hero (pre-inicio): mismo doble modo que la tinta —
+     tematizado sobre la isla, cristal blanco fijo sobre foto (ahí el lienzo
+     es siempre oscuro) */
+  .bk-hero-back {
+    background-color: var(--bk-bg-stone);
+    border-color: var(--bk-line-strong);
+    color: var(--bk-ink);
+  }
+  .bk-hero-backdrop .bk-hero-back {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.9);
+  }
   .bk-hero-backdrop .bk-hero-content {
     color: rgba(255, 255, 255, 0.96);
     text-shadow:

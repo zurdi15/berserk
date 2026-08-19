@@ -21,10 +21,13 @@ import type { RuneName } from './runes'
 // .bk-hero-backdrop, ver base.css) y la runa central va tenue y con blur
 // ("la runa se ve demasiado") para que el texto mande.
 // v6 (zurdi: "en el header del entrenamiento no quiero blur, que se quede
-// como antes de ese commit"): `backdrop` fuerza la isla nocturna de la v3
-// también SIN foto — lienzo oscuro, scrims y la runa tallada a plena
-// presencia (sin opacity/blur). El modo transparente v5 queda para el hero
-// de Hoy; la preview del entreno (WorkoutStartView) pasa backdrop.
+// como antes de ese commit"): `backdrop` = isla con la runa tallada a plena
+// presencia (sin opacity/blur) para la preview del entreno.
+// v7 (zurdi: "en claro se ve negro — debería ser coherente con el modo
+// claro"): esa isla es TEMATIZADA (.bk-hero-island: en oscuro idéntica a la
+// nocturna, en claro niebla pálida con glow y tinta del tema) y sin scrims
+// (no hay foto que oscurecer). La isla NOCTURNA fija (.bk-hero-backdrop)
+// queda solo para el modo foto. El transparente v5 sigue en el hero de Hoy.
 // La media va en una Transition propia keyada por foto/runa: cambiar de
 // rutina cruza la media (y re-talla la runa) SIN remontar la card entera.
 // `flush`: sin radio propio, para heros a sangre (-mx-4 -mt-4 en la vista).
@@ -60,7 +63,7 @@ const mediaKey = computed(() => (showImage.value ? `img-${url.value}` : `rune-${
 <template>
   <div
     class="relative overflow-hidden flex flex-col min-h-64"
-    :class="[(showImage || backdrop) && 'bk-hero-backdrop', !flush && 'rounded-xl']"
+    :class="[showImage ? 'bk-hero-backdrop' : backdrop && 'bk-hero-island', !flush && 'rounded-xl']"
   >
     <Transition name="bk-fade" mode="out-in">
       <div :key="mediaKey" class="absolute inset-0 z-0" aria-hidden="true">
@@ -85,7 +88,9 @@ const mediaKey = computed(() => (showImage.value ? `img-${url.value}` : `rune-${
         </div>
       </div>
     </Transition>
-    <template v-if="showImage || backdrop">
+    <!-- scrims solo con FOTO: en la isla tematizada no hay nada que
+         oscurecer (y en claro el velo oscuro la embarraría) -->
+    <template v-if="showImage">
       <div class="absolute inset-x-0 top-0 h-24 z-0 bg-gradient-to-b from-scrim/80 to-transparent" aria-hidden="true" />
       <div class="absolute inset-x-0 bottom-0 h-40 z-0 bg-gradient-to-t from-scrim via-scrim/40 to-transparent" aria-hidden="true" />
     </template>
