@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.24.0 - 2026-08-19
+
+### Añadido
+- Búsqueda de imágenes de ejercicio desde la webapp: botón "Buscar imagen" en el editor de biblioteca contra free-exercise-db (~870 ejercicios en dominio público); la imagen elegida se descarga a tu instancia y el encuadre parte de cero.
+- Sugerencia de progresión: si la última sesión cumpliste el objetivo entero de la rutina, la card del entreno propone subir el peso (+2.5 kg) y un toque abre el registro ya prefijado.
+- Vista detalle por ejercicio: foto grande, grupo, récords, gráfica con métricas y rango, y el historial completo de sesiones — se abre tocando la fila de la biblioteca (con transición de la imagen) o desde "Ver detalle" en Entrenos.
+- Cardio: métricas de Distancia (km) y Ritmo (min/km) en las gráficas, cuando hay datos de distancia.
+- Rango temporal en las gráficas de Entrenos y del detalle: 3M / 6M / 1A / Todo.
+- Mapa muscular en Hoy: silueta frente/espalda con cada grupo encendido según el volumen de las últimas semanas.
+- La copia de seguridad incluye ahora las imágenes (ejercicios, rutinas, avatares y fotos de progreso) y el restaurado las repone; las copias antiguas siguen restaurando sin tocar tus imágenes actuales.
+
+### Cambiado
+- Admin: la contraseña de otro usuario se cambia desde el propio formulario de editar (campo opcional), sin botón aparte.
+
 ## 0.23.1 - 2026-08-19
 
 ### Cambiado
