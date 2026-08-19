@@ -119,34 +119,29 @@ watch(() => athlete.userId, load)
 </script>
 
 <template>
-  <div class="h-full flex flex-col gap-2">
-    <!-- v0.8.2 (zurdi: "solo debería scrollear la lista, ocupe lo que
-         ocupe"): el picker vuelve a rellenar el hueco que le da su padre —
-         el panel de Entrenos ahora está acotado al viewport con altura
-         MEDIDA (ver ProgressView.measureTrainingPanel), así que la lista
-         toma el resto por flex (flex-1 min-h-0) y es lo ÚNICO que scrollea;
-         los topes en dvh de la v0.8.1 (70/40) eran estimaciones y su
-         sobrante generaba justo el mini-scroll de página que zurdi reportó.
-         La cesión de espacio al chart la anima el propio bloque del chart
-         (bk-reveal-y), no esta lista. La opción "Todos los ejercicios" murió
-         en la v0.8.1 (seleccionaba null → sin chart, botón a ninguna parte).
+  <div class="space-y-2">
+    <!-- v0.24.2 (zurdi: doble scroll en Entrenos): el picker fluye — la
+         página es la ÚNICA superficie de scroll (el panel medido de
+         ProgressView murió con la gráfica ya en el drawer). Y el filtro de
+         grupo + la búsqueda comparten FILA: selector un tercio, búsqueda
+         dos tercios — mismo layout que biblioteca y añadir-ejercicio.
          (comentario dentro de la raíz para no crear un fragmento de dos
          raíces que rompa el fall-through de atributos) -->
-    <!-- v0.11.8 (zurdi: "siempre arriba el selector de grupo y abajo la
-         búsqueda"): mismo orden en todas las superficies con filtro+buscador -->
-    <div class="shrink-0" data-testid="picker-group-filter">
-      <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
+    <div class="grid grid-cols-3 gap-2">
+      <div class="min-w-0" data-testid="picker-group-filter">
+        <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
+      </div>
+      <BkField v-model="query" :label="t('progress.searchExercise')" class="col-span-2 min-w-0" />
     </div>
-    <BkField v-model="query" :label="t('progress.searchExercise')" class="shrink-0" />
 
     <!-- esqueleto mientras carga: mismo hueco que la lista real -->
-    <div v-if="!ready" class="flex-1 min-h-0 overflow-y-auto space-y-1" data-testid="exercise-list-skeleton">
+    <div v-if="!ready" class="space-y-1" data-testid="exercise-list-skeleton">
       <div v-for="n in 6" :key="n" class="h-9 rounded-sm bg-stone bk-shimmer" aria-hidden="true" />
     </div>
 
     <div
       v-else
-      class="flex-1 min-h-0 overflow-y-auto space-y-1"
+      class="space-y-1"
       data-testid="exercise-picker-list"
     >
       <button

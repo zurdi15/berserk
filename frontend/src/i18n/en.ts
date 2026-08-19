@@ -341,6 +341,8 @@ export const en = {
     heroFree: 'Free workout',
     heroInProgress: 'Training',
     heroMeta: '~{min} min · {n} exercises',
+    heroMetaMin: 'min',
+    heroMetaExercises: 'exercise | exercises',
     bodyMap: 'Muscle map',
     bodyMapFront: 'Front',
     bodyMapBack: 'Back',

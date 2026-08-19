@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -55,38 +55,18 @@ watch(tab, () => {
 
 const metric = ref<MetricKey>('top_weight')
 
-// v0.8.2 (zurdi: "solo debería scrollear la lista"): la pestaña Entrenos se
-// acota al hueco visible EXACTO — altura en px medida contra <main> en vez
-// de un calc estático: un calc no puede conocer los banners condicionales
-// (atleta/offline), el breakpoint del top bar ni el pb-24 del wrapper, y
-// cualquier estimación en dvh deja o un mini-scroll o un hueco muerto (el
-// bug exacto que motivó esto). Se mide al activar la pestaña y en resize;
-// PB_RESERVE = los 6rem del pb-24 del wrapper del shell, que quedan FUERA
-// del panel (si el panel llegara hasta el navbar, ese padding alargaría el
-// scrollHeight de <main> y la página volvería a scrollear).
-const trainingPanelEl = ref<HTMLElement | null>(null)
-const trainingPanelHeight = ref<number | null>(null)
-const PB_RESERVE = 96
-function measureTrainingPanel() {
-  const el = trainingPanelEl.value
-  const main = document.querySelector('main')
-  if (!el || !main) return
-  const top = el.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop
-  trainingPanelHeight.value = Math.max(240, main.clientHeight - top - PB_RESERVE)
-}
-watch(tab, async (value) => {
-  if (value !== 'training') return
-  await nextTick()
-  measureTrainingPanel()
-}, { immediate: true })
-onMounted(() => window.addEventListener('resize', measureTrainingPanel))
-onUnmounted(() => window.removeEventListener('resize', measureTrainingPanel))
+// v0.24.2 (zurdi: "hay un scroll general gigante ADEMÁS del de la lista"):
+// el panel ACOTADO por altura medida (v0.8.2→v0.9.3) MURIÓ — su razón de
+// ser (lista+gráfica repartiéndose el hueco) desapareció cuando la gráfica
+// se mudó al drawer, y la medición era una fuente crónica de dobles
+// scrolls. La pestaña Entrenos fluye como cualquier otra: UNA superficie de
+// scroll, la de la página (mismo modelo que la biblioteca).
 const exerciseId = ref<number | null>(null)
 
 // v0.9.3 (zurdi: "sigue habiendo un scroll larguísimo bajo la gráfica —
 // cámbialo a un drawer"): la gráfica vive en un BkSheet que se abre al
-// elegir ejercicio — la vista queda SOLO con la lista (única superficie de
-// scroll, panel acotado por medida) y la clase entera de problemas de
+// elegir ejercicio — la vista queda SOLO con la lista (v0.24.2: en flujo
+// normal de página, sin panel acotado) y la clase entera de problemas de
 // alturas lista+chart desaparece. Cerrar el drawer deselecciona: la lista
 // vuelve completa y los récords pierden el filtro.
 const { locale } = useI18n()
@@ -278,22 +258,14 @@ watch(exerciseId, () => {
          ExercisePicker) y el bloque del chart entra DESPLEGÁNDOSE
          (bk-unfold: max-height animada) para que la cesión de espacio de
          la lista sea gradual, no un salto de flex. -->
-    <!-- overflow-hidden (v0.8.3, zurdi: "al salir la gráfica puedo seguir
-         scrolleando hasta perder de vista todo"): backstop categórico — si
-         el contenido del panel excede la altura medida (chart más alto de lo
-         previsto, fuente grande, lo que sea), se RECORTA dentro del panel en
-         vez de desbordar hacia <main> y devolverle el scroll a la página. -->
-    <!-- v0.9.3 (zurdi): la pestaña es SOLO la lista (panel acotado por
-         medida, overflow-hidden como backstop — nada puede devolverle el
-         scroll a la página); la gráfica vive en el drawer de abajo -->
+    <!-- v0.24.2: pestaña en FLUJO normal (el panel medido de v0.8.2/v0.9.3
+         murió, ver el comentario del script) — scroll único de página -->
     <div
       v-if="tab === 'training'"
-      ref="trainingPanelEl"
-      class="flex flex-col bk-stagger overflow-hidden"
-      :style="{ height: trainingPanelHeight !== null ? `${trainingPanelHeight}px` : undefined }"
+      class="bk-stagger"
       data-testid="training-panel"
     >
-      <div class="flex-1 min-h-0 flex flex-col" :style="{ '--bk-stagger-i': 0 }">
+      <div :style="{ '--bk-stagger-i': 0 }">
         <!-- v0.24.1: los récords ya cargados visten cada fila con su máximo -->
         <ExercisePicker v-model="exerciseId" :records="records" />
       </div>

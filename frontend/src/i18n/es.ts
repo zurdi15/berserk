@@ -346,6 +346,8 @@ export const es = {
     heroFree: 'Entreno libre',
     heroInProgress: 'Entrenando',
     heroMeta: '~{min} min · {n} ejercicios',
+    heroMetaMin: 'min',
+    heroMetaExercises: 'ejercicio | ejercicios',
     bodyMap: 'Mapa muscular',
     bodyMapFront: 'Frente',
     bodyMapBack: 'Espalda',

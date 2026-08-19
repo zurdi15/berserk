@@ -180,6 +180,13 @@ const currentStepSafe = computed(() =>
   Math.min(currentStep.value, Math.max(0, workoutSteps.value.length - 1)),
 )
 
+// v0.24.2 (zurdi: "al pasar de bloque que haga scroll al top para ver el
+// primer ejercicio"): cambiar de step re-ancla la página arriba — sin esto,
+// venir scrolleado del bloque anterior te deja mirando el final del nuevo
+watch(currentStepSafe, () => {
+  resetMainScroll()
+})
+
 // cambiar de entreno (empezar otro, descartar y arrancar de cero) resetea el
 // puntero — con keep-alive la vista sobrevive entre entrenos
 watch(

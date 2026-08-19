@@ -496,14 +496,17 @@ async function confirmDelete() {
                computed filteredExercises -->
           <!-- v0.11.8 (zurdi): grupo SIEMPRE arriba, búsqueda debajo — mismo
                orden que AddExerciseSheet y el picker de progresión -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <!-- v0.24.2 (zurdi): selector y búsqueda SIEMPRE en la misma
+               fila — un tercio / dos tercios, en todas las superficies -->
+          <div class="grid grid-cols-3 gap-2">
             <!-- v0.11.0: filtro de grupo compartido (GroupFilterSelect) -->
-            <div data-testid="exercise-group-filter">
+            <div class="min-w-0" data-testid="exercise-group-filter">
               <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
             </div>
             <BkField
               v-model="query"
               :label="$t('library.searchExercises')"
+              class="col-span-2 min-w-0"
               data-testid="exercise-search-field"
             />
           </div>

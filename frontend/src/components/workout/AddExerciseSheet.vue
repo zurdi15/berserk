@@ -177,10 +177,8 @@ watch(
     <!-- v0.8.0 (zurdi: "la lista debería ocupar más pantalla"): de la
          max-h-64 por defecto de BkSearchList a media pantalla larga — dvh
          para que la UI del navegador móvil no la empuje bajo el borde -->
-    <!-- v0.11.0: filtro de grupo compartido (GroupFilterSelect) -->
-    <div v-if="catalogReady" class="pb-2" data-testid="add-exercise-group-filter">
-      <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
-    </div>
+    <!-- v0.11.0: filtro de grupo compartido — v0.24.2 (zurdi): en la MISMA
+         fila que la búsqueda (1/3 + 2/3), vía el slot beside de BkSearchList -->
     <BkSearchList
       v-if="catalogReady"
       v-model="query"
@@ -193,6 +191,11 @@ watch(
       max-height-class="flex-1 min-h-0"
       @select="pick"
     >
+      <template #beside>
+        <div data-testid="add-exercise-group-filter">
+          <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
+        </div>
+      </template>
       <!-- v0.22.1 (zurdi: "que se parezca al de la biblioteca — que se vean
            las imágenes, y bajo el nombre un chip del grupo muscular"):
            misma anatomía de fila que ExerciseManager — thumb 9:16 con pozo

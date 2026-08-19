@@ -167,22 +167,31 @@ function onInput(event: Event) {
 
 <template>
   <div class="space-y-2">
-    <input
-      type="text"
-      role="combobox"
-      aria-haspopup="listbox"
-      :aria-controls="listId"
-      aria-expanded="true"
-      :aria-activedescendant="filtered.length ? itemId(activeIndex) : undefined"
-      :value="modelValue"
-      :placeholder="label"
-      :aria-label="label"
-      autocomplete="off"
-      class="bk-form-control w-full rounded-sm border border-line bg-stone px-3 py-2.5 text-ink placeholder:text-ink-faint focus:border-aurora"
-      data-testid="search-list-input"
-      @input="onInput"
-      @keydown="onKeydown"
-    />
+    <!-- v0.24.2 (zurdi: "selector de grupo y búsqueda en la misma row"):
+         slot opcional `beside` — lo que llegue ahí (el filtro de grupo)
+         ocupa UN tercio y el input de búsqueda los DOS restantes -->
+    <div :class="$slots.beside && 'grid grid-cols-3 gap-2'">
+      <div v-if="$slots.beside" class="min-w-0">
+        <slot name="beside" />
+      </div>
+      <input
+        type="text"
+        role="combobox"
+        aria-haspopup="listbox"
+        :aria-controls="listId"
+        aria-expanded="true"
+        :aria-activedescendant="filtered.length ? itemId(activeIndex) : undefined"
+        :value="modelValue"
+        :placeholder="label"
+        :aria-label="label"
+        autocomplete="off"
+        class="bk-form-control w-full min-w-0 rounded-sm border border-line bg-stone px-3 py-2.5 text-ink placeholder:text-ink-faint focus:border-aurora"
+        :class="$slots.beside && 'col-span-2'"
+        data-testid="search-list-input"
+        @input="onInput"
+        @keydown="onKeydown"
+      />
+    </div>
     <ul
       :id="listId"
       role="listbox"

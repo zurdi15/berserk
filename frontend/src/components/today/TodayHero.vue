@@ -17,6 +17,7 @@ import { useRouter } from 'vue-router'
 
 import type { ExerciseOut, RotationOut, ScheduledOut } from '@/api/domain'
 import { getRotation, putRotationNext, routineImageUrl } from '@/api/domain'
+import BkAnimatedNumber from '@/lib/BkAnimatedNumber.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
 import BkHero from '@/lib/BkHero.vue'
@@ -90,14 +91,16 @@ const heroRune = computed<RuneName | null>(() =>
     : null,
 )
 
-const heroMeta = computed(() => {
+// v0.24.2 (zurdi: "el blur del min/ejercicios se resetea al cambiar de
+// rutina + quiero los números rotatorios"): la píldora se queda MONTADA
+// (nada de Transition out-in que desmonte el backdrop-blur) y los números
+// ruedan con BkAnimatedNumber, como en el resto de la app
+const heroMinutes = computed(() => {
   const routine = displayRoutine.value
   if (!routine || routine.exercises.length === 0) return null
-  return t('today.heroMeta', {
-    min: estimateRoutineMinutes(routine, props.exercises),
-    n: routine.exercises.length,
-  })
+  return estimateRoutineMinutes(routine, props.exercises)
 })
+const heroExerciseCount = computed(() => displayRoutine.value?.exercises.length ?? 0)
 
 const today = computed(() => todayIso())
 const todaySessions = computed(() => props.schedules.filter((s) => s.date === today.value))
@@ -238,12 +241,14 @@ function goToCalendar() {
           </h2>
         </Transition>
         <!-- v0.23.0 (zurdi): un pelín más grande (text-sm → text-base) y,
-             sobre foto, con píldora scrim+blur detrás (ver .bk-hero-meta) -->
-        <Transition name="bk-fade" mode="out-in">
-          <p v-if="heroMeta" :key="displayRoutine.id" class="text-center">
-            <span class="text-base bk-hero-muted bk-hero-meta">{{ heroMeta }}</span>
-          </p>
-        </Transition>
+             sobre foto, con píldora scrim+blur detrás (ver .bk-hero-meta).
+             v0.24.2: SIN Transition keyed — desmontar la píldora reseteaba
+             el backdrop-blur un instante; ahora persiste y los números
+             ruedan. OJO whitespace: todo en UNA línea — el condense del
+             compilador se come los espacios con salto de línea entre nodos. -->
+        <p v-if="heroMinutes !== null" class="text-center" data-testid="hero-meta">
+          <span class="text-base bk-hero-muted bk-hero-meta">~<BkAnimatedNumber :value="heroMinutes" v-slot="{ value }">{{ value }}</BkAnimatedNumber> {{ t('today.heroMetaMin') }} · <BkAnimatedNumber :value="heroExerciseCount" v-slot="{ value }">{{ value }}</BkAnimatedNumber> {{ t('today.heroMetaExercises', heroExerciseCount) }}</span>
+        </p>
         <!-- hueco central: aquí es donde la runa/foto se luce -->
         <div class="flex-1 min-h-10" aria-hidden="true" />
         <BkButton

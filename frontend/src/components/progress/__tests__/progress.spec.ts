@@ -513,14 +513,19 @@ describe('ExercisePicker', () => {
   // v0.8.1: "Todos los ejercicios" murió (seleccionaba null → sin chart).
   // v0.8.2: la lista rellena el hueco del panel acotado por flex (flex-1
   // min-h-0) — los topes en dvh estimados generaban el mini-scroll de página
-  it('v0.8.2: no "all exercises" option; the list fills its bounded parent via flex, no dvh caps', async () => {
+  // v0.24.2 (zurdi: doble scroll): el picker FLUYE — sin scroll interno, la
+  // página es la única superficie de scroll; y filtro+búsqueda comparten
+  // fila (selector 1/3, búsqueda 2/3)
+  it('v0.24.2: no "all exercises" option; the list flows (no inner scroll) and filter+search share a 1/3-2/3 row', async () => {
     const wrapper = mount(ExercisePicker, { props: { modelValue: null }, ...withI18n() })
     await flushPromises()
     expect(wrapper.find('[data-testid="exercise-option-all"]').exists()).toBe(false)
     const list = wrapper.get('[data-testid="exercise-picker-list"]')
-    expect(list.classes()).toEqual(expect.arrayContaining(['flex-1', 'min-h-0', 'overflow-y-auto']))
+    expect(list.classes()).not.toEqual(expect.arrayContaining(['overflow-y-auto']))
     expect(list.classes().some((c) => c.startsWith('max-h'))).toBe(false)
-    expect(wrapper.classes()).toContain('h-full')
+    const filterRow = wrapper.get('[data-testid="picker-group-filter"]').element.parentElement!
+    expect(filterRow.className).toContain('grid-cols-3')
+    expect(filterRow.querySelector('.col-span-2')).not.toBeNull()
   })
 
   it('item 3a: shows shimmer skeleton rows (not the real list) while listExercises is pending, swaps to the real list once resolved', async () => {
@@ -1201,7 +1206,9 @@ describe('ProgressView', () => {
   // resto (flex-1 min-h-0) y el bloque del chart es shrink-0; la altura en
   // px la mide measureTrainingPanel contra <main> (aquí no hay <main>, así
   // que queda sin fijar — se verifica la estructura, la medida es de Chromium)
-  it('v0.8.2: training panel is a bounded flex column — picker fills, chart block is shrink-0, page never scrolls', async () => {
+  // v0.24.2 (zurdi: doble scroll): el panel medido murió — la pestaña fluye
+  // en la página, sin altura fija, sin overflow-hidden, sin flex acotado
+  it('v0.24.2: the training panel flows with the page — no bounded height, no inner overflow', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
 
@@ -1210,14 +1217,11 @@ describe('ProgressView', () => {
     await flushPromises()
 
     const trainingPanel = wrapper.get('[data-testid="training-panel"]')
-    expect(trainingPanel.classes()).toEqual(expect.arrayContaining(['flex', 'flex-col']))
-
-    const pickerWrapper = wrapper.findComponent({ name: 'ExercisePicker' }).element.parentElement!
-    expect(pickerWrapper.classList.contains('flex-1')).toBe(true)
-    expect(pickerWrapper.classList.contains('min-h-0')).toBe(true)
+    expect(trainingPanel.attributes('style') ?? '').not.toContain('height')
+    expect(trainingPanel.classes()).not.toEqual(expect.arrayContaining(['overflow-hidden']))
 
     const pickerList = wrapper.find('[data-testid="exercise-picker-list"]')
-    expect(pickerList.classes()).toEqual(expect.arrayContaining(['flex-1', 'min-h-0', 'overflow-y-auto']))
+    expect(pickerList.classes()).not.toEqual(expect.arrayContaining(['overflow-y-auto']))
   })
 
   it('round 6 items 3/4: has no view-level h1 (Hoy never had one) and no horizontal padding of its own on the root', async () => {
