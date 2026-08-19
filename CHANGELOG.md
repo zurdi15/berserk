@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.23.1 - 2026-08-19
+
+### Cambiado
+- Registro de series: el stepper de peso/nivel queda alineado con el de reps (el toggle kg/nivel descolgaba la columna).
+- Entreno: más aire entre la imagen del ejercicio y las series; la columna de series es más corta y estrecha en vez de estirarse hasta el borde de la card.
+- Plan rotatorio repensado: fuera la card interior redundante, el índice respira por la izquierda y los nombres de rutina van en multilínea sin truncarse.
+- Listado de rutinas: cada fila muestra la foto de la rutina si la tiene (con el pozo rúnico de fallback) — antes solo salía la runa.
+- "Nueva rutina" se coloca entre el plan rotatorio y la lista, alineado a la derecha.
+
 ## 0.23.0 - 2026-08-19
 
 ### Añadido
