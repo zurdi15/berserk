@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.24.1 - 2026-08-19
+
+### Cambiado
+- Biblioteca: tocar un ejercicio abre directamente su editor (la vista detalle con el progreso queda en Progresión, donde tiene sentido).
+- Entrenos: las cards del selector de ejercicios muestran más información — el máximo del ejercicio a la derecha y el tipo de medición como chip.
+- Los chips de tipo (Cardio, Tiempo, Peso corporal) van en su propia fila, separados del grupo muscular, y no se repiten cuando el grupo ya dice lo mismo.
+
 ## 0.24.0 - 2026-08-19
 
 ### Añadido
