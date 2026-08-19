@@ -45,6 +45,8 @@ class UserOut(BaseModel):
     goal_weight_kg: float | None = None
     # v0.19.x: foto de perfil — el fichero vive en /users/{id}/avatar
     has_avatar: bool = False
+    # v0.25.2: cambia solo al subir otra foto — clave de caché del <img>
+    avatar_version: str | None = None
 
     model_config = {"from_attributes": True}
 

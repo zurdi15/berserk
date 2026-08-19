@@ -751,8 +751,11 @@ export const uploadAvatar = (file: File) => {
 export const deleteAvatar = () => api<void>('/users/me/avatar', { method: 'DELETE' })
 
 // mismo criterio de cache-bust que exerciseImageUrl
-export const avatarUrl = (userId: number, cacheBust?: number) =>
-  `/api/v1/users/${userId}/avatar${cacheBust ? `?v=${cacheBust}` : ''}`
+// v0.25.2: la versión ESTABLE (user.avatar_version, uuid nuevo por subida)
+// sustituye al Date.now() por montaje — con Cache-Control en el backend, el
+// navegador reusa la foto entre visitas y solo refetchea al cambiarla
+export const avatarUrl = (userId: number, version?: string | number | null) =>
+  `/api/v1/users/${userId}/avatar${version ? `?v=${version}` : ''}`
 
 export const listBodyPhotos = () => api<BodyPhotoOut[]>('/body/photos')
 

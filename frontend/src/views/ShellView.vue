@@ -162,12 +162,11 @@ const activeIndex = computed(() => {
 // v0.21.3 (zurdi: "pon de nuevo la tag de Perfil aunque haya avatar, y al
 // mismo tamaño que las runas"): la etiqueta vuelve SIEMPRE y el avatar mide
 // exactamente lo que la runa (22px móvil / 20px desktop) — mismo footprint,
-// nada desentona. El computed se reevalúa cuando refreshMe reemplaza
-// auth.user (subir/quitar foto), y el Date.now() de ese momento rompe la
-// cache del <img> — no es un bust por render: computed cachea por identidad
+// v0.25.2: versión ESTABLE (avatar_version cambia solo al subir otra foto)
+// — el Date.now() de antes rompía la caché en cada arranque
 const auth = useAuthStore()
 const navAvatarSrc = computed(() =>
-  auth.user?.has_avatar ? avatarUrl(auth.user.id, Date.now()) : null,
+  auth.user?.has_avatar ? avatarUrl(auth.user.id, auth.user.avatar_version) : null,
 )
 
 // item 1 (v0.4.0, desktop nav polish): indicador deslizante también arriba,

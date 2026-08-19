@@ -181,7 +181,9 @@ def get_avatar(user_id: int, user: CurrentUser, db: Session = Depends(get_db)):
     path = _uploads_dir("avatars") / target.avatar_path
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not_found")
-    return FileResponse(path)
+    # v0.25.2: el cliente versiona la URL (?v=avatar_version, uuid nuevo por
+    # subida) — cachear fuerte es seguro y evita refetches por visita
+    return FileResponse(path, headers={"Cache-Control": "private, max-age=604800"})
 
 
 @router.delete("/users/me/avatar", status_code=204)

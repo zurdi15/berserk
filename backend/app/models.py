@@ -47,6 +47,16 @@ class User(Base):
         # pide el fichero a /users/{id}/avatar solo si esto es True
         return self.avatar_path is not None
 
+    @property
+    def avatar_version(self) -> str | None:
+        # v0.25.2 (zurdi: "la foto de perfil tarda en cargar"): versión
+        # ESTABLE para la URL del avatar — el nombre en disco es un uuid
+        # nuevo en cada subida, así que su raíz identifica el contenido
+        # exacto. El cliente la usa como ?v= y el navegador cachea de
+        # verdad (antes el bust era Date.now() por montaje = refetch
+        # completo en cada visita al perfil).
+        return self.avatar_path.split(".")[0] if self.avatar_path else None
+
     sessions: Mapped[list["AuthSession"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
     )

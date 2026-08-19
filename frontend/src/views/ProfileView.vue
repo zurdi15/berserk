@@ -112,10 +112,10 @@ const weekDots = computed(() => {
 const initial = computed(() => (auth.user?.username?.[0] ?? '?').toUpperCase())
 
 // v0.19.x (zurdi: "que se pueda poner foto de perfil"): tocar el avatar abre
-// el picker; subir refresca /auth/me (has_avatar) y rompe la cache del
-// <img> con ?v= (mismo criterio que exerciseImageUrl)
+// el picker; subir refresca /auth/me y con él avatar_version — la URL del
+// <img> cambia sola (v0.25.2: adiós al Date.now() por montaje, que
+// refetcheaba la foto completa en CADA visita al perfil)
 const avatarInput = ref<HTMLInputElement | null>(null)
-const avatarBust = ref(Date.now())
 const avatarBusy = ref(false)
 
 function pickAvatar() {
@@ -130,7 +130,6 @@ async function onAvatarPicked(event: Event) {
     avatarBusy.value = true
     await uploadAvatar(file)
     await auth.refreshMe()
-    avatarBust.value = Date.now()
   } catch (error) {
     toastApiError(error)
   } finally {
@@ -207,7 +206,7 @@ async function handleLogout() {
         >
           <img
             v-if="auth.user?.has_avatar && auth.user"
-            :src="avatarUrl(auth.user.id, avatarBust)"
+            :src="avatarUrl(auth.user.id, auth.user.avatar_version)"
             alt=""
             class="absolute inset-0 w-full h-full object-cover"
             data-testid="profile-avatar-img"

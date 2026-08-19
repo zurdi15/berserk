@@ -14,6 +14,8 @@ export interface UserOut {
   goal_weight_kg?: number | null
   // v0.19.x: foto de perfil — el fichero vive en /users/{id}/avatar
   has_avatar?: boolean
+  // v0.25.2: cambia solo al subir otra foto — clave de caché estable del <img>
+  avatar_version?: string | null
 }
 
 export const getStatus = () => api<{ bootstrapped: boolean }>('/auth/status')

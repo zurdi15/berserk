@@ -220,3 +220,34 @@ def test_admin_sees_private_media_of_other_users(client: TestClient, app):
     hodr = login(app, "hodr")
     assert hodr.get(f"/api/v1/routines/{rid}/image").status_code == 404
     assert hodr.get(f"/api/v1/body/photos/{pid}/file").status_code == 404
+
+
+def test_avatar_version_tracks_uploads_and_file_is_cacheable(client: TestClient):
+    """v0.25.2 — la URL del avatar se versiona con avatar_version (raíz uuid
+    del fichero, nueva por subida) y el fichero viaja con Cache-Control: el
+    navegador deja de refetchear la foto en cada visita al perfil."""
+    me = client.get("/api/v1/auth/me").json()
+    assert me["avatar_version"] is None
+
+    assert (
+        client.post(
+            "/api/v1/users/me/avatar", files={"file": ("cara.png", PNG, "image/png")}
+        ).status_code
+        == 204
+    )
+    v1 = client.get("/api/v1/auth/me").json()["avatar_version"]
+    assert v1
+
+    resp = client.get(f"/api/v1/users/{me['id']}/avatar")
+    assert resp.status_code == 200
+    assert "max-age=604800" in resp.headers["cache-control"]
+
+    # re-subir cambia la versión (uuid de fichero nuevo)
+    assert (
+        client.post(
+            "/api/v1/users/me/avatar", files={"file": ("cara2.png", PNG, "image/png")}
+        ).status_code
+        == 204
+    )
+    v2 = client.get("/api/v1/auth/me").json()["avatar_version"]
+    assert v2 and v2 != v1
