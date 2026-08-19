@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.25.1 - 2026-08-20
+
+### Arreglado
+- Rutinas carga al instante: el plan rotatorio reutiliza los datos precargados en el arranque (y muestra un esqueleto de carga cuando aún no los hay), en vez de aparecer de golpe tras su propia petición.
+
 ## 0.25.0 - 2026-08-20
 
 ### Eliminado
