@@ -721,10 +721,14 @@ async function moveDown() {
          series, aspect ratio 9:16"): la foto VERTICAL del ejercicio con peso
          real junto a la checklist — el patrón del player de la referencia.
          Solo en no-cardio (cardio no tiene checklist de series). -->
+    <!-- v0.23.1 (zurdi: "deja más espacio entre la imagen y las series — no
+         hagas la imagen más pequeña, acorta las series y hazlas más
+         estrechas"): gap-3→gap-6 y la columna de series se acota (max-w-48)
+         en vez de estirarse hasta el borde de la card -->
     <div
       v-if="workoutExercise.sets.length || pendingGhostCount"
       class="border-b border-line pb-3 mb-3"
-      :class="!isCardio && 'flex items-center gap-3'"
+      :class="!isCardio && 'flex items-center gap-6'"
     >
       <BkMedia
         v-if="!isCardio"
@@ -734,7 +738,7 @@ async function moveDown() {
         class="self-start"
         :data-testid="`exercise-image-${workoutExercise.id}`"
       />
-      <div class="relative space-y-1.5" :class="!isCardio && 'flex-1 min-w-0'">
+      <div class="relative space-y-1.5" :class="!isCardio && 'flex-1 min-w-0 max-w-48'">
       <TransitionGroup name="bk-remove">
       <div
         v-for="set in workoutExercise.sets"

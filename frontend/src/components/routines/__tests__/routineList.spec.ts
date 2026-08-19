@@ -266,11 +266,14 @@ describe('RoutineList', () => {
 
     // W2 feature 2: scoped a la lista de rutinas PROPIAS — la sección
     // Plantillas (vacía en este test) también renderiza un BkRune por
-    // defecto dentro de su BkEmpty, que no es lo que este test comprueba
+    // defecto dentro de su BkEmpty, que no es lo que este test comprueba.
+    // v0.23.1: la fila pinta BkMedia (foto de rutina o pozo rúnico): la runa
+    // válida llega como prop; la legacy inválida cae a null → bindrune
     const ownList = wrapper.get('.grid.gap-3')
-    const runes = ownList.findAllComponents({ name: 'BkRune' })
-    expect(runes.length).toBe(1)
-    expect(runes[0].props('name')).toBe('chest')
+    const media = ownList.findAllComponents({ name: 'BkMedia' })
+    expect(media.length).toBe(2)
+    expect(media[0].props('rune')).toBe('chest')
+    expect(media[1].props('rune')).toBeNull()
   })
 
   it('shows empty state when no routines', async () => {

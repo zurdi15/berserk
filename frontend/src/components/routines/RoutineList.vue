@@ -9,6 +9,7 @@ import {
   listExercises,
   listRoutineTemplates,
   listRoutines,
+  routineImageUrl,
 } from '@/api/domain'
 import { isValidRuneName } from '@/lib/runeResolve'
 import RotationPlanCard from './RotationPlanCard.vue'
@@ -19,7 +20,7 @@ import { useToastStore } from '@/stores/toast'
 import { formatWeight } from '@/utils/units'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
-import BkRune from '@/lib/BkRune.vue'
+import BkMedia from '@/lib/BkMedia.vue'
 import BkEmpty from '@/lib/BkEmpty.vue'
 import BkUser from '@/lib/BkUser.vue'
 import type { RuneName } from '@/lib/runes'
@@ -175,11 +176,14 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4">
-    <!-- v0.23.0 (zurdi: "el botón nueva rutina arriba, igual que en la
-         biblioteca"): el alta vive ARRIBA del todo — mismo criterio que
-         new-exercise-btn en la cabecera de ExerciseManager. Nunca en el
-         estado vacío: el botón de BkEmpty ya lo cubre, evita el duplicado. -->
-    <div v-if="!ready || displayRoutines.length > 0" class="flex items-center">
+    <!-- v0.14.0: plan rotatorio — editor encima de la lista de rutinas;
+         las candidatas son las mismas que esta lista ya conoce -->
+    <RotationPlanCard v-if="ready" :available="displayRoutines" />
+
+    <!-- v0.23.1 (zurdi): "Nueva rutina" entre el plan rotatorio y la lista,
+         alineado a la DERECHA. Nunca en el estado vacío: el botón de
+         BkEmpty ya lo cubre, evita el duplicado. -->
+    <div v-if="!ready || displayRoutines.length > 0" class="flex justify-end">
       <BkButton
         variant="primary"
         size="sm"
@@ -189,10 +193,6 @@ onMounted(() => {
         {{ $t('routines.newRoutine') }}
       </BkButton>
     </div>
-
-    <!-- v0.14.0: plan rotatorio — editor encima de la lista de rutinas;
-         las candidatas son las mismas que esta lista ya conoce -->
-    <RotationPlanCard v-if="ready" :available="displayRoutines" />
 
     <!-- item 2/3 (v0.4.3, zurdi): esqueleto (shimmer) mientras carga, mismo
          hueco que las cards reales — antes esto era un gate a blanco
@@ -249,9 +249,16 @@ onMounted(() => {
             :data-testid="item.kind === 'own' ? `toggle-routine-${item.id}` : `toggle-template-${item.id}`"
             @click="toggleExpanded(item.id)"
           >
-            <div v-if="item.rune && isValidRuneName(item.rune)" class="text-ink shrink-0">
-              <BkRune :name="(item.rune as RuneName)" :size="32" />
-            </div>
+            <!-- v0.23.1 (zurdi: "aunque tengan fotos, las rutinas no sacan
+                 la imagen en el listado — solo la runa"): BkMedia con la
+                 foto de la rutina y pozo rúnico de fallback, como el resto
+                 de listados del facelift -->
+            <BkMedia
+              :src="item.has_image ? routineImageUrl(item.id) : undefined"
+              :rune="item.rune && isValidRuneName(item.rune) ? (item.rune as RuneName) : null"
+              size="sm"
+              :data-testid="`routine-media-${item.id}`"
+            />
             <div class="flex-1 min-w-0">
               <h3 class="font-semibold text-ink truncate">{{ item.name }}</h3>
               <p v-if="item.description" class="text-sm text-ink-muted truncate">{{ item.description }}</p>

@@ -198,7 +198,7 @@ function submit(keepOpen: boolean) {
     <div v-if="measurement === 'strength'" class="w-full space-y-2">
       <div class="w-full grid grid-cols-2 gap-2">
         <div class="min-w-0 flex flex-col items-center">
-          <div class="flex items-center gap-1 mb-2" data-testid="load-mode-toggle">
+          <div class="h-6 flex items-center gap-1 mb-2" data-testid="load-mode-toggle">
             <button
               type="button"
               class="bk-press px-2 py-0.5 rounded-full border text-xs transition-colors"
@@ -225,7 +225,10 @@ function submit(keepOpen: boolean) {
           <BkStepper v-model="weightDisplay" size="compact" editable :step="loadStep" :min="isLevel ? 1 : 2.5" :max="loadMax" :suffix="loadSuffix" />
         </div>
         <div class="min-w-0 flex flex-col items-center">
-          <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
+          <!-- v0.23.1 (zurdi: "el peso/nivel no está alineado con las reps"):
+               misma altura h-6 que el toggle kg/nivel de la otra columna,
+               para que los DOS steppers queden a ras -->
+          <span class="h-6 flex items-center text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
           <BkStepper v-model="reps" size="compact" :step="1" :min="1" :max="100" />
         </div>
       </div>
@@ -240,13 +243,16 @@ function submit(keepOpen: boolean) {
 
     <div v-else-if="measurement === 'bodyweight'" class="w-full grid grid-cols-2 gap-2">
       <div class="min-w-0 flex flex-col items-center">
-        <span class="block text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
+        <!-- v0.23.1 (zurdi: "el peso/nivel no está alineado con las reps"):
+               misma altura h-6 que el toggle kg/nivel de la otra columna,
+               para que los DOS steppers queden a ras -->
+          <span class="h-6 flex items-center text-xs text-ink-muted mb-2">{{ t('workout.reps') }}</span>
         <BkStepper v-model="reps" size="compact" :step="1" :min="1" :max="100" />
       </div>
       <div class="min-w-0 flex flex-col items-center">
         <!-- mismo toggle que en fuerza — el lastre opcional también puede
              ser un nivel de máquina asistida (0 = sin carga, como siempre) -->
-        <div class="flex items-center gap-1 mb-2" data-testid="load-mode-toggle">
+        <div class="h-6 flex items-center gap-1 mb-2" data-testid="load-mode-toggle">
           <button
             type="button"
             class="bk-press px-2 py-0.5 rounded-full border text-xs transition-colors"

@@ -119,35 +119,36 @@ function ownerOf(routine: RoutineOut): 'mine' | 'global' | 'user' {
           <span class="text-aurora font-medium truncate">{{ nextRoutine.name }}</span>
         </p>
         <p class="text-xs text-ink-faint">{{ t('rotation.tapToSet') }}</p>
-        <!-- v0.23.0 (zurdi: "la estética de 'plan rotatorio' no sigue la
-             nueva del todo"): filas al idioma facelift — pozo de slab en vez
-             de cajas con borde, thumb de media (foto de la rutina o pozo
-             rúnico) como en el resto de listados, y la activa marcada con
-             lavado aurora + outline en lugar de borde coloreado -->
-        <div class="relative bk-slab p-2 space-y-1">
+        <!-- v0.23.1 (zurdi: "las rutinas dentro de una card es redundante…
+             repiensa un poco ese layout"): filas DESNUDAS sobre la card (el
+             pozo bk-slab interior murió), separadas solo por espacio; el
+             índice con aire a la izquierda (pl-3 + w-5), el nombre en
+             MULTILÍNEA (break-words, nada de truncate) y la activa marcada
+             con lavado aurora + outline -->
+        <div class="relative space-y-1">
           <TransitionGroup name="bk-remove">
           <div
             v-for="(routine, index) in entries"
             :key="routine.id"
-            class="flex items-center gap-2 p-2 rounded-lg text-sm"
+            class="flex items-center gap-2 py-2 pl-3 pr-1 rounded-lg text-sm"
             :class="index === rotation!.next_position && 'bg-aurora/10 outline outline-1 outline-aurora/40'"
             :data-testid="`rotation-entry-${routine.id}`"
           >
             <!-- v0.15.0: el cuerpo de la fila fija "la de hoy" de un toque -->
             <button
               type="button"
-              class="bk-press flex items-center gap-2 flex-1 min-w-0 text-left"
+              class="bk-press flex items-center gap-3 flex-1 min-w-0 text-left"
               :aria-label="t('rotation.setToday')"
               :data-testid="`rotation-set-next-${routine.id}`"
               @click="setToday(routine.id)"
             >
-              <span class="bk-metric text-xs text-ink-faint w-4 shrink-0">{{ index + 1 }}</span>
+              <span class="bk-metric text-xs text-ink-faint w-5 text-center shrink-0">{{ index + 1 }}</span>
               <BkMedia
                 :src="routine.has_image ? routineImageUrl(routine.id) : undefined"
                 :rune="runeFor(routine)"
                 size="xs"
               />
-              <span class="truncate text-ink flex-1 min-w-0">{{ routine.name }}</span>
+              <span class="break-words text-ink flex-1 min-w-0">{{ routine.name }}</span>
             </button>
             <button
               v-if="index > 0"
