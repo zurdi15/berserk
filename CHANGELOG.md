@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.21.3 - 2026-08-19
+
+### Fixed
+- Las flechas del carrusel de "hoy toca" se centran verticalmente en la card, despejadas del nombre de la rutina.
+- El item Perfil del menú inferior recupera su etiqueta aunque haya foto de perfil, y el avatar mide lo mismo que las runas vecinas.
+- La cabecera de la preview del entrenamiento es coherente con el modo claro (niebla pálida con el brillo aurora); en oscuro sigue idéntica.
+
 ## 0.21.2 - 2026-08-19
 
 ### Fixed
