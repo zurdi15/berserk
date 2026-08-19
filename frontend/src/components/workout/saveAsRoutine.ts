@@ -65,12 +65,18 @@ export function buildRoutineExercisesFromWorkout(workout: WorkoutOut): RoutineEx
     const source = effective.length ? effective : we.sets
     const reps = source.map((s) => s.reps).filter((r): r is number => r != null)
     const lastWeight = [...source].reverse().find((s) => s.weight_kg != null)?.weight_kg ?? null
+    // v0.23.0: el tiempo de la ÚLTIMA serie con duración pasa a ser el
+    // tiempo objetivo de la rutina (mismo criterio "last" que el peso) —
+    // clampado a los límites del schema (ge=1/le=86400)
+    const lastDuration =
+      [...source].reverse().find((s) => s.duration_seconds != null)?.duration_seconds ?? null
 
     return {
       exercise_id: we.exercise_id,
       target_sets: clampSets(source.length || 3),
       target_reps: clampInt(mode(reps), 1, 200),
       target_weight_kg: lastWeight != null && lastWeight > 0 ? Math.min(1000, lastWeight) : null,
+      target_duration_seconds: clampInt(lastDuration, 1, 86400),
       rest_seconds: clampInt(we.rest_seconds, 5, 900),
       // v0.5.0 superseries: el grouping del entreno viaja a la rutina tal
       // cual (mismo orden de ejercicios → misma contigüidad); si un reorden

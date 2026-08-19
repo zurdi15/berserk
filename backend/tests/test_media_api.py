@@ -182,3 +182,41 @@ def test_routine_image_roundtrip_and_rules(client: TestClient, app):
 
     assert client.delete(f"/api/v1/routines/{rid}/image").status_code == 204
     assert client.get(f"/api/v1/routines/{rid}/image").status_code == 404
+
+
+def test_admin_sees_private_media_of_other_users(client: TestClient, app):
+    """v0.23.0 (zurdi: "asumiendo otro user como admin fallan las imágenes de
+    hero de las rutinas"): los <img> del navegador no llevan la cabecera
+    X-Bk-Act-As, así que bajo act-as llegan con la identidad REAL del admin —
+    el GET de media (rutina, foto de cuerpo) hace bypass de visibilidad para
+    admins. Un no-admin sigue sin ver nada ajeno privado."""
+    make_user(client, "sif")
+    sif = login(app, "sif")
+
+    # rutina PRIVADA de sif con imagen
+    rid = sif.post(
+        "/api/v1/routines", json={"name": "Secreta", "exercises": [], "is_global": False}
+    ).json()["id"]
+    assert (
+        sif.post(
+            f"/api/v1/routines/{rid}/image", files={"file": ("h.png", PNG, "image/png")}
+        ).status_code
+        == 204
+    )
+
+    # foto de cuerpo (siempre privada) de sif
+    pid = sif.post(
+        "/api/v1/body/photos?photo_date=2026-08-01",
+        files={"file": ("b.png", PNG, "image/png")},
+    ).json()["id"]
+
+    # el ADMIN (client) ve ambas (los ejercicios ya son catálogo global
+    # desde v0.20.x: su imagen no entra en este bypass)
+    assert client.get(f"/api/v1/routines/{rid}/image").status_code == 200
+    assert client.get(f"/api/v1/body/photos/{pid}/file").status_code == 200
+
+    # un tercer usuario NO-admin sigue sin ver nada
+    make_user(client, "hodr")
+    hodr = login(app, "hodr")
+    assert hodr.get(f"/api/v1/routines/{rid}/image").status_code == 404
+    assert hodr.get(f"/api/v1/body/photos/{pid}/file").status_code == 404

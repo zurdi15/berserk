@@ -643,7 +643,10 @@ async function moveDown() {
 </script>
 
 <template>
-  <BkCard :class="isCardio && 'border-l-2 border-aurora/50 pl-3'">
+  <!-- v0.23.0 (zurdi: "la card de cardio tiene el borde más ancho a la
+       izquierda"): el acento lateral de cardio (item 6 v0.3.0) muere — con
+       el facelift leía como un borde descuadrado, no como acento -->
+  <BkCard>
     <!-- v0.7.0 (feedback de zurdi): el chip "Superserie A" y el acento del
          grupo suben al CONTENEDOR del bloque (ver WorkoutView.vue) — la card
          ya no pinta nada de superserie salvo el chip "Siguiente"; el acento
@@ -744,23 +747,23 @@ async function moveDown() {
           v-if="exercise"
           type="button"
           :data-testid="`edit-set-${set.id}`"
-          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1.5 hover:bg-slab"
+          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1 hover:bg-slab"
           :aria-label="t('common.edit')"
           @click="openEdit(set)"
         >
-          <span class="bk-metric text-base">
+          <span class="bk-metric text-sm">
             <template v-if="!isCardio">{{ set.set_number }}. </template>{{ formatSetValue(set) }}
             <span v-if="set.rpe" class="text-ink-faint text-sm"> · RPE {{ set.rpe }}</span>
           </span>
         </button>
-        <span v-else class="flex-1 min-w-0 bk-metric text-base px-2 py-1.5">
+        <span v-else class="flex-1 min-w-0 bk-metric text-sm px-2 py-1">
           <template v-if="!isCardio">{{ set.set_number }}. </template>{{ formatSetValue(set) }}
         </span>
         <!-- des-marcar = borrar la serie (facelift v2) — el pie del cajón
              de edición sigue existiendo como camino explícito -->
         <BkCheck
           :model-value="true"
-          size="lg"
+          size="md"
           :aria-label="t('workout.setDone', { n: set.set_number })"
           :data-testid="`uncheck-set-${set.id}`"
           @update:model-value="uncheckSet(set.id)"
@@ -781,26 +784,26 @@ async function moveDown() {
         <button
           v-if="exercise"
           type="button"
-          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1.5"
+          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1"
           :aria-label="t('workout.nextSet')"
           @click="openNew"
         >
           <!-- numeración continua con set_number (que cuenta TODAS las
                series, calentamientos incluidos), no con las efectivas -->
-          <span class="bk-metric text-base" :class="g === 1 ? 'text-ink-muted' : 'text-ink-faint'">
+          <span class="bk-metric text-sm" :class="g === 1 ? 'text-ink-muted' : 'text-ink-faint'">
             <template v-if="!isCardio">{{ workoutExercise.sets.length + g }}. </template>{{ ghostLabel }}
           </span>
         </button>
         <BkCheck
           v-if="g === 1"
           :model-value="false"
-          size="lg"
+          size="md"
           :disabled="quickLogging || !exercise"
           :data-testid="`ghost-check-${workoutExercise.id}`"
           :aria-label="t('workout.logSet')"
           @update:model-value="quickLog"
         />
-        <span v-else class="w-9 h-9 shrink-0" aria-hidden="true" />
+        <span v-else class="w-7 h-7 shrink-0" aria-hidden="true" />
       </div>
       </div>
     </div>
@@ -872,14 +875,19 @@ async function moveDown() {
       >
         {{ t('workout.addSet') }}
       </BkButton>
+      <!-- v0.23.0 (zurdi): las dos acciones ocupan TODA la fila a partes
+           iguales (grid de 2 columnas; en el editor retro, sin "Empezar",
+           registrar toma la fila entera) -->
       <div
         v-else-if="isCardio && exercise && !resumedActive && historyLoaded"
-        class="flex items-center gap-2 min-w-0"
+        class="grid gap-2 flex-1 min-w-0"
+        :class="live ? 'grid-cols-2' : 'grid-cols-1'"
         :data-testid="`cardio-actions-${workoutExercise.id}`"
       >
         <BkButton
           variant="ghost"
           size="sm"
+          block
           :data-testid="`cardio-log-${workoutExercise.id}`"
           @click="openNew"
         >
@@ -889,6 +897,7 @@ async function moveDown() {
           v-if="live"
           variant="primary"
           size="sm"
+          block
           :data-testid="`cardio-start-${workoutExercise.id}`"
           @click="cardioStartOpen = true"
         >

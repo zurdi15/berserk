@@ -265,6 +265,19 @@ body::before {
   .bk-hero-backdrop .bk-hero-muted {
     color: rgba(255, 255, 255, 0.72);
   }
+  /* v0.23.0 (zurdi: "la label de ~min · ejercicios casi no se ve sobre una
+     foto real"): la meta del hero gana una píldora con scrim + blur SOLO en
+     modo foto — sobre el backdrop temático el texto ya era legible y la
+     píldora sería ruido */
+  .bk-hero-backdrop .bk-hero-meta {
+    display: inline-block;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    background: rgba(4, 6, 8, 0.45);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    color: rgba(255, 255, 255, 0.92);
+  }
   /* acento dentro del hero: transparente usa el aurora del tema; sobre foto,
      la aurora NOCTURNA fija — la clara (oscurecida para AA sobre blanco) se
      apaga sobre el lienzo negro. Clases propias y no text-aurora: una

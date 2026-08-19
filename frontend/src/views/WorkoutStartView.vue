@@ -11,6 +11,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { ExerciseOut, MuscleGroupOut, RoutineExerciseOut, RoutineOut } from '@/api/domain'
 import { getRotation, listExercises, listMuscleGroups, listRoutines, routineImageUrl } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
+import { formatDuration } from '@/components/workout/duration'
 import { estimateRoutineMinutes } from '@/components/workout/routineEstimate'
 import BkButton from '@/lib/BkButton.vue'
 import BkMedia from '@/lib/BkMedia.vue'
@@ -125,6 +126,14 @@ function rowName(row: RoutineExerciseOut): string {
 }
 
 function rowMeta(row: RoutineExerciseOut): string {
+  // v0.23.0 (zurdi: "si un ejercicio es cardio, en vez de 'x series' tiene
+  // que poner tiempo"): cardio/timed van por duración — el tiempo objetivo
+  // de la rutina si lo hay, la etiqueta del tipo de medición si no
+  const measurement = rowExercise(row)?.measurement
+  if (measurement === 'cardio' || measurement === 'timed') {
+    if (row.target_duration_seconds != null) return formatDuration(row.target_duration_seconds)
+    return t(`library.measurements.${measurement}`)
+  }
   if (row.target_reps != null) return `${row.target_sets} × ${row.target_reps}`
   return t('prestart.setsOnly', { n: row.target_sets })
 }

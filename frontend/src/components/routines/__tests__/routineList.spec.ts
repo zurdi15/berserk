@@ -101,8 +101,9 @@ describe('RoutineList', () => {
     expect(editor.props('routine')).toBeUndefined()
   })
 
-  // item 1 (v0.4.3, zurdi): "Nueva rutina" se muda debajo de la lista
-  it('item 1: the new-routine button renders AFTER the list in the DOM (below it), not before', async () => {
+  // v0.23.0 (zurdi: "el botón nueva rutina arriba, igual que en la
+  // biblioteca") — deshace el item 1 de v0.4.3, que lo tenía debajo
+  it('v0.23.0: the new-routine button renders BEFORE the list in the DOM (at the top)', async () => {
     const wrapper = build()
     await wrapper.vm.$nextTick()
     await new Promise(resolve => setTimeout(resolve, 50))
@@ -112,7 +113,7 @@ describe('RoutineList', () => {
     const grid = wrapper.get('.grid.gap-3').element
     const button = wrapper.get('[data-testid="new-routine-btn"]').element
     const children = Array.from(root.children)
-    expect(children.indexOf(grid)).toBeLessThan(children.indexOf(button.parentElement!))
+    expect(children.indexOf(button.parentElement!)).toBeLessThan(children.indexOf(grid))
   })
 
   // item 12 (v0.4.3, zurdi): la runa y el grupo de acciones centran contra

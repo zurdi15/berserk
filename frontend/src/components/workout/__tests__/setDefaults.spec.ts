@@ -75,7 +75,28 @@ describe('resolveNewSetDefaults (item 2)', () => {
 
   it('priority 3: falls back to the routine target when there is no workout or history data', () => {
     const result = resolveNewSetDefaults([], null, 1, routines as never, 5)
-    expect(result).toEqual({ reps: 8, weight_kg: 60 })
+    expect(result).toEqual({ reps: 8, weight_kg: 60, duration_seconds: null })
+  })
+
+  // v0.23.0: el tiempo objetivo de cardio también cuenta como target de
+  // rutina — alimenta el default del cronómetro de "Empezar"
+  it('priority 3 (cardio): the routine target_duration_seconds becomes the duration default', () => {
+    const cardioRoutines = [
+      {
+        id: 2,
+        exercises: [
+          {
+            exercise_id: 9,
+            target_sets: 1,
+            target_reps: null,
+            target_weight_kg: null,
+            target_duration_seconds: 900,
+          },
+        ],
+      },
+    ]
+    const result = resolveNewSetDefaults([], null, 2, cardioRoutines as never, 9)
+    expect(result).toEqual({ reps: null, weight_kg: null, duration_seconds: 900 })
   })
 
   it('priority 4: null when nothing matches (free workout, never trained, no routine target)', () => {

@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from ..auth import CurrentUser
 from ..config import get_settings
 from ..db import get_db
-from ..models import BodyPhoto, Exercise, ExerciseNote, User
+from ..models import BodyPhoto, Exercise, ExerciseNote, Routine, User
 from ..schemas.media import BodyPhotoOut, ExerciseNoteIn, ExerciseNoteOut
 from .exercises import _can_edit, get_visible_exercise
 from .routines import _editable_routine, _visible_template
@@ -124,8 +124,18 @@ async def upload_routine_image(
 @router.get("/routines/{routine_id}/image")
 def get_routine_image(routine_id: int, user: CurrentUser, db: Session = Depends(get_db)):
     # misma regla de visibilidad que el resto de la rutina (propia, global o
-    # plantilla legacy) — _visible_template ya lanza 404 si no aplica
-    routine = _visible_template(db, user, routine_id)
+    # plantilla legacy) — _visible_template ya lanza 404 si no aplica.
+    # v0.23.0 (zurdi: "asumiendo otro user como admin fallan las imágenes de
+    # hero de las rutinas"): los <img> del navegador no llevan la cabecera
+    # X-Bk-Act-As (solo la añade el fetch de client.ts), así que llegan con
+    # la identidad REAL del admin — un admin ve cualquier media, igual que ya
+    # ve cualquier dato vía act-as en la API
+    if user.is_admin:
+        routine = db.get(Routine, routine_id)
+        if routine is None:
+            raise HTTPException(status_code=404, detail="not_found")
+    else:
+        routine = _visible_template(db, user, routine_id)
     if not routine.image_path:
         raise HTTPException(status_code=404, detail="not_found")
     path = _uploads_dir("routines") / routine.image_path
@@ -253,7 +263,10 @@ async def upload_body_photo(
 @router.get("/body/photos/{photo_id}/file")
 def get_body_photo(photo_id: int, user: CurrentUser, db: Session = Depends(get_db)):
     photo = db.get(BodyPhoto, photo_id)
-    if photo is None or photo.owner_id != user.id:
+    # v0.23.0: mismo bypass admin que exercise/routine image — bajo act-as la
+    # LISTA ya sale (fetch con cabecera), pero el <img> del fichero llega con
+    # la identidad real del admin y rompía la galería del usuario asumido
+    if photo is None or (photo.owner_id != user.id and not user.is_admin):
         raise HTTPException(status_code=404, detail="not_found")
     path = _uploads_dir("body") / photo.path
     if not path.is_file():

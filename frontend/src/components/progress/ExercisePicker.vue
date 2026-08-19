@@ -132,34 +132,38 @@ watch(() => athlete.userId, load)
         <BkMedia
           :exercise="exercise"
           :rune="primaryGroup(exercise) && isValidRuneName(primaryGroup(exercise)!.slug) ? (primaryGroup(exercise)!.slug as RuneName) : null"
-          size="xs"
+          size="tallSm"
         />
-        <span class="flex-1 min-w-0 truncate text-base">{{ exerciseName(exercise, locale) }}</span>
-        <span class="flex items-center gap-1.5 shrink-0 justify-end">
-          <!-- item 6: tag runa (+ nombre en filas anchas) del grupo primario -->
-          <span
-            v-if="primaryGroup(exercise)"
-            class="inline-flex items-center gap-1 text-ink-faint"
-            :data-testid="`exercise-group-tag-${exercise.id}`"
-          >
-            <BkRune
-              v-if="isValidRuneName(primaryGroup(exercise)!.slug)"
-              :name="(primaryGroup(exercise)!.slug as RuneName)"
-              :size="14"
-            />
-            <span class="hidden sm:inline text-xs">{{ groupLabel(primaryGroup(exercise)!) }}</span>
+        <!-- v0.23.0 (zurdi: "igual que en otros sitios, debajo del nombre el
+             chip de grupo muscular"): misma anatomía que AddExerciseSheet y
+             la biblioteca — nombre arriba, chip runa+grupo debajo (antes el
+             tag vivía a la derecha y escondía el nombre en pantallas sm) -->
+        <span class="flex-1 min-w-0">
+          <span class="block break-words text-base">{{ exerciseName(exercise, locale) }}</span>
+          <span v-if="primaryGroup(exercise)" class="mt-1 block">
+            <span
+              class="inline-flex items-center gap-1 rounded-full border border-line px-1.5 py-0.5 text-2xs text-ink-faint"
+              :data-testid="`exercise-group-tag-${exercise.id}`"
+            >
+              <BkRune
+                v-if="isValidRuneName(primaryGroup(exercise)!.slug)"
+                :name="(primaryGroup(exercise)!.slug as RuneName)"
+                :size="12"
+              />
+              <span>{{ groupLabel(primaryGroup(exercise)!) }}</span>
+            </span>
           </span>
-          <!-- punto aurora (item 5): mismo visual que los dots "done" del
-               calendario (w-1.5 h-1.5 rounded-full bg-aurora, ver MonthGrid.vue)
-               — señal de que este ejercicio ya tiene series registradas -->
-          <span
-            v-if="trainedIds.has(exercise.id)"
-            class="w-1.5 h-1.5 rounded-full bg-aurora shrink-0"
-            data-testid="trained-dot"
-            :title="t('progress.hasData')"
-          >
-            <span class="sr-only">{{ t('progress.hasData') }}</span>
-          </span>
+        </span>
+        <!-- punto aurora (item 5): mismo visual que los dots "done" del
+             calendario (w-1.5 h-1.5 rounded-full bg-aurora, ver MonthGrid.vue)
+             — señal de que este ejercicio ya tiene series registradas -->
+        <span
+          v-if="trainedIds.has(exercise.id)"
+          class="w-1.5 h-1.5 rounded-full bg-aurora shrink-0"
+          data-testid="trained-dot"
+          :title="t('progress.hasData')"
+        >
+          <span class="sr-only">{{ t('progress.hasData') }}</span>
         </span>
       </button>
     </div>

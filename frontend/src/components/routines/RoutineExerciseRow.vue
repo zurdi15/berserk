@@ -11,6 +11,11 @@ import BkSelect from '@/lib/BkSelect.vue'
 import BkStepper from '@/lib/BkStepper.vue'
 import { primaryRune } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
+import {
+  CARDIO_DURATION_MAX_SECONDS,
+  CARDIO_DURATION_STEP_SECONDS,
+  formatDuration,
+} from '../workout/duration'
 import { exerciseName } from './exerciseName'
 
 // v0.10.0 (zurdi: "el flow de rutina debería ser exactamente el mismo que el
@@ -26,6 +31,9 @@ export interface EditorRow {
   target_sets: number
   target_reps: number | null
   target_weight_kg: number | null
+  // v0.23.0 (zurdi: "los ejercicios de cardio deberían tener tiempo
+  // objetivo, no series objetivo"): solo aplica a cardio/timed
+  target_duration_seconds: number | null
   rest_seconds: string | null
   superset_group: number | null
   // v0.17.0 bloques: null = sin bloque; el editor mantiene las filas del
@@ -142,7 +150,22 @@ const restOptions = [
     <div class="flex items-start gap-3">
       <BkMedia :exercise="exercise" :rune="rune" size="tall" class="self-start" />
       <div class="flex-1 min-w-0 space-y-2">
-        <div>
+        <!-- v0.23.0 (zurdi): en cardio "series objetivo" no dice nada — el
+             objetivo es TIEMPO (mismo stepper mm:ss del cajón del entreno,
+             pasos de 30 s) y alimenta el default de "Empezar" -->
+        <div v-if="isCardio" data-testid="target-duration-field">
+          <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetDuration') }}</label>
+          <BkStepper
+            :model-value="row.target_duration_seconds ?? 0"
+            size="compact"
+            :min="0"
+            :max="CARDIO_DURATION_MAX_SECONDS"
+            :step="CARDIO_DURATION_STEP_SECONDS"
+            :display="row.target_duration_seconds ? formatDuration(row.target_duration_seconds) : '—'"
+            @update:model-value="row.target_duration_seconds = $event > 0 ? $event : null"
+          />
+        </div>
+        <div v-else>
           <label class="block text-xs text-ink-muted mb-2">{{ t('routines.targetSets') }}</label>
           <BkStepper
             :model-value="row.target_sets"

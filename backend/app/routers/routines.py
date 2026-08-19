@@ -175,6 +175,7 @@ def copy_routine(routine_id: int, user: CurrentUser, db: Session = Depends(get_d
                 exercise_id=item.exercise_id,
                 target_sets=item.target_sets,
                 target_reps=item.target_reps,
+                target_duration_seconds=item.target_duration_seconds,
                 target_weight_kg=item.target_weight_kg,
                 rest_seconds=item.rest_seconds,
                 # v0.5.0 superseries: la copia preserva el grouping — como el

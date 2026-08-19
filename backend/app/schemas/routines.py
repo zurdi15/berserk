@@ -31,6 +31,8 @@ class RoutineExerciseIn(BaseModel):
     exercise_id: int
     target_sets: int = Field(3, ge=1, le=20)
     target_reps: int | None = Field(None, ge=1, le=200)
+    # v0.23.0: tiempo objetivo (cardio/timed) — mismo rango que SetIn
+    target_duration_seconds: int | None = Field(None, ge=1, le=86400)
     target_weight_kg: float | None = Field(None, gt=0, le=1000)
     rest_seconds: int | None = Field(None, ge=5, le=900)
     # v0.5.0 superseries: índice de grupo normalizado (0,1,2…) o None =
@@ -49,6 +51,7 @@ class RoutineExerciseOut(BaseModel):
     position: int
     target_sets: int
     target_reps: int | None
+    target_duration_seconds: int | None
     target_weight_kg: float | None
     rest_seconds: int | None
     superset_group: int | None

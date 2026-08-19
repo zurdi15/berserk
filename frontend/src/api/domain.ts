@@ -180,6 +180,9 @@ export interface RoutineExerciseOut {
   position: number
   target_sets: number
   target_reps: number | null
+  // v0.23.0: tiempo objetivo (cardio/timed); null = sin objetivo — opcional
+  // en el tipo (fixtures viejos siguen tipando), resolución vía `?? null`
+  target_duration_seconds?: number | null
   target_weight_kg: number | null
   rest_seconds: number | null
   // v0.5.0 superseries: índice de grupo (contiguos con el mismo valor =
@@ -217,6 +220,7 @@ export interface RoutineExerciseIn {
   exercise_id: number
   target_sets?: number
   target_reps?: number | null
+  target_duration_seconds?: number | null
   target_weight_kg?: number | null
   rest_seconds?: number | null
   // v0.5.0 superseries: el editor manda valores YA normalizados (0,1,2…, ver
@@ -273,6 +277,10 @@ export interface SeriesPoint {
   est_1rm: number
   // v0.20.x: mejor NIVEL de la sesión (0 = sin series de nivel ese día)
   top_level: number
+  // v0.23.0: duración TOTAL efectiva de la sesión (cardio/timed), en
+  // segundos — el progreso de cardio es por tiempos. Opcional en el tipo
+  // (fixtures viejos siguen tipando), resolución vía `?? 0`.
+  duration_seconds?: number
 }
 
 export interface HeatmapDay {

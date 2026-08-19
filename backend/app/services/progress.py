@@ -46,24 +46,36 @@ def exercise_series(db: Session, owner_id: int, exercise_id: int) -> list[dict]:
     mezclada en el eje de kg (v0.18.0).
     """
     rows = db.execute(
-        select(Workout.id, Workout.date, WorkoutSet.reps, WorkoutSet.weight_kg, WorkoutSet.load_mode)
+        select(
+            Workout.id,
+            Workout.date,
+            WorkoutSet.reps,
+            WorkoutSet.weight_kg,
+            WorkoutSet.load_mode,
+            WorkoutSet.duration_seconds,
+        )
         .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
         .join(WorkoutSet, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
         .where(
             Workout.owner_id == owner_id,
             WorkoutExercise.exercise_id == exercise_id,
             WorkoutSet.is_warmup.is_(False),
-            WorkoutSet.weight_kg.is_not(None),
         )
         .order_by(Workout.date, Workout.id)
     ).all()
     by_workout: dict[int, dict] = {}
-    for workout_id, workout_date, reps, weight, load_mode in rows:
+    for workout_id, workout_date, reps, weight, load_mode, duration in rows:
         entry = by_workout.setdefault(
             workout_id,
             {"workout_id": workout_id, "date": workout_date, "top_weight": 0.0,
-             "volume": 0.0, "est_1rm": 0.0, "top_level": 0.0},
+             "volume": 0.0, "est_1rm": 0.0, "top_level": 0.0, "duration_seconds": 0},
         )
+        # v0.23.0 (zurdi: "el progreso de cardio debería ser por tiempos"):
+        # duración TOTAL efectiva de la sesión — cardio/timed no tienen kg
+        if duration is not None:
+            entry["duration_seconds"] += duration
+        if weight is None:
+            continue
         if (load_mode or "weight") == "level":
             entry["top_level"] = max(entry["top_level"], weight)
             continue

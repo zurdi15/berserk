@@ -138,6 +138,21 @@ describe('seriesFor', () => {
       { date: '2026-07-08', value: kgToDisplay(900, 'lb') },
     ])
   })
+
+  // v0.23.0: la métrica de cardio — segundos por sesión → minutos con 1
+  // decimal, sin pasar por unidades de peso (units es irrelevante aquí);
+  // las sesiones a cero se caen, igual que en el resto de métricas
+  it('duration maps duration_seconds to minutes with 1 decimal, ignoring units and dropping zero days', () => {
+    const points = [
+      { date: '2026-07-01', duration_seconds: 900 },
+      { date: '2026-07-08', duration_seconds: 1230 },
+      { date: '2026-07-15' },
+    ]
+    expect(seriesFor(points as never, 'duration', 'lb')).toEqual([
+      { date: '2026-07-01', value: 15 },
+      { date: '2026-07-08', value: 20.5 },
+    ])
+  })
 })
 
 describe('PrList', () => {
@@ -1014,6 +1029,47 @@ describe('ProgressView', () => {
       { date: '2026-08-01', value: 10 },
       { date: '2026-08-03', value: 12 },
     ])
+  })
+
+  // v0.23.0 (zurdi: "las gráficas de cardio con la tab peso no tienen
+  // sentido — por tiempos, sin volumen ni est. 1RM")
+  it('a cardio exercise shows a single Tiempo metric tab charting minutes per session', async () => {
+    document.body.innerHTML = ''
+    const cardio = {
+      id: 3,
+      name_es: 'Cinta',
+      name_en: 'Treadmill',
+      measurement: 'cardio',
+      owner_id: null,
+      muscle_groups: [],
+    }
+    vi.mocked(domain.listExercises).mockResolvedValue([...fixtures.exercises, cardio] as never)
+    vi.mocked(domain.getSeries).mockResolvedValue({
+      series: [
+        { workout_id: 1, date: '2026-08-01', top_weight: 0, volume: 0, est_1rm: 0, top_level: 0, duration_seconds: 900 },
+        { workout_id: 2, date: '2026-08-03', top_weight: 0, volume: 0, est_1rm: 0, top_level: 0, duration_seconds: 1230 },
+      ],
+    } as never)
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click') // Entrenos
+    await flushPromises()
+
+    await wrapper.find('[data-testid="exercise-option-3"]').trigger('click')
+    await flushPromises()
+
+    const tabs = metricTabs()
+    expect(tabs).toHaveLength(1)
+    expect(tabs[0].textContent).toContain('Tiempo')
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true')
+    const chart = wrapper.findComponent({ name: 'BkChart' })
+    expect(chart.props('points')).toEqual([
+      { date: '2026-08-01', value: 15 },
+      { date: '2026-08-03', value: 20.5 },
+    ])
+    expect(chart.props('suffix')).toBe(' min')
   })
 
   it('item 8: switches to the body tab (2nd tab in the totales→cuerpo→entreno→récords order) and hides the training-tab content', async () => {

@@ -329,13 +329,6 @@ const elapsedLabel = computed(() => {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
 })
 
-const dateLabel = computed(() => {
-  if (!activeWorkout.workout) return ''
-  return new Intl.DateTimeFormat(locale.value, { weekday: 'long', day: 'numeric', month: 'long' }).format(
-    new Date(`${activeWorkout.workout.date}T00:00:00`),
-  )
-})
-
 // item 4: grupos musculares derivados de los ejercicios del entreno — de
 // solo lectura, el backend ya los recalcula en cada alta/baja de ejercicio
 // (ver services/workouts.py::sync_derived_muscle_groups); ya no hay editor manual
@@ -786,14 +779,7 @@ onBeforeUnmount(stopTicker)
     />
 
     <div v-else-if="activeWorkout.workout" class="space-y-4 bk-stagger">
-      <!-- item 3 (ola de pulido v0.3.0): la fecha pasa a la MISMA fila que el
-           cronómetro, a su derecha (antes iba apilada arriba) — flex-wrap se
-           conserva como red de seguridad: una fecha larga (locale EN con
-           weekday+month largos) más el cronómetro en formato h:mm:ss podría
-           no caber en los ~328px de contenido de un viewport de 360px, y
-           aquí es preferible que la fecha baje a su propia línea a que se
-           corte o se solape con el cronómetro.
-           v0.5.0: wrapper sticky alrededor del slab — ver el comentario del
+      <!-- v0.5.0: wrapper sticky alrededor del slab — ver el comentario del
            script (crono visible mientras se scrollea la lista). -->
       <div
         class="bk-sticky-chrome"
@@ -810,9 +796,10 @@ onBeforeUnmount(stopTicker)
           <div class="flex items-center justify-between gap-3">
             <div class="min-w-0">
               <p class="bk-metric text-3xl text-ink" data-testid="elapsed">{{ elapsedLabel }}</p>
+              <!-- v0.23.0 (zurdi: "la fecha quítala — solo el timer y el
+                   nombre de la rutina"): un entreno vivo siempre es HOY -->
               <p class="text-sm text-ink-muted truncate">
                 <span class="font-medium text-ink">{{ workoutTitle }}</span>
-                <span class="capitalize" data-testid="workout-date"> · {{ dateLabel }}</span>
               </p>
             </div>
             <button

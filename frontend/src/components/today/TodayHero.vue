@@ -237,8 +237,12 @@ function goToCalendar() {
             {{ displayRoutine.name }}
           </h2>
         </Transition>
+        <!-- v0.23.0 (zurdi): un pelín más grande (text-sm → text-base) y,
+             sobre foto, con píldora scrim+blur detrás (ver .bk-hero-meta) -->
         <Transition name="bk-fade" mode="out-in">
-          <p v-if="heroMeta" :key="displayRoutine.id" class="text-sm bk-hero-muted text-center">{{ heroMeta }}</p>
+          <p v-if="heroMeta" :key="displayRoutine.id" class="text-center">
+            <span class="text-base bk-hero-muted bk-hero-meta">{{ heroMeta }}</span>
+          </p>
         </Transition>
         <!-- hueco central: aquí es donde la runa/foto se luce -->
         <div class="flex-1 min-h-10" aria-hidden="true" />

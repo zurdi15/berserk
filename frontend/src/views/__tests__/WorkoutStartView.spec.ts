@@ -72,6 +72,36 @@ describe('WorkoutStartView', () => {
     expect(wrapper.get('[data-testid="prestart-exercise-92"]').text()).toContain('Superserie A')
   })
 
+  // v0.23.0 (zurdi: "si un ejercicio es cardio, en vez de 'x series' tiene
+  // que poner tiempo"): tiempo objetivo si lo hay, la etiqueta del tipo si no
+  it('cardio rows show the target time (or the measurement label) instead of sets', async () => {
+    const domain = await import('@/api/domain')
+    const cardioCatalog = [
+      ...catalog,
+      { id: 4, name_es: 'Cinta', name_en: 'Treadmill', measurement: 'cardio', owner_id: null, has_image: false, muscle_groups: [] },
+      { id: 5, name_es: 'Bici', name_en: 'Bike', measurement: 'cardio', owner_id: null, has_image: false, muscle_groups: [] },
+    ]
+    const cardioRoutine = {
+      ...routines[0],
+      exercises: [
+        { id: 94, exercise_id: 4, position: 0, target_sets: 3, target_reps: null, target_weight_kg: null, target_duration_seconds: 900, rest_seconds: null, superset_group: null, block_label: null },
+        { id: 95, exercise_id: 5, position: 1, target_sets: 3, target_reps: null, target_weight_kg: null, target_duration_seconds: null, rest_seconds: null, superset_group: null, block_label: null },
+      ],
+    }
+    vi.mocked(domain.listRoutines).mockResolvedValueOnce([cardioRoutine] as never)
+    vi.mocked(domain.listExercises).mockResolvedValueOnce(cardioCatalog as never)
+
+    const wrapper = build()
+    await flushPromises()
+
+    const withTarget = wrapper.get('[data-testid="prestart-exercise-94"]').text()
+    expect(withTarget).toContain('15:00')
+    expect(withTarget).not.toContain('series')
+    const withoutTarget = wrapper.get('[data-testid="prestart-exercise-95"]').text()
+    expect(withoutTarget).toContain('Cardio')
+    expect(withoutTarget).not.toContain('series')
+  })
+
   it('shows the HOY chip when the routine is the rotation next', async () => {
     const wrapper = build()
     await flushPromises()

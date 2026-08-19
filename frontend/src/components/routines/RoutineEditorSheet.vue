@@ -118,6 +118,7 @@ async function initializeForm() {
       target_sets: e.target_sets,
       target_reps: e.target_reps || 0,
       target_weight_kg: e.target_weight_kg || null,
+      target_duration_seconds: e.target_duration_seconds ?? null,
       rest_seconds: e.rest_seconds ? String(e.rest_seconds) : '60',
       superset_group: e.superset_group ?? null,
       block_label: e.block_label ?? null,
@@ -171,6 +172,7 @@ function pushRow(exerciseId: number, label: string | null = null): string {
     target_sets: 3,
     target_reps: 0,
     target_weight_kg: null,
+    target_duration_seconds: null,
     rest_seconds: '60',
     // un ejercicio recién añadido nace suelto (o enlazado vía addSupersetPair)
     superset_group: null,
@@ -483,6 +485,9 @@ async function saveRoutine() {
         target_sets: e.target_sets,
         target_reps: isCardio ? null : e.target_reps || null,
         target_weight_kg: isCardio ? null : e.target_weight_kg || null,
+        // v0.23.0: el tiempo objetivo es la cara de cardio de los objetivos
+        // — y a la inversa, un ejercicio de fuerza lo purga
+        target_duration_seconds: isCardio ? e.target_duration_seconds || null : null,
         rest_seconds: !isCardio && e.rest_seconds ? parseInt(e.rest_seconds, 10) : null,
         // ya normalizado (0,1,2…): cada mutación local renormaliza
         superset_group: e.superset_group,
@@ -832,22 +837,24 @@ watch(
         </BkSheet>
       </div>
 
-      <!-- Action Buttons -->
+      <!-- v0.23.0 (zurdi: "unificar cancelar/guardar entre rutina y
+           ejercicio"): cancelar IZQUIERDA, guardar DERECHA, fila entera a
+           partes iguales — mismo orden que ExerciseManager -->
       <div class="flex gap-2 pt-3 border-t border-line">
         <BkButton
+          variant="ghost"
+          class="flex-1"
+          @click="emit('close')"
+        >
+          {{ $t('common.cancel') }}
+        </BkButton>
+        <BkButton
           variant="primary"
-          block
+          class="flex-1"
           :loading="loading"
           @click="saveRoutine"
         >
           {{ $t('common.save') }}
-        </BkButton>
-        <BkButton
-          variant="ghost"
-          block
-          @click="emit('close')"
-        >
-          {{ $t('common.cancel') }}
         </BkButton>
       </div>
     </div>

@@ -23,9 +23,42 @@ const props = withDefaults(
 // componente debe forzar el remonte con :key para repetir la entrada
 // (ver ProgressView.vue)
 const host = ref<HTMLElement | null>(null)
+const wrap = ref<HTMLElement | null>(null)
 let chart: uPlot | null = null
 let observer: ResizeObserver | null = null
 let raf = 0
+
+// v0.23.0 (zurdi: "al hacer click en la gráfica salen coordenadas en
+// lugares arbitrarios y no saca información — que se pueda tocar un dot y
+// un tooltip muestre el dato concreto"): tooltip anclado al PUNTO más
+// cercano al cursor (cursor.idx de uPlot, que ya ajusta al dato real), no a
+// la posición cruda del dedo. Posicionado sobre el wrapper relativo.
+const tooltip = ref<{ left: number; top: number; below: boolean; date: string; value: string } | null>(null)
+const dateFormat = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+
+function onCursor(u: uPlot) {
+  const idx = u.cursor.idx
+  const point = idx == null ? undefined : props.points[idx]
+  const xVal = idx == null ? undefined : (u.data[0][idx] as number | undefined)
+  const yVal = idx == null ? undefined : (u.data[1][idx] as number | null | undefined)
+  if (!wrap.value || point === undefined || xVal === undefined || yVal == null) {
+    tooltip.value = null
+    return
+  }
+  const overRect = u.over.getBoundingClientRect()
+  const wrapRect = wrap.value.getBoundingClientRect()
+  const left = overRect.left - wrapRect.left + u.valToPos(xVal, 'x')
+  const top = overRect.top - wrapRect.top + u.valToPos(yVal, 'y')
+  tooltip.value = {
+    // clamp horizontal: que un punto del borde no empuje el tooltip fuera
+    left: Math.min(Math.max(left, 48), wrapRect.width - 48),
+    top,
+    // cerca del techo del chart el tooltip se abre hacia ABAJO del punto
+    below: top < 48,
+    date: dateFormat.format(new Date(point.date)),
+    value: `${point.value}${props.suffix}`,
+  }
+}
 
 // mismo guard que useAnimatedNumber: leído una vez, no en cada build() — un
 // cambio de preferencia en marcha no debe cortar en seco un tween ya arrancado
@@ -84,6 +117,7 @@ function build(animate: boolean) {
   if (!host.value) return
   cancelFrame(raf)
   chart?.destroy()
+  tooltip.value = null
   const [xs, ys] = toXY()
   const stroke = resolveSeriesStroke(props.color)
   const xRange = pinnedRange(xs)
@@ -106,8 +140,19 @@ function build(animate: boolean) {
         size: yAxisSize,
       },
     ],
-    series: [{}, { stroke, width: 2, points: { show: true, size: 5 } }],
+    series: [{}, { stroke, width: 2, points: { show: true, size: 6 } }],
     legend: { show: false },
+    // v0.23.0: fuera el drag-zoom por defecto (pintaba selecciones
+    // arbitrarias sin información) y fuera el crosshair — la interacción es
+    // tocar cerca de un dot: uPlot ajusta al índice más cercano, el punto se
+    // resalta (cursor.points) y el tooltip de arriba enseña el dato exacto
+    cursor: {
+      drag: { x: false, y: false },
+      x: false,
+      y: false,
+      points: { size: 9 },
+    },
+    hooks: { setCursor: [onCursor] },
   }
 
   // con <2 puntos no hay nada que "crecer" progresivamente (una serie de un
@@ -168,5 +213,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="host" class="bk-metric text-sm" />
+  <div ref="wrap" class="relative">
+    <div ref="host" class="bk-metric text-sm" />
+    <div
+      v-if="tooltip"
+      data-testid="chart-tooltip"
+      class="absolute z-10 pointer-events-none -translate-x-1/2 rounded-md border border-line bg-stone px-2 py-1 text-center whitespace-nowrap shadow-lg"
+      :class="tooltip.below ? 'translate-y-2' : '-translate-y-full -mt-2'"
+      :style="{ left: `${tooltip.left}px`, top: `${tooltip.top}px` }"
+    >
+      <p class="text-2xs text-ink-faint">{{ tooltip.date }}</p>
+      <p class="bk-metric text-xs text-ink">{{ tooltip.value }}</p>
+    </div>
+  </div>
 </template>

@@ -670,13 +670,14 @@ describe('WorkoutView', () => {
       expect(sheet?.querySelector('[data-testid="rest-auto-toggle"]')).not.toBeNull()
     })
 
-    it('the header shows only the elapsed timer and the date — no discard/finish buttons in it', async () => {
+    it('the header shows only the elapsed timer and the routine name — no date, no discard/finish buttons', async () => {
       wrapper = mountLive()
       await flushPromises()
 
       const header = wrapper.get('[data-testid="workout-header"]')
       expect(header.find('[data-testid="elapsed"]').exists()).toBe(true)
-      expect(header.find('[data-testid="workout-date"]').exists()).toBe(true)
+      // v0.23.0: la fecha se fue — un entreno vivo siempre es hoy
+      expect(header.find('[data-testid="workout-date"]').exists()).toBe(false)
       expect(header.find('[data-testid="discard-workout"]').exists()).toBe(false)
     })
 

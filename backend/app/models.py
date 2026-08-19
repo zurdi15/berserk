@@ -239,6 +239,9 @@ class RoutineExercise(Base):
     position: Mapped[int] = mapped_column()
     target_sets: Mapped[int] = mapped_column(default=3)
     target_reps: Mapped[int | None] = mapped_column(default=None)
+    # v0.23.0 (zurdi: "en cardio, tiempo objetivo — las series no tienen
+    # sentido"): objetivo de duración para cardio/timed; NULL = sin objetivo
+    target_duration_seconds: Mapped[int | None] = mapped_column(default=None)
     target_weight_kg: Mapped[float | None] = mapped_column(Float, default=None)
     rest_seconds: Mapped[int | None] = mapped_column(default=None)
     # v0.5.0 superseries: ejercicios CONTIGUOS (por position) con el mismo

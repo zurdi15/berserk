@@ -175,6 +175,21 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4">
+    <!-- v0.23.0 (zurdi: "el botón nueva rutina arriba, igual que en la
+         biblioteca"): el alta vive ARRIBA del todo — mismo criterio que
+         new-exercise-btn en la cabecera de ExerciseManager. Nunca en el
+         estado vacío: el botón de BkEmpty ya lo cubre, evita el duplicado. -->
+    <div v-if="!ready || displayRoutines.length > 0" class="flex items-center">
+      <BkButton
+        variant="primary"
+        size="sm"
+        data-testid="new-routine-btn"
+        @click="openEditor()"
+      >
+        {{ $t('routines.newRoutine') }}
+      </BkButton>
+    </div>
+
     <!-- v0.14.0: plan rotatorio — editor encima de la lista de rutinas;
          las candidatas son las mismas que esta lista ya conoce -->
     <RotationPlanCard v-if="ready" :available="displayRoutines" />
@@ -363,23 +378,6 @@ onMounted(() => {
       action-testid="new-routine-btn"
       @action="openEditor()"
     />
-
-    <!-- item 1 (v0.4.3, zurdi): "Nueva rutina" se muda DEBAJO de la lista
-         (antes vivía arriba, a la izquierda) — mismo criterio que
-         ExerciseManager/MuscleGroupManager, donde "Nuevo ejercicio"/"Nuevo
-         grupo" ya vivían bajo su lista. Vive antes/durante ready o con la
-         lista no vacía (nunca en el estado vacío: el botón de BkEmpty ya lo
-         cubre arriba, evita el duplicado). -->
-    <div v-if="!ready || displayRoutines.length > 0" class="flex items-center">
-      <BkButton
-        variant="primary"
-        size="sm"
-        data-testid="new-routine-btn"
-        @click="openEditor()"
-      >
-        {{ $t('routines.newRoutine') }}
-      </BkButton>
-    </div>
 
     <!-- Editor Sheet -->
     <RoutineEditorSheet

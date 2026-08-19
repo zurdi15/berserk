@@ -65,8 +65,19 @@ export function resolveNewSetDefaults(
 
   const routine = routineId ? routines.find((r) => r.id === routineId) : undefined
   const target = routine?.exercises.find((e) => e.exercise_id === exerciseId)
-  if (target && (target.target_reps != null || target.target_weight_kg != null)) {
-    return { reps: target.target_reps, weight_kg: target.target_weight_kg }
+  if (
+    target &&
+    (target.target_reps != null ||
+      target.target_weight_kg != null ||
+      // v0.23.0: el tiempo objetivo de cardio también es un default legítimo
+      // (alimenta el cronómetro de "Empezar" vía cardioTargetSeconds)
+      target.target_duration_seconds != null)
+  ) {
+    return {
+      reps: target.target_reps,
+      weight_kg: target.target_weight_kg,
+      duration_seconds: target.target_duration_seconds ?? null,
+    }
   }
 
   return null

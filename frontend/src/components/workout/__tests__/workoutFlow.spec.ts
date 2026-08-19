@@ -526,9 +526,19 @@ describe('WorkoutExerciseCard', () => {
       })
     }
 
-    it('renders with a left border accent instead of the plain slab', () => {
+    // v0.23.0 (zurdi): el acento lateral de cardio muere — con el facelift
+    // leía como un borde descuadrado; la card es el slab normal
+    it('renders as the plain slab, without the old left border accent', () => {
       const wrapper = mountCardio()
-      expect(wrapper.classes()).toEqual(expect.arrayContaining(['border-l-2', 'border-aurora/50']))
+      expect(wrapper.classes()).not.toEqual(expect.arrayContaining(['border-l-2']))
+    })
+
+    // v0.23.0 (zurdi): las dos acciones ocupan toda la fila a partes iguales
+    it('the log/start actions fill the row equally (2-col grid, block buttons)', async () => {
+      const wrapper = mountCardio()
+      await flushPromises()
+      const actions = wrapper.get('[data-testid="cardio-actions-30"]')
+      expect(actions.classes()).toEqual(expect.arrayContaining(['grid', 'grid-cols-2', 'flex-1']))
     })
 
     // v0.10.0 (zurdi: "o una entrada con el tiempo hecho y ya, o empezar

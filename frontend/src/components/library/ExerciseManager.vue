@@ -674,7 +674,9 @@ async function confirmDelete() {
               />
             </div>
           </template>
-          <div class="flex gap-2">
+          <!-- v0.23.0 (zurdi): centrados bajo el marco 9:16 — pegados a la
+               izquierda quedaban descolgados del encuadre -->
+          <div class="flex justify-center gap-2">
             <BkButton
               variant="ghost"
               size="sm"
@@ -704,11 +706,14 @@ async function confirmDelete() {
           />
         </div>
 
+        <!-- v0.23.0 (zurdi): cancelar/guardar a fila completa y a partes
+             iguales — mismo footer que el editor de rutina -->
         <div class="flex gap-2">
-          <BkButton variant="ghost" @click="formOpen = false">
+          <BkButton variant="ghost" class="flex-1" @click="formOpen = false">
             {{ $t('common.cancel') }}
           </BkButton>
           <BkButton
+            class="flex-1"
             :loading="saving"
             data-testid="save-exercise-btn"
             @click="submitForm"

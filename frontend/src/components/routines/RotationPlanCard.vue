@@ -8,13 +8,15 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { RotationOut, RoutineOut } from '@/api/domain'
-import { getRotation, putRotation, putRotationNext } from '@/api/domain'
+import { getRotation, putRotation, putRotationNext, routineImageUrl } from '@/api/domain'
+import { useAuthStore } from '@/stores/auth'
 import { toastApiError } from '@/utils/apiErrors'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
-import BkRune from '@/lib/BkRune.vue'
+import BkMedia from '@/lib/BkMedia.vue'
 import BkSheet from '@/lib/BkSheet.vue'
+import BkUser from '@/lib/BkUser.vue'
 import { isValidRuneName } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 
@@ -90,6 +92,17 @@ function move(index: number, delta: number) {
 function runeFor(routine: RoutineOut): RuneName | null {
   return routine.rune && isValidRuneName(routine.rune) ? (routine.rune as RuneName) : null
 }
+
+const auth = useAuthStore()
+
+// v0.23.0 (zurdi: "el selector no indica de qué user es cada rutina — dos
+// rutinas de dos usuarios pueden llamarse igual"): misma atribución que la
+// lista unificada de RoutineList — nada para lo mío, chip "Global" para las
+// plantillas legacy (owner_id null) y BkUser para las de otros usuarios
+function ownerOf(routine: RoutineOut): 'mine' | 'global' | 'user' {
+  if ((routine.owner_id ?? null) === null) return 'global'
+  return routine.owner_id === auth.user?.id ? 'mine' : 'user'
+}
 </script>
 
 <template>
@@ -98,18 +111,26 @@ function runeFor(routine: RoutineOut): RuneName | null {
       <p v-if="!entries.length" class="text-sm text-ink-faint">{{ t('rotation.empty') }}</p>
       <template v-else>
         <!-- te toca: derivado del historial, o fijado a mano tocando una fila -->
-        <p v-if="nextRoutine" class="text-sm" data-testid="rotation-next">
-          <span class="text-ink-muted">{{ t('rotation.next') }} </span>
-          <span class="text-aurora font-medium">{{ nextRoutine.name }}</span>
+        <!-- v0.23.0 (zurdi: "no hay espacio entre 'te toca:' y el nombre"):
+             el hueco pasa a ser estructural (gap) — el espacio literal del
+             texto se lo comía el condense de whitespace del compilador -->
+        <p v-if="nextRoutine" class="text-sm flex items-baseline gap-1 min-w-0" data-testid="rotation-next">
+          <span class="text-ink-muted shrink-0">{{ t('rotation.next') }}</span>
+          <span class="text-aurora font-medium truncate">{{ nextRoutine.name }}</span>
         </p>
         <p class="text-xs text-ink-faint">{{ t('rotation.tapToSet') }}</p>
-        <div class="relative space-y-2">
+        <!-- v0.23.0 (zurdi: "la estética de 'plan rotatorio' no sigue la
+             nueva del todo"): filas al idioma facelift — pozo de slab en vez
+             de cajas con borde, thumb de media (foto de la rutina o pozo
+             rúnico) como en el resto de listados, y la activa marcada con
+             lavado aurora + outline en lugar de borde coloreado -->
+        <div class="relative bk-slab p-2 space-y-1">
           <TransitionGroup name="bk-remove">
           <div
             v-for="(routine, index) in entries"
             :key="routine.id"
-            class="flex items-center gap-2 p-2 rounded border text-sm"
-            :class="index === rotation!.next_position ? 'border-aurora/60 bg-aurora/5' : 'border-line'"
+            class="flex items-center gap-2 p-2 rounded-lg text-sm"
+            :class="index === rotation!.next_position && 'bg-aurora/10 outline outline-1 outline-aurora/40'"
             :data-testid="`rotation-entry-${routine.id}`"
           >
             <!-- v0.15.0: el cuerpo de la fila fija "la de hoy" de un toque -->
@@ -121,7 +142,11 @@ function runeFor(routine: RoutineOut): RuneName | null {
               @click="setToday(routine.id)"
             >
               <span class="bk-metric text-xs text-ink-faint w-4 shrink-0">{{ index + 1 }}</span>
-              <BkRune v-if="runeFor(routine)" :name="runeFor(routine)!" :size="14" />
+              <BkMedia
+                :src="routine.has_image ? routineImageUrl(routine.id) : undefined"
+                :rune="runeFor(routine)"
+                size="xs"
+              />
               <span class="truncate text-ink flex-1 min-w-0">{{ routine.name }}</span>
             </button>
             <button
@@ -172,8 +197,33 @@ function runeFor(routine: RoutineOut): RuneName | null {
           :data-testid="`rotation-pick-${routine.id}`"
           @click="add(routine.id)"
         >
-          <BkRune v-if="runeFor(routine)" :name="runeFor(routine)!" :size="14" />
-          <span class="truncate">{{ routine.name }}</span>
+          <BkMedia
+            :src="routine.has_image ? routineImageUrl(routine.id) : undefined"
+            :rune="runeFor(routine)"
+            size="xs"
+          />
+          <div class="min-w-0 flex-1">
+            <p class="truncate">{{ routine.name }}</p>
+            <!-- v0.23.0: de quién es cada rutina — dos usuarios pueden tener
+                 una "Pierna" cada uno y sin esto son indistinguibles -->
+            <div
+              v-if="ownerOf(routine) !== 'mine'"
+              class="mt-0.5"
+              :data-testid="`rotation-pick-owner-${routine.id}`"
+            >
+              <span
+                v-if="ownerOf(routine) === 'global'"
+                class="inline-flex items-center rounded-full border border-line px-2 py-0.5 text-2xs text-ink-faint"
+              >
+                {{ t('routines.globalTemplate') }}
+              </span>
+              <BkUser
+                v-else-if="routine.owner_username"
+                :user="{ username: routine.owner_username, color: null }"
+                size="xs"
+              />
+            </div>
+          </div>
         </button>
       </div>
     </BkSheet>

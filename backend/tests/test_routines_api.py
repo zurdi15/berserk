@@ -422,3 +422,19 @@ def test_duplicate_own_routine_preserves_superset_groups(client: TestClient):
     )
     copy = client.post(f"/api/v1/routines/{rid}/copy").json()
     assert [e["superset_group"] for e in copy["exercises"]] == [0, 0]
+
+
+def test_cardio_target_duration_round_trips_and_copies(client: TestClient):
+    """v0.23.0 — tiempo objetivo del cardio en rutinas (zurdi: "las series
+    no tienen sentido en cardio")."""
+    exercises = client.get("/api/v1/exercises").json()
+    cardio = next(e for e in exercises if e["measurement"] == "cardio")
+    routine = client.post("/api/v1/routines", json={"name": "Cardio objetivo"}).json()
+    saved = client.put(
+        f"/api/v1/routines/{routine['id']}/exercises",
+        json=[{"exercise_id": cardio["id"], "target_sets": 1, "target_duration_seconds": 1200}],
+    ).json()
+    assert saved["exercises"][0]["target_duration_seconds"] == 1200
+
+    copy = client.post(f"/api/v1/routines/{routine['id']}/copy").json()
+    assert copy["exercises"][0]["target_duration_seconds"] == 1200

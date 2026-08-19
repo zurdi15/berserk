@@ -13,6 +13,9 @@ class SeriesPoint(BaseModel):
     # mejor NIVEL de la sesión (series en load_mode 'level'); 0 = sin series
     # de nivel ese día — eje aparte del kg, nunca se mezclan
     top_level: float = 0.0
+    # v0.23.0: duración TOTAL efectiva de la sesión (cardio/timed) — el
+    # progreso de cardio es por tiempos, no por kg
+    duration_seconds: int = 0
 
 
 class SeriesOut(BaseModel):

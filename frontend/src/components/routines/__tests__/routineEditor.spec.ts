@@ -234,11 +234,15 @@ describe('RoutineEditorSheet', () => {
 
     const cardioRow = dialog.querySelector('[data-testid="routine-row-0"]') as HTMLElement
     const strengthRow = dialog.querySelector('[data-testid="routine-row-1"]') as HTMLElement
-    expect(cardioRow.textContent).toContain('Series objetivo')
+    // v0.23.0: cardio cambia "Series objetivo" por "Tiempo objetivo"
+    expect(cardioRow.textContent).toContain('Tiempo objetivo')
+    expect(cardioRow.textContent).not.toContain('Series objetivo')
     expect(cardioRow.textContent).not.toContain('Reps objetivo')
     expect(cardioRow.textContent).not.toContain('Peso objetivo')
     expect(cardioRow.textContent).not.toContain('Descanso')
     // la fila de fuerza conserva los cuatro campos
+    expect(strengthRow.textContent).toContain('Series objetivo')
+    expect(strengthRow.textContent).not.toContain('Tiempo objetivo')
     expect(strengthRow.textContent).toContain('Reps objetivo')
     expect(strengthRow.textContent).toContain('Peso objetivo')
     expect(strengthRow.textContent).toContain('Descanso')

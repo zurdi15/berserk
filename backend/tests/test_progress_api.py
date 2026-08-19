@@ -236,3 +236,23 @@ def test_exercise_history_carries_recent_cardio(client):
     )
     strength_history = client.get(f"/api/v1/progress/exercise-history/{bench}").json()
     assert strength_history["recent_cardio"] == []
+
+
+def test_cardio_series_reports_total_duration_per_session(client: TestClient):
+    """v0.23.0 — el progreso de cardio es por tiempos: duración TOTAL
+    efectiva por sesión (los calentamientos no cuentan)."""
+    exercises = client.get("/api/v1/exercises").json()
+    cardio = next(e for e in exercises if e["measurement"] == "cardio")
+    workout = client.post("/api/v1/workouts", json={"date": "2026-08-10", "finished": True}).json()
+    wex = client.post(
+        f"/api/v1/workouts/{workout['id']}/exercises", json={"exercise_id": cardio["id"]}
+    ).json()
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}/sets"
+    assert client.post(url, json={"duration_seconds": 600}).status_code == 201
+    assert client.post(url, json={"duration_seconds": 300}).status_code == 201
+    assert client.post(url, json={"duration_seconds": 120, "is_warmup": True}).status_code == 201
+
+    series = client.get(f"/api/v1/progress/exercises/{cardio['id']}").json()["series"]
+    assert len(series) == 1
+    assert series[0]["duration_seconds"] == 900
+    assert series[0]["top_weight"] == 0.0

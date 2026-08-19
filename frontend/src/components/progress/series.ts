@@ -6,7 +6,7 @@ import { kgToDisplay } from '@/utils/units'
 // comparte eje con los kg. Los puntos a 0 se filtran: significan "ese día no
 // hubo series de esta magnitud" (p.ej. sesión solo-nivel en la serie de kg,
 // o al revés), no un valor real.
-export type MetricKey = 'top_weight' | 'volume' | 'est_1rm' | 'top_level'
+export type MetricKey = 'top_weight' | 'volume' | 'est_1rm' | 'top_level' | 'duration'
 
 export function seriesFor(
   points: SeriesPoint[],
@@ -16,7 +16,14 @@ export function seriesFor(
   return points
     .map((p) => ({
       date: p.date,
-      value: metric === 'top_level' ? (p.top_level ?? 0) : kgToDisplay(p[metric], units),
+      value:
+        metric === 'duration'
+          // v0.23.0: cardio/timed progresan por TIEMPO — minutos con un
+          // decimal, sin conversión de unidades de peso
+          ? Math.round(((p.duration_seconds ?? 0) / 60) * 10) / 10
+          : metric === 'top_level'
+            ? (p.top_level ?? 0)
+            : kgToDisplay(p[metric], units),
     }))
     .filter((p) => p.value > 0)
 }

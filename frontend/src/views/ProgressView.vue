@@ -116,17 +116,35 @@ const mainTabs = computed(() => [
 // pestaña Nivel solo aparece si el ejercicio TIENE series en modo nivel
 const hasLevelSeries = computed(() => series.value.some((p) => (p.top_level ?? 0) > 0))
 
-const metricTabs = computed(() => [
-  { value: 'top_weight', label: t('progress.metric.weight') },
-  { value: 'volume', label: t('progress.metric.volume') },
-  { value: 'est_1rm', label: t('progress.metric.est1rm') },
-  ...(hasLevelSeries.value ? [{ value: 'top_level', label: t('progress.metric.level') }] : []),
-])
+// v0.23.0 (zurdi: "las gráficas de cardio con la tab peso no tienen
+// sentido — ese progreso debería ser por tiempos, sin volumen ni 1RM"):
+// cardio y timed progresan SOLO por tiempo (duración total por sesión)
+const selectedIsDurationBased = computed(() => {
+  const measurement = exercises.value.find((e) => e.id === exerciseId.value)?.measurement
+  return measurement === 'cardio' || measurement === 'timed'
+})
+
+const metricTabs = computed(() =>
+  selectedIsDurationBased.value
+    ? [{ value: 'duration', label: t('progress.metric.duration') }]
+    : [
+        { value: 'top_weight', label: t('progress.metric.weight') },
+        { value: 'volume', label: t('progress.metric.volume') },
+        { value: 'est_1rm', label: t('progress.metric.est1rm') },
+        ...(hasLevelSeries.value ? [{ value: 'top_level', label: t('progress.metric.level') }] : []),
+      ],
+)
 
 // si el ejercicio nuevo no tiene niveles, la métrica seleccionada no puede
 // quedarse colgada en una pestaña que ya no existe
 watch(hasLevelSeries, (has) => {
-  if (!has && metric.value === 'top_level') metric.value = 'top_weight'
+  if (!has && metric.value === 'top_level' && !selectedIsDurationBased.value) metric.value = 'top_weight'
+})
+
+// cambiar entre un ejercicio de fuerza y uno de tiempo re-encaja la métrica
+watch(selectedIsDurationBased, (durationBased) => {
+  if (durationBased) metric.value = 'duration'
+  else if (metric.value === 'duration') metric.value = 'top_weight'
 })
 
 // v0.20.x (zurdi: "el nivel/peso máximo en un chip, para no ir a Récords"):
@@ -339,7 +357,13 @@ watch(exerciseId, () => {
              metric NO va en la key, así que cambiar peso/volumen/1RM solo
              actualiza :points sin remontar (el spec de metric-sin-remontar
              fija justo eso) -->
-        <BkChart v-if="chartPoints.length" :key="exerciseId ?? 0" :points="chartPoints" color="aurora" :suffix="metric === 'top_level' ? '' : ` ${units}`" />
+        <BkChart
+          v-if="chartPoints.length"
+          :key="exerciseId ?? 0"
+          :points="chartPoints"
+          color="aurora"
+          :suffix="metric === 'top_level' ? '' : metric === 'duration' ? ' min' : ` ${units}`"
+        />
         <BkEmpty v-else :message="t('progress.noSeries')" />
       </div>
     </BkSheet>
