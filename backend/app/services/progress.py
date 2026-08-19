@@ -40,30 +40,36 @@ def workout_muscle_group_ids(db: Session, workout_ids: list[int]) -> dict[int, s
 
 def exercise_series(db: Session, owner_id: int, exercise_id: int) -> list[dict]:
     """Serie temporal del ejercicio: mejor peso, volumen y 1RM estimado por
-    sesión — SOLO sobre series en kg: una serie en modo nivel (v0.18.0)
-    lleva un número plano de máquina que no puede mezclarse en el mismo eje.
+    sesión sobre las series en kg, y ADEMÁS (v0.20.x, zurdi: "la gráfica
+    solo muestra peso, pero tenemos niveles") el mejor NIVEL por sesión de
+    las series en modo nivel — como magnitud propia (top_level), jamás
+    mezclada en el eje de kg (v0.18.0).
     """
     rows = db.execute(
-        select(Workout.id, Workout.date, WorkoutSet.reps, WorkoutSet.weight_kg)
+        select(Workout.id, Workout.date, WorkoutSet.reps, WorkoutSet.weight_kg, WorkoutSet.load_mode)
         .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
         .join(WorkoutSet, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
         .where(
             Workout.owner_id == owner_id,
             WorkoutExercise.exercise_id == exercise_id,
             WorkoutSet.is_warmup.is_(False),
-            WorkoutSet.reps.is_not(None),
             WorkoutSet.weight_kg.is_not(None),
-            WorkoutSet.load_mode != "level",
         )
         .order_by(Workout.date, Workout.id)
     ).all()
     by_workout: dict[int, dict] = {}
-    for workout_id, workout_date, reps, weight in rows:
+    for workout_id, workout_date, reps, weight, load_mode in rows:
         entry = by_workout.setdefault(
             workout_id,
             {"workout_id": workout_id, "date": workout_date, "top_weight": 0.0,
-             "volume": 0.0, "est_1rm": 0.0},
+             "volume": 0.0, "est_1rm": 0.0, "top_level": 0.0},
         )
+        if (load_mode or "weight") == "level":
+            entry["top_level"] = max(entry["top_level"], weight)
+            continue
+        # las magnitudes en kg exigen reps (volumen/1RM); el nivel no las usa
+        if reps is None:
+            continue
         entry["top_weight"] = max(entry["top_weight"], weight)
         entry["volume"] += reps * weight
         entry["est_1rm"] = max(entry["est_1rm"], estimate_1rm(weight, reps))

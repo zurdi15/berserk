@@ -452,13 +452,13 @@ describe('WorkoutExerciseCard', () => {
       expect(hint).toContain('S2 · 8 × 80 kg')
     })
 
-    it('does not show the card hint once the exercise already has sets logged', async () => {
+    it('facelift v3 (zurdi): the card hint stays visible even once the exercise has sets logged — it is the reference to beat', async () => {
       const actions = makeActions({
         exerciseHistory: vi.fn(async () => ({ workout_id: 9, date: '2026-07-20', sets: [{ reps: 8, weight_kg: 80, duration_seconds: null, distance_m: null, is_warmup: false }] })),
       })
       const wrapper = mountCard({ actions })
       await flushPromises()
-      expect(wrapper.find('[data-testid="card-history-hint"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="card-history-hint"]').exists()).toBe(true)
     })
 
     it('item 4d: shows a multi-line "Última vez" block inside the drawer, date on its own line + one "Sn · reps × peso" line per set', async () => {

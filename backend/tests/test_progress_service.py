@@ -287,3 +287,33 @@ def test_lifetime_stats_empty_user(db_session):
         "avg_session_seconds": 0.0,
         "longest_streak_weeks": 0,
     }
+
+
+def test_exercise_series_levels(db_session):
+    # v0.20.x: las series en modo NIVEL alimentan top_level, jamás las
+    # magnitudes en kg (v0.18.0: ejes distintos) — y una sesión mixta
+    # kg+nivel reporta ambos
+    user, _, bench = seed_user_with_workouts(db_session)
+    day = date(2026, 8, 10)
+    workout = models.Workout(
+        owner_id=user.id, date=day, ended_at=datetime.combine(day, datetime.min.time())
+    )
+    db_session.add(workout)
+    db_session.flush()
+    wex = models.WorkoutExercise(workout_id=workout.id, exercise_id=bench.id, position=1)
+    db_session.add(wex)
+    db_session.flush()
+    db_session.add_all([
+        models.WorkoutSet(workout_exercise_id=wex.id, set_number=1, reps=8, weight_kg=12, load_mode="level"),
+        models.WorkoutSet(workout_exercise_id=wex.id, set_number=2, reps=8, weight_kg=14, load_mode="level"),
+        models.WorkoutSet(workout_exercise_id=wex.id, set_number=3, reps=5, weight_kg=100),
+    ])
+    db_session.commit()
+
+    series = svc.exercise_series(db_session, user.id, bench.id)
+    mixed = next(s for s in series if s["date"] == day)
+    assert mixed["top_level"] == 14
+    assert mixed["top_weight"] == 100
+    assert mixed["volume"] == 500  # SOLO la serie en kg suma volumen
+    # los días solo-kg reportan top_level 0
+    assert next(s for s in series if s["date"] == date(2026, 7, 27))["top_level"] == 0.0

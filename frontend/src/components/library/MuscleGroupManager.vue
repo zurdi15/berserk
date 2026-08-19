@@ -8,6 +8,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { groupRune } from '@/lib/runeResolve'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
+import BkCheck from '@/lib/BkCheck.vue'
 import BkCard from '@/lib/BkCard.vue'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
@@ -302,15 +303,18 @@ async function confirmDelete() {
           <GroupRunePicker v-model="rune" />
         </div>
 
-        <label v-if="auth.user?.is_admin" class="flex items-center gap-2 cursor-pointer">
-          <input
-            v-model="isGlobal"
-            type="checkbox"
-            class="rounded border border-line"
+        <div v-if="auth.user?.is_admin" class="flex items-center gap-2">
+          <BkCheck
+            size="sm"
+            :model-value="isGlobal"
             data-testid="group-is-global-checkbox"
+            :aria-label="$t('library.isGlobal')"
+            @update:model-value="isGlobal = $event"
           />
-          <span class="text-sm text-ink-muted">{{ $t('library.isGlobal') }}</span>
-        </label>
+          <button type="button" class="bk-press text-sm text-ink-muted" @click="isGlobal = !isGlobal">
+            {{ $t('library.isGlobal') }}
+          </button>
+        </div>
         <div class="flex gap-2">
           <BkButton variant="ghost" @click="createGroupOpen = false">
             {{ $t('common.cancel') }}

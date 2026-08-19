@@ -8,6 +8,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { todayIso, getMondayOfWeek } from '@/utils/dates'
 import { useAthleteStore } from '@/stores/athlete'
 import { useAuthStore } from '@/stores/auth'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 import BkCard from '@/lib/BkCard.vue'
 import StreakCard from '@/components/today/StreakCard.vue'
 import TodayHero from '@/components/today/TodayHero.vue'
@@ -35,7 +36,42 @@ const distribution = ref<DistributionItem[]>([])
 // entran una vez con su color/valor final, y el roll de useAnimatedNumber
 // arranca ya sobre ese valor. true también en error (finally) para no dejar
 // la vista en blanco si la carga falla.
+// facelift v3 (zurdi: "al volver a Hoy tarda más de lo debido"): la última
+// carga vive en viewCache — al remontar, hydrate() pinta al instante lo de
+// la visita anterior (la animación de entrada corre igual) y load() de
+// siempre refresca en segundo plano, actualizando reactivamente (los
+// números tween-ean solos vía useAnimatedNumber).
 const ready = ref(false)
+
+type TodaySnapshot = {
+  streak: { weeks: number } | null
+  schedules: ScheduledOut[]
+  workouts: WorkoutOut[]
+  records: PersonalRecordOut[]
+  exercises: ExerciseOut[]
+  muscleGroups: MuscleGroupOut[]
+  distribution: DistributionItem[]
+}
+
+function cacheKey() {
+  return `today:${athlete.userId ?? 'me'}`
+}
+
+function hydrate() {
+  const cached = getViewCache<TodaySnapshot>(cacheKey())
+  if (!cached) {
+    ready.value = false
+    return
+  }
+  streak.value = cached.streak
+  schedules.value = cached.schedules
+  workouts.value = cached.workouts
+  records.value = cached.records
+  exercises.value = cached.exercises
+  muscleGroups.value = cached.muscleGroups
+  distribution.value = cached.distribution
+  ready.value = true
+}
 
 // facelift: saludo grande estilo referencia — con el propio nombre en vista
 // propia, "Viendo a X" en modo atleta
@@ -86,6 +122,15 @@ async function load() {
     exercises.value = exercisesList
     muscleGroups.value = muscleGroupsList
     distribution.value = distributionData
+    setViewCache<TodaySnapshot>(cacheKey(), {
+      streak: streakData,
+      schedules: monthData.scheduled,
+      workouts: workoutsList,
+      records: recordsList,
+      exercises: exercisesList,
+      muscleGroups: muscleGroupsList,
+      distribution: distributionData,
+    })
   } catch (error) {
     toastApiError(error)
   } finally {
@@ -96,7 +141,14 @@ async function load() {
 // recarga en el montaje y cada vez que cambia el atleta observado (empezar/dejar
 // de ver a alguien): sin este watcher los datos de otro atleta quedaban
 // pegados en pantalla tras pulsar "dejar de ver"
-watch(() => athlete.userId, () => load(), { immediate: true })
+watch(
+  () => athlete.userId,
+  () => {
+    hydrate()
+    load()
+  },
+  { immediate: true },
+)
 
 // v0.5.0 (modelo de scroll único, ver ShellView.vue): la raíz FLUYE — sin
 // h-full ni overflow propio, Hoy scrollea contra <main> como toda la app.

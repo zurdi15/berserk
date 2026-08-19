@@ -68,7 +68,7 @@ def test_routines_are_private(client: TestClient, app):
     assert freyja.delete(f"/api/v1/routines/{rid}").status_code == 404
 
 
-def test_put_exercises_rejects_invisible_exercise(client: TestClient, app):
+def test_put_exercises_accepts_any_exercise_global_catalog(client: TestClient, app):
     make_user(client, "freyja")
     freyja = login(app, "freyja")
     chest = next(
@@ -85,7 +85,9 @@ def test_put_exercises_rejects_invisible_exercise(client: TestClient, app):
     resp = client.put(
         f"/api/v1/routines/{rid}/exercises", json=[{"exercise_id": custom, "target_sets": 3}]
     )
-    assert resp.status_code == 422 and resp.json()["detail"] == "exercise_invalid"
+    # v0.20.x catálogo global: el ejercicio de otro usuario ES usable
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["exercises"][0]["exercise_id"] == custom
 
 
 # ROUTINES-OPEN (course correction de zurdi, v0.4.2): "el compartir como
@@ -180,11 +182,9 @@ def test_global_routine_can_reference_an_exercise_the_owner_never_made_public(
     listed = next(r for r in templates if r["id"] == rid)
     assert listed["exercises"][0]["exercise_id"] == private_exercise
 
-    # pero el EJERCICIO en sí sigue siendo privado de freyja: no está en el
-    # catálogo visible de loki (ni propio, ni global, ni público) — el
-    # backend no filtra su nombre; es el frontend quien debe explicar la
-    # ausencia en vez de dejar una fila muda (ver RoutineList.vue)
-    assert all(e["id"] != private_exercise for e in loki.get("/api/v1/exercises").json())
+    # v0.20.x catálogo global: el ejercicio también es visible para loki —
+    # la fila de la plantilla resuelve nombre sin huecos
+    assert any(e["id"] == private_exercise for e in loki.get("/api/v1/exercises").json())
 
 
 def test_copy_creates_independent_routine_owned_by_copier(client: TestClient, app):
@@ -241,7 +241,7 @@ def test_copy_dedupes_name_on_collision(client: TestClient, app):
     assert resp.status_code == 201 and resp.json()["name"] == "Push (3)"
 
 
-def test_copy_rejects_routine_with_exercises_private_to_copier(client: TestClient, app):
+def test_copy_works_with_any_exercises_global_catalog(client: TestClient, app):
     # la rutina en sí es global, pero uno de sus ejercicios es un custom
     # PRIVADO de freyja (nunca marcado is_public) — loki no puede verlo, así
     # que la copia entera se rechaza en vez de dejar un hueco silencioso
@@ -259,13 +259,10 @@ def test_copy_rejects_routine_with_exercises_private_to_copier(client: TestClien
 
     make_user(client, "loki")
     loki = login(app, "loki")
+    # v0.20.x catálogo global: ya no hay ejercicios "privados al copiador" —
+    # la copia funciona a la primera (el guard 409 quedó inalcanzable)
     resp = loki.post(f"/api/v1/routines/{rid}/copy")
-    assert resp.status_code == 409 and resp.json()["detail"] == "routine_has_private_exercises"
-
-    # si freyja hace público el ejercicio, la copia ya funciona
-    freyja.patch(f"/api/v1/exercises/{private_exercise}", json={"is_public": True})
-    resp = loki.post(f"/api/v1/routines/{rid}/copy")
-    assert resp.status_code == 201
+    assert resp.status_code == 201, resp.text
 
 
 # ROUTINES-OPEN: el viejo POST .../globalize (admin-only, cedía la

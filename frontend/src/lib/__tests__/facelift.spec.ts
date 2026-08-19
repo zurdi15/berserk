@@ -180,3 +180,20 @@ describe('BkListRow', () => {
     expect(wrapper.find('svg').exists()).toBe(true)
   })
 })
+
+describe('BkRadio', () => {
+  it('is a custom radio button (role=radio) that emits select on click', async () => {
+    const { default: BkRadio } = await import('../BkRadio.vue')
+    const wrapper = mount(BkRadio, { props: { checked: false } })
+    expect(wrapper.element.tagName).toBe('BUTTON')
+    expect(wrapper.attributes('role')).toBe('radio')
+    expect(wrapper.attributes('aria-checked')).toBe('false')
+    await wrapper.trigger('click')
+    expect(wrapper.emitted('select')).toBeTruthy()
+
+    const checked = mount(BkRadio, { props: { checked: true } })
+    expect(checked.attributes('aria-checked')).toBe('true')
+    // el punto interior solo existe marcado
+    expect(checked.find('span').exists()).toBe(true)
+  })
+})

@@ -23,6 +23,7 @@ from ..db import get_db
 from ..models import BodyPhoto, Exercise, ExerciseNote, User
 from ..schemas.media import BodyPhotoOut, ExerciseNoteIn, ExerciseNoteOut
 from .exercises import _can_edit, get_visible_exercise
+from .routines import _editable_routine, _visible_template
 
 router = APIRouter(tags=["media"])
 
@@ -98,6 +99,47 @@ def delete_exercise_image(exercise_id: int, user: CurrentUser, db: Session = Dep
     if exercise.image_path:
         _delete_quietly(_uploads_dir("exercises") / exercise.image_path)
         exercise.image_path = None
+        db.commit()
+
+
+# ---------- imagen de rutina ----------
+
+
+@router.post("/routines/{routine_id}/image", response_model=None, status_code=204)
+async def upload_routine_image(
+    routine_id: int, file: UploadFile, user: CurrentUser, db: Session = Depends(get_db)
+):
+    # v0.20.x (zurdi): la rutina puede llevar SU imagen (hero de Hoy y
+    # pre-inicio); sin ella manda la runa — nunca la foto de un ejercicio
+    routine = _editable_routine(db, user, routine_id)
+    data, ext = await _read_image(file)
+    filename = f"{uuid.uuid4().hex}{ext}"
+    (_uploads_dir("routines") / filename).write_bytes(data)
+    if routine.image_path:
+        _delete_quietly(_uploads_dir("routines") / routine.image_path)
+    routine.image_path = filename
+    db.commit()
+
+
+@router.get("/routines/{routine_id}/image")
+def get_routine_image(routine_id: int, user: CurrentUser, db: Session = Depends(get_db)):
+    # misma regla de visibilidad que el resto de la rutina (propia, global o
+    # plantilla legacy) — _visible_template ya lanza 404 si no aplica
+    routine = _visible_template(db, user, routine_id)
+    if not routine.image_path:
+        raise HTTPException(status_code=404, detail="not_found")
+    path = _uploads_dir("routines") / routine.image_path
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="not_found")
+    return FileResponse(path)
+
+
+@router.delete("/routines/{routine_id}/image", status_code=204)
+def delete_routine_image(routine_id: int, user: CurrentUser, db: Session = Depends(get_db)):
+    routine = _editable_routine(db, user, routine_id)
+    if routine.image_path:
+        _delete_quietly(_uploads_dir("routines") / routine.image_path)
+        routine.image_path = None
         db.commit()
 
 

@@ -23,6 +23,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import BkCard from '@/lib/BkCard.vue'
 import BkField from '@/lib/BkField.vue'
+import BkCheck from '@/lib/BkCheck.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkSheet from '@/lib/BkSheet.vue'
@@ -628,11 +629,12 @@ function redeemUrl(token: string): string {
           data-testid="create-password-field"
         />
         <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            v-model="createIsAdmin"
-            type="checkbox"
-            class="rounded border border-line"
+          <BkCheck
+            size="sm"
+            :model-value="createIsAdmin"
             data-testid="create-is-admin-checkbox"
+            :aria-label="$t('admin.isAdmin')"
+            @update:model-value="createIsAdmin = $event"
           />
           <span class="text-sm text-ink-muted">{{ $t('admin.isAdmin') }}</span>
         </label>
@@ -712,11 +714,12 @@ function redeemUrl(token: string): string {
           v-if="editUserId !== null && !isOwnUser(editUserId)"
           class="flex items-center gap-2 cursor-pointer"
         >
-          <input
-            v-model="editIsAdmin"
-            type="checkbox"
-            class="rounded border border-line"
+          <BkCheck
+            size="sm"
+            :model-value="editIsAdmin"
             data-testid="edit-is-admin-checkbox"
+            :aria-label="$t('admin.isAdmin')"
+            @update:model-value="editIsAdmin = $event"
           />
           <span class="text-sm text-ink-muted">{{ $t('admin.isAdmin') }}</span>
         </label>

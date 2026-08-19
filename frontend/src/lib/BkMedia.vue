@@ -20,7 +20,7 @@ const props = withDefaults(
     src?: string
     cacheBust?: string | number
     rune?: RuneName | null
-    size?: 'xs' | 'sm' | 'md' | 'lg' | 'fill'
+    size?: 'xs' | 'sm' | 'md' | 'lg' | 'tallSm' | 'tall' | 'fill'
     alt?: string
     glow?: boolean
   }>(),
@@ -46,14 +46,22 @@ watch(url, () => {
 const showImage = computed(() => url.value !== null && !errored.value)
 const runeName = computed<RuneName>(() => props.rune ?? 'berserk')
 
+// facelift v4 (zurdi: "las fotos de ejercicios son verticales, 9:16"):
+// tamaños VERTICALES para las superficies donde la foto es protagonista —
+// tallSm en listados (biblioteca, pre-inicio), tall junto a las series del
+// player. aspect-[9/16] es un valor arbitrario SIN unidad px/rem/em: fuera
+// del veto del guard, y el ratio es un dato del dominio (las fotos reales),
+// no un capricho de espaciado.
 const sizeClasses = {
   xs: 'w-9 h-9 rounded-sm',
   sm: 'w-12 h-12 rounded-sm',
   md: 'w-16 h-16 rounded-md',
   lg: 'w-24 h-24 rounded-md',
+  tallSm: 'w-16 aspect-[9/16] rounded-md',
+  tall: 'w-24 aspect-[9/16] rounded-md',
   fill: 'w-full h-full',
 }
-const runeSizes = { xs: 18, sm: 22, md: 28, lg: 40, fill: 64 }
+const runeSizes = { xs: 18, sm: 22, md: 28, lg: 40, tallSm: 30, tall: 40, fill: 64 }
 </script>
 
 <template>

@@ -120,10 +120,10 @@ def test_custom_exercise_lifecycle(client: TestClient, app):
     loki = login(app, "loki")
     assert loki.patch(f"/api/v1/exercises/{bench['id']}", json={"name_en": "Nope"}).status_code == 404
     assert loki.delete(f"/api/v1/exercises/{bench['id']}").status_code == 404
-    # otro usuario no ve ni toca mi custom
+    # v0.20.x catálogo GLOBAL: otro usuario SÍ ve mi custom… pero no lo toca
     make_user(client, "freyja")
     freyja = login(app, "freyja")
-    assert all(e["id"] != eid for e in freyja.get("/api/v1/exercises").json())
+    assert any(e["id"] == eid for e in freyja.get("/api/v1/exercises").json())
     assert freyja.delete(f"/api/v1/exercises/{eid}").status_code == 404
     assert client.delete(f"/api/v1/exercises/{eid}").status_code == 204
 
@@ -338,7 +338,10 @@ def test_admin_delete_global_muscle_group_in_use_conflict(client: TestClient):
 # admin is_global/owner_id NULL, ver test_create_global_exercise_admin_only)
 
 
-def test_own_exercise_defaults_private_and_invisible_to_others(client: TestClient, app):
+def test_own_exercise_visible_to_everyone_but_only_editable_by_owner(client: TestClient, app):
+    # v0.20.x (zurdi: "todos los ejercicios son de catálogo global"): la
+    # privacidad de ejercicios murió — cualquier ejercicio es visible y
+    # usable por todos; la propiedad solo decide quién edita
     chest = group_id(client, "chest")
     eid = client.post(
         "/api/v1/exercises",
@@ -347,19 +350,13 @@ def test_own_exercise_defaults_private_and_invisible_to_others(client: TestClien
             "muscle_groups": [{"muscle_group_id": chest, "is_primary": True}],
         },
     ).json()["id"]
-    # is_public no viajó en el payload -> default False (ExerciseIn)
-    created = next(e for e in client.get("/api/v1/exercises").json() if e["id"] == eid)
-    assert created["is_public"] is False
 
     make_user(client, "freyja")
     freyja = login(app, "freyja")
-    assert all(e["id"] != eid for e in freyja.get("/api/v1/exercises").json())
-    # tampoco usable: no lo ve, así que no puede meterlo en una rutina suya
-    rid = freyja.post("/api/v1/routines", json={"name": "Push"}).json()["id"]
-    resp = freyja.put(
-        f"/api/v1/routines/{rid}/exercises", json=[{"exercise_id": eid, "target_sets": 3}]
-    )
-    assert resp.status_code == 422 and resp.json()["detail"] == "exercise_invalid"
+    listed = next((e for e in freyja.get("/api/v1/exercises").json() if e["id"] == eid), None)
+    assert listed is not None
+    assert freyja.patch(f"/api/v1/exercises/{eid}", json={"name_en": "Nope"}).status_code == 404
+    assert freyja.delete(f"/api/v1/exercises/{eid}").status_code == 404
 
 
 def test_public_exercise_visible_usable_but_not_editable_by_others(client: TestClient, app):
@@ -402,7 +399,8 @@ def test_public_exercise_visible_usable_but_not_editable_by_others(client: TestC
     assert resp.status_code == 200 and resp.json()["name_en"] == "Community press v2"
 
 
-def test_is_public_toggle_round_trip_changes_visibility(client: TestClient, app):
+def test_visibility_ignores_is_public_flag(client: TestClient, app):
+    # v0.20.x: is_public es INERTE para la visibilidad — todo es global
     chest = group_id(client, "chest")
     eid = client.post(
         "/api/v1/exercises",
@@ -414,23 +412,11 @@ def test_is_public_toggle_round_trip_changes_visibility(client: TestClient, app)
 
     make_user(client, "freyja")
     freyja = login(app, "freyja")
-    assert all(e["id"] != eid for e in freyja.get("/api/v1/exercises").json())
-
-    # PATCH is_public=True (checkbox marcado en edición) -> visible
-    resp = client.patch(f"/api/v1/exercises/{eid}", json={"is_public": True})
-    assert resp.status_code == 200 and resp.json()["is_public"] is True
+    # visible sin tocar ningún flag…
     assert any(e["id"] == eid for e in freyja.get("/api/v1/exercises").json())
-
-    # PATCH is_public=False (desmarcado) -> vuelve a ser invisible
-    resp = client.patch(f"/api/v1/exercises/{eid}", json={"is_public": False})
-    assert resp.status_code == 200 and resp.json()["is_public"] is False
-    assert all(e["id"] != eid for e in freyja.get("/api/v1/exercises").json())
-
-    # patch sin is_public (omitido, no False explícito) no lo toca
-    resp = client.patch(f"/api/v1/exercises/{eid}", json={"is_public": True})
-    assert resp.json()["is_public"] is True
-    resp = client.patch(f"/api/v1/exercises/{eid}", json={"name_en": "Toggle v2"})
-    assert resp.status_code == 200 and resp.json()["is_public"] is True
+    # …y sigue visible aunque el dueño lo "des-publique" explícitamente
+    client.patch(f"/api/v1/exercises/{eid}", json={"is_public": False})
+    assert any(e["id"] == eid for e in freyja.get("/api/v1/exercises").json())
 
 
 def test_catalog_rows_carry_no_owner_username(client: TestClient):

@@ -7,12 +7,16 @@ import { createExercise, deleteExercise, listExercises, listMuscleGroups, update
 import { exerciseName } from '@/components/routines/exerciseName'
 import { deleteExerciseImage, exerciseImageUrl, uploadExerciseImage } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 import { foldSearchText } from '@/utils/searchFold'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import BkCard from '@/lib/BkCard.vue'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkButton from '@/lib/BkButton.vue'
+import BkCheck from '@/lib/BkCheck.vue'
+import BkMedia from '@/lib/BkMedia.vue'
+import BkRadio from '@/lib/BkRadio.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSelect from '@/lib/BkSelect.vue'
@@ -146,16 +150,8 @@ const primaryGroupId = ref<number | null>(null)
 // global solo aparece creando Y siendo admin (is_global no es patchable,
 // mismo criterio que measurement); editando una fila del catálogo admin no
 // se muestra nada (ya es global de por sí, igual que antes)
-type Visibility = 'private' | 'public' | 'global'
-const visibility = ref<Visibility>('private')
-
-const visibilityOptions = computed(() => [
-  { value: 'private', label: t('library.visibilityPrivate') },
-  { value: 'public', label: t('library.visibilityPublic') },
-  ...(editingId.value === null && auth.user?.is_admin
-    ? [{ value: 'global', label: t('library.visibilityGlobal') }]
-    : []),
-])
+// (v0.20.x: el selector de visibilidad MURIÓ — todos los ejercicios son de
+// catálogo global; la propiedad solo decide quién edita)
 const saving = ref(false)
 
 const deleteConfirmOpen = ref(false)
@@ -166,12 +162,21 @@ const deleteId = ref<number | null>(null)
 const ready = ref(false)
 
 async function loadAll() {
+  // facelift v3: hidratar la última carga al instante y refrescar en fondo
+  type Snapshot = { exercises: ExerciseOut[]; groups: MuscleGroupOut[] }
+  const cached = getViewCache<Snapshot>('library:all')
+  if (cached) {
+    exercises.value = cached.exercises
+    muscleGroups.value = cached.groups
+    ready.value = true
+  }
   try {
     const [exercisesData, groupsData] = await Promise.all([listExercises(), listMuscleGroups()])
     exercises.value = exercisesData
     muscleGroups.value = groupsData
+    setViewCache<Snapshot>('library:all', { exercises: exercisesData, groups: groupsData })
   } catch (error) {
-    toastApiError(error)
+    if (!cached) toastApiError(error)
   } finally {
     ready.value = true
   }
@@ -187,7 +192,6 @@ function openCreate() {
   measurement.value = 'strength'
   checkedGroupIds.value = []
   primaryGroupId.value = null
-  visibility.value = 'private'
   formOpen.value = true
 }
 
@@ -200,7 +204,6 @@ function openEdit(exercise: ExerciseOut) {
   measurement.value = exercise.measurement
   checkedGroupIds.value = exercise.muscle_groups.map((l) => l.muscle_group_id)
   primaryGroupId.value = exercise.muscle_groups.find((l) => l.is_primary)?.muscle_group_id ?? null
-  visibility.value = exercise.is_public ? 'public' : 'private'
   formOpen.value = true
 }
 
@@ -268,10 +271,6 @@ async function submitForm() {
         name_es: nameEs.value,
         name_en: nameEn.value,
         muscle_groups,
-        // sobre una fila del catálogo admin (owner_id null) el control de
-        // visibilidad ni se muestra: no viaja is_public para no fingir un
-        // cambio que ahí no significa nada
-        ...(editingOwnerId.value !== null ? { is_public: visibility.value === 'public' } : {}),
       })
     } else {
       await createExercise({
@@ -279,8 +278,6 @@ async function submitForm() {
         name_en: nameEn.value,
         measurement: measurement.value,
         muscle_groups,
-        is_global: visibility.value === 'global',
-        is_public: visibility.value === 'public',
       })
     }
     formOpen.value = false
@@ -318,7 +315,14 @@ async function confirmDelete() {
          públicos de otros), en vez de una sección propia y un catálogo
          colapsable aparte — mismo patrón que MuscleGroupManager, que ya
          vivía así. -->
+    <!-- facelift v4 (zurdi: "el botón añadir está abajo del todo y hay que
+         hacer mucho scroll"): el alta vive ARRIBA, en la fila del título -->
     <BkCard :title="$t('library.exercises')">
+      <template #header>
+        <BkButton size="sm" data-testid="new-exercise-btn" @click="openCreate">
+          {{ $t('library.newExercise') }}
+        </BkButton>
+      </template>
       <div class="space-y-4">
         <!-- item 2/3 (v0.4.3, zurdi): esqueleto shimmer mientras carga, mismo
              hueco que las filas reales (nombre+chip a la izquierda, dos
@@ -369,12 +373,14 @@ async function confirmDelete() {
             :data-testid="exercise.kind === 'own' ? `exercise-row-${exercise.id}` : `catalog-exercise-row-${exercise.id}`"
             class="flex items-start justify-between gap-2 p-2 rounded border border-line text-sm"
           >
-            <!-- v0.12.0: thumb de la imagen del ejercicio (si tiene) -->
-            <img
-              v-if="exercise.has_image"
-              :src="exerciseImageUrl(exercise.id, imageBust)"
-              :alt="''"
-              class="w-10 h-10 rounded-sm object-cover shrink-0"
+            <!-- v0.12.0 → facelift v4 (zurdi: "que la imagen se vea más y
+                 con aspect ratio vertical"): thumb 9:16 con pozo rúnico de
+                 fallback, en TODAS las filas -->
+            <BkMedia
+              :exercise="exercise"
+              :cache-bust="imageBust"
+              :rune="primaryGroupRune(exercise)"
+              size="tallSm"
               :data-testid="`exercise-thumb-${exercise.id}`"
             />
             <div class="min-w-0 flex-1">
@@ -481,17 +487,9 @@ async function confirmDelete() {
              fuera de ahí (aún no listo, o con filas) se queda donde estaba.
              UNIFIED-LISTINGS: una sola vez, cuando NADA de la lista
              unificada (mías + catálogo + públicas de otros) hay que mostrar -->
-        <BkEmpty
-          v-else
-          :message="$t('library.noExercises')"
-          :action-label="$t('library.newExercise')"
-          action-testid="new-exercise-btn"
-          @action="openCreate"
-        />
-
-        <BkButton v-if="!ready || displayExercises.length > 0" data-testid="new-exercise-btn" @click="openCreate">
-          {{ $t('library.newExercise') }}
-        </BkButton>
+        <!-- sin action propia: el alta ya vive arriba, en la fila del
+             título — duplicar el testid rompería los selectores -->
+        <BkEmpty v-else :message="$t('library.noExercises')" />
       </div>
     </BkCard>
 
@@ -518,44 +516,37 @@ async function confirmDelete() {
           :options="measurementOptions"
           data-testid="exercise-measurement-select"
         />
-        <!-- v0.9.4 (zurdi: "visible para todos y global es un poco
-             redundante"): UN select de visibilidad en vez de los dos checks
-             (item 3 is_global + W2 is_public). La opción de catálogo global
-             solo existe creando y siendo admin (no es patchable); sobre una
-             fila del catálogo admin (owner_id null, ya global de por sí) el
-             control entero desaparece, como desaparecía el check antes -->
-        <BkSelect
-          v-if="editingOwnerId !== null || editingId === null"
-          v-model="visibility"
-          :label="$t('library.visibility')"
-          :options="visibilityOptions"
-          data-testid="exercise-visibility-select"
-        />
 
         <div class="space-y-2">
           <span class="block text-sm text-ink-muted">{{ $t('library.muscleGroups') }}</span>
           <div v-for="group in muscleGroups" :key="group.id" class="flex items-center gap-3">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                class="rounded border border-line"
+            <div class="flex items-center gap-2">
+              <BkCheck
+                size="sm"
+                :model-value="checkedGroupIds.includes(group.id)"
                 :data-testid="`muscle-group-checkbox-${group.id}`"
-                :checked="checkedGroupIds.includes(group.id)"
-                @change="setGroupChecked(group.id, ($event.target as HTMLInputElement).checked)"
+                :aria-label="groupLabel(group)"
+                @update:model-value="setGroupChecked(group.id, $event)"
               />
-              <span class="text-sm text-ink-muted">{{ groupLabel(group) }}</span>
-            </label>
-            <label v-if="checkedGroupIds.includes(group.id)" class="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="exercise-primary-muscle-group"
-                class="border border-line"
-                :data-testid="`muscle-group-primary-${group.id}`"
+              <button
+                type="button"
+                class="bk-press text-sm text-ink-muted text-left"
+                @click="setGroupChecked(group.id, !checkedGroupIds.includes(group.id))"
+              >{{ groupLabel(group) }}</button>
+            </div>
+            <div v-if="checkedGroupIds.includes(group.id)" class="flex items-center gap-2">
+              <BkRadio
                 :checked="primaryGroupId === group.id"
-                @change="primaryGroupId = group.id"
+                :data-testid="`muscle-group-primary-${group.id}`"
+                :aria-label="$t('library.primary')"
+                @select="primaryGroupId = group.id"
               />
-              <span class="text-sm text-ink-muted">{{ $t('library.primary') }}</span>
-            </label>
+              <button
+                type="button"
+                class="bk-press text-sm text-ink-muted"
+                @click="primaryGroupId = group.id"
+              >{{ $t('library.primary') }}</button>
+            </div>
           </div>
         </div>
 

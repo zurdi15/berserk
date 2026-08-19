@@ -72,4 +72,7 @@ class RoutineOut(BaseModel):
     owner_username: str | None
     exercises: list[RoutineExerciseOut]
 
+    # v0.20.x: imagen de la rutina — el fichero vive en /routines/{id}/image
+    has_image: bool = False
+
     model_config = {"from_attributes": True}

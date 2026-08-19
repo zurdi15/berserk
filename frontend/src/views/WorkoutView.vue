@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/client'
 import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RoutineOut, SetIn, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
-import { getRotation, listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
+import { getRotation, listExercises, listMuscleGroups, listRoutines, routineImageUrl } from '@/api/domain'
 import { resolveNewSetDefaults } from '@/components/workout/setDefaults'
 import { estimateRoutineMinutes } from '@/components/workout/routineEstimate'
 import BkMedia from '@/lib/BkMedia.vue'
@@ -391,13 +391,10 @@ function openPrestart(routineId: number) {
   router.push({ name: 'workout-start', params: { routineId } })
 }
 
-// media de la card de rutina: primer ejercicio con foto (fallback: runa)
-function routineHeroExercise(routine: RoutineOut): ExerciseOut | null {
-  for (const row of routine.exercises) {
-    const found = exerciseMap.value.get(row.exercise_id)
-    if (found?.has_image) return found
-  }
-  return null
+// facelift v4: la media de la card es la imagen PROPIA de la rutina (o su
+// runa) — nunca la foto de un ejercicio
+function routineHeroSrc(routine: RoutineOut): string | undefined {
+  return routine.has_image ? routineImageUrl(routine.id) : undefined
 }
 
 function routineMeta(routine: RoutineOut): string {
@@ -1124,7 +1121,7 @@ onBeforeUnmount(stopTicker)
           @click="openPrestart(routine.id)"
         >
           <BkMedia
-            :exercise="routineHeroExercise(routine)"
+            :src="routineHeroSrc(routine)"
             :rune="routineRune(routine)"
             size="md"
           />

@@ -4,12 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useI18n } from 'vue-i18n'
 
+import { avatarUrl } from '@/api/domain'
 import BkRune from '@/lib/BkRune.vue'
 import type { RuneName } from '@/lib/runes'
 import StatusBanners from '@/components/shell/StatusBanners.vue'
 import { attachNetListeners, onBackOnline } from '@/offline/net'
 import * as outbox from '@/offline/outbox'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
+import { useAuthStore } from '@/stores/auth'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { useToastStore } from '@/stores/toast'
 import { checkNativeShellUpdate, ensureNativeNotificationPermission, isNativeShell } from '@/utils/nativeShell'
@@ -147,6 +149,17 @@ const activeIndex = computed(() => {
   const idx = items.findIndex((item) => item.name === route.name)
   return idx === -1 ? 0 : idx
 })
+
+// facelift v4 (zurdi: "si hay foto de perfil, que se muestre en el
+// bottombar en vez de la runa de Perfil"): el avatar sustituye a la runa —
+// y en móvil también a la etiqueta "Perfil" (avatar con etiqueta debajo
+// quedaría raro). El computed se reevalúa cuando refreshMe reemplaza
+// auth.user (subir/quitar foto), y el Date.now() de ese momento rompe la
+// cache del <img> — no es un bust por render: computed cachea por identidad
+const auth = useAuthStore()
+const navAvatarSrc = computed(() =>
+  auth.user?.has_avatar ? avatarUrl(auth.user.id, Date.now()) : null,
+)
 
 // item 1 (v0.4.0, desktop nav polish): indicador deslizante también arriba,
 // como el de abajo — pero aquí los items son de ancho VARIABLE (etiquetas de
@@ -329,7 +342,17 @@ watch(activeIndex, () => nextTick(updateIndicator))
               active-class="text-aurora"
             >
               <span class="text-sm">{{ $t(item.label) }}</span>
-              <span><BkRune :name="item.rune" :size="20" :carve="false" class="relative" /></span>
+              <span>
+                <img
+                  v-if="item.name === 'profile' && navAvatarSrc"
+                  :src="navAvatarSrc"
+                  alt=""
+                  class="relative w-6 h-6 rounded-full object-cover border"
+                  :class="route.name === 'profile' ? 'border-aurora' : 'border-line-strong'"
+                  data-testid="nav-avatar-desktop"
+                />
+                <BkRune v-else :name="item.rune" :size="20" :carve="false" class="relative" />
+              </span>
             </RouterLink>
           </li>
         </ul>
@@ -433,11 +456,22 @@ watch(activeIndex, () => nextTick(updateIndicator))
               class="flex flex-col items-center gap-1 py-2.5 text-ink-faint"
               active-class="text-aurora"
             >
-              <span><BkRune :name="item.rune" :size="22" :carve="false" class="relative" /></span>
-              <!-- revertido (round 7, zurdi): se probó ocultar las inactivas
-                   (sr-only + fade solo en la activa), pero con el token a
-                   0.7rem las 5 etiquetas leen bien tal cual — vuelta al clásico -->
-              <span class="text-2xs tracking-wide">{{ $t(item.label) }}</span>
+              <span v-if="item.name === 'profile' && navAvatarSrc" class="flex items-center justify-center h-10">
+                <img
+                  :src="navAvatarSrc"
+                  alt=""
+                  class="relative w-8 h-8 rounded-full object-cover border-2"
+                  :class="route.name === 'profile' ? 'border-aurora' : 'border-line-strong'"
+                  data-testid="nav-avatar"
+                />
+              </span>
+              <template v-else>
+                <span><BkRune :name="item.rune" :size="22" :carve="false" class="relative" /></span>
+                <!-- revertido (round 7, zurdi): se probó ocultar las inactivas
+                     (sr-only + fade solo en la activa), pero con el token a
+                     0.7rem las 5 etiquetas leen bien tal cual — vuelta al clásico -->
+                <span class="text-2xs tracking-wide">{{ $t(item.label) }}</span>
+              </template>
             </RouterLink>
           </li>
         </ul>

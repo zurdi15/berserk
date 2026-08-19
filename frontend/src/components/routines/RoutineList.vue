@@ -13,6 +13,7 @@ import {
 import { isValidRuneName } from '@/lib/runeResolve'
 import RotationPlanCard from './RotationPlanCard.vue'
 import { toastApiError } from '@/utils/apiErrors'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { formatWeight } from '@/utils/units'
@@ -101,6 +102,15 @@ function toggleExpanded(id: number) {
 }
 
 async function loadRoutines() {
+  // facelift v3: hidratar la última carga al instante y refrescar en fondo
+  type Snapshot = { routines: RoutineOut[]; templates: RoutineOut[]; catalog: ExerciseOut[] }
+  const cached = getViewCache<Snapshot>('routines:list')
+  if (cached) {
+    routines.value = cached.routines
+    templates.value = cached.templates
+    exerciseCatalog.value = cached.catalog
+    ready.value = true
+  }
   try {
     // en paralelo: ninguna de las tres depende de las otras
     const [routinesResult, templatesResult, exercisesResult] = await Promise.all([
@@ -111,8 +121,13 @@ async function loadRoutines() {
     routines.value = routinesResult
     templates.value = templatesResult
     exerciseCatalog.value = exercisesResult
+    setViewCache<Snapshot>('routines:list', {
+      routines: routinesResult,
+      templates: templatesResult,
+      catalog: exercisesResult,
+    })
   } catch (error) {
-    toastApiError(error)
+    if (!cached) toastApiError(error)
   } finally {
     ready.value = true
   }

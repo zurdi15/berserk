@@ -21,6 +21,8 @@
 import { afterEach, beforeEach } from 'vitest'
 import { enableAutoUnmount } from '@vue/test-utils'
 
+import { clearViewCache } from '@/utils/viewCache'
+
 enableAutoUnmount(afterEach)
 
 function storageWorks(): boolean {
@@ -57,4 +59,8 @@ if (!storageWorks()) {
 
 beforeEach(() => {
   localStorage.clear()
+  // facelift v3: la cache de vistas es módulo-global y sobreviviría entre
+  // tests del mismo worker — los specs de gating (skeleton mientras carga)
+  // exigen arrancar sin nada hidratado, igual que exigen storage limpio
+  clearViewCache()
 })

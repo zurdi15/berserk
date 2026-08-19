@@ -506,9 +506,9 @@ describe('AdminCard', () => {
       expect(usernameInput).not.toBeNull()
       expect(usernameInput.value).toBe('user2') // pre-fill desde la fila
 
-      const adminCheckbox = document.querySelector('[data-testid="edit-is-admin-checkbox"]') as HTMLInputElement
+      const adminCheckbox = document.querySelector('[data-testid="edit-is-admin-checkbox"]') as HTMLButtonElement
       expect(adminCheckbox).not.toBeNull()
-      expect(adminCheckbox.checked).toBe(false) // user2 no es admin
+      expect(adminCheckbox.getAttribute('aria-checked')).toBe('false') // user2 no es admin
 
       usernameInput.value = 'user2renamed'
       usernameInput.dispatchEvent(new Event('input', { bubbles: true }))

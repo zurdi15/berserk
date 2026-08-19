@@ -989,6 +989,33 @@ describe('ProgressView', () => {
     expect(chartAfter).not.toBe(chartBefore)
   })
 
+  it('opens the drawer on the Nivel metric when the exercise only has level series (weight tab would be empty)', async () => {
+    document.body.innerHTML = ''
+    vi.mocked(domain.getSeries).mockResolvedValueOnce({
+      series: [
+        { workout_id: 1, date: '2026-08-01', top_weight: 0, volume: 0, est_1rm: 0, top_level: 10 },
+        { workout_id: 2, date: '2026-08-03', top_weight: 0, volume: 0, est_1rm: 0, top_level: 12 },
+      ],
+    } as never)
+    const wrapper = mount(ProgressView, withI18n())
+    await flushPromises()
+
+    const mainTablist = wrapper.findAll('[role="tablist"]')[0]
+    await mainTablist.findAll('[role="tab"]')[2].trigger('click') // Entrenos
+    await flushPromises()
+
+    await wrapper.find('[data-testid="exercise-option-1"]').trigger('click')
+    await flushPromises()
+
+    const tabs = metricTabs()
+    expect(tabs[3].textContent).toContain('Nivel')
+    expect(tabs[3].getAttribute('aria-selected')).toBe('true')
+    expect(wrapper.findComponent({ name: 'BkChart' }).props('points')).toEqual([
+      { date: '2026-08-01', value: 10 },
+      { date: '2026-08-03', value: 12 },
+    ])
+  })
+
   it('item 8: switches to the body tab (2nd tab in the totales→cuerpo→entreno→récords order) and hides the training-tab content', async () => {
     const wrapper = mount(ProgressView, withI18n())
     await flushPromises()
@@ -1182,5 +1209,24 @@ describe('ProgressView', () => {
 
       expect(mainTablist.findAll('[role="tab"]')[3].attributes('aria-selected')).toBe('true') // Récords
     })
+  })
+})
+
+// v0.20.x: métrica de NIVEL — número plano (sin conversión kg/lb) y puntos a
+// 0 filtrados en ambas direcciones (día solo-kg no aparece en la serie de
+// nivel, y viceversa)
+describe('seriesFor top_level', () => {
+  it('charts plain levels and drops zero days per-metric', async () => {
+    const { seriesFor } = await import('@/components/progress/series')
+    const points = [
+      { workout_id: 1, date: '2026-08-01', top_weight: 80, volume: 400, est_1rm: 90, top_level: 0 },
+      { workout_id: 2, date: '2026-08-03', top_weight: 0, volume: 0, est_1rm: 0, top_level: 12 },
+    ]
+    expect(seriesFor(points as never, 'top_level', 'lb')).toEqual([
+      { date: '2026-08-03', value: 12 },
+    ])
+    expect(seriesFor(points as never, 'top_weight', 'kg')).toEqual([
+      { date: '2026-08-01', value: 80 },
+    ])
   })
 })

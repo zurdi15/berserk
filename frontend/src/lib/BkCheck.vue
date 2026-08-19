@@ -7,7 +7,7 @@
 // ver animations.css) — la runa y el tick comparten el mismo gesto de
 // tallado. El tick se monta solo cuando está marcado: montar = animar.
 withDefaults(
-  defineProps<{ modelValue: boolean; size?: 'md' | 'lg'; disabled?: boolean }>(),
+  defineProps<{ modelValue: boolean; size?: 'sm' | 'md' | 'lg'; disabled?: boolean }>(),
   { size: 'md', disabled: false },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
@@ -19,9 +19,9 @@ const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
     role="checkbox"
     :aria-checked="modelValue ? 'true' : 'false'"
     :disabled="disabled || undefined"
-    class="bk-press inline-flex items-center justify-center rounded-md border-2 transition-colors shrink-0 disabled:opacity-50"
+    class="bk-press inline-flex items-center justify-center border-2 transition-colors shrink-0 disabled:opacity-50"
     :class="[
-      size === 'md' ? 'w-7 h-7' : 'w-9 h-9',
+      size === 'sm' ? 'w-5 h-5 rounded-sm' : size === 'md' ? 'w-7 h-7 rounded-md' : 'w-9 h-9 rounded-md',
       modelValue
         ? 'bg-aurora-deep border-aurora text-void shadow-(--bk-shadow-aurora) bk-check-pop'
         : 'bg-transparent border-line-strong text-transparent hover:border-aurora',
@@ -36,7 +36,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
       stroke-width="3"
       stroke-linecap="round"
       stroke-linejoin="round"
-      :class="size === 'md' ? 'w-4 h-4' : 'w-5 h-5'"
+      :class="size === 'sm' ? 'w-3 h-3' : size === 'md' ? 'w-4 h-4' : 'w-5 h-5'"
       aria-hidden="true"
     >
       <path class="bk-check-stroke" d="M4 12.5l5 5L20 7" />

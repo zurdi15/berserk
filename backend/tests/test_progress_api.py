@@ -160,7 +160,7 @@ def test_exercise_history_ignores_the_active_unfinished_workout(client: TestClie
     assert client.get(f"/api/v1/progress/exercise-history/{bench}").json() is None
 
 
-def test_exercise_history_of_invisible_exercise_404(client: TestClient, app):
+def test_exercise_history_of_foreign_exercise_is_callers_own(client: TestClient, app):
     from tests.conftest import login, make_user
 
     make_user(client, "freyja")
@@ -175,10 +175,14 @@ def test_exercise_history_of_invisible_exercise_404(client: TestClient, app):
             "muscle_groups": [{"muscle_group_id": chest, "is_primary": True}],
         },
     ).json()["id"]
-    assert client.get(f"/api/v1/progress/exercise-history/{custom}").status_code == 404
+    # v0.20.x catálogo global: el ejercicio ajeno es visible — la historia
+    # es la del CALLER, que nunca lo ha entrenado: None
+    resp = client.get(f"/api/v1/progress/exercise-history/{custom}")
+    assert resp.status_code == 200
+    assert resp.json() is None
 
 
-def test_series_of_invisible_exercise_404(client: TestClient, app):
+def test_series_of_foreign_exercise_is_callers_own(client: TestClient, app):
     from tests.conftest import login, make_user
 
     make_user(client, "freyja")
@@ -193,7 +197,10 @@ def test_series_of_invisible_exercise_404(client: TestClient, app):
             "muscle_groups": [{"muscle_group_id": chest, "is_primary": True}],
         },
     ).json()["id"]
-    assert client.get(f"/api/v1/progress/exercises/{custom}").status_code == 404
+    # v0.20.x catálogo global: visible — la serie es la del CALLER (vacía)
+    resp = client.get(f"/api/v1/progress/exercises/{custom}")
+    assert resp.status_code == 200
+    assert resp.json()["series"] == []
 
 
 # v0.10.0 (zurdi): las últimas 4 veces de cardio viajan con el historial

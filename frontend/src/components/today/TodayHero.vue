@@ -16,7 +16,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import type { ExerciseOut, RotationOut, ScheduledOut } from '@/api/domain'
-import { getRotation, putRotationNext } from '@/api/domain'
+import { getRotation, putRotationNext, routineImageUrl } from '@/api/domain'
 import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
 import BkHero from '@/lib/BkHero.vue'
@@ -25,6 +25,7 @@ import type { RuneName } from '@/lib/runes'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAthleteStore } from '@/stores/athlete'
 import { toastApiError } from '@/utils/apiErrors'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 import { formatTimeShort, todayIso } from '@/utils/dates'
 import { estimateRoutineMinutes } from '@/components/workout/routineEstimate'
 
@@ -49,12 +50,21 @@ onMounted(async () => {
     ready.value = true
     return
   }
+  // facelift v3: la rotación de la última visita pinta al instante; el GET
+  // de siempre la refresca en fondo
+  const cached = getViewCache<RotationOut>('today:rotation')
+  if (cached) {
+    rotation.value = cached
+    selectedIndex.value = cached.next_position ?? null
+    ready.value = true
+  }
   try {
     rotation.value = (await getRotation()) ?? null
     selectedIndex.value = rotation.value?.next_position ?? null
+    if (rotation.value) setViewCache('today:rotation', rotation.value)
   } catch {
-    // hint de fondo: sin red, Hoy sigue sin el carrusel
-    rotation.value = null
+    // hint de fondo: sin red, Hoy sigue con lo hidratado (o sin carrusel)
+    if (!cached) rotation.value = null
   } finally {
     ready.value = true
   }
@@ -67,15 +77,12 @@ const displayRoutine = computed(() =>
 
 const workoutActive = computed(() => activeWorkout.workout !== null)
 
-// media del hero: primer ejercicio de la rutina con foto; la runa de la
-// rutina como fallback (BkMedia cae al bindrune si tampoco hay)
-const heroExercise = computed(() => {
-  for (const routineRow of displayRoutine.value?.exercises ?? []) {
-    const found = props.exercises.find((e) => e.id === routineRow.exercise_id)
-    if (found?.has_image) return found
-  }
-  return null
-})
+// facelift v4 (zurdi: "que la imagen de hero de una rutina no sea la de un
+// ejercicio"): SOLO la imagen propia de la rutina (subida en su editor);
+// sin ella, manda la runa — nunca la foto de un ejercicio cualquiera
+const heroSrc = computed(() =>
+  displayRoutine.value?.has_image ? routineImageUrl(displayRoutine.value.id) : undefined,
+)
 
 const heroRune = computed<RuneName | null>(() =>
   displayRoutine.value?.rune && isValidRuneName(displayRoutine.value.rune)
@@ -116,6 +123,7 @@ async function selectDelta(delta: number) {
   try {
     rotation.value = await putRotationNext(target.id)
     selectedIndex.value = rotation.value?.next_position ?? next
+    if (rotation.value) setViewCache('today:rotation', rotation.value)
   } catch (error) {
     toastApiError(error)
   } finally {
@@ -178,25 +186,29 @@ function goToCalendar() {
   </BkCard>
 
   <template v-else-if="ready">
-    <!-- facelift v2: las tres ramas comparten una Transition out-in — las
-         flechas del carrusel cambian la :key y el hero entero se remonta con
-         pop suave (y la runa del fallback se RE-TALLA con cada rutina) -->
+    <!-- facelift v3: la Transition externa solo cubre el cambio de RAMA
+         (claves estáticas) — las flechas del carrusel ya NO remontan la
+         card: animan solo el interior (título/meta con sus Transitions
+         propias, y la media/runa dentro del propio BkHero) -->
     <Transition name="bk-pop-soft" mode="out-in">
-    <!-- (b) hero de rotación -->
+    <!-- (b) hero de rotación — contenido redistribuido: eyebrow + título +
+         meta arriba (con el padding del hero como margen del radio), la runa
+         respira en el hueco central (spacer flex-1) y el CTA/chips/dots
+         asientan abajo -->
     <BkHero
       v-if="displayRoutine"
-      :key="`rot-${displayRoutine.id}`"
-      :exercise="heroExercise"
+      key="rot"
+      :src="heroSrc"
       :rune="heroRune"
       data-testid="rotation-next-card"
     >
-      <div class="space-y-3">
-        <p class="bk-eyebrow text-aurora">{{ workoutActive ? t('today.heroInProgress') : t('today.heroEyebrow') }}</p>
+      <div class="flex-1 flex flex-col gap-3">
+        <p class="bk-eyebrow bk-hero-accent">{{ workoutActive ? t('today.heroInProgress') : t('today.heroEyebrow') }}</p>
         <div class="flex items-center gap-2">
           <button
             v-if="routines.length > 1"
             type="button"
-            class="bk-press shrink-0 w-9 h-9 rounded-full border border-line-strong text-ink flex items-center justify-center"
+            class="bk-press shrink-0 w-9 h-9 rounded-full border border-white/30 flex items-center justify-center"
             :disabled="switching || undefined"
             :aria-label="t('today.heroPrev')"
             data-testid="hero-prev"
@@ -204,13 +216,15 @@ function goToCalendar() {
           >
             <span aria-hidden="true">‹</span>
           </button>
-          <h2 class="flex-1 min-w-0 bk-display text-ink truncate text-center" data-testid="rotation-next-name">
-            {{ displayRoutine.name }}
-          </h2>
+          <Transition name="bk-pop-soft" mode="out-in">
+            <h2 :key="displayRoutine.id" class="flex-1 min-w-0 bk-display truncate text-center" data-testid="rotation-next-name">
+              {{ displayRoutine.name }}
+            </h2>
+          </Transition>
           <button
             v-if="routines.length > 1"
             type="button"
-            class="bk-press shrink-0 w-9 h-9 rounded-full border border-line-strong text-ink flex items-center justify-center"
+            class="bk-press shrink-0 w-9 h-9 rounded-full border border-white/30 flex items-center justify-center"
             :disabled="switching || undefined"
             :aria-label="t('today.heroNext')"
             data-testid="hero-next"
@@ -219,7 +233,11 @@ function goToCalendar() {
             <span aria-hidden="true">›</span>
           </button>
         </div>
-        <p v-if="heroMeta" class="text-sm text-ink-muted text-center">{{ heroMeta }}</p>
+        <Transition name="bk-fade" mode="out-in">
+          <p v-if="heroMeta" :key="displayRoutine.id" class="text-sm bk-hero-muted text-center">{{ heroMeta }}</p>
+        </Transition>
+        <!-- hueco central: aquí es donde la runa/foto se luce -->
+        <div class="flex-1 min-h-10" aria-hidden="true" />
         <BkButton
           variant="primary"
           size="lg"
@@ -236,8 +254,8 @@ function goToCalendar() {
             v-for="session in todaySessions"
             :key="session.id"
             :type="session.status === 'planned' ? 'button' : undefined"
-            class="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-ink-muted transition-colors"
-            :class="session.status === 'planned' && 'bk-press hover:border-aurora hover:text-ink'"
+            class="inline-flex items-center gap-1.5 rounded-full border border-white/25 px-2.5 py-1 text-xs bk-hero-muted transition-colors"
+            :class="session.status === 'planned' && 'bk-press hover:border-aurora'"
             :data-testid="`session-${session.status}`"
             @click="session.status === 'planned' && startSession()"
           >
@@ -250,7 +268,7 @@ function goToCalendar() {
             v-for="(routine, i) in routines"
             :key="routine.id"
             class="w-1.5 h-1.5 rounded-full"
-            :class="i === selectedIndex ? 'bg-aurora' : 'bg-line-strong'"
+            :class="i === selectedIndex ? 'bg-aurora' : 'bg-white/30'"
           />
         </div>
       </div>
@@ -258,11 +276,12 @@ function goToCalendar() {
 
     <!-- (c) sin plan, con sesiones hoy (planificadas, hechas u omitidas) -->
     <BkHero v-else-if="todaySessions.length > 0" key="session" rune="berserk">
-      <div class="space-y-3">
-        <p v-if="plannedSession" class="bk-eyebrow text-aurora">
+      <div class="flex-1 flex flex-col gap-3">
+        <p v-if="plannedSession" class="bk-eyebrow bk-hero-accent">
           {{ t('calendar.plannedEyebrow') }}<template v-if="formatTimeShort(plannedSession.time)"> · {{ formatTimeShort(plannedSession.time) }}</template>
         </p>
-        <h2 class="bk-display text-ink">{{ t('today.todaySession') }}</h2>
+        <h2 class="bk-display">{{ t('today.todaySession') }}</h2>
+        <div class="flex-1 min-h-10" aria-hidden="true" />
         <div class="space-y-2">
           <div
             v-for="session in todaySessions"
@@ -272,10 +291,10 @@ function goToCalendar() {
           >
             <span :class="['w-2.5 h-2.5', statusClasses(session.status)]" />
             <div class="flex-1 min-w-0">
-              <p v-if="formatTimeShort(session.time)" class="font-medium text-ink">{{ formatTimeShort(session.time) }}</p>
-              <p v-if="session.note" class="text-sm text-ink-muted truncate">{{ session.note }}</p>
+              <p v-if="formatTimeShort(session.time)" class="font-medium">{{ formatTimeShort(session.time) }}</p>
+              <p v-if="session.note" class="text-sm bk-hero-muted truncate">{{ session.note }}</p>
               <!-- sin hora ni nota: etiqueta de estado, que el punto no quede solo -->
-              <p v-if="!formatTimeShort(session.time) && !session.note && session.status === 'planned'" class="text-sm text-ink-muted">
+              <p v-if="!formatTimeShort(session.time) && !session.note && session.status === 'planned'" class="text-sm bk-hero-muted">
                 {{ t('calendar.plannedEyebrow') }}
               </p>
             </div>

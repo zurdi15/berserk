@@ -9,7 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { ExerciseOut, MuscleGroupOut, RoutineExerciseOut, RoutineOut } from '@/api/domain'
-import { getRotation, listExercises, listMuscleGroups, listRoutines } from '@/api/domain'
+import { getRotation, listExercises, listMuscleGroups, listRoutines, routineImageUrl } from '@/api/domain'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { estimateRoutineMinutes } from '@/components/workout/routineEstimate'
 import BkButton from '@/lib/BkButton.vue'
@@ -69,14 +69,10 @@ onMounted(async () => {
   if (ready.value && !routine.value) router.replace({ name: 'workout' })
 })
 
-// media del hero: primer ejercicio de la rutina con foto
-const heroExercise = computed(() => {
-  for (const row of routine.value?.exercises ?? []) {
-    const found = exerciseMap.value.get(row.exercise_id)
-    if (found?.has_image) return found
-  }
-  return null
-})
+// facelift v4: SOLO la imagen propia de la rutina; sin ella, la runa
+const heroSrc = computed(() =>
+  routine.value?.has_image ? routineImageUrl(routine.value.id) : undefined,
+)
 
 const heroRune = computed<RuneName | null>(() =>
   routine.value?.rune && isValidRuneName(routine.value.rune) ? (routine.value.rune as RuneName) : null,
@@ -166,12 +162,12 @@ function goBack() {
   <div v-if="ready && routine" class="bk-stagger">
     <!-- hero a sangre (flush: sin radio propio) con el back flotante -->
     <div class="-mx-4 -mt-4" :style="{ '--bk-stagger-i': 0 }">
-      <BkHero :exercise="heroExercise" :rune="heroRune" flush>
+      <BkHero :src="heroSrc" :rune="heroRune" flush>
         <template #corner>
           <button
             type="button"
             data-testid="prestart-back"
-            class="bk-press w-10 h-10 rounded-full bg-scrim text-ink flex items-center justify-center"
+            class="bk-press w-10 h-10 rounded-full bg-scrim flex items-center justify-center"
             :aria-label="t('prestart.back')"
             @click="goBack"
           >
@@ -222,7 +218,7 @@ function goBack() {
           <BkMedia
             :exercise="rowExercise(row)"
             :rune="primaryRune(rowExercise(row), muscleGroups)"
-            size="sm"
+            size="tallSm"
           />
           <div class="flex-1 min-w-0">
             <p class="text-base font-medium text-ink truncate">{{ rowName(row) }}</p>

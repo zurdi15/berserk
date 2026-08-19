@@ -509,8 +509,8 @@ describe('RoutineEditorSheet', () => {
 
       const dialogs = document.querySelectorAll('[role="dialog"]')
       const dialog = dialogs[dialogs.length - 1] as HTMLElement
-      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
-      expect(checkbox.checked).toBe(true)
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLButtonElement
+      expect(checkbox.getAttribute('aria-checked')).toBe('true')
     })
 
     it('reflects the routine\'s is_global when editing an existing one', async () => {
@@ -526,8 +526,8 @@ describe('RoutineEditorSheet', () => {
 
       const dialogs = document.querySelectorAll('[role="dialog"]')
       const dialog = dialogs[dialogs.length - 1] as HTMLElement
-      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
-      expect(checkbox.checked).toBe(true)
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLButtonElement
+      expect(checkbox.getAttribute('aria-checked')).toBe('true')
     })
 
     it('saving a NEW routine without touching the (already-checked) checkbox sends is_global: true to createRoutine', async () => {
@@ -543,8 +543,8 @@ describe('RoutineEditorSheet', () => {
       const dialogs = document.querySelectorAll('[role="dialog"]')
       const dialog = dialogs[dialogs.length - 1] as HTMLElement
       // sin tocar el checkbox: ya nace marcado (item 10)
-      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
-      expect(checkbox.checked).toBe(true)
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLButtonElement
+      expect(checkbox.getAttribute('aria-checked')).toBe('true')
       await wrapper.vm.$nextTick()
 
       const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
@@ -567,9 +567,8 @@ describe('RoutineEditorSheet', () => {
 
       const dialogs = document.querySelectorAll('[role="dialog"]')
       const dialog = dialogs[dialogs.length - 1] as HTMLElement
-      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
-      checkbox.checked = false
-      checkbox.dispatchEvent(new Event('change'))
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLButtonElement
+      checkbox.click()
       await wrapper.vm.$nextTick()
 
       const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
@@ -596,10 +595,9 @@ describe('RoutineEditorSheet', () => {
 
       const dialogs = document.querySelectorAll('[role="dialog"]')
       const dialog = dialogs[dialogs.length - 1] as HTMLElement
-      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
-      expect(checkbox.checked).toBe(true)
-      checkbox.checked = false
-      checkbox.dispatchEvent(new Event('change'))
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLButtonElement
+      expect(checkbox.getAttribute('aria-checked')).toBe('true')
+      checkbox.click()
       await wrapper.vm.$nextTick()
 
       const saveButton = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent === 'Guardar')
@@ -622,8 +620,9 @@ describe('RoutineEditorSheet', () => {
       // flujo globalize)
       const dialogs = document.querySelectorAll('[role="dialog"]')
       const dialog = dialogs[dialogs.length - 1] as HTMLElement
-      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLInputElement
-      expect(checkbox.type).toBe('checkbox')
+      // facelift v4: control PROPIO (BkCheck, role=checkbox) — nunca nativo
+      const checkbox = dialog.querySelector('[data-testid="routine-is-global-checkbox"]') as HTMLButtonElement
+      expect(checkbox.getAttribute('role')).toBe('checkbox')
       expect(checkbox.disabled).toBe(false)
     })
   })

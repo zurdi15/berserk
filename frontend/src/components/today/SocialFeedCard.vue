@@ -14,6 +14,7 @@ import { formatDateShort, todayIso } from '@/utils/dates'
 import { formatWeight, kgToDisplay } from '@/utils/units'
 import BkCard from '@/lib/BkCard.vue'
 import BkUser from '@/lib/BkUser.vue'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 
 const { t, locale } = useI18n()
 const units = useDisplayUnits()
@@ -22,11 +23,18 @@ const feed = ref<FeedOut | null>(null)
 const ready = ref(false)
 
 onMounted(async () => {
+  // facelift v3: el feed de la última visita pinta al instante
+  const cached = getViewCache<FeedOut>('today:feed')
+  if (cached) {
+    feed.value = cached
+    ready.value = true
+  }
   try {
     feed.value = await getSocialFeed()
+    if (feed.value) setViewCache('today:feed', feed.value)
   } catch {
-    // hint de fondo: sin red o con error, Hoy sigue siendo Hoy sin feed
-    feed.value = null
+    // hint de fondo: sin red o con error, Hoy sigue con lo hidratado (o sin feed)
+    if (!cached) feed.value = null
   } finally {
     ready.value = true
   }

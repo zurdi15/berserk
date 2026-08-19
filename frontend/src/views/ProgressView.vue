@@ -10,6 +10,7 @@ import ExercisePicker from '@/components/progress/ExercisePicker.vue'
 import PrList from '@/components/progress/PrList.vue'
 import type { MetricKey } from '@/components/progress/series'
 import { seriesFor } from '@/components/progress/series'
+import { formatWeight } from '@/utils/units'
 import StatsGrid from '@/components/progress/StatsGrid.vue'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import { useTabHash } from '@/composables/useTabHash'
@@ -21,6 +22,7 @@ import BkSheet from '@/lib/BkSheet.vue'
 import BkTabs from '@/lib/BkTabs.vue'
 import { useAthleteStore } from '@/stores/athlete'
 import { toastApiError } from '@/utils/apiErrors'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 
 const { t } = useI18n()
 const athlete = useAthleteStore()
@@ -110,30 +112,72 @@ const mainTabs = computed(() => [
 // (v0.18.0: la pestaña única "Nivel" de la v0.17.x murió con el modo
 // por-ejercicio — el backend excluye las series en modo nivel de la serie
 // temporal, así que el chart es siempre kg puro con las 3 métricas)
+// v0.20.x (zurdi: "la gráfica solo muestra peso, pero tenemos niveles"): la
+// pestaña Nivel solo aparece si el ejercicio TIENE series en modo nivel
+const hasLevelSeries = computed(() => series.value.some((p) => (p.top_level ?? 0) > 0))
+
 const metricTabs = computed(() => [
   { value: 'top_weight', label: t('progress.metric.weight') },
   { value: 'volume', label: t('progress.metric.volume') },
   { value: 'est_1rm', label: t('progress.metric.est1rm') },
+  ...(hasLevelSeries.value ? [{ value: 'top_level', label: t('progress.metric.level') }] : []),
 ])
+
+// si el ejercicio nuevo no tiene niveles, la métrica seleccionada no puede
+// quedarse colgada en una pestaña que ya no existe
+watch(hasLevelSeries, (has) => {
+  if (!has && metric.value === 'top_level') metric.value = 'top_weight'
+})
+
+// v0.20.x (zurdi: "el nivel/peso máximo en un chip, para no ir a Récords"):
+// récords del ejercicio seleccionado — loadRecords ya trae los filtrados al
+// abrir el drawer; el filtro extra es defensivo
+const maxWeightRecord = computed(() => {
+  if (exerciseId.value === null) return null
+  return records.value
+    .filter((r) => r.exercise_id === exerciseId.value && r.kind === 'max_weight' && (r.load_mode ?? 'weight') === 'weight')
+    .sort((a, b) => b.value - a.value)[0] ?? null
+})
+const maxLevelRecord = computed(() => {
+  if (exerciseId.value === null) return null
+  return records.value
+    .filter((r) => r.exercise_id === exerciseId.value && r.kind === 'max_weight' && r.load_mode === 'level')
+    .sort((a, b) => b.value - a.value)[0] ?? null
+})
 
 const chartPoints = computed(() => seriesFor(series.value, metric.value, units.value))
 
 // item 4 (v0.4.2): antes cargaba también grupos musculares + distribución
 // para DistributionBars, que se mudó a Hoy (ver TodayView.vue) — aquí ya
 // solo queda el catálogo de ejercicios que necesita PrList
+// facelift v3: catálogo/récords/stats hidratan de viewCache y refrescan en
+// fondo — volver a Progresión pinta al instante
+function progressKey(part: string) {
+  return `progress:${part}:${athlete.userId ?? 'me'}`
+}
+
 async function loadCatalog() {
+  const cached = getViewCache<ExerciseOut[]>(progressKey('catalog'))
+  if (cached) exercises.value = cached
   try {
     exercises.value = await listExercises({ userId: athlete.userId })
+    setViewCache(progressKey('catalog'), exercises.value)
   } catch (error) {
-    toastApiError(error)
+    if (!cached) toastApiError(error)
   }
 }
 
 async function loadRecords() {
+  // solo se cachea la lista SIN filtro (la vista de aterrizaje); las
+  // filtradas por ejercicio son efímeras del drawer
+  const cacheable = exerciseId.value === null
+  const cached = cacheable ? getViewCache<PersonalRecordOut[]>(progressKey('records')) : undefined
+  if (cached) records.value = cached
   try {
     records.value = await getRecords({ exercise_id: exerciseId.value ?? undefined, userId: athlete.userId })
+    if (cacheable) setViewCache(progressKey('records'), records.value)
   } catch (error) {
-    toastApiError(error)
+    if (!cached) toastApiError(error)
   }
 }
 
@@ -145,16 +189,26 @@ async function loadSeries() {
   try {
     const result = await getSeries(exerciseId.value, athlete.userId)
     series.value = result.series
+    // ejercicios solo-nivel (máquinas): abrir el drawer en "Peso" enseñaría
+    // el vacío teniendo datos — arranca en la métrica que sí los tiene
+    const hasWeight = series.value.some((p) => p.top_weight > 0)
+    if (!hasWeight && hasLevelSeries.value) metric.value = 'top_level'
   } catch (error) {
     toastApiError(error)
   }
 }
 
 async function loadStats() {
+  const cached = getViewCache<StatsOut>(progressKey('stats'))
+  if (cached) {
+    stats.value = cached
+    statsReady.value = true
+  }
   try {
     stats.value = await getStats(athlete.userId)
+    if (stats.value) setViewCache(progressKey('stats'), stats.value)
   } catch (error) {
-    toastApiError(error)
+    if (!cached) toastApiError(error)
   } finally {
     // true también en error (mismo motivo que TodayView): no deja la pestaña
     // Estadísticas colgada esperando para siempre si el fetch falla
@@ -267,12 +321,25 @@ watch(exerciseId, () => {
     >
       <div class="space-y-3 p-4" data-testid="chart-sheet-body">
         <BkTabs v-model="metric" :tabs="metricTabs" />
+        <!-- v0.20.x: los máximos del ejercicio a la vista, sin ir a Récords -->
+        <div v-if="maxWeightRecord || maxLevelRecord" class="flex flex-wrap gap-2">
+          <span
+            v-if="maxWeightRecord"
+            class="inline-flex items-center gap-1.5 rounded-full border border-ember/50 text-ember px-2.5 py-1 text-xs bk-metric"
+            data-testid="chart-max-weight"
+          >{{ t('progress.maxWeightChip', { value: formatWeight(maxWeightRecord.value, units) }) }}</span>
+          <span
+            v-if="maxLevelRecord"
+            class="inline-flex items-center gap-1.5 rounded-full border border-ember/50 text-ember px-2.5 py-1 text-xs bk-metric"
+            data-testid="chart-max-level"
+          >{{ t('progress.maxLevelChip', { n: maxLevelRecord.value }) }}</span>
+        </div>
         <!-- :key="exerciseId" (item 2): remonta el chart al cambiar de
              ejercicio para repetir el revelado progresivo de la serie — el
              metric NO va en la key, así que cambiar peso/volumen/1RM solo
              actualiza :points sin remontar (el spec de metric-sin-remontar
              fija justo eso) -->
-        <BkChart v-if="chartPoints.length" :key="exerciseId ?? 0" :points="chartPoints" color="aurora" :suffix="` ${units}`" />
+        <BkChart v-if="chartPoints.length" :key="exerciseId ?? 0" :points="chartPoints" color="aurora" :suffix="metric === 'top_level' ? '' : ` ${units}`" />
         <BkEmpty v-else :message="t('progress.noSeries')" />
       </div>
     </BkSheet>

@@ -143,3 +143,42 @@ def test_avatar_rejects_non_images(client: TestClient):
         files={"file": ("malo.txt", b"hola", "text/plain")},
     )
     assert resp.status_code == 422
+
+
+# ---------- v0.20.x: imagen de rutina ----------
+
+
+def test_routine_image_roundtrip_and_rules(client: TestClient, app):
+    # crear una rutina propia mínima
+    # is_global default a True (v0.4.3): privada EXPLÍCITA para poder
+    # asertar las reglas de visibilidad
+    resp = client.post(
+        "/api/v1/routines", json={"name": "Pierna", "exercises": [], "is_global": False}
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["id"]
+    assert resp.json()["has_image"] is False
+
+    up = client.post(
+        f"/api/v1/routines/{rid}/image",
+        files={"file": ("hero.png", PNG, "image/png")},
+    )
+    assert up.status_code == 204, up.text
+    listed = next(r for r in client.get("/api/v1/routines").json() if r["id"] == rid)
+    assert listed["has_image"] is True
+
+    got = client.get(f"/api/v1/routines/{rid}/image")
+    assert got.status_code == 200
+    assert got.content == PNG
+
+    # otro usuario NO ve la imagen de una rutina privada ajena (404, no 403)
+    make_user(client, "loki2")
+    loki = login(app, "loki2")
+    assert loki.get(f"/api/v1/routines/{rid}/image").status_code == 404
+    # ...ni puede subirla
+    assert loki.post(
+        f"/api/v1/routines/{rid}/image", files={"file": ("x.png", PNG, "image/png")}
+    ).status_code == 404
+
+    assert client.delete(f"/api/v1/routines/{rid}/image").status_code == 204
+    assert client.get(f"/api/v1/routines/{rid}/image").status_code == 404

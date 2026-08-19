@@ -396,6 +396,8 @@ export const es = {
     },
   },
   progress: {
+    maxWeightChip: 'Máx · {value}',
+    maxLevelChip: 'Nivel máx · {n}',
     kinds: {
       // item 7 (v0.4.0): 'all' es el valor comodín del selector de récords
       // (Todos/Peso Máx/Volumen Máx/Est. 1RM) — vive en este mismo grupo
@@ -413,6 +415,7 @@ export const es = {
       weight: 'Peso',
       volume: 'Volumen',
       est1rm: 'Est. 1RM',
+      level: 'Nivel',
     },
     searchExercise: 'Buscar ejercicio',
     hasData: 'Con datos',

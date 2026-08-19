@@ -71,6 +71,9 @@ export const useAuthStore = defineStore('auth', () => {
     // reset() de arriba (workout → null limpia la clave vía el watch).
     const { clearReadCache } = await import('@/offline/readCache')
     clearReadCache()
+    // facelift v3: la cache de vistas también es del usuario saliente
+    const { clearViewCache } = await import('@/utils/viewCache')
+    clearViewCache()
     try {
       localStorage.removeItem('bk:outbox')
       localStorage.removeItem('bk:outbox-idmap')

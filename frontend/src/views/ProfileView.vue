@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { avatarUrl, deleteAvatar, listWorkouts, uploadAvatar } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { getMondayOfWeek, todayIso } from '@/utils/dates'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 import { useTabHash } from '@/composables/useTabHash'
 import { resetMainScroll } from '@/composables/useMainScroll'
 import BkListRow from '@/lib/BkListRow.vue'
@@ -73,11 +74,18 @@ const weekWorkoutDates = ref<Set<string>>(new Set())
 const weekReady = ref(false)
 
 async function loadWeek() {
+  // facelift v3: los puntos de la última visita pintan al instante
+  const cached = getViewCache<string[]>('profile:week')
+  if (cached) {
+    weekWorkoutDates.value = new Set(cached)
+    weekReady.value = true
+  }
   try {
     const workouts = await listWorkouts({ from_date: getMondayOfWeek(), to_date: todayIso() })
     weekWorkoutDates.value = new Set(workouts.map((w) => w.date))
+    setViewCache('profile:week', [...weekWorkoutDates.value])
   } catch {
-    // hint de fondo: sin red, el hub sigue sin los puntos
+    // hint de fondo: sin red, el hub sigue con lo hidratado (o sin puntos)
   } finally {
     weekReady.value = true
   }

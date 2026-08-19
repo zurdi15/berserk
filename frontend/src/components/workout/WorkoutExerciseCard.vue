@@ -656,7 +656,10 @@ async function moveDown() {
          (reordenar, descanso, bloque, quitar) se mudan al sheet kebab -->
     <div class="flex items-start justify-between gap-3 mb-3">
       <div class="flex items-center gap-3 min-w-0">
+        <!-- facelift v4: la foto grande vive junto a las SERIES (abajo); el
+             header solo conserva el thumb en cardio, que no tiene esa zona -->
         <BkMedia
+          v-if="isCardio"
           :exercise="exercise"
           :rune="primaryRune"
           size="md"
@@ -711,7 +714,24 @@ async function moveDown() {
          lleno a la derecha; tocar la FILA abre el cajón de edición (borrar
          vive en el pie del cajón). Las acciones inline de editar/borrar de
          antes mueren: una fila = un gesto. -->
-    <div v-if="workoutExercise.sets.length || pendingGhostCount" class="relative space-y-1.5 border-b border-line pb-3 mb-3">
+    <!-- facelift v4 (zurdi: "la imagen a la izquierda y a la derecha las
+         series, aspect ratio 9:16"): la foto VERTICAL del ejercicio con peso
+         real junto a la checklist — el patrón del player de la referencia.
+         Solo en no-cardio (cardio no tiene checklist de series). -->
+    <div
+      v-if="workoutExercise.sets.length || pendingGhostCount"
+      class="border-b border-line pb-3 mb-3"
+      :class="!isCardio && 'flex items-center gap-3'"
+    >
+      <BkMedia
+        v-if="!isCardio"
+        :exercise="exercise"
+        :rune="primaryRune"
+        size="tall"
+        class="self-start"
+        :data-testid="`exercise-image-${workoutExercise.id}`"
+      />
+      <div class="relative space-y-1.5" :class="!isCardio && 'flex-1 min-w-0'">
       <TransitionGroup name="bk-remove">
       <div
         v-for="set in workoutExercise.sets"
@@ -782,14 +802,16 @@ async function moveDown() {
         />
         <span v-else class="w-9 h-9 shrink-0" aria-hidden="true" />
       </div>
+      </div>
     </div>
     <!-- v0.17.0 (zurdi): el hint de "última vez" deja la línea densa truncada
          y pasa al mismo bloque multilínea del drawer — fecha en su línea y
-         cada serie en la suya, menos densidad en la card. facelift: visible
-         mientras no haya NINGUNA serie registrada (las ghosts prefijadas no
-         lo sustituyen: esto es la sesión anterior completa, contexto) -->
+         cada serie en la suya, menos densidad en la card. facelift v3
+         (zurdi: "que ese bloque se quede siempre visible aunque hagas
+         check"): visible SIEMPRE que haya historial — es la referencia
+         contra la que se entrena hoy, no solo el arranque -->
     <div
-      v-if="!workoutExercise.sets.length && historyLines.length"
+      v-if="historyLines.length"
       class="text-xs text-ink-faint mb-3 space-y-0.5"
       data-testid="card-history-hint"
     >

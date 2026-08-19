@@ -9,6 +9,10 @@ class SeriesPoint(BaseModel):
     top_weight: float
     volume: float
     est_1rm: float
+    # v0.20.x (zurdi: "la gráfica solo muestra peso, pero tenemos niveles"):
+    # mejor NIVEL de la sesión (series en load_mode 'level'); 0 = sin series
+    # de nivel ese día — eje aparte del kg, nunca se mezclan
+    top_level: float = 0.0
 
 
 class SeriesOut(BaseModel):

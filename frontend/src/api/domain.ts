@@ -203,6 +203,8 @@ export interface RoutineOut {
   is_global?: boolean
   // atribución en la lista unificada; null para una plantilla GLOBAL legacy
   owner_username?: string | null
+  // v0.20.x: la rutina puede llevar SU imagen (hero) — pedirla a routineImageUrl(id)
+  has_image?: boolean
   exercises: RoutineExerciseOut[]
 }
 
@@ -264,6 +266,8 @@ export interface SeriesPoint {
   top_weight: number
   volume: number
   est_1rm: number
+  // v0.20.x: mejor NIVEL de la sesión (0 = sin series de nivel ese día)
+  top_level: number
 }
 
 export interface HeatmapDay {
@@ -714,6 +718,20 @@ export const exerciseImageUrl = (exerciseId: number, cacheBust?: number) =>
 // v0.19.x (zurdi: "que se pueda poner foto de perfil") — mismo esquema que
 // la imagen de ejercicio: subir/borrar la propia, GET por id de usuario
 // (identidad de la instancia, visible autenticado)
+// v0.20.x: imagen propia de la rutina (hero de Hoy/pre-inicio) — mismo
+// esquema que la de ejercicio
+export const uploadRoutineImage = (routineId: number, file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return apiForm<void>(`/routines/${routineId}/image`, form)
+}
+
+export const deleteRoutineImage = (routineId: number) =>
+  api<void>(`/routines/${routineId}/image`, { method: 'DELETE' })
+
+export const routineImageUrl = (routineId: number, cacheBust?: number) =>
+  `/api/v1/routines/${routineId}/image${cacheBust ? `?v=${cacheBust}` : ''}`
+
 export const uploadAvatar = (file: File) => {
   const form = new FormData()
   form.append('file', file)

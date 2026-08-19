@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { monthLabel } from '@/utils/dates'
 import { getMonth, getHeatmap, listMuscleGroups } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 import BkHeatmap from '@/lib/BkHeatmap.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
@@ -58,30 +59,53 @@ const legendGroups = computed(() =>
     })),
 )
 
+// facelift v3 (zurdi: cargas instantáneas): cada fetch hidrata primero de
+// viewCache (última visita) y refresca en fondo — el mes/heatmap aparecen
+// al momento al volver a la vista y se actualizan reactivamente
+function monthKey() {
+  return `cal:${athlete.userId ?? 'me'}:${year.value}-${month.value}`
+}
+function heatmapKey() {
+  return `heatmap:${athlete.userId ?? 'me'}:${year.value}`
+}
+function groupsKey() {
+  return `mgroups:${athlete.userId ?? 'me'}`
+}
+
 async function loadMuscleGroups() {
+  const cached = getViewCache<MuscleGroupOut[]>(groupsKey())
+  if (cached) muscleGroups.value = cached
   try {
     muscleGroups.value = await listMuscleGroups(athlete.userId)
+    setViewCache(groupsKey(), muscleGroups.value)
   } catch (error) {
-    toastApiError(error)
+    if (!cached) toastApiError(error)
   }
 }
 
 async function loadMonth() {
+  const cached = getViewCache<CalendarMonthOut>(monthKey())
+  if (cached) monthData.value = cached
+  else monthData.value = { scheduled: [], workouts: [] }
   try {
     loading.value = true
     monthData.value = await getMonth(year.value, month.value, athlete.userId)
+    setViewCache(monthKey(), monthData.value)
   } catch (error) {
-    toastApiError(error)
+    if (!cached) toastApiError(error)
   } finally {
     loading.value = false
   }
 }
 
 async function loadHeatmap() {
+  const cached = getViewCache<{ date: string; count: number }[]>(heatmapKey())
+  if (cached) heatmapData.value = cached
   try {
     heatmapData.value = await getHeatmap(year.value, athlete.userId)
+    setViewCache(heatmapKey(), heatmapData.value)
   } catch (error) {
-    toastApiError(error)
+    if (!cached) toastApiError(error)
   }
 }
 

@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { ExerciseOut, RoutineOut } from '@/api/domain'
-import { createRoutine, listExercises, listMuscleGroups, replaceRoutineExercises, updateRoutine } from '@/api/domain'
+import { createRoutine, deleteRoutineImage, listExercises, listMuscleGroups, replaceRoutineExercises, routineImageUrl, updateRoutine, uploadRoutineImage } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { displayToKg, kgToDisplay } from '@/utils/units'
 import { useAuthStore } from '@/stores/auth'
@@ -11,6 +11,7 @@ import { useToastStore } from '@/stores/toast'
 import BkActionBtn from '@/lib/BkActionBtn.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkButton from '@/lib/BkButton.vue'
+import BkCheck from '@/lib/BkCheck.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
 import { FUTHARK_RUNE_NAMES, type RuneName } from '@/lib/runes'
@@ -41,6 +42,40 @@ const selectedRune = ref<string | null>(null)
 // marcable al crear (a diferencia del viejo flujo globalize, admin-only y
 // que cedía la propiedad)
 const isGlobal = ref(false)
+
+// v0.20.x (zurdi): imagen PROPIA de la rutina (el hero la usa; sin ella,
+// la runa) — solo editando una existente, mismo criterio que la imagen de
+// ejercicio en la biblioteca. La subida/borrado son PUTs inmediatos.
+const editingHasImage = ref(false)
+const imageBust = ref(Date.now())
+const imageUploading = ref(false)
+const imageFileEl = ref<HTMLInputElement | null>(null)
+
+async function onRoutineImagePicked(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  ;(event.target as HTMLInputElement).value = ''
+  if (!file || !props.routine) return
+  try {
+    imageUploading.value = true
+    await uploadRoutineImage(props.routine.id, file)
+    editingHasImage.value = true
+    imageBust.value = Date.now()
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    imageUploading.value = false
+  }
+}
+
+async function removeRoutineImage() {
+  if (!props.routine) return
+  try {
+    await deleteRoutineImage(props.routine.id)
+    editingHasImage.value = false
+  } catch (error) {
+    toastApiError(error)
+  }
+}
 // v0.10.0: filas tipadas por el componente de fila (misma anatomía que la
 // card del entreno) — superset_group SIEMPRE normalizado tras cada mutación
 const exercises = ref<EditorRow[]>([])
@@ -76,6 +111,7 @@ async function initializeForm() {
     description.value = props.routine.description || ''
     selectedRune.value = props.routine.rune || null
     isGlobal.value = props.routine.is_global ?? false
+    editingHasImage.value = props.routine.has_image ?? false
     exercises.value = props.routine.exercises.map(e => ({
       id: String(e.id),
       exercise_id: e.exercise_id,
@@ -497,6 +533,47 @@ watch(
         type="text"
       />
 
+      <!-- v0.20.x: imagen de la rutina (solo editando) — el hero de Hoy y
+           el pre-inicio la usan; sin ella manda la runa -->
+      <div v-if="routine" class="space-y-2">
+        <span class="block text-sm text-ink-muted">{{ $t('library.image') }}</span>
+        <img
+          v-if="editingHasImage"
+          :src="routineImageUrl(routine.id, imageBust)"
+          :alt="name"
+          class="w-full max-h-40 object-cover rounded-md border border-line"
+          data-testid="routine-image-preview"
+        />
+        <div class="flex gap-2">
+          <BkButton
+            variant="ghost"
+            size="sm"
+            :loading="imageUploading"
+            data-testid="routine-image-upload"
+            @click="imageFileEl?.click()"
+          >
+            {{ editingHasImage ? $t('library.imageReplace') : $t('library.imageAdd') }}
+          </BkButton>
+          <BkButton
+            v-if="editingHasImage"
+            variant="danger"
+            size="sm"
+            data-testid="routine-image-delete"
+            @click="removeRoutineImage"
+          >
+            {{ $t('common.delete') }}
+          </BkButton>
+        </div>
+        <input
+          ref="imageFileEl"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          class="hidden"
+          data-testid="routine-image-input"
+          @change="onRoutineImagePicked"
+        />
+      </div>
+
       <!-- Rune Picker: futhark completo (24) + berserk aparte — con el
            grupo muscular fuera del picker, la lista es larga, así que se
            limita la altura y se deja scroll (mismo patrón que la lista de
@@ -538,15 +615,18 @@ watch(
            cedía la propiedad) — mismo patrón visual que el checkbox
            isPublic de ExerciseManager. -->
       <div class="space-y-1">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            v-model="isGlobal"
-            type="checkbox"
-            class="rounded border border-line"
+        <div class="flex items-center gap-2">
+          <BkCheck
+            size="sm"
+            :model-value="isGlobal"
             data-testid="routine-is-global-checkbox"
+            :aria-label="$t('routines.isGlobal')"
+            @update:model-value="isGlobal = $event"
           />
-          <span class="text-sm text-ink-muted">{{ $t('routines.isGlobal') }}</span>
-        </label>
+          <button type="button" class="bk-press text-sm text-ink-muted" @click="isGlobal = !isGlobal">
+            {{ $t('routines.isGlobal') }}
+          </button>
+        </div>
         <p class="text-xs text-ink-faint pl-6">{{ $t('routines.isGlobalHint') }}</p>
       </div>
 

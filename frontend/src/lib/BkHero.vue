@@ -1,23 +1,24 @@
 <script setup lang="ts">
-import type { ExerciseOut } from '@/api/domain'
-import BkMedia from './BkMedia.vue'
+import { computed, ref, watch } from 'vue'
+
+import { exerciseImageUrl, type ExerciseOut } from '@/api/domain'
+import BkRune from './BkRune.vue'
 import type { RuneName } from './runes'
 
-// facelift: hero con media de fondo + scrim degradado + contenido encima.
-// v2 (feedback de zurdi): el contenido vive EN FLUJO (justify-end sobre un
-// min-h), no en un absolute anclado abajo — con contenido más alto que el
-// hero, el absolute desbordaba por ARRIBA y el overflow-hidden se comía el
-// eyebrow ("la tag de hoy toca se corta"). Además la runa animada del
-// fallback creaba stacking context al tallarse y pintaba POR ENCIMA del
-// texto: media y contenido llevan ahora z explícitos, y el contenido añade
-// .bk-hero-content (sombra de texto, ver base.css) para leerse sobre
-// cualquier foto. El degradado usa el token scrim — SIEMPRE oscuro en los
-// dos temas (ver tokens/index.ts::scrim), justo lo que pide texto claro
-// sobre una imagen.
-// `flush`: sin radio propio, para heros a sangre (-mx-4 -mt-4 en la vista) —
-// una prop y no una clase del consumidor porque dos utilidades rounded-* en
-// el mismo nodo compiten por orden de hoja, no de template.
-withDefaults(
+// facelift: hero con media de fondo + contenido encima.
+// v2: contenido EN FLUJO (no absolute) — con contenido más alto que el
+// mínimo, crece en vez de recortarse por arriba; z explícitos para que la
+// runa animada (stacking context al tallarse) nunca pinte sobre el texto.
+// v3 (zurdi, tema claro: "el nombre se ve muy negro… mejorala"): el lienzo
+// del hero es SIEMPRE OSCURO, venga el tema que venga (.bk-hero-backdrop,
+// mismo criterio que el scrim) y el texto SIEMPRE claro con sombra
+// (.bk-hero-content) — una foto/runa con degradado oscuro pide tinta clara
+// en los dos temas. Degradado doble (arriba y abajo): el contenido ahora
+// vive también pegado al top. La media va en una Transition propia keyada
+// por foto/runa: cambiar de rutina cruza la media (y re-talla la runa) SIN
+// remontar la card entera.
+// `flush`: sin radio propio, para heros a sangre (-mx-4 -mt-4 en la vista).
+const props = withDefaults(
   defineProps<{
     exercise?: Pick<ExerciseOut, 'id' | 'has_image'> | null
     src?: string
@@ -26,21 +27,51 @@ withDefaults(
   }>(),
   { flush: false },
 )
+
+const errored = ref(false)
+
+const url = computed(() => {
+  if (props.src) return props.src
+  if (props.exercise?.has_image) return exerciseImageUrl(props.exercise.id)
+  return null
+})
+
+// otra rutina en el mismo hero: un error viejo no condena a la nueva foto
+watch(url, () => {
+  errored.value = false
+})
+
+const showImage = computed(() => url.value !== null && !errored.value)
+const runeName = computed<RuneName>(() => props.rune ?? 'berserk')
+const mediaKey = computed(() => (showImage.value ? `img-${url.value}` : `rune-${runeName.value}`))
 </script>
 
 <template>
   <div
-    class="relative overflow-hidden flex flex-col justify-end min-h-64"
+    class="relative overflow-hidden flex flex-col min-h-64 bk-hero-backdrop"
     :class="!flush && 'rounded-xl'"
   >
-    <div class="absolute inset-0 z-0" aria-hidden="true">
-      <BkMedia :exercise="exercise" :src="src" :rune="rune" size="fill" glow />
-    </div>
-    <div class="absolute inset-0 z-0 bg-gradient-to-t from-scrim via-scrim/40 to-transparent" aria-hidden="true" />
-    <div v-if="$slots.corner" class="absolute inset-x-4 top-4 z-10 flex items-start justify-between gap-2">
+    <Transition name="bk-fade" mode="out-in">
+      <div :key="mediaKey" class="absolute inset-0 z-0" aria-hidden="true">
+        <img
+          v-if="showImage"
+          :src="url!"
+          alt=""
+          class="w-full h-full object-cover"
+          decoding="async"
+          @error="errored = true"
+        />
+        <div v-else class="absolute inset-0 flex items-center justify-center">
+          <BkRune :name="runeName" :size="96" carve tone="aurora" />
+        </div>
+      </div>
+    </Transition>
+    <div class="absolute inset-x-0 top-0 h-24 z-0 bg-gradient-to-b from-scrim/80 to-transparent" aria-hidden="true" />
+    <div class="absolute inset-x-0 bottom-0 h-40 z-0 bg-gradient-to-t from-scrim via-scrim/40 to-transparent" aria-hidden="true" />
+    <div v-if="$slots.corner" class="absolute inset-x-4 top-4 z-10 flex items-start justify-between gap-2 bk-hero-content">
       <slot name="corner" />
     </div>
-    <div class="relative z-10 p-5 pt-16 bk-hero-content">
+    <div class="relative z-10 flex-1 flex flex-col p-5 bk-hero-content">
       <slot />
     </div>
   </div>

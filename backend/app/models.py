@@ -190,6 +190,11 @@ class Routine(Base):
     description: Mapped[str | None] = mapped_column(String(300), default=None)
     rune: Mapped[str | None] = mapped_column(String(20), default=None)
     color: Mapped[str | None] = mapped_column(String(30), default=None)
+    # v0.20.x (zurdi: "que la imagen de hero de una rutina sea la runa, a no
+    # ser que se añada la imagen específicamente al editar la rutina"):
+    # fichero uuid.ext bajo BK_DATA_DIR/uploads/routines — mismo esquema que
+    # Exercise.image_path
+    image_path: Mapped[str | None] = mapped_column(String(80), default=None)
     # ROUTINES-OPEN (renombrada desde is_public, migración
     # fbf6cb158a4e_rename_routine_is_public_to_is_global): un check por
     # rutina, editable por CUALQUIER usuario sobre la suya desde el editor —
@@ -210,6 +215,11 @@ class Routine(Base):
     def owner_username(self) -> str | None:
         return self.owner.username if self.owner is not None else None
 
+
+    @property
+    def has_image(self) -> bool:
+        # bandera para RoutineOut (from_attributes lee properties)
+        return self.image_path is not None
 
 class RoutineExercise(Base):
     __tablename__ = "routine_exercises"

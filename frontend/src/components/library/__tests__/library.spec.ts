@@ -198,170 +198,32 @@ describe('ExerciseManager', () => {
     strengthOption.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await flushPromises()
 
-    await byTestId('muscle-group-checkbox-1').setValue(true)
-    await byTestId('muscle-group-primary-1').setValue(true)
+    // facelift v4: controles propios (BkCheck/BkRadio) — se accionan con click
+    await byTestId('muscle-group-checkbox-1').trigger('click')
+    await flushPromises()
+    await byTestId('muscle-group-primary-1').trigger('click')
 
     await byTestId('save-exercise-btn').trigger('click')
     await flushPromises()
 
+    // v0.20.x: sin flags de visibilidad — todos los ejercicios son globales
     expect(createExercise).toHaveBeenCalledWith({
       name_es: 'Press Arnold',
       name_en: 'Arnold press',
       measurement: 'strength',
       muscle_groups: [{ muscle_group_id: 1, is_primary: true }],
-      is_global: false,
-      is_public: false,
     })
   })
 
-  // v0.9.4 (zurdi: "visible para todos y global es un poco redundante"): los
-  // checks is_global + is_public colapsan en un select de visibilidad — los
-  // tests de item 3 / W2 feature 1 se re-apuntan a ese select
-  async function visibilityOptionLabels(): Promise<string[]> {
-    await byTestId('exercise-visibility-select').find('[role="combobox"]').trigger('click')
-    const labels = Array.from(document.querySelectorAll('[role="option"]'))
-      .map((o) => o.textContent?.trim() ?? '')
-    // cerrar el listbox para no contaminar la siguiente interacción
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-    return labels
-  }
-
-  async function pickVisibility(label: string) {
-    await byTestId('exercise-visibility-select').find('[role="combobox"]').trigger('click')
-    const option = Array.from(document.querySelectorAll('[role="option"]'))
-      .find((o) => o.textContent?.trim() === label) as HTMLElement
-    expect(option).not.toBeUndefined()
-    option.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await flushPromises()
-  }
-
-  it('item 3: a non-admin user never sees the global-catalog visibility option', async () => {
+  it('v0.20.x: the visibility select is GONE — every exercise is global catalog now', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([] as never)
     vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
-    setUser({ is_admin: false })
-
-    const wrapper = buildExerciseManager()
-    await flushPromises()
-    await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
-    await flushPromises()
-
-    const labels = await visibilityOptionLabels()
-    expect(labels).toContain('Privado')
-    expect(labels).toContain('Visible para todos')
-    expect(labels).not.toContain('Cat\u00e1logo global')
-  })
-
-  it('item 3: an admin picking "Cat\u00e1logo global" on create sends is_global true (and is_public false)', async () => {
-    const { listExercises, listMuscleGroups, createExercise } = await import('@/api/domain')
-    vi.mocked(listExercises).mockResolvedValue([] as never)
-    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
-    vi.mocked(createExercise).mockResolvedValue({
-      id: 21, name_es: 'X', name_en: 'X', measurement: 'strength', owner_id: null, muscle_groups: [],
-    } as never)
     setUser({ is_admin: true })
 
     const wrapper = buildExerciseManager()
     await flushPromises()
     await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
-    await flushPromises()
-
-    await byTestId('exercise-name-es-field').find('input').setValue('X')
-    await byTestId('exercise-name-en-field').find('input').setValue('X')
-    await pickVisibility('Cat\u00e1logo global')
-    await byTestId('save-exercise-btn').trigger('click')
-    await flushPromises()
-
-    expect(createExercise).toHaveBeenCalledWith(expect.objectContaining({ is_global: true, is_public: false }))
-  })
-
-  it('item 3: the global-catalog option is create-only \u2014 editing never offers it (is_global is not patchable)', async () => {
-    const { listExercises, listMuscleGroups } = await import('@/api/domain')
-    vi.mocked(listExercises).mockResolvedValue([
-      { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
-    ] as never)
-    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
-    setUser({ is_admin: true })
-
-    const wrapper = buildExerciseManager()
-    await flushPromises()
-
-    await wrapper.find('[data-testid="edit-exercise-12"]').trigger('click')
-    await flushPromises()
-
-    const labels = await visibilityOptionLabels()
-    expect(labels).not.toContain('Cat\u00e1logo global')
-  })
-
-  it('W2 feature 1: visibility round-trips on create (Privado by default, is_public true when set to Visible para todos)', async () => {
-    const { listExercises, listMuscleGroups, createExercise } = await import('@/api/domain')
-    vi.mocked(listExercises).mockResolvedValue([] as never)
-    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
-    vi.mocked(createExercise).mockResolvedValue({
-      id: 30, name_es: 'X', name_en: 'X', measurement: 'strength', owner_id: 7,
-      is_public: true, owner_username: null, muscle_groups: [],
-    } as never)
-
-    const wrapper = buildExerciseManager()
-    await flushPromises()
-    await wrapper.find('[data-testid="new-exercise-btn"]').trigger('click')
-    await flushPromises()
-
-    // por defecto: privado
-    expect(byTestId('exercise-visibility-select').text()).toContain('Privado')
-
-    await byTestId('exercise-name-es-field').find('input').setValue('X')
-    await byTestId('exercise-name-en-field').find('input').setValue('X')
-    await pickVisibility('Visible para todos')
-    await byTestId('save-exercise-btn').trigger('click')
-    await flushPromises()
-
-    expect(createExercise).toHaveBeenCalledWith(expect.objectContaining({ is_public: true, is_global: false }))
-  })
-
-  it('W2 feature 1: editing a PUBLIC own exercise preselects Visible para todos, and switching to Privado sends is_public false', async () => {
-    const { listExercises, listMuscleGroups, updateExercise } = await import('@/api/domain')
-    vi.mocked(listExercises).mockResolvedValue([
-      {
-        id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7,
-        is_public: true, owner_username: null, muscle_groups: [],
-      },
-    ] as never)
-    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
-    vi.mocked(updateExercise).mockResolvedValue({
-      id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7,
-      is_public: false, owner_username: null, muscle_groups: [],
-    } as never)
-
-    const wrapper = buildExerciseManager()
-    await flushPromises()
-    await wrapper.find('[data-testid="edit-exercise-12"]').trigger('click')
-    await flushPromises()
-
-    // pre-seleccionado en "Visible para todos" por venir p\u00fablico
-    expect(byTestId('exercise-visibility-select').text()).toContain('Visible para todos')
-
-    await pickVisibility('Privado')
-    await byTestId('save-exercise-btn').trigger('click')
-    await flushPromises()
-
-    expect(updateExercise).toHaveBeenCalledWith(12, expect.objectContaining({ is_public: false }))
-  })
-
-  it('W2 feature 1: hides the visibility select entirely when an admin edits a predefined catalog row (owner_id null)', async () => {
-    const { listExercises, listMuscleGroups } = await import('@/api/domain')
-    vi.mocked(listExercises).mockResolvedValue([
-      {
-        id: 1, name_es: 'Press banca', name_en: 'Bench press', measurement: 'strength', owner_id: null,
-        is_public: false, owner_username: null, muscle_groups: [],
-      },
-    ] as never)
-    vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
-    setUser({ is_admin: true })
-
-    const wrapper = buildExerciseManager()
-    await flushPromises()
-    await wrapper.get('[data-testid="edit-exercise-1"]').trigger('click')
     await flushPromises()
 
     expect(byTestId('exercise-visibility-select').exists()).toBe(false)

@@ -46,15 +46,11 @@ def visible_muscle_group_ids(db: Session, user_id: int) -> set[int]:
 
 
 def get_visible_exercise(db: Session, user_id: int, exercise_id: int) -> Exercise | None:
-    exercise = db.get(Exercise, exercise_id)
-    if exercise is None:
-        return None
-    # W2 feature 1: catálogo admin (owner_id NULL), lo propio, o lo público
-    # de otro usuario — los tres son USABLES (añadir a rutinas/entrenos);
-    # is_public no da permiso de edición, eso lo sigue decidiendo _can_edit
-    if exercise.owner_id is None or exercise.owner_id == user_id or exercise.is_public:
-        return exercise
-    return None
+    # v0.20.x (zurdi: "todos los ejercicios son de catálogo global"): la
+    # privacidad de ejercicios MUERE — todo ejercicio existente es visible y
+    # usable por cualquiera; la propiedad solo decide quién EDITA (_can_edit)
+    del user_id  # la firma se conserva: los consumidores no cambian
+    return db.get(Exercise, exercise_id)
 
 
 def _can_edit(owner_id: int | None, user: User) -> bool:
@@ -154,16 +150,11 @@ def list_exercises(
     muscle_group_id: int | None = Query(default=None),
     measurement: str | None = Query(default=None),
 ):
-    # W2 feature 1: catálogo admin, lo propio del target, o CUALQUIER
-    # ejercicio público (de cualquier usuario, no solo del target) — is_public
-    # ignora a propósito el scope de TargetUser, es "visible a todo el mundo"
-    query = select(Exercise).where(
-        or_(
-            Exercise.owner_id.is_(None),
-            Exercise.owner_id == target.id,
-            Exercise.is_public.is_(True),
-        )
-    )
+    # v0.20.x: catálogo GLOBAL — todos los ejercicios de la instancia, sean
+    # de quien sean (la privacidad de ejercicios murió; TargetUser se
+    # conserva en la firma porque el resto de listados con atleta la usan)
+    del target
+    query = select(Exercise)
     if q:
         pattern = f"%{q}%"
         query = query.where(or_(Exercise.name_es.ilike(pattern), Exercise.name_en.ilike(pattern)))

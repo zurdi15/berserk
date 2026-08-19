@@ -391,6 +391,8 @@ export const en = {
     },
   },
   progress: {
+    maxWeightChip: 'Max · {value}',
+    maxLevelChip: 'Max level · {n}',
     kinds: {
       // item 7 (v0.4.0): wildcard value for the records filter
       // (All/Max Weight/Max Volume/Est. 1RM) — lives in this group because
@@ -408,6 +410,7 @@ export const en = {
       weight: 'Weight',
       volume: 'Volume',
       est1rm: 'Est. 1RM',
+      level: 'Level',
     },
     searchExercise: 'Search exercise',
     hasData: 'Has data',

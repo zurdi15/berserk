@@ -9,6 +9,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useAuthStore } from '@/stores/auth'
 import BkRune from '@/lib/BkRune.vue'
 import BkSearchList from '@/lib/BkSearchList.vue'
+import BkCheck from '@/lib/BkCheck.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import GroupFilterSelect from '@/lib/GroupFilterSelect.vue'
 import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
@@ -73,7 +74,7 @@ const groupFiltered = computed(() => {
   return exercises.value.filter((e) => e.muscle_groups.some((l) => l.muscle_group_id === groupId))
 })
 
-onMounted(async () => {
+async function loadCatalog() {
   try {
     const [exercisesList, muscleGroupsList] = await Promise.all([
       listExercises({}),
@@ -86,7 +87,20 @@ onMounted(async () => {
   } finally {
     catalogReady.value = true
   }
-})
+}
+
+onMounted(loadCatalog)
+
+// facelift v4 (bug de zurdi: "añado un ejercicio en biblioteca a mitad de
+// entreno y al volver la lista no lo tiene"): bajo el KeepAlive del player
+// este sheet vive montado para siempre — cada APERTURA refresca el catálogo
+// en fondo (la lista retenida pinta al instante y se actualiza reactiva)
+watch(
+  () => props.open,
+  (open) => {
+    if (open) void loadCatalog()
+  },
+)
 
 async function pick(exercise: ExerciseOut) {
   try {
@@ -137,15 +151,18 @@ watch(
     <!-- v0.8.0: check de superserie sobre la lista (solo si el store de esta
          superficie sabe añadir pares — el editor retroactivo no lo enseña) -->
     <div v-if="actions.addSupersetPair" class="px-1 pb-2 space-y-1">
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input
-          v-model="supersetMode"
-          type="checkbox"
-          class="rounded border border-line"
+      <div class="flex items-center gap-2">
+        <BkCheck
+          size="sm"
+          :model-value="supersetMode"
           data-testid="superset-mode-checkbox"
+          :aria-label="t('workout.supersetMode')"
+          @update:model-value="supersetMode = $event"
         />
-        <span class="text-sm text-ink-muted">{{ t('workout.supersetMode') }}</span>
-      </label>
+        <button type="button" class="bk-press text-sm text-ink-muted" @click="supersetMode = !supersetMode">
+          {{ t('workout.supersetMode') }}
+        </button>
+      </div>
       <p v-if="supersetMode" class="text-xs text-aurora pl-6" data-testid="superset-pick-hint">
         {{ firstPick ? t('workout.supersetPickSecond', { name: labelFor(firstPick) }) : t('workout.supersetPickFirst') }}
       </p>
