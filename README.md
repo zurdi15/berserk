@@ -16,22 +16,16 @@
 
 ## Screenshots
 
-<p align="center">
-  <img src="docs/screenshots/desktop-today.png" width="100%" alt="Today view: weekly summary, today's session and recent PRs">
-</p>
-
 <table>
   <tr>
-    <td><img src="docs/screenshots/desktop-calendar.png" width="100%" alt="Calendar view with scheduled sessions, rune-tagged training days and the yearly activity heatmap"></td>
-    <td><img src="docs/screenshots/desktop-workout.png" width="100%" alt="Live workout logging with compact exercise cards, muscle tags and set entry"></td>
-    <td><img src="docs/screenshots/desktop-progress.png" width="100%" alt="Progress view's lifetime stats tab: workouts, hours, volume, PR count and longest streak"></td>
+    <td><img src="docs/screenshots/mobile-today.png" width="240" alt="Today view: routine hero, social activity feed and weekly streak"></td>
+    <td><img src="docs/screenshots/mobile-prestart.png" width="240" alt="Pre-workout view: routine hero with its blocks and exercise photos"></td>
+    <td><img src="docs/screenshots/mobile-workout.png" width="240" alt="Live workout player: block stepper, exercise photo and one-tap set logging"></td>
   </tr>
-</table>
-
-<table>
   <tr>
-    <td><img src="docs/screenshots/mobile-today.png" width="240" alt="Today view on mobile"></td>
-    <td><img src="docs/screenshots/mobile-workout.png" width="240" alt="Live workout logging on mobile"></td>
+    <td><img src="docs/screenshots/mobile-calendar.png" width="240" alt="Calendar with rune-tagged training days, shared-user dots and the yearly heatmap"></td>
+    <td><img src="docs/screenshots/mobile-progress.png" width="240" alt="Lifetime stats: workouts, hours, volume, PR count and longest streak"></td>
+    <td><img src="docs/screenshots/mobile-exercise.png" width="240" alt="Exercise detail: photo, records, trend chart with time ranges and full session history"></td>
   </tr>
 </table>
 
