@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.22.0 - 2026-08-19
+
+### Added
+- Pre-carga de arranque: nada más entrar, la app trae en paralelo los datos de todas las secciones — la primera visita a cada una pinta al instante, sin esperar red.
+- Splash de arranque: la runa tallándose cubre la carga inicial y la app aparece entera de golpe, sin saltos de elementos.
+- Encuadre de la foto del ejercicio: la preview del editor es ahora un marco 9:16 (como se ve en la app) y puedes arrastrar la imagen y hacer zoom — tal cual la dejes es exactamente como se verá en todas partes.
+
+### Fixed
+- El botón atrás de la preview del entrenamiento vuelve a funcionar, y esa pantalla marca la sección de Entreno en el menú (no "Hoy").
+- El avatar del menú inferior ya no se estira con fotos no cuadradas: siempre circular, como en Perfil.
+
+### Changed
+- Biblioteca: los nombres de ejercicio ya no se cortan (pasan a varias líneas), desaparece la etiqueta "Catálogo predefinido", las acciones de editar/borrar van en columna a la derecha (editar arriba) y el selector de grupos musculares se muestra siempre entero.
+
 ## 0.21.3 - 2026-08-19
 
 ### Fixed
