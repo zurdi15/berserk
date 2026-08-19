@@ -208,7 +208,7 @@ function goToCalendar() {
           <button
             v-if="routines.length > 1"
             type="button"
-            class="bk-press shrink-0 w-9 h-9 rounded-full border border-white/30 flex items-center justify-center"
+            class="bk-press shrink-0 w-9 h-9 rounded-full border bk-hero-line flex items-center justify-center"
             :disabled="switching || undefined"
             :aria-label="t('today.heroPrev')"
             data-testid="hero-prev"
@@ -224,7 +224,7 @@ function goToCalendar() {
           <button
             v-if="routines.length > 1"
             type="button"
-            class="bk-press shrink-0 w-9 h-9 rounded-full border border-white/30 flex items-center justify-center"
+            class="bk-press shrink-0 w-9 h-9 rounded-full border bk-hero-line flex items-center justify-center"
             :disabled="switching || undefined"
             :aria-label="t('today.heroNext')"
             data-testid="hero-next"
@@ -254,7 +254,7 @@ function goToCalendar() {
             v-for="session in todaySessions"
             :key="session.id"
             :type="session.status === 'planned' ? 'button' : undefined"
-            class="inline-flex items-center gap-1.5 rounded-full border border-white/25 px-2.5 py-1 text-xs bk-hero-muted transition-colors"
+            class="inline-flex items-center gap-1.5 rounded-full border bk-hero-line px-2.5 py-1 text-xs bk-hero-muted transition-colors"
             :class="session.status === 'planned' && 'bk-press hover:border-aurora'"
             :data-testid="`session-${session.status}`"
             @click="session.status === 'planned' && startSession()"
@@ -268,7 +268,7 @@ function goToCalendar() {
             v-for="(routine, i) in routines"
             :key="routine.id"
             class="w-1.5 h-1.5 rounded-full"
-            :class="i === selectedIndex ? 'bg-aurora' : 'bg-white/30'"
+            :class="i === selectedIndex ? 'bg-aurora' : 'bk-hero-dot'"
           />
         </div>
       </div>

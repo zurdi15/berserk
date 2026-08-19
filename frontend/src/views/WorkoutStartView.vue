@@ -167,7 +167,7 @@ function goBack() {
           <button
             type="button"
             data-testid="prestart-back"
-            class="bk-press w-10 h-10 rounded-full bg-scrim flex items-center justify-center"
+            class="bk-press w-10 h-10 rounded-full bg-scrim text-white/90 flex items-center justify-center"
             :aria-label="t('prestart.back')"
             @click="goBack"
           >

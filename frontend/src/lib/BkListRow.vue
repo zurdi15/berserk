@@ -28,7 +28,7 @@ withDefaults(
     :is="to ? RouterLink : 'button'"
     :to="to"
     :type="to ? undefined : 'button'"
-    class="bk-press flex w-full items-center gap-3 rounded-lg bg-slab p-4 text-left transition-colors hover:bg-line/50"
+    class="bk-press flex w-full items-center gap-3 rounded-lg border border-line bg-slab p-4 text-left transition-colors hover:bg-line/50"
   >
     <slot name="leading">
       <span v-if="rune" class="flex items-center justify-center w-10 h-10 rounded-md bg-stone shrink-0">

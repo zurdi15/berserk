@@ -83,9 +83,23 @@ describe('BkMedia', () => {
 })
 
 describe('BkHero', () => {
-  it('paints the scrim gradient overlay and the bottom content slot', () => {
-    const wrapper = mount(BkHero, { slots: { default: '<p>Hoy toca</p>' } })
+  it('with a photo it is the night island: dark backdrop + scrim gradients over the image', () => {
+    const wrapper = mount(BkHero, {
+      props: { src: '/api/v1/routines/3/image' },
+      slots: { default: '<p>Hoy toca</p>' },
+    })
+    expect(wrapper.classes()).toContain('bk-hero-backdrop')
     expect(wrapper.html()).toContain('from-scrim')
+    expect(wrapper.text()).toContain('Hoy toca')
+  })
+
+  it('without a photo there is NO card: transparent (no backdrop, no scrim) and the rune goes faint + blurred', () => {
+    const wrapper = mount(BkHero, { slots: { default: '<p>Hoy toca</p>' } })
+    expect(wrapper.classes()).not.toContain('bk-hero-backdrop')
+    expect(wrapper.html()).not.toContain('from-scrim')
+    const rune = wrapper.find('[aria-hidden="true"] .opacity-25')
+    expect(rune.exists() || wrapper.html().includes('opacity-25')).toBe(true)
+    expect(wrapper.html()).toContain('blur-xs')
     expect(wrapper.text()).toContain('Hoy toca')
   })
 
