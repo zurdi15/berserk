@@ -20,6 +20,11 @@ import type { RuneName } from './runes'
 // tema (las clases bk-hero-* resuelven ambos modos vía descendiente de
 // .bk-hero-backdrop, ver base.css) y la runa central va tenue y con blur
 // ("la runa se ve demasiado") para que el texto mande.
+// v6 (zurdi: "en el header del entrenamiento no quiero blur, que se quede
+// como antes de ese commit"): `backdrop` fuerza la isla nocturna de la v3
+// también SIN foto — lienzo oscuro, scrims y la runa tallada a plena
+// presencia (sin opacity/blur). El modo transparente v5 queda para el hero
+// de Hoy; la preview del entreno (WorkoutStartView) pasa backdrop.
 // La media va en una Transition propia keyada por foto/runa: cambiar de
 // rutina cruza la media (y re-talla la runa) SIN remontar la card entera.
 // `flush`: sin radio propio, para heros a sangre (-mx-4 -mt-4 en la vista).
@@ -29,8 +34,9 @@ const props = withDefaults(
     src?: string
     rune?: RuneName | null
     flush?: boolean
+    backdrop?: boolean
   }>(),
-  { flush: false },
+  { flush: false, backdrop: false },
 )
 
 const errored = ref(false)
@@ -54,7 +60,7 @@ const mediaKey = computed(() => (showImage.value ? `img-${url.value}` : `rune-${
 <template>
   <div
     class="relative overflow-hidden flex flex-col min-h-64"
-    :class="[showImage && 'bk-hero-backdrop', !flush && 'rounded-xl']"
+    :class="[(showImage || backdrop) && 'bk-hero-backdrop', !flush && 'rounded-xl']"
   >
     <Transition name="bk-fade" mode="out-in">
       <div :key="mediaKey" class="absolute inset-0 z-0" aria-hidden="true">
@@ -66,14 +72,20 @@ const mediaKey = computed(() => (showImage.value ? `img-${url.value}` : `rune-${
           decoding="async"
           @error="errored = true"
         />
-        <!-- modo transparente: la runa respira detrás, tenue y desenfocada,
-             para que la tipografía mande sobre ella -->
-        <div v-else class="absolute inset-0 flex items-center justify-center opacity-25 blur-xs">
+        <!-- modo transparente (v5): la runa respira detrás, tenue y
+             desenfocada, para que la tipografía mande sobre ella. Con
+             `backdrop` (v6, preview del entreno) la runa va a plena
+             presencia, como antes del blur -->
+        <div
+          v-else
+          class="absolute inset-0 flex items-center justify-center"
+          :class="!backdrop && 'opacity-25 blur-xs'"
+        >
           <BkRune :name="runeName" :size="96" carve tone="aurora" />
         </div>
       </div>
     </Transition>
-    <template v-if="showImage">
+    <template v-if="showImage || backdrop">
       <div class="absolute inset-x-0 top-0 h-24 z-0 bg-gradient-to-b from-scrim/80 to-transparent" aria-hidden="true" />
       <div class="absolute inset-x-0 bottom-0 h-40 z-0 bg-gradient-to-t from-scrim via-scrim/40 to-transparent" aria-hidden="true" />
     </template>

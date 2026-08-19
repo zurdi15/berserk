@@ -162,12 +162,17 @@ function goBack() {
   <div v-if="ready && routine" class="bk-stagger">
     <!-- hero a sangre (flush: sin radio propio) con el back flotante -->
     <div class="-mx-4 -mt-4" :style="{ '--bk-stagger-i': 0 }">
-      <BkHero :src="heroSrc" :rune="heroRune" flush>
+      <!-- v0.21.2 (zurdi): backdrop = la isla oscura de antes del commit del
+           blur — aquí la runa va a plena presencia. El back es un círculo
+           "de cristal" tema-INVARIANTE (blancos fijos, mismo criterio que
+           bk-hero-content): con bg-scrim, en oscuro el círculo era
+           literalmente el color del lienzo y solo se veía el chevron -->
+      <BkHero :src="heroSrc" :rune="heroRune" flush backdrop>
         <template #corner>
           <button
             type="button"
             data-testid="prestart-back"
-            class="bk-press w-10 h-10 rounded-full bg-scrim text-white/90 flex items-center justify-center"
+            class="bk-press w-10 h-10 rounded-full bg-white/10 border border-white/25 text-white/90 flex items-center justify-center"
             :aria-label="t('prestart.back')"
             @click="goBack"
           >

@@ -107,6 +107,20 @@ describe('BkHero', () => {
     expect(mount(BkHero).classes()).toContain('rounded-xl')
     expect(mount(BkHero, { props: { flush: true } }).classes()).not.toContain('rounded-xl')
   })
+
+  // v0.21.2 (zurdi: "en el header del entrenamiento no quiero blur, que se
+  // quede como antes de ese commit"): backdrop fuerza la isla nocturna
+  // también sin foto — runa a plena presencia, sin opacity/blur
+  it('backdrop keeps the night island without a photo and the rune at full presence (no blur)', () => {
+    const wrapper = mount(BkHero, {
+      props: { backdrop: true },
+      slots: { default: '<p>Pre-inicio</p>' },
+    })
+    expect(wrapper.classes()).toContain('bk-hero-backdrop')
+    expect(wrapper.html()).toContain('from-scrim')
+    expect(wrapper.html()).not.toContain('blur-xs')
+    expect(wrapper.html()).not.toContain('opacity-25')
+  })
 })
 
 describe('BkSegmentedProgress', () => {
