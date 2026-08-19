@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.18.1 - 2026-08-19
+
+### Added
+- Bloques editables en pleno entreno: cada card tiene ahora "Bloque: X" — mueve el ejercicio a un bloque existente, sácalo, o estrena un bloque nuevo con nombre sin salir del entrenamiento (funciona también sin conexión). Estrenar el primer bloque activa el stepper al momento.
+
+### Changed
+- El botón "Añadir aquí" de los bloques del editor de rutinas pasa a llamarse "Añadir ejercicio a bloque".
+
 ## 0.18.0 - 2026-08-15
 
 ### Changed
