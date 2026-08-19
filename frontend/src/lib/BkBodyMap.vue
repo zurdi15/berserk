@@ -7,23 +7,26 @@ import type { DistributionItem, MuscleGroupOut } from '@/api/domain'
 // arte anatómico del proyecto wger (wger.de, CC-BY-SA — ver atribución en el
 // README), vendorizado en assets/bodymap con viewBox añadido para que
 // escale. La base es el sistema muscular en grises; cada grupo entrenado
-// enciende su(s) músculo(s) como capa superpuesta, teñida a aurora vía
-// filter (el rojo original chocaría con la paleta) y con opacidad
-// proporcional al volumen relativo de la ventana.
+// enciende su(s) músculo(s) como capa superpuesta pintada en aurora
+// (currentColor, ver imports) con opacidad proporcional al volumen
+// relativo de la ventana.
 import backUrl from '@/assets/bodymap/back.svg'
 import frontUrl from '@/assets/bodymap/front.svg'
-import m1 from '@/assets/bodymap/muscle-1.svg'
-import m2 from '@/assets/bodymap/muscle-2.svg'
-import m4 from '@/assets/bodymap/muscle-4.svg'
-import m5 from '@/assets/bodymap/muscle-5.svg'
-import m6 from '@/assets/bodymap/muscle-6.svg'
-import m7 from '@/assets/bodymap/muscle-7.svg'
-import m8 from '@/assets/bodymap/muscle-8.svg'
-import m9 from '@/assets/bodymap/muscle-9.svg'
-import m10 from '@/assets/bodymap/muscle-10.svg'
-import m11 from '@/assets/bodymap/muscle-11.svg'
-import m12 from '@/assets/bodymap/muscle-12.svg'
-import m14 from '@/assets/bodymap/muscle-14.svg'
+// capas INLINE (?raw) con fill:currentColor — pintan text-aurora EXACTO y
+// siguen al tema; un hue-rotate sobre el rojo original derivaba a verde
+// (la matriz de hue-rotate de CSS no es una rotación HSL real)
+import m1 from '@/assets/bodymap/muscle-1.svg?raw'
+import m2 from '@/assets/bodymap/muscle-2.svg?raw'
+import m4 from '@/assets/bodymap/muscle-4.svg?raw'
+import m5 from '@/assets/bodymap/muscle-5.svg?raw'
+import m6 from '@/assets/bodymap/muscle-6.svg?raw'
+import m7 from '@/assets/bodymap/muscle-7.svg?raw'
+import m8 from '@/assets/bodymap/muscle-8.svg?raw'
+import m9 from '@/assets/bodymap/muscle-9.svg?raw'
+import m10 from '@/assets/bodymap/muscle-10.svg?raw'
+import m11 from '@/assets/bodymap/muscle-11.svg?raw'
+import m12 from '@/assets/bodymap/muscle-12.svg?raw'
+import m14 from '@/assets/bodymap/muscle-14.svg?raw'
 
 const props = withDefaults(
   defineProps<{ items: DistributionItem[]; groups: MuscleGroupOut[] }>(),
@@ -96,16 +99,17 @@ function label(slug: string): string {
            mantiene alineadas aunque sus alturas de lienzo difieran unos px -->
       <div class="relative w-full aspect-[200/369] overflow-hidden">
         <img :src="figure.base" alt="" class="absolute inset-x-0 top-0 w-full" aria-hidden="true" />
-        <img
+        <!-- svg estático vendorizado (nunca input de usuario): v-html es
+             seguro aquí y necesario para que currentColor herede text-aurora -->
+        <span
           v-for="(overlay, i) in figure.overlays"
           :key="`${overlay.slug}-${i}`"
-          :src="overlay.src"
-          alt=""
           aria-hidden="true"
-          class="absolute inset-x-0 top-0 w-full bk-bodymap-tint"
+          class="bk-bodymap-overlay absolute inset-x-0 top-0 text-aurora"
           :style="{ opacity: intensity(overlay.slug) }"
           :title="label(overlay.slug)"
           :data-testid="`body-map-${overlay.slug}`"
+          v-html="overlay.src"
         />
       </div>
       <figcaption class="mt-1 text-center text-2xs text-ink-faint">{{ figure.caption }}</figcaption>
