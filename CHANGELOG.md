@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.25.2 - 2026-08-20
+
+### Arreglado
+- La foto de perfil ya no se descarga de nuevo en cada visita: se cachea en el navegador y solo se refetchea cuando subes otra.
+
 ## 0.25.1 - 2026-08-20
 
 ### Arreglado
