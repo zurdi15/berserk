@@ -2,8 +2,10 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { ExerciseOut, MuscleGroupOut } from '@/api/domain'
+import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut } from '@/api/domain'
 import { getTrainedExercises, listExercises, listMuscleGroups } from '@/api/domain'
+import { useDisplayUnits } from '@/composables/useDisplayUnits'
+import { formatWeight } from '@/utils/units'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { foldSearchText } from '@/utils/searchFold'
@@ -15,7 +17,9 @@ import GroupFilterSelect from '@/lib/GroupFilterSelect.vue'
 import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 
-const props = defineProps<{ modelValue: number | null }>()
+// v0.24.1 (zurdi: "las cards están un poco vacías"): los récords llegan del
+// padre (ProgressView ya los tiene cargados) — cada fila enseña su máximo
+const props = defineProps<{ modelValue: number | null; records?: PersonalRecordOut[] }>()
 const emit = defineEmits<{ 'update:modelValue': [value: number | null] }>()
 
 const { t, locale } = useI18n()
@@ -77,6 +81,33 @@ function select(id: number | null) {
 
 function primaryGroup(exercise: ExerciseOut): MuscleGroupOut | undefined {
   return primaryMuscleGroup(exercise, muscleGroups.value)
+}
+
+const units = useDisplayUnits()
+
+// mejor máximo por ejercicio: peso (kg/lb) preferente, nivel como fallback
+const bestRecordByExercise = computed(() => {
+  const map = new Map<number, PersonalRecordOut>()
+  for (const record of props.records ?? []) {
+    if (record.kind !== 'max_weight') continue
+    const current = map.get(record.exercise_id)
+    const isLevel = record.load_mode === 'level'
+    const currentIsLevel = current?.load_mode === 'level'
+    if (
+      !current ||
+      (currentIsLevel && !isLevel) ||
+      (currentIsLevel === isLevel && record.value > current.value)
+    ) {
+      map.set(record.exercise_id, record)
+    }
+  }
+  return map
+})
+
+function bestLabel(exerciseId: number): string | null {
+  const record = bestRecordByExercise.value.get(exerciseId)
+  if (!record) return null
+  return record.load_mode === 'level' ? `N ${record.value}` : formatWeight(record.value, units.value)
 }
 
 function groupLabel(group: MuscleGroupOut): string {
@@ -153,6 +184,25 @@ watch(() => athlete.userId, load)
               <span>{{ groupLabel(primaryGroup(exercise)!) }}</span>
             </span>
           </span>
+          <!-- v0.24.1 (zurdi): el chip del TIPO en SU propia fila — salvo
+               cuando duplicaría al de grupo (grupo "Cardio" en una cinta) -->
+          <span
+            v-if="exercise.measurement !== 'strength' && !(exercise.measurement === 'cardio' && primaryGroup(exercise)?.slug === 'cardio')"
+            class="mt-1 block"
+          >
+            <span
+              class="inline-flex items-center rounded-full border border-aurora/40 px-1.5 py-0.5 text-2xs text-aurora"
+              :data-testid="`picker-measurement-tag-${exercise.id}`"
+            >
+              {{ t(`library.measurements.${exercise.measurement}`) }}
+            </span>
+          </span>
+        </span>
+        <!-- v0.24.1: el máximo del ejercicio a la derecha — la card deja de
+             estar vacía y de paso ahorra un viaje a Récords -->
+        <span v-if="bestLabel(exercise.id)" class="shrink-0 text-right" :data-testid="`picker-max-${exercise.id}`">
+          <span class="block bk-metric text-sm text-ember">{{ bestLabel(exercise.id) }}</span>
+          <span class="block text-2xs text-ink-faint">{{ t('progress.maxShort') }}</span>
         </span>
         <!-- punto aurora (item 5): mismo visual que los dots "done" del
              calendario (w-1.5 h-1.5 rounded-full bg-aurora, ver MonthGrid.vue)

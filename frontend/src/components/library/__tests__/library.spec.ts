@@ -26,11 +26,7 @@ vi.mock('@/api/domain', () => ({
   updateExerciseFraming: vi.fn(async () => {}),
 }))
 
-// v0.24.0: la fila navega a la vista detalle (openDetail usa useRouter)
-const detailPush = vi.fn()
-vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: detailPush }),
-}))
+
 
 function setUser(overrides: Partial<{ id: number; is_admin: boolean }> = {}) {
   const auth = useAuthStore()
@@ -373,20 +369,32 @@ describe('ExerciseManager', () => {
     wrapper.unmount()
   })
 
-  // v0.24.0: tocar el cuerpo de la fila navega a la vista detalle
-  it('v0.24.0: tapping the row body pushes the exercise-detail route', async () => {
+  // v0.24.1 (zurdi): tocar la fila abre el EDITOR (el detalle vive solo en
+  // Progresión); una fila NO editable ni siquiera es botón
+  it('v0.24.1: tapping an editable row body opens the edit sheet; a non-editable row is not a button', async () => {
     const { listExercises, listMuscleGroups } = await import('@/api/domain')
     vi.mocked(listExercises).mockResolvedValue([
       { id: 12, name_es: 'Press Arnold', name_en: 'Arnold press', measurement: 'strength', owner_id: 7, muscle_groups: [] },
+      { id: 40, name_es: 'Zancadas de Loki', name_en: 'Loki lunges', measurement: 'strength', owner_id: 9, is_public: true, owner_username: 'loki', muscle_groups: [] },
     ] as never)
     vi.mocked(listMuscleGroups).mockResolvedValue([] as never)
-    detailPush.mockClear()
 
-    const wrapper = buildExerciseManager()
+    const wrapper = mount(ExerciseManager, {
+      global: { plugins: [createI18nInstance()] },
+      attachTo: document.body,
+    })
     await flushPromises()
 
-    await wrapper.get('[data-testid="exercise-detail-link-12"]').trigger('click')
-    expect(detailPush).toHaveBeenCalledWith({ name: 'exercise-detail', params: { exerciseId: 12 } })
+    const own = wrapper.get('[data-testid="row-body-12"]')
+    expect(own.element.tagName).toBe('BUTTON')
+    await own.trigger('click')
+    await flushPromises()
+    const nameField = document.querySelector<HTMLInputElement>('[data-testid="exercise-name-es-field"] input, [data-testid="exercise-name-field"] input')
+    expect(document.querySelector('[data-testid="save-exercise-btn"]')).not.toBeNull()
+
+    const other = wrapper.get('[data-testid="row-body-40"]')
+    expect(other.element.tagName).toBe('DIV')
+    wrapper.unmount()
   })
 
   it('UNIFIED-LISTINGS: predefined (owner_id null) rows render inline, no collapsible catalog section left', async () => {

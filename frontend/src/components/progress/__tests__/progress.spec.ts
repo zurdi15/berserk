@@ -421,6 +421,27 @@ describe('ExercisePicker', () => {
     vi.mocked(domain.getTrainedExercises).mockClear().mockResolvedValue({ exercise_ids: fixtures.trainedExerciseIds } as never)
   })
 
+  // v0.24.1 (zurdi: "las cards están un poco vacías"): máximo del ejercicio
+  // a la derecha (récords del padre) y chip del TIPO en su propia fila
+  it('v0.24.1: rows show the max record from the records prop, and non-strength rows a measurement chip row', async () => {
+    const records = [
+      { id: 1, exercise_id: 1, kind: 'max_weight', value: 100, load_mode: 'weight', achieved_at: 'x' },
+      { id: 2, exercise_id: 1, kind: 'max_weight', value: 12, load_mode: 'level', achieved_at: 'x' },
+      { id: 3, exercise_id: 1, kind: 'max_volume', value: 9999, achieved_at: 'x' },
+    ]
+    const cardio = { id: 9, name_es: 'Cinta', name_en: 'Treadmill', measurement: 'cardio', owner_id: null, muscle_groups: [] }
+    vi.mocked(domain.listExercises).mockResolvedValue([...fixtures.exercises, cardio] as never)
+    const wrapper = mount(ExercisePicker, { props: { modelValue: null, records: records as never }, ...withI18n() })
+    await flushPromises()
+
+    // peso gana sobre nivel; max_volume nunca pinta aquí
+    expect(wrapper.get('[data-testid="picker-max-1"]').text()).toContain('100 kg')
+    expect(wrapper.find('[data-testid="picker-max-2"]').exists()).toBe(false)
+    // chip de tipo en fila PROPIA solo para no-fuerza
+    expect(wrapper.get('[data-testid="picker-measurement-tag-9"]').text()).toBe('Cardio')
+    expect(wrapper.find('[data-testid="picker-measurement-tag-1"]').exists()).toBe(false)
+  })
+
   it('loads the full catalog with athlete threading on mount', async () => {
     mount(ExercisePicker, { props: { modelValue: null }, ...withI18n() })
     await flushPromises()

@@ -435,6 +435,7 @@ export const es = {
       distance: 'Distancia',
       pace: 'Ritmo',
     },
+    maxShort: 'Máx',
     range: {
       label: 'Rango temporal',
       '3m': '3M',

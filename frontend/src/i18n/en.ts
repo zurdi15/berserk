@@ -430,6 +430,7 @@ export const en = {
       distance: 'Distance',
       pace: 'Pace',
     },
+    maxShort: 'Max',
     range: {
       label: 'Time range',
       '3m': '3M',

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 
 import type { ExerciseOut, Measurement, MuscleGroupOut } from '@/api/domain'
 import { createExercise, deleteExercise, listExercises, listMuscleGroups, updateExercise } from '@/api/domain'
@@ -11,7 +10,6 @@ import type { ImageSearchResult } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { imageFramingStyle } from '@/utils/imageFraming'
 import { getViewCache, setViewCache } from '@/utils/viewCache'
-import { navigateWithSharedMedia } from '@/utils/viewTransition'
 import { foldSearchText } from '@/utils/searchFold'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
@@ -136,6 +134,11 @@ function primaryGroupRune(exercise: ExerciseOut): RuneName | null {
   return groupRune(primaryGroup(exercise))
 }
 
+// misma regla que la columna de acciones: dueño, o admin sobre el catálogo
+function canEditRow(exercise: DisplayExercise): boolean {
+  return exercise.kind === 'own' || (exercise.kind === 'catalog' && auth.user?.is_admin === true)
+}
+
 const formOpen = ref(false)
 const editingId = ref<number | null>(null)
 // owner_id de la fila que se está editando (null en creación, o si es una
@@ -198,20 +201,6 @@ function openCreate() {
   checkedGroupIds.value = []
   primaryGroupId.value = null
   formOpen.value = true
-}
-
-// v0.24.0: tocar la fila abre la vista detalle — el thumb (BkMedia) hace
-// morph hacia la foto grande del detalle vía view transition (si el
-// navegador la soporta; si no, navegación normal)
-const router = useRouter()
-function openDetail(exercise: ExerciseOut, event: MouseEvent) {
-  const thumb =
-    (event.currentTarget as HTMLElement | null)?.querySelector<HTMLElement>(
-      '[data-testid^="exercise-thumb-"]',
-    ) ?? null
-  navigateWithSharedMedia(thumb, () =>
-    router.push({ name: 'exercise-detail', params: { exerciseId: exercise.id } }),
-  )
 }
 
 function openEdit(exercise: ExerciseOut) {
@@ -531,14 +520,18 @@ async function confirmDelete() {
             <!-- v0.12.0 → facelift v4 (zurdi: "que la imagen se vea más y
                  con aspect ratio vertical"): thumb 9:16 con pozo rúnico de
                  fallback, en TODAS las filas -->
-            <!-- v0.24.0: tocar el cuerpo de la fila abre la VISTA DETALLE del
-                 ejercicio, con morph del thumb (view transition) — las
-                 acciones de editar/borrar quedan fuera del botón -->
-            <button
-              type="button"
-              class="bk-press flex items-start gap-2 flex-1 min-w-0 text-left"
-              :data-testid="`exercise-detail-link-${exercise.id}`"
-              @click="openDetail(exercise, $event)"
+            <!-- v0.24.1 (zurdi: "desde biblioteca si pinchas deberías poder
+                 editarlo sin más, no ver el detalle"): el cuerpo de la fila
+                 abre el EDITOR en las filas editables (mismo criterio que la
+                 columna de acciones); las no editables no son botón. El
+                 detalle vive solo en Progresión. -->
+            <component
+              :is="canEditRow(exercise) ? 'button' : 'div'"
+              :type="canEditRow(exercise) ? 'button' : undefined"
+              class="flex items-start gap-2 flex-1 min-w-0 text-left"
+              :class="canEditRow(exercise) && 'bk-press'"
+              :data-testid="`row-body-${exercise.id}`"
+              @click="canEditRow(exercise) && openEdit(exercise)"
             >
             <BkMedia
               :exercise="exercise"
@@ -563,7 +556,7 @@ async function confirmDelete() {
                    renderiza esta fila en absoluto (item 2: "own items get no
                    chip row at all"). -->
               <div
-                v-if="primaryGroup(exercise) || exercise.kind === 'other' || exercise.measurement !== 'strength'"
+                v-if="primaryGroup(exercise) || exercise.kind === 'other'"
                 class="flex items-center gap-1.5 flex-wrap mt-1"
               >
                 <span
@@ -577,19 +570,6 @@ async function confirmDelete() {
                     :size="12"
                   />
                   <span>{{ groupLabel(primaryGroup(exercise)!) }}</span>
-                </span>
-                <!-- v0.9.4 (zurdi: "los de cardio no salen"): chip del TIPO
-                     para todo lo que no es fuerza (cardio/tiempo/peso
-                     corporal) — el chip de grupo dice "Piernas" en una cinta
-                     de correr, así que sin esto nada de la fila delataba que
-                     era cardio. Fuerza (la mayoría de la lista) no lo lleva:
-                     sería ruido repetido en 40 filas. -->
-                <span
-                  v-if="exercise.measurement !== 'strength'"
-                  class="inline-flex items-center rounded-full border border-aurora/40 px-1.5 py-0.5 text-2xs text-aurora"
-                  :data-testid="`exercise-measurement-tag-${exercise.id}`"
-                >
-                  {{ $t(`library.measurements.${exercise.measurement}`) }}
                 </span>
                 <!-- UNIFIED-LISTINGS → v0.21.4 (zurdi: "quita la tag de
                      catálogo predefinido"): la atribución queda SOLO para lo
@@ -607,8 +587,23 @@ async function confirmDelete() {
                   />
                 </span>
               </div>
+              <!-- v0.9.4 → v0.24.1 (zurdi: "que esos chips estén en su propia
+                   row"): el chip del TIPO (cardio/tiempo/peso corporal) vive
+                   en SU fila, separado del grupo muscular. Fuerza no lo
+                   lleva: sería ruido repetido en 40 filas. -->
+              <div
+                v-if="exercise.measurement !== 'strength' && !(exercise.measurement === 'cardio' && primaryGroup(exercise)?.slug === 'cardio')"
+                class="mt-1"
+              >
+                <span
+                  class="inline-flex items-center rounded-full border border-aurora/40 px-1.5 py-0.5 text-2xs text-aurora"
+                  :data-testid="`exercise-measurement-tag-${exercise.id}`"
+                >
+                  {{ $t(`library.measurements.${exercise.measurement}`) }}
+                </span>
+              </div>
             </div>
-            </button>
+            </component>
             <!-- item 1: icon-only, como en RoutineList/AdminCard. item 5: un
                  admin puede editar/borrar filas predefinidas (owner_id
                  null), mismo sheet/flow que los ejercicios propios. W2

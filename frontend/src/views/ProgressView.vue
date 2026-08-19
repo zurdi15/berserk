@@ -294,7 +294,8 @@ watch(exerciseId, () => {
       data-testid="training-panel"
     >
       <div class="flex-1 min-h-0 flex flex-col" :style="{ '--bk-stagger-i': 0 }">
-        <ExercisePicker v-model="exerciseId" />
+        <!-- v0.24.1: los récords ya cargados visten cada fila con su máximo -->
+        <ExercisePicker v-model="exerciseId" :records="records" />
       </div>
     </div>
 
