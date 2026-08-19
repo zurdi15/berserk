@@ -501,7 +501,7 @@ async function confirmDelete() {
           <div class="grid grid-cols-3 gap-2">
             <!-- v0.11.0: filtro de grupo compartido (GroupFilterSelect) -->
             <div class="min-w-0" data-testid="exercise-group-filter">
-              <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
+              <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" hide-label />
             </div>
             <BkField
               v-model="query"

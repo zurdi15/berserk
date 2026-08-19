@@ -269,6 +269,13 @@ body::before {
      foto real"): la meta del hero gana una píldora con scrim + blur SOLO en
      modo foto — sobre el backdrop temático el texto ya era legible y la
      píldora sería ruido */
+  /* v0.24.4 — mapa muscular realista (arte wger): las capas de músculo
+     vienen en ROJO; el hue-rotate las lleva al territorio aurora sin perder
+     el sombreado anatómico */
+  .bk-bodymap-tint {
+    filter: hue-rotate(160deg) saturate(0.85) brightness(1.15);
+  }
+
   .bk-hero-backdrop .bk-hero-meta {
     display: inline-block;
     padding: 0.125rem 0.625rem;

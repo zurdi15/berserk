@@ -526,9 +526,14 @@ watch(activeIndex, () => nextTick(updateIndicator))
          El scroll interno sobrevive SOLO en cajas hoja con su propia altura
          (lista del picker de Entrenos, overlays/sheets) — nunca como cadena
          de referencias de altura entre niveles. -->
+    <!-- v0.24.4 (zurdi: "el scroll doble sigue roto"): `relative` es
+         ESTRUCTURAL — sin él, cualquier descendiente position:absolute sin
+         ancestro posicionado (los .sr-only de Tailwind, p. ej. el del dot
+         de "entrenado" del picker) se ancla al HTML y estira el documento:
+         la ventana ganaba ~3000px de scroll fantasma además del de main -->
     <main
       ref="mainEl"
-      class="flex-1 min-h-0 overflow-y-auto bk-scroll-stable w-full"
+      class="relative flex-1 min-h-0 overflow-y-auto bk-scroll-stable w-full"
       @touchstart.passive="onMainTouchStart"
       @touchend.passive="onMainTouchEnd"
     >

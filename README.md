@@ -88,3 +88,8 @@ This starts the backend on `:8000` and the frontend (Vite, hot reload) on `:5173
 ## Stack
 
 FastAPI + SQLAlchemy/Alembic on SQLite for the backend, Vue 3 + TypeScript + Tailwind for the frontend, shipped as a single non-root Docker image.
+
+## Credits
+
+- Muscle-map artwork (front/back muscular system and per-muscle overlays) from the [wger project](https://github.com/wger-project/wger), licensed [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
+- Exercise image search powered by [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain).

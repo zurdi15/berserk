@@ -193,7 +193,7 @@ watch(
     >
       <template #beside>
         <div data-testid="add-exercise-group-filter">
-          <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
+          <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" hide-label />
         </div>
       </template>
       <!-- v0.22.1 (zurdi: "que se parezca al de la biblioteca — que se vean

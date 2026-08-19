@@ -129,7 +129,7 @@ watch(() => athlete.userId, load)
          raíces que rompa el fall-through de atributos) -->
     <div class="grid grid-cols-3 gap-2">
       <div class="min-w-0" data-testid="picker-group-filter">
-        <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" />
+        <GroupFilterSelect v-model="filterGroupId" :muscle-groups="muscleGroups" hide-label />
       </div>
       <BkField v-model="query" :label="t('progress.searchExercise')" class="col-span-2 min-w-0" />
     </div>

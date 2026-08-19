@@ -10,7 +10,7 @@ import BkSelect from '@/lib/BkSelect.vue'
 // ejercicio y el picker de progresión — un único componente, mismos rótulos
 // y misma opción "todos" en todas las superficies. El valor es el id del
 // grupo como string ('' = todos), igual que siempre.
-const props = defineProps<{ modelValue: string; muscleGroups: MuscleGroupOut[] }>()
+const props = defineProps<{ modelValue: string; muscleGroups: MuscleGroupOut[]; hideLabel?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const { t, locale } = useI18n()
@@ -31,6 +31,7 @@ const options = computed(() => [
     :label="t('library.muscleGroups')"
     :options="options"
     full-panel
+    :hide-label="hideLabel"
     data-testid="group-filter-select"
     @update:model-value="emit('update:modelValue', $event)"
   />

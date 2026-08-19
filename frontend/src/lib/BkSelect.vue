@@ -11,6 +11,9 @@ import { foldSearchText } from '@/utils/searchFold'
 
 const props = defineProps<{
   label: string
+  // v0.24.4: en filas compactas (filtro+búsqueda 1/3-2/3) la etiqueta
+  // visible descuadra la fila — sr-only mantiene la accesibilidad
+  hideLabel?: boolean
   modelValue: string
   options: { value: string; label: string; disabled?: boolean }[]
   // v0.21.4 (zurdi: "el selector de grupos musculares que se vea siempre
@@ -214,7 +217,11 @@ watch(filterQuery, () => {
   <div class="relative">
     <!-- M10: la etiqueta es un span (no un <label for>) asociado por
          aria-labelledby — un click ahí no enfoca nada por sí solo -->
-    <span :id="labelId" class="block mb-1 text-sm text-ink-muted cursor-pointer" @click="triggerEl?.focus()">{{ label }}</span>
+    <span
+      :id="labelId"
+      :class="hideLabel ? 'sr-only' : 'block mb-1 text-sm text-ink-muted cursor-pointer'"
+      @click="triggerEl?.focus()"
+    >{{ label }}</span>
     <button
       ref="triggerEl"
       type="button"
