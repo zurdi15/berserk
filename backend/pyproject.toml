@@ -1,6 +1,6 @@
 [project]
 name = "berserk-backend"
-version = "0.24.5"
+version = "0.25.0"
 description = "Backend de berserk: workout tracker self-hosted"
 requires-python = ">=3.13"
 dependencies = [

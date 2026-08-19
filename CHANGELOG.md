@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.25.0 - 2026-08-20
+
+### Eliminado
+- La planificación de entrenamientos desaparece: con las rutinas y el plan rotatorio ya no aportaba nada. El calendario queda como registro de lo entrenado (con el retro-registro de siempre) y Hoy se centra en el plan rotatorio.
+
+### Cambiado
+- Calendario: la card del entreno del día adopta la nueva estética — imagen de cada ejercicio y resumen de series×reps (3×8).
+- Biblioteca: las filas de ejercicios pierden el borde, como en el resto de listados.
+- Registro de series: el botón "Discos" se deshabilita (en vez de esconderse) al elegir nivel.
+
 ## 0.24.5 - 2026-08-19
 
 ### Arreglado
