@@ -405,6 +405,24 @@
   transform: scale(0.96);
 }
 
+/* v0.24.3 — entrada letra a letra (BkAnimatedText): el análogo textual del
+   roll numérico; la cascada la pone cada letra con --bk-letter-delay */
+@keyframes bk-letter-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.bk-letter-in {
+  display: inline-block;
+  animation: bk-letter-in var(--bk-dur-3) var(--bk-ease-out) both;
+  animation-delay: var(--bk-letter-delay, 0ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -18,6 +18,7 @@ import { useRouter } from 'vue-router'
 import type { ExerciseOut, RotationOut, ScheduledOut } from '@/api/domain'
 import { getRotation, putRotationNext, routineImageUrl } from '@/api/domain'
 import BkAnimatedNumber from '@/lib/BkAnimatedNumber.vue'
+import BkAnimatedText from '@/lib/BkAnimatedText.vue'
 import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
 import BkHero from '@/lib/BkHero.vue'
@@ -235,11 +236,11 @@ function goToCalendar() {
           <span aria-hidden="true">›</span>
         </button>
         <p class="bk-eyebrow bk-hero-accent">{{ workoutActive ? t('today.heroInProgress') : t('today.heroEyebrow') }}</p>
-        <Transition name="bk-pop-soft" mode="out-in">
-          <h2 :key="displayRoutine.id" class="min-w-0 bk-display truncate text-center" data-testid="rotation-next-name">
-            {{ displayRoutine.name }}
-          </h2>
-        </Transition>
+        <!-- v0.24.3 (zurdi): el título entra letra a letra al cambiar de
+             rutina (BkAnimatedText) — la Transition out-in de antes muere -->
+        <h2 class="min-w-0 bk-display truncate text-center" data-testid="rotation-next-name">
+          <BkAnimatedText :text="displayRoutine.name" />
+        </h2>
         <!-- v0.23.0 (zurdi): un pelín más grande (text-sm → text-base) y,
              sobre foto, con píldora scrim+blur detrás (ver .bk-hero-meta).
              v0.24.2: SIN Transition keyed — desmontar la píldora reseteaba
