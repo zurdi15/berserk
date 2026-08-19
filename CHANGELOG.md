@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.20.0 - 2026-08-19
+
+### Added
+- Foto de perfil: toca el avatar en Perfil para ponerla o cambiarla, y "Quitar foto" para borrarla (JPG/PNG/WebP, mismo esquema seguro que las fotos de ejercicio).
+- El nombre en inglés de un ejercicio es ahora opcional: sin traducción, la app en inglés enseña el nombre en español en vez de una fila vacía; vaciar el campo al editar borra la traducción.
+- Al terminar un entreno: scroll automático arriba (la runa berserk se talla a la vista), pulso neón de bordes y una ráfaga de chispas aurora/ember — cerrar un entreno ya se siente como un logro.
+- Los checks de serie se pueden DES-marcar: quitar el check de una serie hecha la borra (funciona también sin conexión) y la fila reaparece como pendiente para re-marcarla.
+
+### Changed
+- El hero de Hoy ya no recorta el "HOY TOCA" en móvil, es más alto (la runa de fondo se luce), el texto lleva sombra y queda siempre POR ENCIMA de la runa/foto, y las flechas del carrusel animan el cambio de rutina (la runa se re-talla con cada una).
+- Los sheets se cierran arrastrando la rayita hacia abajo (el panel sigue al dedo), y "Añadir ejercicio" tiene un único scroll: el de la lista.
+- La pastilla activa de las pestañas (Progresión, Récords, métricas de la gráfica) se desliza animada al cambiar de sección.
+- Las runas de los días del calendario van agrupadas y un punto más pequeñas: ya no rozan las esquinas redondeadas.
+- La serie activa del entreno tiene más aire alrededor del check (nada apelmazado contra el borde de la selección).
+
+### Fixed
+- App Android: el gesto de atrás navega a la pantalla anterior en vez de cerrar la app (en la raíz la manda al fondo, conservando el entreno en curso). Requiere la APK nueva de esta release.
+
 ## 0.19.0 - 2026-08-19
 
 ### Changed
