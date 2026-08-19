@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.24.4 - 2026-08-19
+
+### Arreglado
+- El doble scroll de verdad: la ventana ganaba ~3000px de scroll fantasma por un detalle de posicionamiento (elementos de accesibilidad anclándose al documento en vez de al contenedor de scroll). Ahora solo scrollea el contenido.
+- La fila de filtro + búsqueda ya no se descuadra: la etiqueta del selector pasa a ser invisible (pero accesible) en las filas compactas.
+
+### Cambiado
+- El mapa muscular de Hoy es ahora un cuerpo humano realista (arte anatómico del proyecto wger): sistema muscular en grises con cada músculo trabajado encendido según su volumen.
+
 ## 0.24.3 - 2026-08-19
 
 ### Añadido
