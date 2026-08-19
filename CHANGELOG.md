@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.24.5 - 2026-08-19
+
+### Arreglado
+- El mapa muscular se veía verde en vez de aurora: los músculos se pintan ahora con el color exacto del tema (y cambian con el modo claro/oscuro).
+
 ## 0.24.4 - 2026-08-19
 
 ### Arreglado
