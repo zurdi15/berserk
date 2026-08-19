@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.24.3 - 2026-08-19
+
+### Añadido
+- Hoy: el nombre de la rutina entra letra a letra al cambiar de rutina en el hero, a juego con los números rotatorios.
+
 ## 0.24.2 - 2026-08-19
 
 ### Cambiado
