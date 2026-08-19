@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.24.2 - 2026-08-19
+
+### Cambiado
+- Entreno: al pasar de bloque en el stepper, la vista vuelve arriba para ver el primer ejercicio.
+- Entrenos: desaparece el doble scroll — la lista de ejercicios fluye con la página, que es la única superficie de scroll.
+- El selector de grupo muscular y la búsqueda comparten fila (un tercio / dos tercios) en Entrenos, la biblioteca y el diálogo de añadir ejercicio.
+- Hoy: la etiqueta de minutos/ejercicios del hero ya no parpadea al cambiar de rutina y sus números ruedan con la animación de la app.
+
 ## 0.24.1 - 2026-08-19
 
 ### Cambiado
