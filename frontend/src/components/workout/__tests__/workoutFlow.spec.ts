@@ -376,6 +376,47 @@ describe('WorkoutExerciseCard', () => {
     })
   })
 
+  // v0.18.1 (zurdi: "los bloques deberían poder cambiarse también mid
+  // entreno"): picker "Bloque: X" en la card en vivo
+  describe('v0.18.1: per-card block picker', () => {
+    it('is hidden when the actions lack setExerciseBlock (retro editor)', () => {
+      const wrapper = mountCard()
+      expect(wrapper.find('[data-testid="block-toggle-20"]').exists()).toBe(false)
+    })
+
+    it('moves the exercise to an existing block via the chips', async () => {
+      const setExerciseBlock = vi.fn(async () => {})
+      const actions = makeActions({ setExerciseBlock })
+      const wrapper = mountCard({ actions, blockLabels: ['Empuje', 'Tirón'] })
+
+      await wrapper.get('[data-testid="block-toggle-20"]').trigger('click')
+      await wrapper.get('[data-testid="block-pick-20-Tirón"]').trigger('click')
+      expect(setExerciseBlock).toHaveBeenCalledWith(20, 'Tirón')
+      // el picker se cierra tras elegir
+      expect(wrapper.find('[data-testid="block-picker-20"]').exists()).toBe(false)
+    })
+
+    it('offers "sin bloque" only when the exercise IS in one, and clears with null', async () => {
+      const setExerciseBlock = vi.fn(async () => {})
+      const actions = makeActions({ setExerciseBlock })
+      const inBlock = { ...pushExercise, block_label: 'Empuje' }
+      const wrapper = mountCard({ actions, workoutExercise: inBlock, blockLabels: ['Empuje'] })
+
+      await wrapper.get('[data-testid="block-toggle-20"]').trigger('click')
+      await wrapper.get('[data-testid="block-pick-none-20"]').trigger('click')
+      expect(setExerciseBlock).toHaveBeenCalledWith(20, null)
+    })
+
+    it('"+ Nuevo bloque…" emits newBlock for the parent to name it', async () => {
+      const actions = makeActions({ setExerciseBlock: vi.fn(async () => {}) })
+      const wrapper = mountCard({ actions })
+
+      await wrapper.get('[data-testid="block-toggle-20"]').trigger('click')
+      await wrapper.get('[data-testid="block-new-20"]').trigger('click')
+      expect(wrapper.emitted('newBlock')).toBeTruthy()
+    })
+  })
+
   describe('item 3: previous-session history', () => {
     it('shows the multi-line "last time" block on the compact card when the exercise has no sets yet (v0.17.0)', async () => {
       const emptyExercise = { ...pushExercise, sets: [] }

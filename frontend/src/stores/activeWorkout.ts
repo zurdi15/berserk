@@ -453,6 +453,27 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     })
   }
 
+  // v0.18.1 (zurdi: "los bloques deberían poder cambiarse también mid
+  // entreno"): mover un ejercicio de bloque (o estrenar uno, o sacarlo a
+  // sin-bloque) — el stepper agrupa por etiqueta, así que cambiarla basta
+  // para que la card salte a su step sin reordenar nada
+  async function setExerciseBlock(weid: number, blockLabel: string | null) {
+    if (!offline()) {
+      await domain.updateWorkoutExercise(workout.value!.id, weid, { block_label: blockLabel })
+      await refresh()
+      return
+    }
+    const wex = localExercise(weid)
+    wex.block_label = blockLabel
+    outbox.enqueue({
+      id: outbox.newClientId(),
+      kind: 'setExerciseBlock',
+      workoutId: workout.value!.id,
+      exerciseId: weid,
+      blockLabel,
+    })
+  }
+
   async function setExerciseRest(weid: number, restSeconds: number | null) {
     if (!offline()) {
       await domain.updateWorkoutExercise(workout.value!.id, weid, { rest_seconds: restSeconds })
@@ -509,6 +530,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     exerciseNote,
     saveExerciseNote,
     setExerciseRest,
+    setExerciseBlock,
     reset,
   }
 })

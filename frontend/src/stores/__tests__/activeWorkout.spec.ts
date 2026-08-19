@@ -70,6 +70,21 @@ describe('active workout store', () => {
     })
   })
 
+  // v0.18.1: mover un ejercicio de bloque mid-entreno (PATCH block_label)
+  it('setExerciseBlock patches the block label and refreshes', async () => {
+    vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+    const store = useActiveWorkoutStore()
+    await store.resume()
+    vi.mocked(domain.updateWorkoutExercise).mockResolvedValue({} as never)
+    vi.mocked(domain.getWorkout).mockResolvedValue(workout as never)
+
+    await store.setExerciseBlock(9, 'Tirón')
+    expect(domain.updateWorkoutExercise).toHaveBeenCalledWith(4, 9, { block_label: 'Tirón' })
+
+    await store.setExerciseBlock(9, null)
+    expect(domain.updateWorkoutExercise).toHaveBeenLastCalledWith(4, 9, { block_label: null })
+  })
+
   it('updateSet never touches lastRecords (celebration only fires from live logging via logSet)', async () => {
     vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
     const store = useActiveWorkoutStore()

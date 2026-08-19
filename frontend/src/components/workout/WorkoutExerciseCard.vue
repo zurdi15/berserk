@@ -92,6 +92,11 @@ const props = withDefaults(
     // marcado como "siguiente" tras registrar una serie en el miembro
     // anterior del grupo — chip pequeño, puramente presentacional
     supersetNext?: boolean
+    // v0.18.1 (zurdi: "los bloques deberían poder cambiarse también mid
+    // entreno"): etiquetas de bloque existentes en el entreno — alimentan
+    // el picker "Bloque: X" (solo en vivo y si actions.setExerciseBlock
+    // existe)
+    blockLabels?: string[]
   }>(),
   {
     muscleGroups: () => [],
@@ -106,6 +111,7 @@ const props = withDefaults(
     supersetLabel: null,
     supersetLast: true,
     supersetNext: false,
+    blockLabels: () => [],
   },
 )
 
@@ -114,6 +120,9 @@ const emit = defineEmits<{
   // item 9: cada serie NUEVA logueada con éxito, sea o no récord — el padre
   // decide si dispara el pulso neón (se salta cuando gana la celebración de PR)
   logged: [hasNewRecords: boolean]
+  // v0.18.1: "+ Nuevo bloque…" del picker — el padre (WorkoutView) abre su
+  // sheet de nombre y asigna al confirmar
+  newBlock: []
 }>()
 
 const { t } = useI18n()
@@ -430,6 +439,29 @@ async function onDeleteSet(setId: number) {
   }
 }
 
+// ── v0.18.1 picker de bloque (mismo idiom que el de descanso: línea
+// punteada que revela chips) ───────────────────────────────────────────────
+const blockPickerOpen = ref(false)
+
+const currentBlockName = computed(
+  () => props.workoutExercise.block_label ?? t('routines.blockNone'),
+)
+
+async function pickBlock(label: string | null) {
+  blockPickerOpen.value = false
+  if ((props.workoutExercise.block_label ?? null) === label) return
+  try {
+    await props.actions.setExerciseBlock?.(props.workoutExercise.id, label)
+  } catch (error) {
+    toastApiError(error)
+  }
+}
+
+function requestNewBlock() {
+  blockPickerOpen.value = false
+  emit('newBlock')
+}
+
 async function pickRest(seconds: number) {
   restPickerOpen.value = false
   try {
@@ -630,6 +662,57 @@ async function moveDown() {
           suffix="s"
           @update:model-value="pickRestManual"
         />
+      </div>
+    </div>
+
+    <!-- v0.18.1 (zurdi: "los bloques deberían poder cambiarse también mid
+         entreno"): picker de bloque con el mismo idiom que el de descanso —
+         línea punteada que revela chips (bloques existentes, sin bloque, o
+         estrenar uno). Solo en vivo: el editor retro no implementa la acción. -->
+    <div v-if="live && actions.setExerciseBlock" class="mb-2">
+      <button
+        type="button"
+        class="bk-press text-xs text-ink-faint underline decoration-dotted"
+        :data-testid="`block-toggle-${workoutExercise.id}`"
+        :aria-expanded="blockPickerOpen ? 'true' : 'false'"
+        @click="blockPickerOpen = !blockPickerOpen"
+      >
+        {{ t('workout.blockLabel', { name: currentBlockName }) }}
+      </button>
+      <div
+        v-if="blockPickerOpen"
+        class="flex flex-wrap gap-1 mt-1"
+        :data-testid="`block-picker-${workoutExercise.id}`"
+      >
+        <button
+          v-if="workoutExercise.block_label != null"
+          type="button"
+          class="bk-press px-2 py-1 rounded-sm border text-xs border-line text-ink-muted"
+          :data-testid="`block-pick-none-${workoutExercise.id}`"
+          @click="pickBlock(null)"
+        >
+          {{ t('routines.blockNone') }}
+        </button>
+        <button
+          v-for="label in blockLabels"
+          :key="label"
+          type="button"
+          class="bk-press px-2 py-1 rounded-sm border text-xs"
+          :class="label === workoutExercise.block_label ? 'border-aurora text-aurora bg-aurora/10' : 'border-line text-ink-muted'"
+          :aria-pressed="label === workoutExercise.block_label ? 'true' : 'false'"
+          :data-testid="`block-pick-${workoutExercise.id}-${label}`"
+          @click="pickBlock(label)"
+        >
+          {{ label }}
+        </button>
+        <button
+          type="button"
+          class="bk-press px-2 py-1 rounded-sm border border-line text-xs text-ink-muted"
+          :data-testid="`block-new-${workoutExercise.id}`"
+          @click="requestNewBlock"
+        >
+          {{ t('routines.newBlockOption') }}
+        </button>
       </div>
     </div>
 

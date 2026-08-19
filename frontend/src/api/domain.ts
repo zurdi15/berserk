@@ -507,6 +507,8 @@ export const addWorkoutExercise = (id: number, body: {
 export const updateWorkoutExercise = (wid: number, weid: number, body: {
   note?: string | null
   rest_seconds?: number | null
+  // v0.18.1: mover el ejercicio de bloque mid-entreno (null = sin bloque)
+  block_label?: string | null
 }) =>
   api<WorkoutExerciseOut>(`/workouts/${wid}/exercises/${weid}`, { method: 'PATCH', body })
 

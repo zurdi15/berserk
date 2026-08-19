@@ -115,6 +115,10 @@ class WorkoutExercisePatchIn(BaseModel):
     # a caer al target de rutina/default) — sí es una semántica válida aquí,
     # a diferencia del "note" de WorkoutPatchIn.date que nunca se anula
     rest_seconds: int | None = Field(None, ge=5, le=900)
+    # v0.18.1 (zurdi: "los bloques deberían poder cambiarse también mid
+    # entreno"): mover el ejercicio de bloque en vivo — null explícito lo
+    # saca a "sin bloque" (exclude_unset distingue omitido de null)
+    block_label: str | None = Field(None, min_length=1, max_length=40)
 
 
 class ExerciseOrderIn(BaseModel):

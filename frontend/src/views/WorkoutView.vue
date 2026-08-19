@@ -30,6 +30,7 @@ import NeonPulse from '@/components/workout/NeonPulse.vue'
 import WorkoutExerciseCard from '@/components/workout/WorkoutExerciseCard.vue'
 import BkCelebration from '@/components/celebration/BkCelebration.vue'
 import BkButton from '@/lib/BkButton.vue'
+import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import type { RuneName } from '@/lib/runes'
@@ -200,6 +201,34 @@ function stepProgress(step: WorkoutStep): string {
 const currentBlockLabel = computed<string | null>(() =>
   stepperActive.value ? workoutSteps.value[currentStepSafe.value]?.label ?? null : null,
 )
+
+// v0.18.1: etiquetas existentes (en orden de step) — alimentan el picker
+// "Bloque: X" de cada card
+const workoutBlockLabels = computed<string[]>(() =>
+  workoutSteps.value.map((s) => s.label).filter((l): l is string => l !== null),
+)
+
+// "+ Nuevo bloque…" desde el picker de una card: nombre en un mini-sheet
+// (mismo flujo que el editor de rutinas) y la card se muda al confirmarlo
+const newBlockForWeid = ref<number | null>(null)
+const newBlockName = ref('')
+
+function openNewBlockFor(weid: number) {
+  newBlockForWeid.value = weid
+  newBlockName.value = ''
+}
+
+async function confirmNewBlock() {
+  const weid = newBlockForWeid.value
+  const name = newBlockName.value.trim().slice(0, 40)
+  if (weid === null || !name) return
+  newBlockForWeid.value = null
+  try {
+    await activeWorkout.setExerciseBlock(weid, name)
+  } catch (error) {
+    toastApiError(error)
+  }
+}
 
 // acciones que ve AddExerciseSheet: mismas del store, pero el alta lleva el
 // bloque visible. Objeto explícito (no spread del store: esparcir un store
@@ -739,8 +768,10 @@ onBeforeUnmount(stopTicker)
               :superset-label="supersetLabelByIndex[entry.index]"
               :superset-last="supersetLastByIndex[entry.index]"
               :superset-next="entry.we.id === supersetNextUpId"
+              :block-labels="workoutBlockLabels"
               @recorded="onRecorded"
               @logged="onLogged(entry.index, $event)"
+              @new-block="openNewBlockFor(entry.we.id)"
             />
           </template>
         </div>
@@ -763,8 +794,10 @@ onBeforeUnmount(stopTicker)
           :superset-label="null"
           :superset-last="true"
           :superset-next="false"
+          :block-labels="workoutBlockLabels"
           @recorded="onRecorded"
           @logged="onLogged(block.entries[0].index, $event)"
+          @new-block="openNewBlockFor(block.entries[0].we.id)"
         />
       </template>
       </TransitionGroup>
@@ -840,6 +873,32 @@ onBeforeUnmount(stopTicker)
         </BkButton>
         <BkButton variant="primary" @click="onFinish">{{ t('workout.finish') }}</BkButton>
       </div>
+
+      <!-- v0.18.1: nombre del bloque nuevo pedido desde el picker de una
+           card (mismo flujo que el editor de rutinas) -->
+      <BkSheet
+        :open="newBlockForWeid !== null"
+        :title="t('routines.newBlock')"
+        @close="newBlockForWeid = null"
+      >
+        <div class="space-y-4" data-testid="workout-new-block-sheet">
+          <BkField
+            v-model="newBlockName"
+            :label="t('routines.blockName')"
+            data-testid="workout-new-block-name"
+          />
+          <p class="text-xs text-ink-faint">{{ t('routines.newBlockAssignHint') }}</p>
+          <BkButton
+            variant="primary"
+            block
+            :disabled="!newBlockName.trim()"
+            data-testid="workout-new-block-confirm"
+            @click="confirmNewBlock"
+          >
+            {{ t('routines.newBlockCreate') }}
+          </BkButton>
+        </div>
+      </BkSheet>
 
       <BkSheet
         :open="discardConfirmOpen"

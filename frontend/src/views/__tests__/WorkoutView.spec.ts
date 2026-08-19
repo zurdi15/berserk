@@ -144,6 +144,26 @@ describe('WorkoutView', () => {
       expect(wrapper.findAllComponents(WorkoutExerciseCard)).toHaveLength(3)
     })
 
+    // v0.18.1: "+ Nuevo bloque…" desde una card — el sheet de nombre asigna
+    // la card al bloque nuevo al confirmar
+    it('v0.18.1: naming a new block from a card assigns it via setExerciseBlock', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+      const setBlockSpy = vi.spyOn(activeWorkout, 'setExerciseBlock').mockResolvedValue(undefined)
+      activeWorkout.workout = workoutWithBlocks()
+
+      const wrapper = build()
+      await flushPromises()
+      const vm = wrapper.vm as any
+
+      vm.openNewBlockFor(3)
+      vm.newBlockName = 'Aislamiento'
+      await vm.confirmNewBlock()
+
+      expect(setBlockSpy).toHaveBeenCalledWith(3, 'Aislamiento')
+      expect(vm.newBlockForWeid).toBeNull()
+    })
+
     it('ad-hoc null-labeled exercises fold into a "General" step alongside the named blocks', async () => {
       const activeWorkout = useActiveWorkoutStore()
       vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
