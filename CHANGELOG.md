@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.21.2 - 2026-08-19
+
+### Fixed
+- La preview del entrenamiento (antes de darle a empezar) recupera su cabecera de antes: isla oscura con la runa a plena presencia, sin el blur del hero de Hoy (que se queda como está).
+- El botón "atrás" de esa cabecera se ve ahora también en modo oscuro: círculo translúcido con borde, no solo el chevron.
+
 ## 0.21.1 - 2026-08-19
 
 ### Changed
