@@ -88,13 +88,9 @@ fun TimerApp(
         }
     }
     val scope = rememberCoroutineScope()
-    var cancelFailed by remember { mutableStateOf(false) }
 
     val alarming = board.alarming()
     val primary = board.primary()
-    LaunchedEffect(primary?.kind, primary?.spec?.sentAtEpochMs) {
-        if (primary != null) cancelFailed = false
-    }
 
     AppScaffold {
         when {
@@ -110,14 +106,15 @@ fun TimerApp(
                 workout = board.workout(),
                 now = now,
                 onCancel = {
+                    // optimista: se para aquí; si el móvil no está al alcance, su
+                    // DataItem lo resucitará al reconectar mientras no haya vencido
                     engine.cancelLocally(primary.kind)
-                    scope.launch { if (!link.requestCancel(primary.kind)) cancelFailed = true }
+                    scope.launch { link.requestCancel(primary.kind) }
                 },
             )
             else -> IdleScreen(
                 phoneReachable = phoneReachable,
                 notificationsGranted = notificationsGranted,
-                cancelFailed = cancelFailed,
                 appVersion = appVersion,
             )
         }
@@ -281,68 +278,59 @@ private fun AlarmScreen(timer: ActiveTimer, onAcknowledge: () -> Unit) {
     }
 }
 
+/**
+ * v0.32.0 (zurdi: "el texto sobra; la runa en el centro como indicador de
+ * móvil conectado o no, apagada o con glow, y la versión abajo pequeñita;
+ * mantén la hora arriba"). La hora la pone el AppScaffold (TimeText).
+ */
 @Composable
-private fun IdleScreen(phoneReachable: Boolean, notificationsGranted: Boolean, cancelFailed: Boolean, appVersion: String) {
+private fun IdleScreen(phoneReachable: Boolean, notificationsGranted: Boolean, appVersion: String) {
     val aurora = MaterialTheme.colorScheme.primary
     val pulse by rememberPulse(periodMs = 3_000, label = "idle")
+    // conectado: runa encendida con halo que respira; sin móvil: apagada, sin halo
+    val runeTint = if (phoneReachable) aurora else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
     ScreenScaffold { contentPadding ->
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Halo(color = aurora, alpha = 0.05f + 0.04f * pulse, radiusFraction = 0.7f)
-            Column(
-                modifier = Modifier.fillMaxSize().padding(contentPadding).padding(horizontal = 18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                // la runa con su propio halo, como el logo de la web
+        Box(modifier = Modifier.fillMaxSize().padding(contentPadding), contentAlignment = Alignment.Center) {
+            if (phoneReachable) {
+                Halo(color = aurora, alpha = 0.07f + 0.05f * pulse, radiusFraction = 0.7f)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(contentAlignment = Alignment.Center) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .background(
-                                Brush.radialGradient(listOf(aurora.copy(alpha = 0.18f + 0.14f * pulse), Color.Transparent)),
-                                CircleShape,
-                            ),
-                    )
+                    if (phoneReachable) {
+                        Box(
+                            modifier = Modifier
+                                .size(96.dp)
+                                .background(
+                                    Brush.radialGradient(listOf(aurora.copy(alpha = 0.22f + 0.16f * pulse), Color.Transparent)),
+                                    CircleShape,
+                                ),
+                        )
+                    }
                     Icon(
                         painter = painterResource(R.drawable.ic_stat_berserk),
-                        contentDescription = null,
-                        tint = aurora,
-                        modifier = Modifier.size(30.dp),
+                        contentDescription = stringResource(if (phoneReachable) R.string.phone_connected else R.string.phone_disconnected),
+                        tint = runeTint,
+                        modifier = Modifier.size(44.dp),
                     )
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.idle_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(
-                        when {
-                            cancelFailed -> R.string.cancel_failed
-                            !notificationsGranted -> R.string.notifications_needed
-                            else -> R.string.idle_hint
-                        },
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = stringResource(if (phoneReachable) R.string.phone_connected else R.string.phone_disconnected),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (phoneReachable) aurora else MaterialTheme.colorScheme.secondary,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = stringResource(R.string.version, appVersion),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (!notificationsGranted) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = stringResource(R.string.notifications_needed),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                    )
+                }
             }
+            Text(
+                text = stringResource(R.string.version, appVersion),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+            )
         }
     }
 }

@@ -15,11 +15,8 @@
     <string name="ok">OK</string>
     <string name="alarm_hint">Pulsa OK para parar la alarma</string>
     <string name="cancel">Cancelar</string>
-    <string name="cancel_failed">Móvil no accesible: cancelado solo en el reloj</string>
     <string name="workout_elapsed">Entrenando · %1$s</string>
 
-    <string name="idle_title">Sin temporizador</string>
-    <string name="idle_hint">Arranca un descanso o un cardio en el móvil</string>
     <string name="phone_connected">Móvil conectado</string>
     <string name="phone_disconnected">Móvil no conectado</string>
     <string name="notifications_needed">Permite las notificaciones para ver los temporizadores en la esfera</string>
