@@ -1091,9 +1091,12 @@ onBeforeUnmount(stopTicker)
       >
         <div class="space-y-4 p-4" data-testid="discard-confirm-sheet">
           <p>{{ t('workout.discardHint') }}</p>
-          <div class="flex gap-2">
+          <!-- v0.35.2 (zurdi): mismo patrón que cancelar/confirmar del cajón de
+               series — la fila entera, mitad cada botón, cancelar a la izquierda -->
+          <div class="grid grid-cols-2 gap-2">
             <BkButton
               variant="ghost"
+              block
               data-testid="discard-cancel-btn"
               @click="discardConfirmOpen = false"
             >
@@ -1101,6 +1104,7 @@ onBeforeUnmount(stopTicker)
             </BkButton>
             <BkButton
               variant="danger"
+              block
               data-testid="discard-confirm-btn"
               @click="confirmDiscard"
             >
