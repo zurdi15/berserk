@@ -120,6 +120,7 @@ export const en = {
     notifyBodyWithExercise: 'Tap to get back to {exercise}.',
     autoRest: 'Auto rest',
     cancelRest: 'Cancel rest',
+    alarmOk: 'OK',
   },
   profile: {
     tab: 'Profile',

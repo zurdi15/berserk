@@ -143,7 +143,8 @@ export const core = {
   // eje z (pointer-events none, 2% de opacidad) la relación es CONSTANTE
   // durante y después de cualquier animación, para todo (cards, sheets,
   // toasts) — y bk-chrome-bg dejó de necesitar su réplica del grano.
-  z: { nav: '40', sheet: '50', toast: '60', timer: '70', noise: '90' },
+  // v0.35.0: alarm = overlay de la alarma de fin (shell): sobre toasts y timer, bajo el grano
+  z: { nav: '40', sheet: '50', toast: '60', timer: '70', alarm: '80', noise: '90' },
   shadow: {
     aurora: '0 0 20px var(--bk-aurora-glow)',
     ember: '0 0 24px var(--bk-ember-glow)',

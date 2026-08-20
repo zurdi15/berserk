@@ -122,6 +122,7 @@ export const es = {
     notifyBodyWithExercise: 'Toca para volver a {exercise}.',
     autoRest: 'Descanso automático',
     cancelRest: 'Cancelar descanso',
+    alarmOk: 'OK',
   },
   profile: {
     tab: 'Perfil',

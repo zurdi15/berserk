@@ -79,7 +79,11 @@ data class TimerSpec(
             if (sentAt <= 0L) return Decoded.Invalid("sentAtEpochMs ausente")
             val target = fields.long(KEY_TARGET, 0L)
             if (running && target <= 0L) return Decoded.Invalid("targetEpochMs ausente en un temporizador en marcha")
-            val total = fields.long(KEY_TOTAL, 0L).coerceAtLeast(0L)
+            var total = fields.long(KEY_TOTAL, 0L).coerceAtLeast(0L)
+            // v0.35.0: una shell anterior a v0.35.0 mandaba totalMs = 0 (getLong
+            // de Capacitor descartaba el Integer); para una cuenta atrás recién
+            // arrancada, fin − envío ES la duración — mejor eso que un anillo vacío
+            if (running && kind.countsDown && total <= 0L && target > sentAt) total = target - sentAt
             val title = fields.string(KEY_TITLE).orEmpty().trim()
             val reason = fields.string(KEY_REASON).orEmpty()
             return Decoded.Ok(TimerSpec(kind, running, target, total, title, sentAt, reason))

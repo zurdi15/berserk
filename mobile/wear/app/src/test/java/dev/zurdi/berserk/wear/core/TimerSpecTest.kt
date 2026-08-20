@@ -51,10 +51,14 @@ class TimerSpecTest {
     }
 
     @Test
-    fun `negative total is clamped and title defaults to empty`() {
-        val spec = (TimerSpec.decode(fields("kind" to "rest", "state" to "running", "targetEpochMs" to 10L, "totalMs" to -5L, "sentAtEpochMs" to 1L)) as TimerSpec.Decoded.Ok).spec
-        assertEquals(0L, spec.totalMs)
+    fun `missing or negative total falls back to target minus sentAt for a running countdown`() {
+        val spec = (TimerSpec.decode(fields("kind" to "rest", "state" to "running", "targetEpochMs" to 100_000L, "totalMs" to -5L, "sentAtEpochMs" to 10_000L)) as TimerSpec.Decoded.Ok).spec
+        assertEquals(90_000L, spec.totalMs)
         assertEquals("", spec.title)
+        val explicit = (TimerSpec.decode(fields("kind" to "rest", "state" to "running", "targetEpochMs" to 100_000L, "totalMs" to 60_000L, "sentAtEpochMs" to 10_000L)) as TimerSpec.Decoded.Ok).spec
+        assertEquals(60_000L, explicit.totalMs)
+        val stopwatch = (TimerSpec.decode(fields("kind" to "workout", "state" to "running", "targetEpochMs" to 10_000L, "sentAtEpochMs" to 10_000L)) as TimerSpec.Decoded.Ok).spec
+        assertEquals(0L, stopwatch.totalMs)
     }
 
     @Test

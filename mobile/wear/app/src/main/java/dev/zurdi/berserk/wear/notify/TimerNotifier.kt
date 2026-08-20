@@ -62,10 +62,10 @@ class TimerNotifier(context: Context) {
      */
     fun doneNotification(timer: ActiveTimer, alarming: Boolean): Notification {
         ensureChannels()
+        // v0.35.0: sin "¡Tiempo!" — el nombre del temporizador basta
         val builder = NotificationCompat.Builder(ctx, CHANNEL_ALERTS)
             .setSmallIcon(R.drawable.ic_stat_berserk)
-            .setContentTitle(ctx.getString(R.string.time_up))
-            .setContentText(titleOf(timer))
+            .setContentTitle(titleOf(timer))
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(contentIntent())

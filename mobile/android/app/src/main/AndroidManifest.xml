@@ -25,20 +25,12 @@
         <receiver android:name=".BkRestEndReceiver" android:exported="false" />
 
         <!-- v0.34.0: la alarma que vibra hasta el OK (shortService desde la
-             alarma exacta, como en el reloj) y su pantalla, que se abre sola
-             aunque el móvil esté bloqueado -->
+             alarma exacta, como en el reloj); v0.35.0: abre la app normal y la
+             web pinta el overlay -->
         <service
             android:name=".BkAlarmService"
             android:exported="false"
             android:foregroundServiceType="shortService" />
-        <activity
-            android:name=".BkAlarmActivity"
-            android:exported="false"
-            android:excludeFromRecents="true"
-            android:launchMode="singleTask"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:theme="@style/BkAlarmTheme" />
 
         <!-- v0.28.0 reloj: órdenes del Galaxy Watch (cancelar cuenta atrás)
              por MessageClient; Play services lo arranca aunque la app esté

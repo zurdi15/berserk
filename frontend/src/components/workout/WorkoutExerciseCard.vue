@@ -186,7 +186,7 @@ watch(resumedActive, (timer, previous) => {
     void startNativeCardioCountdown(timer.endsAt, t('timer.cardioOngoingTitle'), { subtitle: name.value, imageUrl: exerciseImage.value })
     void scheduleNativeCardioEndAlarm(
       timer.endsAt,
-      t('workout.cardio.timeUp'),
+      t('timer.cardioOngoingTitle'),
       t('timer.notifyBodyWithExercise', { exercise: name.value }),
       { subtitle: name.value, imageUrl: exerciseImage.value },
     )

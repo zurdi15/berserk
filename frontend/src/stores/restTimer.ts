@@ -137,9 +137,11 @@ export const useRestTimerStore = defineStore('restTimer', () => {
           ? `${i18n.global.t('timer.restOngoingTitle')} · ${exerciseName}`
           : i18n.global.t('timer.restOngoingTitle'),
       })
+      // v0.35.0: título = el tipo ("Descanso"); el ejercicio va de subtítulo y
+      // la shell lo pone de titular — nada de "Descanso terminado"
       void scheduleNativeRestNotification(
         endsAt.value,
-        i18n.global.t('timer.notifyTitle'),
+        i18n.global.t('timer.restOngoingTitle'),
         exerciseName
           ? i18n.global.t('timer.notifyBodyWithExercise', { exercise: exerciseName })
           : i18n.global.t('timer.notifyBody'),

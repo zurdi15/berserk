@@ -150,7 +150,7 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
                 // v0.33.1: el arco es el tiempo TRANSCURRIDO (empieza vacío) sobre
                 // una pista gris tenue — la fracción restante llenaba el anillo
                 // casi entero desde el principio y se leía como fondo
-                GlowRing(progress = timer.elapsedFraction(now), color = accent, glow = glow, drawCore = false)
+                GlowRing(progress = timer.elapsedFraction(now), color = accent, glow = glow, drawCore = true, track = Color.Transparent)
                 // v0.34.0: hacia dentro (el borde queda bajo el cristal del Watch 8) y
                 // con hueco a las 12 para la hora — ver RING_* en Glow.kt
                 CircularProgressIndicator(
@@ -219,7 +219,12 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
     }
 }
 
-/** v0.29.0: "¡Tiempo!" con halo al ritmo de la vibración y un OK que la para. */
+/**
+ * v0.29.0: alarma con halo al ritmo de la vibración y un OK que la para.
+ * v0.35.0 (zurdi: "esos textos son innecesarios y tienen ruido; en la esfera
+ * está todo un pelín apelotonado, el OK un pelín más pequeño"): sin título
+ * ni ayuda — el halo ámbar y el nombre ya dicen qué pasa; OK al 46 % del ancho.
+ */
 @Composable
 private fun AlarmScreen(timer: ActiveTimer, onAcknowledge: () -> Unit) {
     val ember = MaterialTheme.colorScheme.secondary
@@ -241,7 +246,7 @@ private fun AlarmScreen(timer: ActiveTimer, onAcknowledge: () -> Unit) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = 26.dp)
                     .graphicsLayer {
                         scaleX = entrance
                         scaleY = entrance
@@ -250,28 +255,21 @@ private fun AlarmScreen(timer: ActiveTimer, onAcknowledge: () -> Unit) {
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = stringResource(R.string.time_up),
-                    style = MaterialTheme.typography.displaySmall,
-                    color = ember,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
                     text = titleOf(timer),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(18.dp))
                 Button(
                     onClick = onAcknowledge,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = ember,
                         contentColor = MaterialTheme.colorScheme.onSecondary,
                     ),
-                    modifier = Modifier.fillMaxWidth(0.62f),
+                    modifier = Modifier.fillMaxWidth(0.46f),
                 ) {
                     Text(
                         text = stringResource(R.string.ok),
@@ -280,30 +278,11 @@ private fun AlarmScreen(timer: ActiveTimer, onAcknowledge: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = stringResource(R.string.alarm_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
             }
         }
     }
 }
 
-/**
- * v0.32.0 (zurdi: "el texto sobra; la runa en el centro como indicador de
- * móvil conectado o no, apagada o con glow, y la versión abajo pequeñita;
- * mantén la hora arriba"). La hora la pone el AppScaffold (TimeText).
- */
-/**
- * v0.32.0 (zurdi: "el texto sobra; la runa en el centro como indicador de
- * móvil conectado o no, apagada o con glow, y la versión abajo pequeñita;
- * mantén la hora arriba"). La hora la pone el AppScaffold (TimeText).
- * v0.32.1: tres estados — cerca (Bluetooth): encendida con halo que respira;
- * remoto (solo Wi-Fi/Internet): tenue, sin halo; sin móvil: apagada.
- */
 @Composable
 private fun IdleScreen(presence: PhoneLink.PhonePresence, notificationsGranted: Boolean, appVersion: String) {
     val aurora = MaterialTheme.colorScheme.primary

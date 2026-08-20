@@ -14,6 +14,7 @@ import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { useToastStore } from '@/stores/toast'
+import NativeAlarmOverlay from '@/components/shell/NativeAlarmOverlay.vue'
 import { bootSplashActive, runBootSplash } from '@/utils/bootSplash'
 import { checkNativeShellUpdate, ensureNativeNotificationPermission, isNativeShell } from '@/utils/nativeShell'
 // v0.16.0: la versión del bundle (verdad de build, ver SettingsCard.vue) —
@@ -595,5 +596,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
         <p class="font-display font-semibold tracking-widest text-ink-muted text-lg">ᛒᛖᚱᛋᛖᚱᚲ</p>
       </div>
     </Transition>
+      <!-- v0.35.0: overlay de la alarma de fin (solo pinta algo en la shell) -->
+    <NativeAlarmOverlay />
   </div>
 </template>

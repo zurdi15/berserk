@@ -37,9 +37,12 @@ interface OngoingPlugin {
   syncTimer?: (options: WearTimerWire) => Promise<unknown>
   getWearStatus?: () => Promise<Partial<WearStatus>>
   addListener?: (
-    event: 'timerCancelled',
-    callback: (data: { kind?: string }) => void,
+    event: 'timerCancelled' | 'alarmState',
+    callback: (data: Record<string, unknown>) => void,
   ) => Promise<{ remove: () => Promise<void> }> | { remove: () => Promise<void> }
+  // v0.35.0: alarma de fin en bucle (BkAlarmService) — la web pinta el overlay
+  getAlarmState?: () => Promise<Record<string, unknown>>
+  ackAlarm?: () => Promise<unknown>
 }
 
 interface CapacitorGlobal {
@@ -483,5 +486,71 @@ export async function cancelNativeCardioEndAlarm(reason: WearStopReason = 'cance
     })
   } catch {
     // nada que cancelar
+  }
+}
+
+// ---------- v0.35.0: la alarma de fin del móvil, pintada por la web ----------
+// zurdi: "en el móvil, en vez de una pantalla específica para el crono
+// terminado, un overlay en la pantalla del entreno con glow naranja". La
+// shell vibra hasta el OK (BkAlarmService) y publica su estado; la web lo
+// escucha (evento alarmState), lo pregunta al volver a primer plano y manda
+// el OK. Todo no-op en web y en shells anteriores.
+export interface NativeAlarmState {
+  ringing: boolean
+  kind: WearTimerKind | null
+  title: string
+  subtitle: string
+}
+
+function toAlarmState(raw: Record<string, unknown> | undefined): NativeAlarmState {
+  const kind = raw?.kind
+  return {
+    ringing: raw?.ringing === true,
+    kind: isWearTimerKind(kind) ? kind : null,
+    title: typeof raw?.title === 'string' ? raw.title : '',
+    subtitle: typeof raw?.subtitle === 'string' ? raw.subtitle : '',
+  }
+}
+
+export async function getNativeAlarmState(): Promise<NativeAlarmState | null> {
+  const plugin = ongoingPlugin()
+  if (!plugin?.getAlarmState) return null
+  try {
+    return toAlarmState(await plugin.getAlarmState())
+  } catch {
+    return null
+  }
+}
+
+export async function ackNativeAlarm(): Promise<void> {
+  const plugin = ongoingPlugin()
+  if (!plugin?.ackAlarm) return
+  try {
+    await plugin.ackAlarm()
+  } catch {
+    // sin alarma que callar
+  }
+}
+
+type NativeAlarmListener = (state: NativeAlarmState) => void
+const alarmListeners = new Set<NativeAlarmListener>()
+let alarmSubscribedTo: OngoingPlugin | null = null
+
+export function onNativeAlarm(listener: NativeAlarmListener): () => void {
+  alarmListeners.add(listener)
+  const plugin = ongoingPlugin()
+  if (plugin?.addListener && plugin.getAlarmState && alarmSubscribedTo !== plugin) {
+    alarmSubscribedTo = plugin
+    try {
+      void plugin.addListener('alarmState', (event) => {
+        const state = toAlarmState(event)
+        for (const callback of [...alarmListeners]) callback(state)
+      })
+    } catch {
+      alarmSubscribedTo = null
+    }
+  }
+  return () => {
+    alarmListeners.delete(listener)
   }
 }

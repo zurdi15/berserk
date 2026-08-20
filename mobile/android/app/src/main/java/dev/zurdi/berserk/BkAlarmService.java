@@ -20,6 +20,8 @@ import android.util.Log;
 import androidx.core.app.ServiceCompat;
 import androidx.core.content.ContextCompat;
 
+import com.getcapacitor.JSObject;
+
 /**
  * v0.34.0 (zurdi: "en la apk del móvil quiero el mismo comportamiento que en
  * el reloj: que vibre hasta que el user le dé a OK"). Mismo diseño que
@@ -28,7 +30,7 @@ import androidx.core.content.ContextCompat;
  * de fin (BkRestEndReceiver) — arranque exento de la restricción de
  * foreground services en segundo plano —, vibración en bucle como ALARMA y
  * tres caminos para el OK: la pantalla nativa que se abre sola (full-screen
- * intent, BkAlarmActivity), la acción de la notificación y descartarla. El
+ * intent → la app, cuyo overlay trae el OK), la acción de la notificación y descartarla. El
  * OK también calla la alarma del reloj (publica el stopped/cancelled) y el
  * del reloj llega aquí por BkWearListenerService.
  */
@@ -83,7 +85,16 @@ public class BkAlarmService extends Service {
     /** Una serie nueva, un cancelar o el OK del reloj: fuera la alarma (idempotente). */
     static void stopIfRunning() {
         BkAlarmService current = instance;
-        if (current != null) current.finish(true);
+        if (current != null) {
+            BkAlarmEvents.publish(BkAlarmEvents.idle());
+            current.finish(true);
+        }
+    }
+
+    /** El OK del overlay de la web: como el de la notificación (calla también el reloj). */
+    static void acknowledgeIfRunning() {
+        BkAlarmService current = instance;
+        if (current != null) current.acknowledge(false);
     }
 
     static boolean isRinging(String kind) {
@@ -146,6 +157,7 @@ public class BkAlarmService extends Service {
         startVibration();
         handler.removeCallbacks(timeout);
         handler.postDelayed(timeout, ALARM_MAX_MS);
+        BkAlarmEvents.publish(state(true));
         if (cached == null) {
             // la foto llega después: se actualiza la misma notificación de primer plano
             BkNotifications.loadArt(app, imageUrl, art -> {
@@ -157,10 +169,20 @@ public class BkAlarmService extends Service {
         return START_NOT_STICKY;
     }
 
+    private JSObject state(boolean ringing) {
+        JSObject state = new JSObject();
+        state.put("ringing", ringing);
+        state.put("kind", kind == null ? "" : kind);
+        state.put("title", title == null ? "" : title);
+        state.put("subtitle", subtitle == null ? "" : subtitle);
+        return state;
+    }
+
     /** @param timedOut nadie dio al OK en el tope: callar y dejar el aviso silencioso */
     private void acknowledge(boolean timedOut) {
         Context app = getApplicationContext();
         String ackedKind = kind;
+        BkAlarmEvents.publish(BkAlarmEvents.idle());
         finish(!timedOut);
         if (timedOut) {
             BkNotifications.postEnd(app, notificationId, title, "", subtitle, channelName, imageUrl, null);
@@ -187,7 +209,10 @@ public class BkAlarmService extends Service {
     public void onDestroy() {
         handler.removeCallbacks(timeout);
         stopVibration();
-        if (instance == this) instance = null;
+        if (instance == this) {
+            instance = null;
+            BkAlarmEvents.publish(BkAlarmEvents.idle());
+        }
         super.onDestroy();
     }
 

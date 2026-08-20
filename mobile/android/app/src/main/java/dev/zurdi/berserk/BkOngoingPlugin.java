@@ -36,6 +36,18 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "BkOngoing")
 public class BkOngoingPlugin extends Plugin {
 
+    /**
+     * v0.35.0 — el bug del anillo del reloj: PluginCall.getLong solo devuelve
+     * el valor si el JSON ya lo trae como Long; un número pequeño (totalMs =
+     * 90000) llega como Integer y getLong devolvía el DEFAULT (0). Los epoch
+     * (grandes) sí llegan como Long, por eso los tiempos iban bien y el anillo
+     * (que depende de totalMs) nunca tuvo datos. Cualquier Number vale.
+     */
+    static long optLong(PluginCall call, String key, long fallback) {
+        Object value = call.getData().opt(key);
+        return value instanceof Number ? ((Number) value).longValue() : fallback;
+    }
+
     private PendingIntent launchIntent() {
         Intent intent = getContext().getPackageManager()
                 .getLaunchIntentForPackage(getContext().getPackageName());
@@ -59,7 +71,7 @@ public class BkOngoingPlugin extends Plugin {
                     call.getInt("id", 1003),
                     call.getString("title", "berserk"),
                     call.getString("subtitle", ""),
-                    call.getLong("whenMs", System.currentTimeMillis()),
+                    optLong(call, "whenMs", System.currentTimeMillis()),
                     false,
                     call.getString("channelName", "berserk"),
                     call.getString("imageUrl", ""),
@@ -79,7 +91,7 @@ public class BkOngoingPlugin extends Plugin {
                     call.getInt("id", 1002),
                     call.getString("title", "berserk"),
                     call.getString("subtitle", ""),
-                    call.getLong("whenMs", System.currentTimeMillis()),
+                    optLong(call, "whenMs", System.currentTimeMillis()),
                     true,
                     call.getString("channelName", "berserk"),
                     call.getString("imageUrl", ""),
@@ -139,7 +151,7 @@ public class BkOngoingPlugin extends Plugin {
     @PluginMethod
     public void scheduleEndAlarm(PluginCall call) {
         try {
-            long whenMs = call.getLong("whenMs", System.currentTimeMillis());
+            long whenMs = optLong(call, "whenMs", System.currentTimeMillis());
             android.app.AlarmManager alarms =
                     (android.app.AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
             PendingIntent operation = endAlarmIntent(
@@ -271,6 +283,8 @@ public class BkOngoingPlugin extends Plugin {
 
     @Override
     public void load() {
+        // v0.35.0: la web pinta el overlay de la alarma a partir de este estado
+        BkAlarmEvents.setSink(state -> getBridge().executeOnMainThread(() -> notifyListeners("alarmState", state, true)));
         // BkWearListenerService corre en este proceso pero sin bridge: le
         // dejamos un sumidero para que una cancelación desde el reloj llegue
         // a la web como evento del plugin (nativeShell.onWearTimerCancelled)
@@ -284,6 +298,25 @@ public class BkOngoingPlugin extends Plugin {
     @Override
     protected void handleOnDestroy() {
         BkWearEvents.setSink(null);
+        BkAlarmEvents.setSink(null);
+    }
+
+    /** v0.35.0: ¿está sonando la alarma de fin? (la web lo pregunta al volver) */
+    @PluginMethod
+    public void getAlarmState(PluginCall call) {
+        call.resolve(BkAlarmEvents.current());
+    }
+
+    /** v0.35.0: el OK del overlay de la web */
+    @PluginMethod
+    public void ackAlarm(PluginCall call) {
+        try {
+            BkAlarmService.acknowledgeIfRunning();
+            if (getActivity() != null) getActivity().setShowWhenLocked(false);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(e.toString());
+        }
     }
 
     /** Publica el estado de un temporizador para el reloj (DataItem /berserk/timer/&lt;kind&gt;). */
@@ -296,8 +329,8 @@ public class BkOngoingPlugin extends Plugin {
                 call.reject("syncTimer: kind/state inválidos");
                 return;
             }
-            long targetEpochMs = call.getLong("targetEpochMs", 0L);
-            long totalMs = call.getLong("totalMs", 0L);
+            long targetEpochMs = optLong(call, "targetEpochMs", 0L);
+            long totalMs = optLong(call, "totalMs", 0L);
             String title = call.getString("title", "");
             String reason = call.getString("reason", "");
             BkWear.publishTimer(getContext(), kind, state, targetEpochMs, totalMs, title, reason);

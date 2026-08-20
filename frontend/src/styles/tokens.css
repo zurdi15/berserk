@@ -43,6 +43,7 @@
   --bk-z-sheet: 50;
   --bk-z-toast: 60;
   --bk-z-timer: 70;
+  --bk-z-alarm: 80;
   --bk-z-noise: 90;
   --bk-shadow-aurora: 0 0 20px var(--bk-aurora-glow);
   --bk-shadow-ember: 0 0 24px var(--bk-ember-glow);

@@ -104,10 +104,11 @@ final class BkNotifications {
                         String channelName, String imageUrl, Runnable done) {
         Context app = ctx.getApplicationContext();
         ensureAlertsChannel(app, channelName);
-        String second = TextUtils.isEmpty(subtitle) ? body : subtitle;
+        final String headline = TextUtils.isEmpty(subtitle) ? title : subtitle;
+        final String detail = TextUtils.isEmpty(subtitle) ? body : title;
         loadArt(app, imageUrl, art -> {
             try {
-                notify(app, id, build(app, CHANNEL_ALERTS, title, second, System.currentTimeMillis(), false, false, false, false, art));
+                notify(app, id, build(app, CHANNEL_ALERTS, headline, detail, System.currentTimeMillis(), false, false, false, false, art));
             } finally {
                 if (done != null) done.run();
             }
@@ -133,15 +134,23 @@ final class BkNotifications {
                                           String channelName, String imageUrl, Bitmap art) {
         ensureAlertsChannel(ctx, channelName);
         PendingIntent ack = BkAlarmService.ackIntent(ctx, kind);
+        // v0.35.0: abre la app normal con la marca de alarma (MainActivity se
+        // muestra sobre el bloqueo y enciende la pantalla); la web pinta el
+        // overlay con el OK. Sin "¡Tiempo!": el ejercicio es el titular.
+        Intent launch = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
+        if (launch == null) launch = new Intent(ctx, MainActivity.class);
+        launch.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(MainActivity.EXTRA_ALARM, true);
         PendingIntent open = PendingIntent.getActivity(
-                ctx, 4201 + ("cardio".equals(kind) ? 1 : 0),
-                BkAlarmActivity.intent(ctx, kind, title, subtitle, imageUrl),
+                ctx, 4201 + ("cardio".equals(kind) ? 1 : 0), launch,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        final String headline = TextUtils.isEmpty(subtitle) ? title : subtitle;
+        final String detail = TextUtils.isEmpty(subtitle) ? "" : title;
         Notification.Builder builder = new Notification.Builder(ctx, CHANNEL_ALERTS)
                 .setSmallIcon(smallIcon(ctx))
                 .setColor(ctx.getColor(R.color.bk_aurora))
-                .setContentTitle(title)
-                .setContentText(TextUtils.isEmpty(subtitle) ? body : subtitle)
+                .setContentTitle(headline)
+                .setContentText(detail)
                 .setCategory(Notification.CATEGORY_ALARM)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)

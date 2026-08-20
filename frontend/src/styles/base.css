@@ -392,3 +392,24 @@ body::before {
 .bk-safe-top {
   padding-top: env(safe-area-inset-top, var(--safe-area-inset-top, 0px));
 }
+
+/* v0.35.0 overlay de la alarma de fin (shell): vacío casi opaco y un halo
+   ámbar radial que respira al ritmo de la vibración nativa (~2 s) */
+.bk-alarm-overlay {
+  background: color-mix(in srgb, var(--bk-bg-void) 90%, transparent);
+  backdrop-filter: blur(6px);
+}
+.bk-alarm-halo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--bk-accent-ember) 38%, transparent) 0%, transparent 70%);
+  animation: bk-alarm-breathe calc(var(--bk-dur-5) * 2) var(--bk-ease-inout) infinite alternate;
+}
+@keyframes bk-alarm-breathe {
+  from { opacity: 0.45; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-alarm-halo { animation: none; opacity: 0.8; }
+}

@@ -11,9 +11,7 @@
     <string name="notif_countdown_text">Cuenta atrás en marcha</string>
     <string name="notif_stopwatch_text">Tiempo de entreno</string>
 
-    <string name="time_up">¡Tiempo!</string>
     <string name="ok">OK</string>
-    <string name="alarm_hint">Pulsa OK para parar la alarma</string>
     <string name="cancel">Cancelar</string>
     <string name="workout_elapsed">Entrenando · %1$s</string>
 
