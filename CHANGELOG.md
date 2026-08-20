@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.36.1 - 2026-08-20
+
+### Cambiado
+- Reloj: la esfera muestra solo el nombre del ejercicio (sin «Descanso ·» / «Cardio ·») y, bajo la cuenta atrás, el tiempo de entreno a secas, sin la etiqueta «Entrenando».
+
 ## 0.36.0 - 2026-08-20
 
 ### Añadido
