@@ -13,6 +13,7 @@ val Ember = Color(0xFFFF8A3D)
 val Ink = Color(0xFFE8EDF2)
 val InkMuted = Color(0xFF9AA4B2)
 val Void = Color(0xFF0A0C0F)
+val Slab = Color(0xFF1A1E25)
 
 private val BerserkColors = ColorScheme(
     primary = Aurora,

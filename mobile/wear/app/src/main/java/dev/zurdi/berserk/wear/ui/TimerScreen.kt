@@ -51,6 +51,7 @@ import dev.zurdi.berserk.wear.core.TimerFormat
 import dev.zurdi.berserk.wear.core.TimerKind
 import dev.zurdi.berserk.wear.notify.Haptics
 import dev.zurdi.berserk.wear.sync.PhoneLink
+import dev.zurdi.berserk.wear.ui.theme.Slab
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -148,14 +149,17 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
                 // externa"): el anillo nítido es el indicador oficial de Material 3
                 // —grueso y pegado al borde—; el halo propio va centrado en su
                 // misma trayectoria (2dp de margen + media anchura de trazo)
-                GlowRing(progress = timer.progress(now), color = accent, glow = glow, centerInset = RING_PADDING + RING_STROKE / 2, drawCore = false)
+                // v0.33.1: el arco es el tiempo TRANSCURRIDO (empieza vacío) sobre
+                // una pista gris tenue — la fracción restante llenaba el anillo
+                // casi entero desde el principio y se leía como fondo
+                GlowRing(progress = timer.elapsedFraction(now), color = accent, glow = glow, centerInset = RING_PADDING + RING_STROKE / 2, drawCore = false)
                 CircularProgressIndicator(
-                    progress = { timer.progress(now) },
+                    progress = { timer.elapsedFraction(now) },
                     modifier = Modifier.fillMaxSize().padding(RING_PADDING),
                     strokeWidth = RING_STROKE,
                     colors = ProgressIndicatorDefaults.colors(
                         indicatorColor = accent,
-                        trackColor = accent.copy(alpha = 0.16f),
+                        trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f),
                     ),
                 )
             } else {
@@ -197,7 +201,14 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
                 }
                 if (countsDown) {
                     Spacer(Modifier.height(10.dp))
-                    FilledTonalButton(onClick = onCancel) {
+                    // colores explícitos: el tonal por defecto de M3 salía lavanda
+                    FilledTonalButton(
+                        onClick = onCancel,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = Slab,
+                            contentColor = MaterialTheme.colorScheme.primary,
+                        ),
+                    ) {
                         Text(stringResource(R.string.cancel))
                     }
                 }

@@ -56,7 +56,9 @@ class TimerBoardTest {
         assertEquals(60_000L, rest.remainingMs(40_000L))
         assertEquals(30_000L, rest.elapsedMs(40_000L))
         assertEquals(60f / 90f, rest.progress(40_000L), 0.0001f)
+        assertEquals(30f / 90f, rest.elapsedFraction(40_000L), 0.0001f)
         assertEquals(0f, rest.progress(200_000L), 0f)
+        assertEquals(1f, rest.elapsedFraction(200_000L), 0f)
         assertTrue(!rest.isDue(99_999L))
         assertTrue(rest.isDue(100_000L))
 
@@ -64,6 +66,7 @@ class TimerBoardTest {
         assertEquals(0L, workout.remainingMs(50_000L))
         assertEquals(40_000L, workout.elapsedMs(50_000L))
         assertEquals(0f, workout.progress(50_000L), 0f)
+        assertEquals(0f, workout.elapsedFraction(50_000L), 0f)
         assertTrue(!workout.isDue(999_999L))
     }
 }

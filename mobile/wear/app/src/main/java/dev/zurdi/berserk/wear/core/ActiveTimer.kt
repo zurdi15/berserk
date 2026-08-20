@@ -34,5 +34,14 @@ data class ActiveTimer(
         if (!kind.countsDown || spec.totalMs <= 0L) 0f
         else (remainingMs(nowEpochMs).toFloat() / spec.totalMs.toFloat()).coerceIn(0f, 1f)
 
+    /**
+     * v0.33.1 (zurdi, foto en mano: "veo una circunferencia pero es como si
+     * fuese el fondo, sin la barra de progreso"): fracción TRANSCURRIDA — el
+     * anillo empieza vacío y se llena; con la fracción restante, a los 12 s
+     * de un cardio de 10 min el arco estaba al 98 % y se leía como decoración.
+     */
+    fun elapsedFraction(nowEpochMs: Long): Float =
+        if (!kind.countsDown || spec.totalMs <= 0L) 0f else 1f - progress(nowEpochMs)
+
     fun isDue(nowEpochMs: Long): Boolean = kind.countsDown && remainingMs(nowEpochMs) <= 0L
 }
