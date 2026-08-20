@@ -17,6 +17,7 @@ import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { exerciseImageUrl } from '@/api/domain'
+import { runeDataUrl } from '@/utils/runeImage'
 import {
   cancelNativeCardioEndAlarm,
   onWearTimerCancelled,
@@ -166,8 +167,6 @@ watch(
 )
 
 const name = computed(() => exerciseName(props.exercise, props.locale))
-// v0.30.0: la imagen del ejercicio viaja a las notificaciones del móvil (descanso y cardio)
-const exerciseImage = computed(() => (props.exercise?.has_image ? exerciseImageUrl(props.exercise.id) : undefined))
 
 // v0.28.0 reloj + shell (zurdi: "vamos directamente a por la C"): el
 // countdown de cardio sale de la web — cuenta atrás ongoing en la barra del
@@ -213,6 +212,18 @@ onBeforeUnmount(stopWearCancel)
 
 // runa del grupo muscular primario del ejercicio, si el catálogo lo resuelve
 const primaryRune = computed<RuneName | null>(() => resolvePrimaryRune(props.exercise, props.muscleGroups))
+// v0.30.0: la imagen del ejercicio viaja a las notificaciones del móvil (descanso y cardio).
+// v0.34.1: sin foto, la runa del grupo muscular (como BkMedia), pre-rasterizada
+// en cuanto se conoce para que el arranque del descanso siga siendo síncrono
+const runeArt = ref<string | undefined>(undefined)
+watch(
+  () => primaryRune.value ?? 'berserk',
+  async (rune) => {
+    runeArt.value = await runeDataUrl(rune)
+  },
+  { immediate: true },
+)
+const exerciseImage = computed(() => (props.exercise?.has_image ? exerciseImageUrl(props.exercise.id) : runeArt.value))
 
 const index = computed(() => props.exerciseIds.indexOf(props.workoutExercise.id))
 const isFirst = computed(() => index.value <= 0)

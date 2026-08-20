@@ -8,6 +8,8 @@ import { i18n } from '@/i18n'
 import { normalizeSupersets } from '@/lib/supersets'
 import { isNativeShell, startNativeWorkoutChronometer, stopNativeWorkoutChronometer, syncWearTimer } from '@/utils/nativeShell'
 import { routineImageUrl } from '@/api/domain'
+import { isValidRuneName } from '@/lib/runeResolve'
+import { runeDataUrl } from '@/utils/runeImage'
 import { online } from '@/offline/net'
 import * as outbox from '@/offline/outbox'
 import { useRestTimerStore } from '@/stores/restTimer'
@@ -54,9 +56,22 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
         const parsedMs = startedAt ? Date.parse(`${startedAt}Z`) : Date.now()
         const startedMs = Number.isFinite(parsedMs) ? parsedMs : Date.now()
         const title = i18n.global.t('workout.ongoingTitle')
-        // v0.30.0: la imagen de la rutina (si la tiene) ilustra la tarjeta de la barra del móvil
+        // v0.30.0: la imagen de la rutina ilustra la tarjeta de la barra del
+        // móvil; v0.34.1: sin foto, su runa (como el hero del pre-inicio), y sin
+        // rutina, el bindrune de la casa. Resolver la rutina es asíncrono (la
+        // lista viene de la cache de lecturas): el crono arranca en cuanto se sabe
         const routineId = workout.value.routine_id
-        void startNativeWorkoutChronometer(startedMs, title, { imageUrl: routineId != null ? routineImageUrl(routineId) : undefined })
+        void (async () => {
+          let imageUrl: string | undefined
+          try {
+            const routine = routineId != null ? (await domain.listRoutines()).find((r) => r.id === routineId) : undefined
+            if (routine?.has_image) imageUrl = routineImageUrl(routine.id)
+            else imageUrl = await runeDataUrl(routine?.rune && isValidRuneName(routine.rune) ? routine.rune : 'berserk')
+          } catch {
+            imageUrl = undefined
+          }
+          void startNativeWorkoutChronometer(startedMs, title, { imageUrl })
+        })()
         // v0.28.0 reloj: el crono del entreno también va a la Data Layer —
         // el reloj lo pinta pequeño bajo la cuenta atrás, o en la esfera si
         // no hay ninguna en marcha

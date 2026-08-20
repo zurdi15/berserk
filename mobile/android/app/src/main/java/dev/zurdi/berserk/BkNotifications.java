@@ -21,6 +21,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
 import android.util.LruCache;
 import android.view.View;
@@ -312,6 +313,20 @@ final class BkNotifications {
     }
 
     private static Bitmap fetch(String url) {
+        // v0.34.1: la web manda la runa (rutina sin foto, ejercicio sin foto) ya
+        // rasterizada como data URL — misma tubería que una foto, sin red
+        if (url.startsWith("data:")) {
+            try {
+                int comma = url.indexOf(',');
+                if (comma < 0) return null;
+                byte[] bytes = Base64.decode(url.substring(comma + 1), Base64.DEFAULT);
+                Bitmap decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                return decoded == null ? null : rounded(decoded, ART_PX, ART_PX * 0.2f);
+            } catch (Exception e) {
+                Log.w(TAG, "data URL ilegible: " + e.getMessage());
+                return null;
+            }
+        }
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) new URL(url).openConnection();
