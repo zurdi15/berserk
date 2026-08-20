@@ -36,10 +36,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import dev.zurdi.berserk.wear.R
@@ -56,6 +58,9 @@ private const val TICK_MS = 250L
 
 /** últimos segundos: el anillo y los dígitos pasan a ámbar, el halo respira y hay tic háptico 3-2-1 */
 private const val URGENT_MS = 10_000L
+
+private val RING_PADDING = 2.dp
+private val RING_STROKE = 7.dp
 
 /**
  * Una sola pantalla con cuatro estados, por prioridad: alarma esperando el
@@ -141,7 +146,20 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (countsDown) {
                 Halo(color = accent, alpha = if (urgent) 0.28f * pulse else 0.10f, radiusFraction = 0.9f)
-                GlowRing(progress = timer.progress(now), color = accent, glow = glow)
+                // v0.31.2 (zurdi: "no veo la cuenta atrás de la circunferencia
+                // externa"): el anillo nítido es el indicador oficial de Material 3
+                // —grueso y pegado al borde—; el halo propio va centrado en su
+                // misma trayectoria (2dp de margen + media anchura de trazo)
+                GlowRing(progress = timer.progress(now), color = accent, glow = glow, centerInset = RING_PADDING + RING_STROKE / 2, drawCore = false)
+                CircularProgressIndicator(
+                    progress = { timer.progress(now) },
+                    modifier = Modifier.fillMaxSize().padding(RING_PADDING),
+                    strokeWidth = RING_STROKE,
+                    colors = ProgressIndicatorDefaults.colors(
+                        indicatorColor = accent,
+                        trackColor = accent.copy(alpha = 0.16f),
+                    ),
+                )
             } else {
                 Halo(color = MaterialTheme.colorScheme.primary, alpha = 0.08f + 0.05f * pulse, radiusFraction = 0.8f)
             }

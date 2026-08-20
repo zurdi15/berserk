@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -41,20 +42,39 @@ fun rememberPulse(periodMs: Int, label: String = "pulse"): State<Float> {
     )
 }
 
-/** Anillo de progreso con halo: pista tenue, halo ancho translúcido y arco fino encima. */
+/**
+ * Halo de progreso: un arco ANCHO y translúcido centrado a [centerInset] del
+ * borde (donde pasa el anillo nítido que se pinte encima) y, si [drawCore],
+ * también el arco fino y la pista. v0.31.2: en la pantalla de cuenta atrás el
+ * anillo nítido lo pinta el CircularProgressIndicator de Material 3 y aquí
+ * solo queda el halo; el arco propio sigue en la pantalla de alarma.
+ */
 @Composable
-fun GlowRing(progress: Float, color: Color, glow: Float, modifier: Modifier = Modifier, track: Color = Color.White.copy(alpha = 0.08f)) {
+fun GlowRing(
+    progress: Float,
+    color: Color,
+    glow: Float,
+    modifier: Modifier = Modifier,
+    centerInset: Dp = 13.dp,
+    haloWidth: Dp = 22.dp,
+    drawCore: Boolean = true,
+    track: Color = Color.White.copy(alpha = 0.08f),
+) {
     Canvas(modifier = modifier.fillMaxSize()) {
         val stroke = 6.dp.toPx()
-        val halo = 22.dp.toPx()
-        val inset = halo / 2f + 2.dp.toPx()
+        val halo = haloWidth.toPx()
+        val inset = centerInset.toPx()
         val arcSize = Size(size.width - inset * 2f, size.height - inset * 2f)
         val topLeft = Offset(inset, inset)
-        drawArc(track, -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+        if (drawCore) {
+            drawArc(track, -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+        }
         val sweep = 360f * progress.coerceIn(0f, 1f)
         if (sweep > 0f) {
             drawArc(color.copy(alpha = 0.30f * glow), -90f, sweep, false, topLeft, arcSize, style = Stroke(halo, cap = StrokeCap.Round))
-            drawArc(color, -90f, sweep, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+            if (drawCore) {
+                drawArc(color, -90f, sweep, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+            }
         }
     }
 }

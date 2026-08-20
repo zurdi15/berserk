@@ -52,6 +52,10 @@ Para actualizar, repite `adb connect` + `adb install -r`. La app del reloj es de
 
 En debug, las dos APKs (shell y reloj) tienen que firmarse con el **mismo** keystore de debug (la misma máquina) y sin `applicationIdSuffix`: la Data Layer falla en silencio si el paquete o la firma no coinciden.
 
+## Now Bar de One UI 8 Watch
+
+La Now Bar del reloj muestra por defecto **solo el icono** de las apps de terceros; el tiempo en vivo aparece al cambiar el modo **por app**: en el reloj, *Ajustes → Now Bar → berserk → Icono con texto* (el ajuste no es global: el temporizador de Samsung puede estar en texto y berserk en icono). No depende de nada de la app — v0.31.1 probó con un foreground service y no hacía falta. Con Wear OS 7 (One UI 9 Watch) los temporizadores van además como Live Update.
+
 ## Depurar
 
 ```

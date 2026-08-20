@@ -40,9 +40,6 @@ class TimerNotifier(context: Context) {
     fun render(board: TimerBoard, nowEpochMs: Long) {
         ensureChannels()
         val primary = board.primary()
-        // v0.31.1: sin temporizador vivo, el foreground service se va ANTES de
-        // cancelar (una notificación de primer plano ignora cancel())
-        if (primary == null) TimerForegroundService.stopIfRunning()
         for (kind in TimerKind.entries) {
             val timer = board.timers[kind]
             if (timer == null || timer.isFinished) {
@@ -51,7 +48,6 @@ class TimerNotifier(context: Context) {
             }
             manager.notify(kind.notificationId, ongoingNotification(timer, withOngoingActivity = primary?.kind == kind, nowEpochMs = nowEpochMs))
         }
-        if (primary != null) TimerForegroundService.sync(ctx)
     }
 
     fun cancelOngoing(kind: TimerKind) {
@@ -107,13 +103,15 @@ class TimerNotifier(context: Context) {
         manager.cancel(kind.doneNotificationId)
     }
 
-    /** La notificación ongoing de un temporizador (la publica render; la adopta TimerForegroundService). */
+    /** La notificación ongoing de un temporizador. */
     fun ongoingNotification(timer: ActiveTimer, withOngoingActivity: Boolean, nowEpochMs: Long): Notification {
         val kind = timer.kind
         val title = titleOf(timer)
         val builder = NotificationCompat.Builder(ctx, CHANNEL_TIMERS)
             .setSmallIcon(R.drawable.ic_stat_berserk)
-            // v0.31.1: el color "de la app" que Samsung pinta en su Now Bar
+            // v0.31.1: el color de la app, que la Now Bar de One UI 8 Watch pinta
+            // en su barra (el texto del tiempo NO depende de nada de esto: es el
+            // modo "icono con texto" POR APP de la propia Now Bar — v0.31.2)
             .setColor(ctx.getColor(R.color.aurora))
             .setContentTitle(title)
             .setContentText(
