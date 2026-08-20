@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.33.2 - 2026-08-20
+
+### Arreglado
+- Reloj: al llegar a cero, la app ya no parpadea ni se reabre varias veces — la alarma no se rearmaba por releer el mismo temporizador al abrirse.
+
 ## 0.33.1 - 2026-08-20
 
 ### Arreglado
