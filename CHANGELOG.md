@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.27.0 - 2026-08-20
+
+### Añadido
+- Ya puedes cambiar tu nombre de usuario, en Perfil → Cuenta.
+- El cambio de contraseña pide la actual y la nueva dos veces, para que una errata no te deje fuera de tu cuenta.
+
+### Cambiado
+- Perfil se ordena en dos secciones: **Ajustes**, con todo lo de la app (tema, idioma, unidades, zona horaria y la versión instalada), y **Cuenta**, con todo lo tuyo (foto, nombre de usuario, color y contraseña).
+- La foto de perfil se cambia tocando el avatar, y se quita desde Cuenta.
+
+### Eliminado
+- Los botones "Editar" y "Quitar foto" que colgaban debajo de la foto de perfil.
+
 ## 0.26.0 - 2026-08-20
 
 ### Añadido
