@@ -80,7 +80,21 @@ Thin Capacitor Android shell: a WebView pointed at the production server URL in 
    ```
 
    The commit message convention in that repo is bare `berserk: X.Y.Z` (not Conventional Commits — match the neighbours).
-4. **Confirm it rolled out.** ArgoCD auto-syncs within a couple of minutes; verify the pod is actually `Running` on the new image rather than assuming (`kubectl -n apps get pods -l app=berserk`, or curl the version off `https://berserk.ginnugagap.net`). A tag that fails to pull leaves the old pod serving happily, so silence is not success.
+4. **Force the ArgoCD refresh, then confirm it rolled out.** Do not wait on auto-sync: push the refresh so ArgoCD re-reads the repo now. The `argocd` binary is **not** installed on the host — this homelab drives it by annotating the `Application` (the same thing the Telegram bot's `/argocd` hard-refresh button does). The `Application` objects live in the `argocd` namespace, while the workloads live in `apps`:
+
+   ```bash
+   ssh ginnugagap 'kubectl -n argocd annotate application berserk argocd.argoproj.io/refresh=hard --overwrite'
+   ```
+
+   Then verify, rather than assuming: the `Application` should report `Synced`/`Healthy` at the revision you just pushed, and the pod should be `Running` on the new image.
+
+   ```bash
+   ssh ginnugagap 'kubectl -n argocd get application berserk \
+       -o jsonpath="{.status.sync.status} {.status.health.status} {.status.sync.revision}"; \
+     kubectl -n apps get pods -l app=berserk'
+   ```
+
+   For a real end-to-end check, the version is baked into the served bundle — pull the `/assets/index-*.js` referenced by `https://berserk.ginnugagap.net/` and grep it for `X.Y.Z`. A tag that fails to pull leaves the old pod serving happily, so silence is not success.
 5. **Notify over Telegram.** Use the `telegram-notify` skill, which lives in the ginnugagap repo (`telegram_bot/claude-skill/SKILL.md`, symlinked into `~/.claude/skills/` **on the server**, not on the dev machine). From here it is reachable over SSH by absolute path — the wrapper is not on `PATH` in a non-interactive shell:
 
    ```bash
