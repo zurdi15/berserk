@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.26.0 - 2026-08-20
+
+### Añadido
+- Carga de imágenes con blur: cada imagen subida genera una miniatura que se muestra al instante (borrosa) mientras carga la real — y las ya subidas ganan la suya automáticamente al arrancar el backend.
+- Si una imagen no puede cargar, siempre aparece el placeholder rúnico de la app (nunca el icono de imagen rota del navegador).
+
+### Cambiado
+- Entrenos y Cuerpo aprovechan ahora la precarga del arranque: la lista de ejercicios y tus medidas/fotos pintan al instante.
+
 ## 0.25.2 - 2026-08-20
 
 ### Arreglado
