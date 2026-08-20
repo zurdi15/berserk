@@ -138,6 +138,9 @@ export const es = {
     libraryTab: 'Biblioteca',
     adminTab: 'Admin',
     updateShell: 'Actualizar app a v{version}',
+    timerNotification: 'Cronómetro en la barra',
+    timerNotificationLive: 'Chip en vivo (Now Bar)',
+    timerNotificationCard: 'Tarjeta con imagen',
     wear: {
       linked: 'Reloj vinculado: {name}',
       appMissing: 'Reloj conectado, pero sin la app de berserk',

@@ -17,7 +17,7 @@ import { setTheme } from '@/utils/theme'
 // compilar), la misma que ve el shell Android porque carga este bundle del
 // servidor. Con el sufijo · app se distingue shell de navegador.
 import { version as appVersion } from '../../../package.json'
-import { getThemeMode, type ThemeMode } from '@/utils/uiPrefs'
+import { getThemeMode, getTimerNotificationStyle, setTimerNotificationStyle, type ThemeMode, type TimerNotificationStyle } from '@/utils/uiPrefs'
 
 // v0.27.0 (zurdi: "el tema del perfil y los ajustes está descolocado"): esta
 // tarjeta se queda SOLO con lo que es la web app —tema, idioma, unidades,
@@ -45,6 +45,8 @@ const shellUpdateAvailable = ref(false)
 // la app de berserk — la primera pregunta de cualquier "no me sale el
 // cronómetro en el reloj". Solo en la shell; en web no existe el puente.
 const wearStatus = ref<WearStatus | null>(null)
+// v0.33.0: estilo de la notificación del cronómetro en la shell (ver uiPrefs)
+const timerNotificationStyle = ref<TimerNotificationStyle>(getTimerNotificationStyle())
 const wearStatusLabel = computed(() => {
   const status = wearStatus.value
   if (!status || !status.playServices) return null
@@ -129,6 +131,20 @@ function pickTheme(mode: ThemeMode) {
         :options="timezones.map(tz => ({ value: tz, label: tz }))"
         data-testid="timezone-select"
         @update:model-value="(val) => save({ timezone: val })"
+      />
+
+      <!-- v0.33.0: solo en la shell — cómo se pinta el cronómetro en la barra
+           de Android (chip en vivo / tarjeta grande); aplica al siguiente timer -->
+      <BkSelect
+        v-if="isNativeShell()"
+        v-model="timerNotificationStyle"
+        :label="$t('profile.timerNotification')"
+        :options="[
+          { value: 'live', label: $t('profile.timerNotificationLive') },
+          { value: 'card', label: $t('profile.timerNotificationCard') },
+        ]"
+        data-testid="timer-notification-select"
+        @update:model-value="(val) => setTimerNotificationStyle(val as TimerNotificationStyle)"
       />
 
       <!-- v0.14.2: versión desplegada, visible para poder verificar que la

@@ -140,3 +140,30 @@ export function setPlateConfig(value: unknown): void {
     // sin persistencia: la config vive lo que la sesión de página
   }
 }
+
+// v0.33.0 (zurdi: "algo así molaría, ese bloque de Spotify"): en Android 16 la
+// shell puede publicar los cronómetros como Live Update (chip en la barra,
+// sección "en tiempo real", Now Bar) o como tarjeta grande con imagen y
+// cronómetro propio. Las dos no caben en una misma notificación (las
+// promovidas no admiten vistas propias) y Samsung solo promueve a terceros
+// con un ajuste de desarrollador: la elección es del usuario, no de una
+// heurística. Solo la lee la shell; en web no aplica.
+export type TimerNotificationStyle = 'live' | 'card'
+const TIMER_NOTIFICATION_STYLE_KEY = 'berserk:timer-notification-style'
+
+export function getTimerNotificationStyle(): TimerNotificationStyle {
+  try {
+    const raw = localStorage.getItem(TIMER_NOTIFICATION_STYLE_KEY)
+    return raw === 'card' ? 'card' : 'live'
+  } catch {
+    return 'live'
+  }
+}
+
+export function setTimerNotificationStyle(style: TimerNotificationStyle): void {
+  try {
+    localStorage.setItem(TIMER_NOTIFICATION_STYLE_KEY, style)
+  } catch {
+    // sin storage: se queda el valor por defecto
+  }
+}

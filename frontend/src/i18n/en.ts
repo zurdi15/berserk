@@ -134,6 +134,9 @@ export const en = {
     libraryTab: 'Library',
     adminTab: 'Admin',
     updateShell: 'Update app to v{version}',
+    timerNotification: 'Timer in the status bar',
+    timerNotificationLive: 'Live chip (Now Bar)',
+    timerNotificationCard: 'Card with image',
     wear: {
       linked: 'Watch linked: {name}',
       appMissing: 'Watch connected, but without the berserk watch app',

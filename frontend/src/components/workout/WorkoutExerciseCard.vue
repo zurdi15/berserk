@@ -183,7 +183,8 @@ let cardioStopReason: WearStopReason = 'cancelled'
 watch(resumedActive, (timer, previous) => {
   if (timer) {
     const title = `${t('timer.cardioOngoingTitle')} · ${name.value}`
-    void startNativeCardioCountdown(timer.endsAt, title, { subtitle: name.value, imageUrl: exerciseImage.value })
+    // en el móvil el ejercicio va como subtítulo: el título es solo el tipo
+    void startNativeCardioCountdown(timer.endsAt, t('timer.cardioOngoingTitle'), { subtitle: name.value, imageUrl: exerciseImage.value })
     void scheduleNativeCardioEndAlarm(
       timer.endsAt,
       t('workout.cardio.timeUp'),

@@ -75,18 +75,24 @@ final class BkNotifications {
     }
 
     /** Cronómetro (hacia arriba) o cuenta atrás ongoing. */
-    static void postTimer(Context ctx, int id, String title, String subtitle, long whenMs,
-                          boolean countDown, String channelName, String imageUrl) {
+    static void postTimer(Context ctx, int id, String kindTitle, String exercise, long whenMs,
+                          boolean countDown, String channelName, String imageUrl, String style) {
         Context app = ctx.getApplicationContext();
         ensureTimersChannel(app, channelName);
+        // v0.33.0: el ejercicio es el titular y el tipo va debajo — antes se
+        // repetía ("Cardio · Elíptica" / "Elíptica")
+        final String title = TextUtils.isEmpty(exercise) ? kindTitle : exercise;
+        final String subtitle = TextUtils.isEmpty(exercise) ? "" : kindTitle;
+        final boolean promote = !"card".equals(style);
         LIVE.put(id, whenMs);
+        Log.i(TAG, "timer " + id + " → " + title + " (" + (promote ? "live" : "card") + ")");
         Bitmap cached = imageUrl == null || imageUrl.isEmpty() ? null : ART.get(imageUrl);
-        notify(app, id, build(app, CHANNEL_TIMERS, title, subtitle, whenMs, true, countDown, true, cached));
+        notify(app, id, build(app, CHANNEL_TIMERS, title, subtitle, whenMs, true, countDown, true, promote, cached));
         if (cached == null && imageUrl != null && !imageUrl.isEmpty()) {
             loadArt(app, imageUrl, art -> {
                 Long current = LIVE.get(id);
                 if (art == null || current == null || current != whenMs) return;
-                notify(app, id, build(app, CHANNEL_TIMERS, title, subtitle, whenMs, true, countDown, true, art));
+                notify(app, id, build(app, CHANNEL_TIMERS, title, subtitle, whenMs, true, countDown, true, promote, art));
             });
         }
     }
@@ -99,7 +105,7 @@ final class BkNotifications {
         String second = TextUtils.isEmpty(subtitle) ? body : subtitle;
         loadArt(app, imageUrl, art -> {
             try {
-                notify(app, id, build(app, CHANNEL_ALERTS, title, second, System.currentTimeMillis(), false, false, false, art));
+                notify(app, id, build(app, CHANNEL_ALERTS, title, second, System.currentTimeMillis(), false, false, false, false, art));
             } finally {
                 if (done != null) done.run();
             }
@@ -108,14 +114,15 @@ final class BkNotifications {
 
     static void cancel(Context ctx, int id) {
         LIVE.remove(id);
+        Log.i(TAG, "cancel " + id);
         manager(ctx).cancel(id);
     }
 
     // ---------- construcción ----------
 
     private static Notification build(Context ctx, String channelId, String title, String subtitle, long whenMs,
-                                      boolean chronometer, boolean countDown, boolean ongoing, Bitmap art) {
-        if (ongoing && chronometer && Build.VERSION.SDK_INT >= 36
+                                      boolean chronometer, boolean countDown, boolean ongoing, boolean promote, Bitmap art) {
+        if (promote && ongoing && chronometer && Build.VERSION.SDK_INT >= 36
                 && manager(ctx).canPostPromotedNotifications()) {
             return buildPromoted(ctx, channelId, title, subtitle, whenMs, countDown, art);
         }

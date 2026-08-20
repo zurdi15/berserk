@@ -62,7 +62,8 @@ public class BkOngoingPlugin extends Plugin {
                     call.getLong("whenMs", System.currentTimeMillis()),
                     false,
                     call.getString("channelName", "berserk"),
-                    call.getString("imageUrl", ""));
+                    call.getString("imageUrl", ""),
+                    call.getString("style", "live"));
             call.resolve();
         } catch (Exception e) {
             call.reject(e.toString());
@@ -81,7 +82,8 @@ public class BkOngoingPlugin extends Plugin {
                     call.getLong("whenMs", System.currentTimeMillis()),
                     true,
                     call.getString("channelName", "berserk"),
-                    call.getString("imageUrl", ""));
+                    call.getString("imageUrl", ""),
+                    call.getString("style", "live"));
             call.resolve();
         } catch (Exception e) {
             call.reject(e.toString());

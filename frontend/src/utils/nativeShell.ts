@@ -17,6 +17,8 @@
 //   corriendo / la cuenta atrás del descanso en barra y pantalla de
 //   bloqueo (plugin propio BkOngoing, ver mobile/android)
 
+import { getTimerNotificationStyle, type TimerNotificationStyle } from '@/utils/uiPrefs'
+
 interface LocalNotificationsPlugin {
   requestPermissions: () => Promise<{ display: string }>
   schedule: (options: { notifications: unknown[] }) => Promise<unknown>
@@ -80,8 +82,9 @@ function absoluteUrl(path?: string): string {
   }
 }
 
-function extrasPayload(extras?: NativeTimerExtras): { subtitle: string; imageUrl: string } {
-  return { subtitle: extras?.subtitle ?? '', imageUrl: absoluteUrl(extras?.imageUrl) }
+function extrasPayload(extras?: NativeTimerExtras): { subtitle: string; imageUrl: string; style: TimerNotificationStyle } {
+  // v0.33.0: 'live' = Live Update (chip) en Android 16, 'card' = tarjeta grande con imagen
+  return { subtitle: extras?.subtitle ?? '', imageUrl: absoluteUrl(extras?.imageUrl), style: getTimerNotificationStyle() }
 }
 
 // ---------- v0.31.0: barras del sistema (shell edge-to-edge, Capacitor 8) ----------

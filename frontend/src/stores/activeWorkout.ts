@@ -216,11 +216,22 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     return result
   }
 
+  // v0.33.0 (zurdi: "al finalizar un entrenamiento la notificación se queda"):
+  // el watch de arriba ya apaga el crono al pasar workout a null, pero se
+  // apaga también aquí, explícito e idempotente — un camino menos que depende
+  // de que Vue observe el cambio justo como esperamos
+  function stopWorkoutChrono() {
+    if (!isNativeShell()) return
+    void stopNativeWorkoutChronometer()
+    void syncWearTimer({ kind: 'workout', state: 'stopped', reason: 'cancelled' })
+  }
+
   async function finish(): Promise<WorkoutOut> {
     if (!offline()) {
       const finished = await domain.finishWorkout(workout.value!.id)
       workout.value = null
       lastRecords.value = []
+      stopWorkoutChrono()
       return finished
     }
     // cierre offline: el resumen se construye del estado local; los PRs de
@@ -230,6 +241,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     outbox.enqueue({ id: outbox.newClientId(), kind: 'finishWorkout', workoutId: finished.id })
     workout.value = null
     lastRecords.value = []
+    stopWorkoutChrono()
     return finished
   }
 
@@ -504,6 +516,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     // registrado sin que el usuario vea qué está tirando
     await domain.deleteWorkout(workout.value!.id)
     workout.value = null
+    stopWorkoutChrono()
     lastRecords.value = []
     // el descarte cierra el entreno, así que un descanso en marcha ya no aplica
     useRestTimerStore().clear()
