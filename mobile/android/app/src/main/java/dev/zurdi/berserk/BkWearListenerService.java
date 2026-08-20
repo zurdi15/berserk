@@ -40,7 +40,7 @@ public class BkWearListenerService extends WearableListenerService {
                 // el entreno no se termina desde el reloj
                 return;
             }
-            BkWear.publishTimer(ctx, kind, "stopped", 0L, 0L, "");
+            BkWear.publishTimer(ctx, kind, "stopped", 0L, 0L, "", "cancelled");
         } catch (Exception ignored) {
             // un throw aquí tumba el proceso (ver BkOngoingPlugin): nunca
         }

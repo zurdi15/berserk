@@ -7,6 +7,8 @@ data class ActiveTimer(
     val receivedAtEpochMs: Long,
     /** epoch local en que la cuenta atrás llegó a cero (alarma); null mientras corre */
     val finishedAtEpochMs: Long? = null,
+    /** epoch local del OK del usuario (o del tope de la alarma); null mientras avisa */
+    val acknowledgedAtEpochMs: Long? = null,
 ) {
     val kind: TimerKind get() = spec.kind
 
@@ -14,6 +16,9 @@ data class ActiveTimer(
     val targetEpochMs: Long get() = spec.targetEpochMs
 
     val isFinished: Boolean get() = finishedAtEpochMs != null
+
+    /** llegó a cero y nadie ha dado al OK todavía: la alarma sigue */
+    val isAlarming: Boolean get() = isFinished && acknowledgedAtEpochMs == null
 
     fun remainingMs(nowEpochMs: Long): Long = if (kind.countsDown) targetEpochMs - nowEpochMs else 0L
 

@@ -61,7 +61,7 @@ final class BkWear {
     }
 
     /** Publica (o sustituye) el DataItem del temporizador. Fire-and-forget: un fallo solo se loguea. */
-    static void publishTimer(Context ctx, String kind, String state, long targetEpochMs, long totalMs, String title) {
+    static void publishTimer(Context ctx, String kind, String state, long targetEpochMs, long totalMs, String title, String reason) {
         if (!playServicesAvailable(ctx)) return;
         PutDataMapRequest request = PutDataMapRequest.create(PATH_PREFIX + kind);
         DataMap map = request.getDataMap();
@@ -71,6 +71,9 @@ final class BkWear {
         map.putLong("targetEpochMs", targetEpochMs);
         map.putLong("totalMs", totalMs);
         map.putString("title", title == null ? "" : title);
+        // v0.29.0: con stopped, "finished" (terminó solo: el reloj sigue
+        // avisando hasta el OK) o "cancelled" (paró el usuario: calla)
+        map.putString("reason", reason == null ? "" : reason);
         // hace único cada arranque (dos descansos idénticos seguidos también
         // disparan onDataChanged) y permite al reloj medir el desfase de relojes
         map.putLong("sentAtEpochMs", System.currentTimeMillis());

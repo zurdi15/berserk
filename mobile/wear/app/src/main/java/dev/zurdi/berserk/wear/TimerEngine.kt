@@ -6,9 +6,12 @@ import android.util.Log
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.Wearable
+import dev.zurdi.berserk.wear.alarm.AlarmService
 import dev.zurdi.berserk.wear.alarm.TimerAlarms
 import dev.zurdi.berserk.wear.core.ActiveTimer
 import dev.zurdi.berserk.wear.core.ClockSync
+import dev.zurdi.berserk.wear.core.StopAction
+import dev.zurdi.berserk.wear.core.StopPolicy
 import dev.zurdi.berserk.wear.core.TimerBoard
 import dev.zurdi.berserk.wear.core.TimerKind
 import dev.zurdi.berserk.wear.core.TimerSpec
@@ -23,9 +26,9 @@ import kotlinx.coroutines.withContext
 
 /**
  * Orquestador: la única puerta por la que entra estado (Data Layer, alarma,
- * UI) y sale a sus tres salidas (repositorio, notificaciones/Ongoing
- * Activity, alarmas). Idempotente a propósito — el mismo DataItem puede
- * llegar dos veces (reconexión + restore) sin efectos dobles.
+ * UI) y sale a sus salidas (repositorio, notificaciones/Ongoing Activity,
+ * alarmas, servicio de alarma). Idempotente a propósito — el mismo DataItem
+ * puede llegar dos veces (reconexión + restore) sin efectos dobles.
  */
 class TimerEngine private constructor(context: Context) {
     private val ctx = context.applicationContext
@@ -41,10 +44,17 @@ class TimerEngine private constructor(context: Context) {
         if (ClockSync.isSuspicious(spec.sentAtEpochMs, nowEpochMs)) {
             Log.w(TAG, "${spec.kind.wireName}: sentAt difiere ${ClockSync.skewMs(spec.sentAtEpochMs, nowEpochMs)} ms de ahora (entrega tardía o reloj desajustado)")
         }
+        val current = repository.board.value.timers[spec.kind]
         if (!spec.running) {
-            stop(spec.kind, nowEpochMs)
+            when (StopPolicy.onStopped(current, spec.reason)) {
+                StopAction.IGNORE -> Log.i(TAG, "${spec.kind.wireName}: stopped/finished con la alarma ya en marcha — se mantiene hasta el OK")
+                StopAction.FINISH_NOW -> onCountdownDue(spec.kind, nowEpochMs)
+                StopAction.STOP -> stop(spec.kind, nowEpochMs)
+            }
             return
         }
+        // una serie nueva mientras la anterior aún avisa: el usuario ya está a otra cosa
+        if (current?.isAlarming == true) silenceAlarm(spec.kind)
         val timer = ActiveTimer(spec, receivedAtEpochMs = nowEpochMs)
         if (timer.kind.countsDown && timer.remainingMs(nowEpochMs) < -STALE_AFTER_MS) {
             // DataItem viejo (reconexión, arranque, app recién instalada): ya
@@ -65,12 +75,14 @@ class TimerEngine private constructor(context: Context) {
         notifier.render(board, nowEpochMs)
     }
 
-    /** Fuera ese temporizador (stopped del móvil, DataItem borrado, cancelación local). */
+    /** Fuera ese temporizador (cancelado en el móvil, DataItem borrado, cancelación local). Calla también la alarma. */
     @Synchronized
     fun stop(kind: TimerKind, nowEpochMs: Long = System.currentTimeMillis()) {
         alarms.cancel(kind)
+        silenceAlarm(kind)
         val board = repository.update { it.without(kind).pruned(nowEpochMs) }
         notifier.cancelOngoing(kind)
+        notifier.cancelDone(kind)
         notifier.render(board, nowEpochMs)
     }
 
@@ -82,7 +94,7 @@ class TimerEngine private constructor(context: Context) {
      */
     fun cancelLocally(kind: TimerKind) = stop(kind)
 
-    /** La cuenta atrás llegó a cero (alarma, o DataItem justo en el filo). */
+    /** La cuenta atrás llegó a cero (alarma, DataItem en el filo, o finished del móvil con alarma tardía). */
     @Synchronized
     fun onCountdownDue(kind: TimerKind, nowEpochMs: Long = System.currentTimeMillis()) {
         val current = repository.board.value.timers[kind] ?: return
@@ -90,9 +102,31 @@ class TimerEngine private constructor(context: Context) {
         val finished = current.copy(finishedAtEpochMs = nowEpochMs)
         val board = repository.update { it.with(finished).pruned(nowEpochMs) }
         alarms.cancel(kind)
-        notifier.showDone(finished)
-        Haptics.timeUp(ctx)
+        notifier.cancelOngoing(kind)
+        // v0.29.0: vibra hasta el OK (AlarmService); si ni siquiera se puede pedir, aviso único
+        if (!AlarmService.start(ctx, kind)) {
+            notifier.showDone(finished, alarming = false)
+            Haptics.timeUp(ctx)
+            acknowledge(kind, nowEpochMs)
+            return
+        }
         notifier.render(board, nowEpochMs)
+    }
+
+    /** El usuario se ha dado por enterado (botón, acción de la notificación, descarte) — o el tope de la alarma. */
+    @Synchronized
+    fun acknowledge(kind: TimerKind, nowEpochMs: Long = System.currentTimeMillis()) {
+        val current = repository.board.value.timers[kind]
+        if (current != null && current.isAlarming) {
+            repository.update { it.with(current.copy(acknowledgedAtEpochMs = nowEpochMs)).pruned(nowEpochMs) }
+        }
+        silenceAlarm(kind)
+        notifier.render(repository.board.value, nowEpochMs)
+    }
+
+    private fun silenceAlarm(kind: TimerKind) {
+        AlarmService.stopIfRunning()
+        notifier.cancelDone(kind)
     }
 
     /** Tras reinicio/actualización: re-pintar y re-programar desde lo persistido, y luego la verdad del móvil. */

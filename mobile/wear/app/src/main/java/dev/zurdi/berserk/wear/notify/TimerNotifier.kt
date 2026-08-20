@@ -1,5 +1,6 @@
 package dev.zurdi.berserk.wear.notify
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -9,6 +10,7 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.wear.ongoing.OngoingActivity
 import androidx.wear.ongoing.Status
+import dev.zurdi.berserk.wear.alarm.AlarmService
 import dev.zurdi.berserk.wear.R
 import dev.zurdi.berserk.wear.core.ActiveTimer
 import dev.zurdi.berserk.wear.core.ClockSync
@@ -52,23 +54,46 @@ class TimerNotifier(context: Context) {
         manager.cancel(kind.notificationId)
     }
 
-    /** la cuenta atrás llegó a cero: fuera la ongoing, y un aviso que vibra y se va solo */
-    fun showDone(timer: ActiveTimer) {
+    /**
+     * Notificación de fin. Alarmando (v0.29.0): ongoing, con la acción OK y
+     * el descarte como OK — es la notificación del AlarmService que vibra
+     * hasta que el usuario se da por enterado. Sin alarma: silenciosa, se
+     * descarta sola.
+     */
+    fun doneNotification(timer: ActiveTimer, alarming: Boolean): Notification {
         ensureChannels()
-        manager.cancel(timer.kind.notificationId)
-        val notification = NotificationCompat.Builder(ctx, CHANNEL_ALERTS)
+        val builder = NotificationCompat.Builder(ctx, CHANNEL_ALERTS)
             .setSmallIcon(R.drawable.ic_stat_berserk)
             .setContentTitle(ctx.getString(R.string.time_up))
             .setContentText(titleOf(timer))
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setVibrate(VIBRATION)
-            .setAutoCancel(true)
-            .setTimeoutAfter(DONE_TIMEOUT_MS)
             .setContentIntent(contentIntent())
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build()
-        manager.notify(timer.kind.doneNotificationId, notification)
+        if (alarming) {
+            val ack = AlarmService.ackIntent(ctx, timer.kind)
+            builder
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setVibrate(VIBRATION)
+                .addAction(R.drawable.ic_stat_berserk, ctx.getString(R.string.ok), ack)
+                .setDeleteIntent(ack)
+        } else {
+            builder
+                .setSilent(true)
+                .setAutoCancel(true)
+                .setTimeoutAfter(DONE_TIMEOUT_MS)
+        }
+        return builder.build()
+    }
+
+    fun showDone(timer: ActiveTimer, alarming: Boolean) {
+        manager.cancel(timer.kind.notificationId)
+        manager.notify(timer.kind.doneNotificationId, doneNotification(timer, alarming))
+    }
+
+    fun cancelDone(kind: TimerKind) {
+        manager.cancel(kind.doneNotificationId)
     }
 
     private fun postOngoing(timer: ActiveTimer, withOngoingActivity: Boolean, nowEpochMs: Long) {

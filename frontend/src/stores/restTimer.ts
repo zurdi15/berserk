@@ -10,6 +10,7 @@ import {
   startNativeRestCountdown,
   stopNativeRestCountdown,
   syncWearTimer,
+  type WearStopReason,
 } from '@/utils/nativeShell'
 
 // timestamps absolutos: el interval solo refresca la vista; si el móvil se
@@ -105,7 +106,9 @@ export const useRestTimerStore = defineStore('restTimer', () => {
         navigator.vibrate?.([200, 100, 200])
         void notifyRestOver()
         // el timeout de gracia sobrevivía a un restart y borraba el timer nuevo
-        graceTimeout = setTimeout(clear, 3000)
+        // v0.29.0: el reloj distingue este clear (terminó solo → sigue
+        // avisando hasta el OK) del de cancelar (calla)
+        graceTimeout = setTimeout(() => clear('finished'), 3000)
       }
     }
   }
@@ -149,7 +152,7 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     ticker = setInterval(tick, 500)
   }
 
-  function clear() {
+  function clear(reason: WearStopReason = 'cancelled') {
     // cancelar timeout de gracia si existe
     if (graceTimeout) clearTimeout(graceTimeout)
     // v0.13.0 shell Android: un descanso cancelado a mano no debe sonar
@@ -157,7 +160,7 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     if (isNativeShell()) {
       void cancelNativeRestNotification()
       void stopNativeRestCountdown()
-      void syncWearTimer({ kind: 'rest', state: 'stopped' })
+      void syncWearTimer({ kind: 'rest', state: 'stopped', reason })
     }
     endsAt.value = null
     total.value = 0

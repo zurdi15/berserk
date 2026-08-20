@@ -146,9 +146,12 @@ describe('reloj Wear OS — syncWearTimer / getWearStatus / onWearTimerCancelled
       targetEpochMs: 5_000,
       totalMs: 4_000,
       title: 'Cardio · Cinta',
+      reason: '',
     })
     await syncWearTimer({ kind: 'cardio', state: 'stopped' })
-    expect(syncTimer).toHaveBeenLastCalledWith({ kind: 'cardio', state: 'stopped', targetEpochMs: 0, totalMs: 0, title: '' })
+    expect(syncTimer).toHaveBeenLastCalledWith({ kind: 'cardio', state: 'stopped', targetEpochMs: 0, totalMs: 0, title: '', reason: '' })
+    await syncWearTimer({ kind: 'rest', state: 'stopped', reason: 'finished' })
+    expect(syncTimer).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'finished' }))
   })
 
   it('un fallo nativo (sin Play Services) no se propaga', async () => {

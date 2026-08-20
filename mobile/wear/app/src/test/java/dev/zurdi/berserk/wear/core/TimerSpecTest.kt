@@ -23,11 +23,14 @@ class TimerSpecTest {
     }
 
     @Test
-    fun `stopped needs no target`() {
-        val decoded = TimerSpec.decode(fields("kind" to "cardio", "state" to "stopped", "sentAtEpochMs" to 5L))
+    fun `stopped needs no target and carries its reason`() {
+        val decoded = TimerSpec.decode(fields("kind" to "cardio", "state" to "stopped", "sentAtEpochMs" to 5L, "reason" to "finished"))
         val spec = (decoded as TimerSpec.Decoded.Ok).spec
         assertEquals(TimerKind.CARDIO, spec.kind)
         assertTrue(!spec.running)
+        assertEquals(TimerSpec.REASON_FINISHED, spec.reason)
+        val legacy = (TimerSpec.decode(fields("kind" to "cardio", "state" to "stopped", "sentAtEpochMs" to 5L)) as TimerSpec.Decoded.Ok).spec
+        assertEquals("", legacy.reason)
     }
 
     @Test

@@ -309,7 +309,8 @@ public class BkOngoingPlugin extends Plugin {
             long targetEpochMs = call.getLong("targetEpochMs", 0L);
             long totalMs = call.getLong("totalMs", 0L);
             String title = call.getString("title", "");
-            BkWear.publishTimer(getContext(), kind, state, targetEpochMs, totalMs, title);
+            String reason = call.getString("reason", "");
+            BkWear.publishTimer(getContext(), kind, state, targetEpochMs, totalMs, title, reason);
             call.resolve();
         } catch (Exception e) {
             call.reject(e.toString());

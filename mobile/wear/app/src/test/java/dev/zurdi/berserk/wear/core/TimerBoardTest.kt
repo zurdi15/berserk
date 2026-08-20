@@ -6,8 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimerBoardTest {
-    private fun timer(kind: TimerKind, target: Long, sentAt: Long, total: Long = 60_000L, finishedAt: Long? = null) =
-        ActiveTimer(TimerSpec(kind, true, target, total, "", sentAt), receivedAtEpochMs = sentAt, finishedAtEpochMs = finishedAt)
+    private fun timer(kind: TimerKind, target: Long, sentAt: Long, total: Long = 60_000L, finishedAt: Long? = null, ackedAt: Long? = null) =
+        ActiveTimer(TimerSpec(kind, true, target, total, "", sentAt), receivedAtEpochMs = sentAt, finishedAtEpochMs = finishedAt, acknowledgedAtEpochMs = ackedAt)
 
     @Test
     fun `the newest countdown is primary and the workout stopwatch is the fallback`() {
@@ -23,15 +23,31 @@ class TimerBoardTest {
     }
 
     @Test
-    fun `finished countdowns leave the live set, are held briefly and pruned later`() {
+    fun `a finished countdown leaves the live set and alarms until acknowledged`() {
         val rest = timer(TimerKind.REST, target = 100_000L, sentAt = 40_000L, finishedAt = 100_000L)
         val board = TimerBoard().with(rest)
         assertTrue(board.live.isEmpty())
         assertNull(board.primary())
-        assertEquals(TimerKind.REST, board.recentlyFinished(nowEpochMs = 103_000L)?.kind)
-        assertNull(board.recentlyFinished(nowEpochMs = 100_000L + TimerBoard.FINISHED_HOLD_MS))
-        assertEquals(1, board.pruned(nowEpochMs = 130_000L).timers.size)
-        assertEquals(0, board.pruned(nowEpochMs = 100_000L + TimerBoard.FINISHED_KEEP_MS).timers.size)
+        assertEquals(TimerKind.REST, board.alarming()?.kind)
+        assertTrue(rest.isAlarming)
+
+        val acked = board.with(rest.copy(acknowledgedAtEpochMs = 103_000L))
+        assertNull(acked.alarming())
+        assertTrue(!acked.timers.getValue(TimerKind.REST).isAlarming)
+    }
+
+    @Test
+    fun `pruning keeps alarming timers until the failsafe and drops acknowledged ones quickly`() {
+        val alarming = TimerBoard().with(timer(TimerKind.REST, target = 100_000L, sentAt = 40_000L, finishedAt = 100_000L))
+        assertEquals(1, alarming.pruned(nowEpochMs = 100_000L + TimerBoard.ALARM_FAILSAFE_MS - 1L).timers.size)
+        assertEquals(0, alarming.pruned(nowEpochMs = 100_000L + TimerBoard.ALARM_FAILSAFE_MS).timers.size)
+
+        val acked = TimerBoard().with(timer(TimerKind.REST, target = 100_000L, sentAt = 40_000L, finishedAt = 100_000L, ackedAt = 105_000L))
+        assertEquals(1, acked.pruned(nowEpochMs = 105_000L + TimerBoard.ACKNOWLEDGED_KEEP_MS - 1L).timers.size)
+        assertEquals(0, acked.pruned(nowEpochMs = 105_000L + TimerBoard.ACKNOWLEDGED_KEEP_MS).timers.size)
+
+        val running = TimerBoard().with(timer(TimerKind.WORKOUT, target = 0L, sentAt = 1L, total = 0L))
+        assertEquals(1, running.pruned(nowEpochMs = 999_999_999L).timers.size)
     }
 
     @Test

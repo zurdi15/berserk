@@ -21,23 +21,38 @@ data class TimerBoard(val timers: Map<TimerKind, ActiveTimer> = emptyMap()) {
     /** crono del entreno en marcha, para pintarlo pequeño bajo la cuenta atrás */
     fun workout(): ActiveTimer? = live.firstOrNull { it.kind == TimerKind.WORKOUT }
 
-    /** cuenta atrás que acaba de llegar a cero (para el "¡Tiempo!" en pantalla) */
-    fun recentlyFinished(nowEpochMs: Long, holdMs: Long = FINISHED_HOLD_MS): ActiveTimer? =
-        timers.values
-            .filter { it.finishedAtEpochMs != null && nowEpochMs - it.finishedAtEpochMs < holdMs }
-            .maxByOrNull { it.finishedAtEpochMs!! }
+    /**
+     * v0.29.0: cuenta atrás que llegó a cero y aún espera el OK — manda sobre
+     * todo lo demás en pantalla (la alarma es lo urgente, el crono puede esperar)
+     */
+    fun alarming(): ActiveTimer? =
+        timers.values.filter { it.isAlarming }.maxByOrNull { it.finishedAtEpochMs!! }
 
     fun with(timer: ActiveTimer): TimerBoard = copy(timers = timers + (timer.kind to timer))
 
     fun without(kind: TimerKind): TimerBoard = copy(timers = timers - kind)
 
-    /** poda terminados hace rato sin `stopped` del móvil (móvil muerto o sin enlace) */
-    fun pruned(nowEpochMs: Long, keepFinishedMs: Long = FINISHED_KEEP_MS): TimerBoard =
-        copy(timers = timers.filterValues { it.finishedAtEpochMs == null || nowEpochMs - it.finishedAtEpochMs < keepFinishedMs })
+    /**
+     * Poda: los terminados con OK se van enseguida; los que avisan sin OK
+     * tienen un tope de seguridad muy por encima del de la alarma, por si el
+     * servicio que vibra murió sin darse por enterado.
+     */
+    fun pruned(
+        nowEpochMs: Long,
+        keepAcknowledgedMs: Long = ACKNOWLEDGED_KEEP_MS,
+        failsafeMs: Long = ALARM_FAILSAFE_MS,
+    ): TimerBoard = copy(
+        timers = timers.filterValues { timer ->
+            when {
+                timer.finishedAtEpochMs == null -> true
+                timer.acknowledgedAtEpochMs != null -> nowEpochMs - timer.acknowledgedAtEpochMs < keepAcknowledgedMs
+                else -> nowEpochMs - timer.finishedAtEpochMs < failsafeMs
+            }
+        },
+    )
 
     companion object {
-        /** cuánto se sostiene el "¡Tiempo!" en pantalla */
-        const val FINISHED_HOLD_MS = 6_000L
-        const val FINISHED_KEEP_MS = 60_000L
+        const val ACKNOWLEDGED_KEEP_MS = 10_000L
+        const val ALARM_FAILSAFE_MS = 150_000L
     }
 }

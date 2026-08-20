@@ -19,7 +19,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
-import { cancelNativeCardioEndAlarm, stopNativeCardioCountdown, syncWearTimer } from '@/utils/nativeShell'
+import { cancelNativeCardioEndAlarm, stopNativeCardioCountdown, syncWearTimer, type WearStopReason } from '@/utils/nativeShell'
 import {
   clearPersistedCardioCountdown,
   getPersistedCardioCountdown,
@@ -488,11 +488,11 @@ function formatCardioDuration(seconds: number): string {
 // huérfano de otro entreno, entreno terminado/descartado), la notificación
 // ongoing del móvil, su alarma y el DataItem del reloj tienen que irse con
 // él — la tarjeta solo cubre los caminos en los que ella sigue viva.
-function dropCardioCountdown() {
+function dropCardioCountdown(reason: WearStopReason = 'cancelled') {
   clearPersistedCardioCountdown()
   void stopNativeCardioCountdown()
   void cancelNativeCardioEndAlarm()
-  void syncWearTimer({ kind: 'cardio', state: 'stopped' })
+  void syncWearTimer({ kind: 'cardio', state: 'stopped', reason })
 }
 
 async function checkPersistedCardioCountdown() {
@@ -537,7 +537,8 @@ async function checkPersistedCardioCountdown() {
     // esconder un fallo real (p.ej. de red) tras la máscara de "descartado"
     if (!(error instanceof ApiError && error.status === 404)) toastApiError(error)
   } finally {
-    dropCardioCountdown()
+    // terminó solo mientras la app no estaba: el reloj sigue avisando hasta el OK
+    dropCardioCountdown('finished')
   }
 }
 

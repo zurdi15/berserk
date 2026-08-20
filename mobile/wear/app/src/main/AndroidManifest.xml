@@ -6,6 +6,8 @@
     <!-- notificaciones (ongoing + "¡Tiempo!") son permiso de runtime desde API 33 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- v0.29.0: la alarma que vibra hasta el OK vive en un shortService -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- re-programar las alarmas de fin tras reinicio/actualización -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- el aviso a 0:00 va por AlarmManager exacto: Wear OS 5+ deniega
@@ -61,6 +63,14 @@
         <receiver
             android:name=".alarm.TimerAlarmReceiver"
             android:exported="false" />
+
+        <!-- v0.29.0: vibra en bucle hasta el OK (tope 60 s). shortService:
+             arrancado desde la alarma exacta, exento de la restricción de
+             arranque en segundo plano; sin permiso de tipo específico -->
+        <service
+            android:name=".alarm.AlarmService"
+            android:exported="false"
+            android:foregroundServiceType="shortService" />
 
         <!-- tras reiniciar o actualizar: las alarmas se pierden → rehidratar -->
         <receiver

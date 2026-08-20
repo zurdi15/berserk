@@ -1,13 +1,19 @@
 package dev.zurdi.berserk.wear.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -19,13 +25,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.AppScaffold
-import androidx.wear.compose.material3.CircularProgressIndicator
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
@@ -36,18 +47,22 @@ import dev.zurdi.berserk.wear.TimerEngine
 import dev.zurdi.berserk.wear.core.ActiveTimer
 import dev.zurdi.berserk.wear.core.TimerFormat
 import dev.zurdi.berserk.wear.core.TimerKind
+import dev.zurdi.berserk.wear.notify.Haptics
 import dev.zurdi.berserk.wear.sync.PhoneLink
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val TICK_MS = 250L
 
+/** últimos segundos: el anillo y los dígitos pasan a ámbar, el halo respira y hay tic háptico 3-2-1 */
+private const val URGENT_MS = 10_000L
+
 /**
- * Una sola pantalla con tres estados: temporizador en marcha (la cuenta
- * atrás en grande con su anillo, el crono del entreno pequeño debajo y
- * cancelar), "¡Tiempo!" unos segundos al llegar a cero, y reposo (estado del
- * enlace con el móvil). La fuente de verdad es el mismo tablero persistido
- * que pintan las notificaciones; la pantalla solo hace tic.
+ * Una sola pantalla con cuatro estados, por prioridad: alarma esperando el
+ * OK (v0.29.0), temporizador en marcha (cuenta atrás en grande con su anillo
+ * con halo, el crono del entreno pequeño debajo y cancelar), y reposo
+ * (estado del enlace con el móvil). La fuente de verdad es el mismo tablero
+ * persistido que pintan las notificaciones; la pantalla solo hace tic.
  */
 @Composable
 fun TimerApp(engine: TimerEngine, link: PhoneLink, appVersion: String, notificationsGranted: Boolean) {
@@ -64,14 +79,18 @@ fun TimerApp(engine: TimerEngine, link: PhoneLink, appVersion: String, notificat
     val scope = rememberCoroutineScope()
     var cancelFailed by remember { mutableStateOf(false) }
 
+    val alarming = board.alarming()
     val primary = board.primary()
     LaunchedEffect(primary?.kind, primary?.spec?.sentAtEpochMs) {
         if (primary != null) cancelFailed = false
     }
 
     AppScaffold {
-        val finished = board.recentlyFinished(now)
         when {
+            alarming != null -> AlarmScreen(
+                timer = alarming,
+                onAcknowledge = { engine.acknowledge(alarming.kind) },
+            )
             primary != null -> RunningScreen(
                 timer = primary,
                 workout = board.workout(),
@@ -81,7 +100,6 @@ fun TimerApp(engine: TimerEngine, link: PhoneLink, appVersion: String, notificat
                     scope.launch { if (!link.requestCancel(primary.kind)) cancelFailed = true }
                 },
             )
-            finished != null -> DoneScreen(finished)
             else -> IdleScreen(
                 phoneReachable = phoneReachable,
                 notificationsGranted = notificationsGranted,
@@ -95,16 +113,28 @@ fun TimerApp(engine: TimerEngine, link: PhoneLink, appVersion: String, notificat
 @Composable
 private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, onCancel: () -> Unit) {
     val countsDown = timer.kind.countsDown
-    // ScreenScaffold sin lista desplazable (el EdgeButton de M3 exige una):
-    // el botón de cancelar va como FilledTonalButton al pie de la columna
+    val remaining = timer.remainingMs(now)
+    val urgent = countsDown && remaining <= URGENT_MS
+    val accent = if (urgent) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+    // el halo respira despacio en marcha y rápido en los últimos segundos
+    val pulse by rememberPulse(periodMs = if (urgent) 500 else 2_400, label = "ring")
+    val glow = if (urgent) pulse else 0.45f + 0.25f * pulse
+
+    // tic háptico 3-2-1 solo mientras se mira la pantalla (la alarma de
+    // verdad es la de AlarmService, con o sin pantalla)
+    val context = LocalContext.current
+    val secondsLeft = if (remaining <= 0L) 0L else (remaining + 999L) / 1000L
+    LaunchedEffect(secondsLeft, countsDown) {
+        if (countsDown && secondsLeft in 1L..3L) Haptics.tick(context)
+    }
+
     ScreenScaffold { contentPadding ->
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (countsDown) {
-                CircularProgressIndicator(
-                    progress = { timer.progress(now) },
-                    modifier = Modifier.fillMaxSize().padding(1.dp),
-                    strokeWidth = 5.dp,
-                )
+                Halo(color = accent, alpha = if (urgent) 0.28f * pulse else 0.10f, radiusFraction = 0.9f)
+                GlowRing(progress = timer.progress(now), color = accent, glow = glow)
+            } else {
+                Halo(color = MaterialTheme.colorScheme.primary, alpha = 0.08f + 0.05f * pulse, radiusFraction = 0.8f)
             }
             Column(
                 modifier = Modifier.fillMaxSize().padding(contentPadding).padding(horizontal = 22.dp),
@@ -120,11 +150,16 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(4.dp))
+                val scale = if (urgent) 1f + 0.05f * pulse else 1f
                 Text(
-                    text = if (countsDown) TimerFormat.countdown(timer.remainingMs(now)) else TimerFormat.elapsed(timer.elapsedMs(now)),
+                    text = if (countsDown) TimerFormat.countdown(remaining) else TimerFormat.elapsed(timer.elapsedMs(now)),
                     style = MaterialTheme.typography.numeralMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = accent,
                     textAlign = TextAlign.Center,
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    },
                 )
                 if (countsDown && workout != null) {
                     Spacer(Modifier.height(6.dp))
@@ -146,79 +181,141 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
     }
 }
 
+/** v0.29.0: "¡Tiempo!" con halo al ritmo de la vibración y un OK que la para. */
 @Composable
-private fun DoneScreen(timer: ActiveTimer) {
+private fun AlarmScreen(timer: ActiveTimer, onAcknowledge: () -> Unit) {
+    val ember = MaterialTheme.colorScheme.secondary
+    // mismo periodo que el patrón de Haptics.ALARM (≈ 2 s por ciclo, ida y vuelta)
+    val pulse by rememberPulse(periodMs = 1_000, label = "alarm")
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val entrance by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0.82f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "entrance",
+    )
+
     ScreenScaffold { contentPadding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(contentPadding).padding(horizontal = 22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = stringResource(R.string.time_up),
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.secondary,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = titleOf(timer),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Halo(color = ember, alpha = 0.22f + 0.30f * pulse, radiusFraction = 1f)
+            GlowRing(progress = 1f, color = ember, glow = pulse, track = Color.Transparent)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding)
+                    .padding(horizontal = 20.dp)
+                    .graphicsLayer {
+                        scaleX = entrance
+                        scaleY = entrance
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = stringResource(R.string.time_up),
+                    style = MaterialTheme.typography.displaySmall,
+                    color = ember,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = titleOf(timer),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = onAcknowledge,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ember,
+                        contentColor = MaterialTheme.colorScheme.onSecondary,
+                    ),
+                    modifier = Modifier.fillMaxWidth(0.62f),
+                ) {
+                    Text(
+                        text = stringResource(R.string.ok),
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.alarm_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun IdleScreen(phoneReachable: Boolean, notificationsGranted: Boolean, cancelFailed: Boolean, appVersion: String) {
+    val aurora = MaterialTheme.colorScheme.primary
+    val pulse by rememberPulse(periodMs = 3_000, label = "idle")
     ScreenScaffold { contentPadding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(contentPadding).padding(horizontal = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_stat_berserk),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.idle_title),
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(
-                    when {
-                        cancelFailed -> R.string.cancel_failed
-                        !notificationsGranted -> R.string.notifications_needed
-                        else -> R.string.idle_hint
-                    },
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = stringResource(if (phoneReachable) R.string.phone_connected else R.string.phone_disconnected),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (phoneReachable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = stringResource(R.string.version, appVersion),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Halo(color = aurora, alpha = 0.05f + 0.04f * pulse, radiusFraction = 0.7f)
+            Column(
+                modifier = Modifier.fillMaxSize().padding(contentPadding).padding(horizontal = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                // la runa con su propio halo, como el logo de la web
+                Box(contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .background(
+                                Brush.radialGradient(listOf(aurora.copy(alpha = 0.18f + 0.14f * pulse), Color.Transparent)),
+                                CircleShape,
+                            ),
+                    )
+                    Icon(
+                        painter = painterResource(R.drawable.ic_stat_berserk),
+                        contentDescription = null,
+                        tint = aurora,
+                        modifier = Modifier.size(30.dp),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.idle_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(
+                        when {
+                            cancelFailed -> R.string.cancel_failed
+                            !notificationsGranted -> R.string.notifications_needed
+                            else -> R.string.idle_hint
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = stringResource(if (phoneReachable) R.string.phone_connected else R.string.phone_disconnected),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (phoneReachable) aurora else MaterialTheme.colorScheme.secondary,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.version, appVersion),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

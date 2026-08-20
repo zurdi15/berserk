@@ -272,7 +272,7 @@ describe('rest timer store — Galaxy Watch (Data Layer vía shell)', () => {
       }),
     )
     timer.clear()
-    expect(syncTimer).toHaveBeenLastCalledWith({ kind: 'rest', state: 'stopped', targetEpochMs: 0, totalMs: 0, title: '' })
+    expect(syncTimer).toHaveBeenLastCalledWith({ kind: 'rest', state: 'stopped', targetEpochMs: 0, totalMs: 0, title: '', reason: 'cancelled' })
   })
 
   it('cancelar desde el reloj hace clear() del descanso activo (y solo del descanso)', () => {
@@ -283,6 +283,19 @@ describe('rest timer store — Galaxy Watch (Data Layer vía shell)', () => {
     expect(timer.active).toBe(true)
     handler!({ kind: 'rest' })
     expect(timer.active).toBe(false)
-    expect(syncTimer).toHaveBeenLastCalledWith({ kind: 'rest', state: 'stopped', targetEpochMs: 0, totalMs: 0, title: '' })
+    expect(syncTimer).toHaveBeenLastCalledWith({ kind: 'rest', state: 'stopped', targetEpochMs: 0, totalMs: 0, title: '', reason: 'cancelled' })
+  })
+
+  // v0.29.0: el reloj sigue vibrando hasta el OK si el descanso terminó solo
+  it('terminar solo publica stopped con reason finished (el reloj no calla); cancelar, cancelled', () => {
+    vi.stubGlobal('navigator', { vibrate: vi.fn() })
+    const timer = useRestTimerStore()
+    timer.start(10)
+    vi.setSystemTime(1_000_000 + 10_500)
+    vi.advanceTimersByTime(600)
+    vi.advanceTimersByTime(3_100)
+    expect(timer.active).toBe(false)
+    expect(syncTimer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'rest', state: 'stopped', reason: 'finished' }))
+    vi.unstubAllGlobals()
   })
 })

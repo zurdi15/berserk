@@ -32,6 +32,12 @@ data class TimerSpec(
     /** título ya localizado por el móvil ("Descanso · Press banca"); vacío = título por defecto del kind */
     val title: String,
     val sentAtEpochMs: Long,
+    /**
+     * solo con stopped: "finished" = llegó a cero por sí solo (el móvil lo
+     * limpia tras la gracia; el reloj sigue avisando hasta el OK) o
+     * "cancelled" = lo paró el usuario / lo sustituyó otra serie (calla)
+     */
+    val reason: String = "",
 ) {
     sealed interface Decoded {
         data class Ok(val spec: TimerSpec) : Decoded
@@ -47,8 +53,11 @@ data class TimerSpec(
         const val KEY_TOTAL = "totalMs"
         const val KEY_TITLE = "title"
         const val KEY_SENT_AT = "sentAtEpochMs"
+        const val KEY_REASON = "reason"
         const val STATE_RUNNING = "running"
         const val STATE_STOPPED = "stopped"
+        const val REASON_FINISHED = "finished"
+        const val REASON_CANCELLED = "cancelled"
 
         /**
          * @param kindFromPath kind deducido del path del DataItem; si el
@@ -72,7 +81,8 @@ data class TimerSpec(
             if (running && target <= 0L) return Decoded.Invalid("targetEpochMs ausente en un temporizador en marcha")
             val total = fields.long(KEY_TOTAL, 0L).coerceAtLeast(0L)
             val title = fields.string(KEY_TITLE).orEmpty().trim()
-            return Decoded.Ok(TimerSpec(kind, running, target, total, title, sentAt))
+            val reason = fields.string(KEY_REASON).orEmpty()
+            return Decoded.Ok(TimerSpec(kind, running, target, total, title, sentAt, reason))
         }
     }
 }

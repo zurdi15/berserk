@@ -53,8 +53,10 @@ class TimerRepository private constructor(context: Context) {
         put("total", timer.spec.totalMs)
         put("title", timer.spec.title)
         put("sentAt", timer.spec.sentAtEpochMs)
+        put("reason", timer.spec.reason)
         put("receivedAt", timer.receivedAtEpochMs)
         timer.finishedAtEpochMs?.let { put("finishedAt", it) }
+        timer.acknowledgedAtEpochMs?.let { put("acknowledgedAt", it) }
     }.toString()
 
     private fun decode(kind: TimerKind, raw: String): ActiveTimer? = runCatching {
@@ -67,9 +69,11 @@ class TimerRepository private constructor(context: Context) {
                 totalMs = json.optLong("total"),
                 title = json.optString("title"),
                 sentAtEpochMs = json.getLong("sentAt"),
+                reason = json.optString("reason"),
             ),
             receivedAtEpochMs = json.optLong("receivedAt"),
             finishedAtEpochMs = if (json.has("finishedAt")) json.getLong("finishedAt") else null,
+            acknowledgedAtEpochMs = if (json.has("acknowledgedAt")) json.getLong("acknowledgedAt") else null,
         )
     }.getOrNull()
 

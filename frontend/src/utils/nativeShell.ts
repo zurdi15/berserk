@@ -32,7 +32,7 @@ interface OngoingPlugin {
   getAppInfo?: () => Promise<{ versionName?: string }>
   openUrl?: (options: { url: string }) => Promise<unknown>
   // v0.28.0 reloj Wear OS (ver el bloque "reloj" al final)
-  syncTimer?: (options: Required<WearTimerSync>) => Promise<unknown>
+  syncTimer?: (options: WearTimerWire) => Promise<unknown>
   getWearStatus?: () => Promise<Partial<WearStatus>>
   addListener?: (
     event: 'timerCancelled',
@@ -248,6 +248,16 @@ export async function openNativeShellDownload(version: string): Promise<void> {
 
 export type WearTimerKind = 'rest' | 'cardio' | 'workout'
 
+/**
+ * v0.29.0 (zurdi: "que la vibración no fuese una única vez, sino
+ * constantemente hasta que yo le dé a OK"): el reloj sigue avisando tras
+ * llegar a cero hasta que se le da al OK, así que tiene que distinguir el
+ * `stopped` automático de un descanso que SE TERMINÓ SOLO (finished: el
+ * móvil lo limpia a los 3 s de gracia) del que paró el usuario o sustituyó
+ * otra serie (cancelled): solo este último calla la alarma.
+ */
+export type WearStopReason = 'cancelled' | 'finished'
+
 export interface WearTimerSync {
   kind: WearTimerKind
   state: 'running' | 'stopped'
@@ -257,7 +267,12 @@ export interface WearTimerSync {
   totalMs?: number
   /** ya localizado ("Descanso · Press banca"); el reloj solo lo pinta */
   title?: string
+  /** solo con `stopped`; por defecto, cancelled */
+  reason?: WearStopReason
 }
+
+/** lo que recibe el plugin: todos los campos presentes (DataMap sin opcionales) */
+export type WearTimerWire = Required<Omit<WearTimerSync, 'reason'>> & { reason: WearStopReason | '' }
 
 export interface WearStatus {
   playServices: boolean
@@ -275,7 +290,7 @@ export async function syncWearTimer(sync: WearTimerSync): Promise<void> {
   const plugin = ongoingPlugin()
   if (!plugin?.syncTimer) return
   try {
-    await plugin.syncTimer({ targetEpochMs: 0, totalMs: 0, title: '', ...sync })
+    await plugin.syncTimer({ targetEpochMs: 0, totalMs: 0, title: '', reason: '', ...sync })
   } catch {
     // sin Play Services o sin reloj: el móvil sigue igual
   }

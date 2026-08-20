@@ -23,6 +23,7 @@ import {
   startNativeCardioCountdown,
   stopNativeCardioCountdown,
   syncWearTimer,
+  type WearStopReason,
 } from '@/utils/nativeShell'
 import {
   clearPersistedCardioCountdown,
@@ -172,6 +173,10 @@ const name = computed(() => exerciseName(props.exercise, props.locale))
 // que refleja un countdown vivo en esta tarjeta (arranque fresco, resume
 // tras evicción, cancelación, auto-log): un solo watcher cubre todos los
 // caminos. Todo no-op en web.
+// v0.29.0: por qué se apaga el countdown — el reloj solo calla la alarma si
+// lo paró el usuario (cancelled); si terminó solo (finished, auto-log) sigue
+// vibrando hasta su OK
+let cardioStopReason: WearStopReason = 'cancelled'
 watch(resumedActive, (timer, previous) => {
   if (timer) {
     const title = `${t('timer.cardioOngoingTitle')} · ${name.value}`
@@ -191,7 +196,8 @@ watch(resumedActive, (timer, previous) => {
   } else if (previous) {
     void stopNativeCardioCountdown()
     void cancelNativeCardioEndAlarm()
-    void syncWearTimer({ kind: 'cardio', state: 'stopped' })
+    void syncWearTimer({ kind: 'cardio', state: 'stopped', reason: cardioStopReason })
+    cardioStopReason = 'cancelled'
   }
 })
 // cancelado desde la muñeca: misma salida que el botón cancelar de la tarjeta
@@ -528,6 +534,7 @@ async function onResumedDone() {
     if (persisted.distanceM) body.distance_m = persisted.distanceM
     const result = await props.actions.logSet(persisted.workoutExerciseId, body)
     clearPersistedCardioCountdown()
+    cardioStopReason = 'finished'
     resumedActive.value = null
     // v0.9.4: sin descanso tras cardio — este camino SIEMPRE es cardio
     if (result.new_records.length) emit('recorded', result.new_records)
