@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- v0.30.0: la alarma abre la app directamente (full-screen intent) -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- v0.31.0: Live Updates (Now Bar) — efectivos en Wear OS 7 / One UI 9 Watch -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <!-- re-programar las alarmas de fin tras reinicio/actualización -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- el aviso a 0:00 va por AlarmManager exacto: Wear OS 5+ deniega
@@ -34,6 +36,13 @@
         <meta-data
             android:name="com.google.android.wearable.standalone"
             android:value="false" />
+        <!-- v0.31.0: las notificaciones del móvil NO se puentean a este reloj —
+             la app del reloj ya pinta los temporizadores y la alarma; puenteadas
+             solo duplicarían (y, con Wear OS 7, los Live Updates del móvil
+             aparecerían dos veces en la Now Bar) -->
+        <meta-data
+            android:name="com.google.android.wearable.notificationBridgeMode"
+            android:value="NO_BRIDGING" />
 
         <activity
             android:name=".ui.MainActivity"

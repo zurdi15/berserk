@@ -18,6 +18,10 @@ android {
     // paquete y la misma firma), pero el código del reloj vive en su propio
     // paquete para no confundirlo con el de la shell.
     namespace = "dev.zurdi.berserk.wear"
+    // v0.31.0: los Live Updates (Now Bar del reloj con Wear OS 7 / One UI 9
+    // Watch) van por NotificationCompat (core 1.17+), que compila contra 36;
+    // la plataforma 37 aún se publica como "android-37.0" y AGP 9.1 no la
+    // resuelve como compileSdk — no hace falta
     compileSdk = 36
 
     defaultConfig {

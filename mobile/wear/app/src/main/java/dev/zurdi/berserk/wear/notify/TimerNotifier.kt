@@ -123,6 +123,11 @@ class TimerNotifier(context: Context) {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(contentIntent())
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            // v0.31.0 (zurdi: "la migración para el Now Bar"): Live Update —
+            // en Wear OS 7 (One UI 9 Watch) el chip de la Now Bar pinta el
+            // cronómetro del setWhen; en Wear OS 6 NotificationCompat lo ignora.
+            // La Ongoing Activity se mantiene: la doc de Wear OS 7 admite las dos.
+            .setRequestPromotedOngoing(true)
 
         if (withOngoingActivity) {
             // Status.TimerPart/StopwatchPart van en base elapsedRealtime, no epoch

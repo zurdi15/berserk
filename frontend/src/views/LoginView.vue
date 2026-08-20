@@ -38,7 +38,7 @@ async function submit() {
 </script>
 
 <template>
-  <main class="min-h-dvh flex flex-col items-center justify-center gap-6 px-6">
+  <main class="min-h-dvh flex flex-col items-center justify-center gap-6 px-6 bk-safe-top">
     <Transition name="bk-pop" appear>
       <div class="flex flex-col items-center gap-3">
         <BkRune name="berserk" :size="72" carve tone="aurora" />

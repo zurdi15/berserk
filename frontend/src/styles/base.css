@@ -383,3 +383,12 @@ body::before {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* v0.31.0 shell edge-to-edge (Capacitor 8, targetSdk 36): el WebView se
+   extiende bajo la barra de estado; las raíces de pantalla completa reservan
+   ese hueco (el fondo del tema lo rellena) y el contenido empieza debajo. En
+   el navegador y la PWA el inset es 0. Capacitor inyecta --safe-area-inset-*
+   como respaldo para WebViews antiguos donde env() no es fiable. */
+.bk-safe-top {
+  padding-top: env(safe-area-inset-top, var(--safe-area-inset-top, 0px));
+}

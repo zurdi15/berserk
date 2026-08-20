@@ -4,6 +4,7 @@
 // siquiera se parsee) — este archivo es el que mantiene el estado correcto
 // una vez la app ya está viva: toggles desde SettingsCard y cambios en vivo
 // del tema del sistema operativo mientras mode === 'system'.
+import { setNativeSystemBarsStyle } from '@/utils/nativeShell'
 import { getThemeMode, setThemeMode, type ThemeMode } from './uiPrefs'
 
 const MEDIA_QUERY = '(prefers-color-scheme: light)'
@@ -25,6 +26,8 @@ export function resolveIsLight(mode: ThemeMode): boolean {
 export function applyTheme(mode: ThemeMode): void {
   const isLight = resolveIsLight(mode)
   document.documentElement.classList.toggle('bk-light', isLight)
+  // v0.31.0 shell edge-to-edge: los iconos de las barras del sistema siguen al tema
+  setNativeSystemBarsStyle(isLight)
 
   // el color real lo define tokens.css (--bk-bg-void, distinto bajo :root y
   // bajo html.bk-light) — se RELEE del DOM en vez de hardcodear el hex aquí:

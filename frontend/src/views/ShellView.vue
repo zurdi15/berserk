@@ -275,7 +275,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
 </script>
 
 <template>
-  <div class="h-dvh flex flex-col">
+  <div class="h-dvh flex flex-col bk-safe-top">
     <!-- Desktop navbar: barra superior centrada con destinos (identidad por ahora en móvil).
          relative: contexto de posicionamiento del indicador deslizante de abajo (item 1/2) —
          translateX() queda relativo al header entero (donde el <ul> vive centrado), y el

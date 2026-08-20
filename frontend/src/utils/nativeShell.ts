@@ -45,6 +45,8 @@ interface CapacitorGlobal {
   Plugins?: {
     LocalNotifications?: LocalNotificationsPlugin
     BkOngoing?: OngoingPlugin
+    // Capacitor 8: plugin de núcleo (edge-to-edge); no existe en shells anteriores
+    SystemBars?: { setStyle?: (options: { style: 'DARK' | 'LIGHT' | 'DEFAULT' }) => Promise<unknown> }
   }
 }
 
@@ -80,6 +82,20 @@ function absoluteUrl(path?: string): string {
 
 function extrasPayload(extras?: NativeTimerExtras): { subtitle: string; imageUrl: string } {
   return { subtitle: extras?.subtitle ?? '', imageUrl: absoluteUrl(extras?.imageUrl) }
+}
+
+// ---------- v0.31.0: barras del sistema (shell edge-to-edge, Capacitor 8) ----------
+// Con targetSdk 36 el WebView se extiende bajo la barra de estado y la de
+// gestos; sus iconos tienen que seguir al tema de la web (claro = iconos
+// oscuros). 'DARK'/'LIGHT' en SystemBars nombran el FONDO, como en StatusBar.
+export function setNativeSystemBarsStyle(lightBackground: boolean): void {
+  const bars = capacitor()?.Plugins?.SystemBars
+  if (!bars?.setStyle) return
+  try {
+    void bars.setStyle({ style: lightBackground ? 'LIGHT' : 'DARK' }).catch(() => {})
+  } catch {
+    // shell sin el plugin: nada que ajustar
+  }
 }
 
 // ---------- permiso (una sola petición viva a la vez) ----------

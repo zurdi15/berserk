@@ -14,6 +14,8 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.media.ThumbnailUtils;
+import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -58,6 +60,8 @@ final class BkNotifications {
     static final String CHANNEL_ALERTS = "berserk-alerts";
 
     private static final int ART_PX = 192;
+    /** Notification.EXTRA_REQUEST_PROMOTED_ONGOING (Android 16) */
+    private static final String EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing";
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final LruCache<String, Bitmap> ART = new LruCache<>(6);
@@ -111,6 +115,10 @@ final class BkNotifications {
 
     private static Notification build(Context ctx, String channelId, String title, String subtitle, long whenMs,
                                       boolean chronometer, boolean countDown, boolean ongoing, Bitmap art) {
+        if (ongoing && chronometer && Build.VERSION.SDK_INT >= 36
+                && manager(ctx).canPostPromotedNotifications()) {
+            return buildPromoted(ctx, channelId, title, subtitle, whenMs, countDown, art);
+        }
         RemoteViews small = views(ctx, R.layout.bk_notif_timer, title, subtitle, whenMs, chronometer, countDown, art);
         RemoteViews big = views(ctx, R.layout.bk_notif_timer_big, title, subtitle, whenMs, chronometer, countDown, art);
         Notification.Builder builder = new Notification.Builder(ctx, channelId)
@@ -136,6 +144,40 @@ final class BkNotifications {
         } else {
             builder.setAutoCancel(true);
         }
+        return builder.build();
+    }
+
+    /**
+     * v0.31.0 (zurdi: "la migración para el Now Bar de Samsung"): Live Update
+     * de Android 16 — chip en la barra de estado con el cronómetro, tarjeta en
+     * la pantalla de bloqueo y, en One UI 8, la Now Bar. La plataforma PROHÍBE
+     * las vistas personalizadas en las promovidas, así que en Android 16+ la
+     * tarjeta es estándar (imagen grande + cronómetro); la RemoteViews de
+     * v0.30.0 queda para Android ≤ 15. Sin setShortCriticalText a propósito:
+     * con él, el chip lo mostraría en vez del cronómetro.
+     */
+    private static Notification buildPromoted(Context ctx, String channelId, String title, String subtitle,
+                                              long whenMs, boolean countDown, Bitmap art) {
+        Notification.Builder builder = new Notification.Builder(ctx, channelId)
+                .setSmallIcon(smallIcon(ctx))
+                .setColor(ctx.getColor(R.color.bk_aurora))
+                .setContentTitle(title)
+                .setContentText(subtitle == null ? "" : subtitle)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setShowWhen(true)
+                .setWhen(whenMs)
+                .setUsesChronometer(true)
+                .setChronometerCountDown(countDown)
+                .setContentIntent(launchIntent(ctx))
+                .setVisibility(Notification.VISIBILITY_PUBLIC);
+        // la petición de promoción: la doc de Live Updates admite el extra
+        // EXTRA_REQUEST_PROMOTED_ONGOING como equivalente del setter (que el
+        // framework de API 36 no expone en Notification.Builder)
+        Bundle extras = new Bundle();
+        extras.putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true);
+        builder.addExtras(extras);
+        if (art != null) builder.setLargeIcon(art);
         return builder.build();
     }
 
