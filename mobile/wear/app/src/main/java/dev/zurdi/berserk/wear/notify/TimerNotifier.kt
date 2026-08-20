@@ -40,14 +40,18 @@ class TimerNotifier(context: Context) {
     fun render(board: TimerBoard, nowEpochMs: Long) {
         ensureChannels()
         val primary = board.primary()
+        // v0.31.1: sin temporizador vivo, el foreground service se va ANTES de
+        // cancelar (una notificación de primer plano ignora cancel())
+        if (primary == null) TimerForegroundService.stopIfRunning()
         for (kind in TimerKind.entries) {
             val timer = board.timers[kind]
             if (timer == null || timer.isFinished) {
                 manager.cancel(kind.notificationId)
                 continue
             }
-            postOngoing(timer, withOngoingActivity = primary?.kind == kind, nowEpochMs = nowEpochMs)
+            manager.notify(kind.notificationId, ongoingNotification(timer, withOngoingActivity = primary?.kind == kind, nowEpochMs = nowEpochMs))
         }
+        if (primary != null) TimerForegroundService.sync(ctx)
     }
 
     fun cancelOngoing(kind: TimerKind) {
@@ -103,11 +107,14 @@ class TimerNotifier(context: Context) {
         manager.cancel(kind.doneNotificationId)
     }
 
-    private fun postOngoing(timer: ActiveTimer, withOngoingActivity: Boolean, nowEpochMs: Long) {
+    /** La notificación ongoing de un temporizador (la publica render; la adopta TimerForegroundService). */
+    fun ongoingNotification(timer: ActiveTimer, withOngoingActivity: Boolean, nowEpochMs: Long): Notification {
         val kind = timer.kind
         val title = titleOf(timer)
         val builder = NotificationCompat.Builder(ctx, CHANNEL_TIMERS)
             .setSmallIcon(R.drawable.ic_stat_berserk)
+            // v0.31.1: el color "de la app" que Samsung pinta en su Now Bar
+            .setColor(ctx.getColor(R.color.aurora))
             .setContentTitle(title)
             .setContentText(
                 ctx.getString(if (kind.countsDown) R.string.notif_countdown_text else R.string.notif_stopwatch_text),
@@ -137,19 +144,25 @@ class TimerNotifier(context: Context) {
             } else {
                 Status.StopwatchPart(zero)
             }
+            // v0.31.1: título + tiempo en el estado (las superficies que pintan
+            // texto —Recientes, la Now Bar de Samsung— tienen qué mostrar)
             val status = Status.Builder()
-                .addTemplate("#time#")
+                .addTemplate("#title# #time#")
+                .addPart("title", Status.TextPart(title))
                 .addPart("time", timePart)
                 .build()
             OngoingActivity.Builder(ctx, kind.notificationId, builder)
                 .setStaticIcon(R.drawable.ic_stat_berserk)
                 .setTouchIntent(contentIntent())
                 .setTitle(title)
+                // v0.31.1: los entrenos son una de las categorías que la Now Bar
+                // de One UI 8 Watch trata como propias
+                .setCategory(NotificationCompat.CATEGORY_WORKOUT)
                 .setStatus(status)
                 .build()
                 .apply(ctx)
         }
-        manager.notify(kind.notificationId, builder.build())
+        return builder.build()
     }
 
     private fun titleOf(timer: ActiveTimer): String = timer.spec.title.ifEmpty {

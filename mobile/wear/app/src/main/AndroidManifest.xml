@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- v0.29.0: la alarma que vibra hasta el OK vive en un shortService -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- v0.31.1: el temporizador principal como servicio de primer plano (specialUse) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- v0.30.0: la alarma abre la app directamente (full-screen intent) -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- v0.31.0: Live Updates (Now Bar) — efectivos en Wear OS 7 / One UI 9 Watch -->
@@ -84,6 +86,17 @@
             android:name=".alarm.AlarmService"
             android:exported="false"
             android:foregroundServiceType="shortService" />
+
+        <!-- v0.31.1: adopta la notificación del temporizador principal como de
+             primer plano (ver TimerForegroundService) -->
+        <service
+            android:name=".notify.TimerForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Espejo en el reloj del temporizador de descanso/cardio/entreno del móvil" />
+        </service>
 
         <!-- tras reiniciar o actualizar: las alarmas se pierden → rehidratar -->
         <receiver
