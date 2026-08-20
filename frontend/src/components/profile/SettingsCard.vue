@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { updateSettings } from '@/api/auth'
@@ -10,7 +10,7 @@ import BkCard from '@/lib/BkCard.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
-import { checkNativeShellUpdate, isNativeShell, openNativeShellDownload } from '@/utils/nativeShell'
+import { checkNativeShellUpdate, getWearStatus, isNativeShell, openNativeShellDownload, type WearStatus } from '@/utils/nativeShell'
 import { setTheme } from '@/utils/theme'
 // v0.14.2 (zurdi: "pon en algún sitio la versión actual"): la versión del
 // bundle desplegado — verdad de build (package.json en el momento de
@@ -41,10 +41,26 @@ const theme = ref<ThemeMode>(getThemeMode())
 // el shell instalado va por detrás del bundle, aquí vive la descarga (el
 // toast del boot en ShellView solo apunta a esta tarjeta)
 const shellUpdateAvailable = ref(false)
+// v0.28.0 reloj (zurdi): si el móvil ve un Galaxy Watch y si ese reloj tiene
+// la app de berserk — la primera pregunta de cualquier "no me sale el
+// cronómetro en el reloj". Solo en la shell; en web no existe el puente.
+const wearStatus = ref<WearStatus | null>(null)
+const wearStatusLabel = computed(() => {
+  const status = wearStatus.value
+  if (!status || !status.playServices) return null
+  if (status.appInstalled) return t('profile.wear.linked', { name: status.watchName ?? 'Wear OS' })
+  if (status.connected) return t('profile.wear.appMissing')
+  return t('profile.wear.none')
+})
 onMounted(() => {
   void checkNativeShellUpdate(appVersion).then(({ available }) => {
     shellUpdateAvailable.value = available
   })
+  if (isNativeShell()) {
+    void getWearStatus().then((status) => {
+      wearStatus.value = status
+    })
+  }
 })
 
 function downloadShellUpdate() {
@@ -119,6 +135,10 @@ function pickTheme(mode: ThemeMode) {
            PWA/shell ya corre el último bundle -->
       <p class="bk-metric text-2xs text-ink-faint text-center pt-2" data-testid="app-version">
         berserk v{{ appVersion }}<template v-if="isNativeShell()"> · app</template>
+      </p>
+      <!-- v0.28.0 reloj: estado del enlace con el Galaxy Watch (solo shell) -->
+      <p v-if="wearStatusLabel" class="text-2xs text-ink-faint text-center" data-testid="wear-status">
+        {{ wearStatusLabel }}
       </p>
       <!-- v0.16.0: APK instalada más vieja que el bundle → descarga directa
            de la release (el asset se llama berserk-vX.Y.Z.apk) -->

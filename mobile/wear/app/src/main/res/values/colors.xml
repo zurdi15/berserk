@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- tokens de berserk (frontend/src/tokens): bg-void y accent-aurora -->
+    <color name="ic_launcher_background">#0A0C0F</color>
+    <color name="aurora">#4FD8C4</color>
+</resources>

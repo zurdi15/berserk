@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type {
@@ -16,6 +16,14 @@ import { primaryRune as resolvePrimaryRune } from '@/lib/runeResolve'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { useRestTimerStore } from '@/stores/restTimer'
+import {
+  cancelNativeCardioEndAlarm,
+  onWearTimerCancelled,
+  scheduleNativeCardioEndAlarm,
+  startNativeCardioCountdown,
+  stopNativeCardioCountdown,
+  syncWearTimer,
+} from '@/utils/nativeShell'
 import {
   clearPersistedCardioCountdown,
   getPersistedCardioCountdown,
@@ -156,6 +164,41 @@ watch(
 )
 
 const name = computed(() => exerciseName(props.exercise, props.locale))
+
+// v0.28.0 reloj + shell (zurdi: "vamos directamente a por la C"): el
+// countdown de cardio sale de la web — cuenta atrás ongoing en la barra del
+// móvil y alarma sonora a cero (como el descanso) y estado en la Data Layer
+// para el Galaxy Watch. Cuelga de resumedActive porque es el ÚNICO estado
+// que refleja un countdown vivo en esta tarjeta (arranque fresco, resume
+// tras evicción, cancelación, auto-log): un solo watcher cubre todos los
+// caminos. Todo no-op en web.
+watch(resumedActive, (timer, previous) => {
+  if (timer) {
+    const title = `${t('timer.cardioOngoingTitle')} · ${name.value}`
+    void startNativeCardioCountdown(timer.endsAt, title)
+    void scheduleNativeCardioEndAlarm(
+      timer.endsAt,
+      t('workout.cardio.timeUp'),
+      t('timer.notifyBodyWithExercise', { exercise: name.value }),
+    )
+    void syncWearTimer({
+      kind: 'cardio',
+      state: 'running',
+      targetEpochMs: timer.endsAt,
+      totalMs: timer.targetSeconds * 1000,
+      title,
+    })
+  } else if (previous) {
+    void stopNativeCardioCountdown()
+    void cancelNativeCardioEndAlarm()
+    void syncWearTimer({ kind: 'cardio', state: 'stopped' })
+  }
+})
+// cancelado desde la muñeca: misma salida que el botón cancelar de la tarjeta
+const stopWearCancel = onWearTimerCancelled((kind) => {
+  if (kind === 'cardio' && resumedActive.value) onResumedCancel()
+})
+onBeforeUnmount(stopWearCancel)
 
 // runa del grupo muscular primario del ejercicio, si el catálogo lo resuelve
 const primaryRune = computed<RuneName | null>(() => resolvePrimaryRune(props.exercise, props.muscleGroups))

@@ -1,5 +1,7 @@
 ext {
-    minSdkVersion = 22
+    // v0.28.0 reloj: play-services-wearable (Data Layer) exige minSdk 23 — el
+    // mismo mínimo que pide Capacitor 7; ningún dispositivo real se queda fuera
+    minSdkVersion = 23
     compileSdkVersion = 34
     targetSdkVersion = 34
     androidxActivityVersion = '1.8.0'

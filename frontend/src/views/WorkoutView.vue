@@ -19,6 +19,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
+import { cancelNativeCardioEndAlarm, stopNativeCardioCountdown, syncWearTimer } from '@/utils/nativeShell'
 import {
   clearPersistedCardioCountdown,
   getPersistedCardioCountdown,
@@ -443,7 +444,7 @@ async function onFinish() {
     // que hubiera persistido ya pasó por checkPersistedCardioCountdown al
     // montar (mismatches se limpian ahí), así que si queda algo es
     // literalmente de este entreno — limpiar sin condicionar es seguro
-    clearPersistedCardioCountdown()
+    dropCardioCountdown()
     resetMainScroll()
     finishSparks.value = true
     triggerNeonPulse()
@@ -460,7 +461,7 @@ async function confirmDiscard() {
   discardConfirmOpen.value = false
   try {
     await activeWorkout.discard()
-    clearPersistedCardioCountdown()
+    dropCardioCountdown()
     router.push({ name: 'today' })
   } catch (error) {
     toastApiError(error)
@@ -482,6 +483,18 @@ function formatCardioDuration(seconds: number): string {
 // vista EN VIVO (el editor retroactivo ni monta este componente) — decide
 // qué hacer con un countdown que se dejó corriendo antes de que el sistema
 // matara la pestaña.
+// v0.28.0 reloj + shell: cuando el countdown persistido se retira SIN que la
+// tarjeta que lo pintaba siga montada (terminó mientras la app no estaba,
+// huérfano de otro entreno, entreno terminado/descartado), la notificación
+// ongoing del móvil, su alarma y el DataItem del reloj tienen que irse con
+// él — la tarjeta solo cubre los caminos en los que ella sigue viva.
+function dropCardioCountdown() {
+  clearPersistedCardioCountdown()
+  void stopNativeCardioCountdown()
+  void cancelNativeCardioEndAlarm()
+  void syncWearTimer({ kind: 'cardio', state: 'stopped' })
+}
+
 async function checkPersistedCardioCountdown() {
   const persisted = getPersistedCardioCountdown()
   if (!persisted) return
@@ -493,7 +506,7 @@ async function checkPersistedCardioCountdown() {
     // quitó mientras tanto: countdown huérfano, se limpia sin loguear nada —
     // nunca se registra a ciegas contra un entreno que no es literalmente el
     // que sigue activo aquí y ahora
-    clearPersistedCardioCountdown()
+    dropCardioCountdown()
     return
   }
 
@@ -524,7 +537,7 @@ async function checkPersistedCardioCountdown() {
     // esconder un fallo real (p.ej. de red) tras la máscara de "descartado"
     if (!(error instanceof ApiError && error.status === 404)) toastApiError(error)
   } finally {
-    clearPersistedCardioCountdown()
+    dropCardioCountdown()
   }
 }
 

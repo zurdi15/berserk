@@ -6,7 +6,7 @@ import * as domain from '@/api/domain'
 import type { ExerciseHistoryOut, PersonalRecordOut, SetIn, SetLogOut, SetOut, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
 import { i18n } from '@/i18n'
 import { normalizeSupersets } from '@/lib/supersets'
-import { isNativeShell, startNativeWorkoutChronometer, stopNativeWorkoutChronometer } from '@/utils/nativeShell'
+import { isNativeShell, startNativeWorkoutChronometer, stopNativeWorkoutChronometer, syncWearTimer } from '@/utils/nativeShell'
 import { online } from '@/offline/net'
 import * as outbox from '@/offline/outbox'
 import { useRestTimerStore } from '@/stores/restTimer'
@@ -50,13 +50,17 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
       if (!isNativeShell()) return
       if (workout.value && workout.value.ended_at === null) {
         // started_at llega naive en UTC del backend; en offline puede faltar
-        const startedMs = startedAt ? Date.parse(`${startedAt}Z`) : Date.now()
-        void startNativeWorkoutChronometer(
-          Number.isFinite(startedMs) ? startedMs : Date.now(),
-          i18n.global.t('workout.ongoingTitle'),
-        )
+        const parsedMs = startedAt ? Date.parse(`${startedAt}Z`) : Date.now()
+        const startedMs = Number.isFinite(parsedMs) ? parsedMs : Date.now()
+        const title = i18n.global.t('workout.ongoingTitle')
+        void startNativeWorkoutChronometer(startedMs, title)
+        // v0.28.0 reloj: el crono del entreno también va a la Data Layer —
+        // el reloj lo pinta pequeño bajo la cuenta atrás, o en la esfera si
+        // no hay ninguna en marcha
+        void syncWearTimer({ kind: 'workout', state: 'running', targetEpochMs: startedMs, title })
       } else {
         void stopNativeWorkoutChronometer()
+        void syncWearTimer({ kind: 'workout', state: 'stopped' })
       }
     },
     { immediate: true },

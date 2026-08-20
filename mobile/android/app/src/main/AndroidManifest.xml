@@ -24,6 +24,16 @@
              descanso cuando dispara la alarma (ver BkOngoingPlugin) -->
         <receiver android:name=".BkRestEndReceiver" android:exported="false" />
 
+        <!-- v0.28.0 reloj: órdenes del Galaxy Watch (cancelar cuenta atrás)
+             por MessageClient; Play services lo arranca aunque la app esté
+             cerrada. El estado hacia el reloj va por DataItems (BkWear). -->
+        <service android:name=".BkWearListenerService" android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/berserk/cmd/" />
+            </intent-filter>
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

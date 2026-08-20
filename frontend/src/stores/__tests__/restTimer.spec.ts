@@ -215,3 +215,74 @@ describe('rest timer store — mobile notification on rest-over', () => {
     expect(NotificationMock).not.toHaveBeenCalled() // nunca el constructor plano si hay SW
   })
 })
+
+// v0.28.0 reloj: el descanso se publica en la Data Layer (vía el shell) y se
+// puede cancelar desde la muñeca. Stub de window.Capacitor como en
+// utils/__tests__/nativeShell.spec.ts.
+describe('rest timer store — Galaxy Watch (Data Layer vía shell)', () => {
+  type CapacitorStub = { isNativePlatform: () => boolean; Plugins: Record<string, unknown> }
+  let handler: ((data: { kind?: string }) => void) | null = null
+  const syncTimer = vi.fn().mockResolvedValue(undefined)
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000_000)
+    syncTimer.mockClear()
+    handler = null
+    const stub: CapacitorStub = {
+      isNativePlatform: () => true,
+      Plugins: {
+        LocalNotifications: {
+          requestPermissions: vi.fn().mockResolvedValue({ display: 'granted' }),
+          schedule: vi.fn().mockResolvedValue(undefined),
+          cancel: vi.fn().mockResolvedValue(undefined),
+        },
+        BkOngoing: {
+          startCountdown: vi.fn().mockResolvedValue(undefined),
+          stop: vi.fn().mockResolvedValue(undefined),
+          scheduleEndAlarm: vi.fn().mockResolvedValue(undefined),
+          cancelEndAlarm: vi.fn().mockResolvedValue(undefined),
+          getAppInfo: vi.fn().mockResolvedValue({ versionName: '0.28.0' }),
+          syncTimer,
+          addListener: vi.fn((_event: string, callback: (data: { kind?: string }) => void) => {
+            handler = callback
+            return Promise.resolve({ remove: () => Promise.resolve() })
+          }),
+        },
+      },
+    }
+    ;(globalThis as { Capacitor?: CapacitorStub }).Capacitor = stub
+  })
+  afterEach(() => {
+    delete (globalThis as { Capacitor?: CapacitorStub }).Capacitor
+    vi.useRealTimers()
+  })
+
+  it('start publica running con el endsAt absoluto y el ejercicio; clear publica stopped', () => {
+    const timer = useRestTimerStore()
+    timer.start(90, 'Press banca')
+    expect(syncTimer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'rest',
+        state: 'running',
+        targetEpochMs: 1_000_000 + 90_000,
+        totalMs: 90_000,
+        title: expect.stringContaining('Press banca'),
+      }),
+    )
+    timer.clear()
+    expect(syncTimer).toHaveBeenLastCalledWith({ kind: 'rest', state: 'stopped', targetEpochMs: 0, totalMs: 0, title: '' })
+  })
+
+  it('cancelar desde el reloj hace clear() del descanso activo (y solo del descanso)', () => {
+    const timer = useRestTimerStore()
+    timer.start(60)
+    expect(handler).not.toBeNull()
+    handler!({ kind: 'cardio' })
+    expect(timer.active).toBe(true)
+    handler!({ kind: 'rest' })
+    expect(timer.active).toBe(false)
+    expect(syncTimer).toHaveBeenLastCalledWith({ kind: 'rest', state: 'stopped', targetEpochMs: 0, totalMs: 0, title: '' })
+  })
+})

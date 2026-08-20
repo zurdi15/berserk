@@ -60,6 +60,9 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+    // v0.28.0 reloj: Wear OS Data Layer (DataClient/MessageClient/CapabilityClient).
+    // Este fichero NO lo regenera `cap sync` (solo capacitor.build.gradle).
+    implementation "com.google.android.gms:play-services-wearable:20.0.1"
 }
 
 apply from: 'capacitor.build.gradle'

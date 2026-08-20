@@ -57,10 +57,12 @@ public class BkRestEndReceiver extends BroadcastReceiver {
                     .setContentIntent(contentIntent)
                     .setVisibility(Notification.VISIBILITY_PUBLIC)
                     .build();
-            manager.notify(REST_END_NOTIFICATION_ID, notification);
+            // v0.28.0: ids parametrizados — la misma alarma avisa del fin de
+            // cardio (ver BkOngoingPlugin.endAlarmIntent); sin extras, descanso
+            manager.notify(intent.getIntExtra("notificationId", REST_END_NOTIFICATION_ID), notification);
 
             // el cronómetro ongoing de la cuenta atrás ya no pinta nada útil
-            manager.cancel(1002);
+            manager.cancel(intent.getIntExtra("cancelNotificationId", 1002));
         } catch (Exception ignored) {
         }
     }

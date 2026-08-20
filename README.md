@@ -41,6 +41,7 @@
 - **Multi-user read sharing** — grant another account read access to your training so a coach or training partner can follow along.
 - **Invite-only signup** — no public registration; new accounts are created from single-use invite links issued by an admin.
 - **PWA** — installable, works offline for the shell, no app store required.
+- **Android shell & Galaxy Watch app** — an optional Android APK (system-rendered rest/cardio/workout timers, exact end-of-rest alarm) and a Wear OS companion that shows the running countdown on the watch face and buzzes your wrist at zero — no store, no account, just two APKs signed with the same key.
 - **ES/EN** — full Spanish and English UI.
 - **kg/lb** — per-user unit preference, converted consistently across logging, history and charts.
 
@@ -84,6 +85,13 @@ cd berserk
 ```
 
 This starts the backend on `:8000` and the frontend (Vite, hot reload) on `:5173`, seeding realistic synthetic history on first run. Use the app at `http://localhost:5173`; the API and its docs live at `http://localhost:8000/api/docs`.
+
+## Android shell and Wear OS app
+
+Every release ships two optional APKs next to the Docker image, built and signed by CI:
+
+- `berserk-vX.Y.Z.apk` — the Android shell ([mobile/](mobile/)): a WebView against your server plus native extras the PWA can't do (system-chronometer notifications for rest, cardio and workout time, an exact end-of-rest alarm, and the Wear OS bridge). Install it directly or through Obtainium; it tells you when a newer APK exists.
+- `berserk-wear-vX.Y.Z.apk` — the Galaxy Watch / Wear OS app ([mobile/wear/](mobile/wear/)): the phone publishes each timer to the Wear OS Data Layer and the watch renders it as an ongoing activity on the watch face, with a full-screen countdown and a wrist vibration at zero. It needs the shell on the phone and is installed over ADB Wi-Fi — see [mobile/wear/README.md](mobile/wear/README.md).
 
 ## Stack
 

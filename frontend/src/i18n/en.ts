@@ -113,6 +113,7 @@ export const en = {
   },
   timer: {
     restOngoingTitle: 'Rest',
+    cardioOngoingTitle: 'Cardio',
     rest: 'Rest',
     notifyTitle: 'Rest over',
     notifyBody: 'Tap to get back to your workout.',
@@ -133,6 +134,11 @@ export const en = {
     libraryTab: 'Library',
     adminTab: 'Admin',
     updateShell: 'Update app to v{version}',
+    wear: {
+      linked: 'Watch linked: {name}',
+      appMissing: 'Watch connected, but without the berserk watch app',
+      none: 'No watch connected',
+    },
     theme: 'Theme',
     themeDark: 'Dark',
     themeLight: 'Light',

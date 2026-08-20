@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- capacidad que anuncia la app del reloj; el móvil la consulta
+         (CapabilityClient) para saber si el reloj tiene berserk instalada -->
+    <string-array name="android_wear_capabilities">
+        <item>berserk_watch</item>
+    </string-array>
+</resources>

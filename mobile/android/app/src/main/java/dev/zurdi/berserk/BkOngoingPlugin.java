@@ -127,13 +127,22 @@ public class BkOngoingPlugin extends Plugin {
         }
     }
 
-    private PendingIntent endAlarmIntent(String title, String body, String channelName) {
+    // v0.28.0: la misma alarma sirve para el fin de CARDIO — request code e
+    // ids propios (los fija nativeShell.ts) para que no se pise con la del
+    // descanso. Sin parámetros, todo cae a los valores del descanso de siempre.
+    static final int REST_END_REQUEST_CODE = 2001;
+
+    private PendingIntent endAlarmIntent(
+            int requestCode, String title, String body, String channelName,
+            int notificationId, int cancelNotificationId) {
         Intent intent = new Intent(getContext(), BkRestEndReceiver.class);
         intent.putExtra("title", title);
         intent.putExtra("body", body);
         intent.putExtra("channelName", channelName);
+        intent.putExtra("notificationId", notificationId);
+        intent.putExtra("cancelNotificationId", cancelNotificationId);
         return PendingIntent.getBroadcast(
-                getContext(), 2001, intent,
+                getContext(), requestCode, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
@@ -156,9 +165,12 @@ public class BkOngoingPlugin extends Plugin {
             android.app.AlarmManager alarms =
                     (android.app.AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
             PendingIntent operation = endAlarmIntent(
+                    call.getInt("requestCode", REST_END_REQUEST_CODE),
                     call.getString("title", "berserk"),
                     call.getString("body", ""),
-                    call.getString("channelName", "berserk"));
+                    call.getString("channelName", "berserk"),
+                    call.getInt("notificationId", BkRestEndReceiver.REST_END_NOTIFICATION_ID),
+                    call.getInt("cancelNotificationId", 1002));
             boolean exactAllowed = Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms();
             if (exactAllowed) {
                 try {
@@ -191,15 +203,34 @@ public class BkOngoingPlugin extends Plugin {
     @PluginMethod
     public void cancelEndAlarm(PluginCall call) {
         try {
-            android.app.AlarmManager alarms =
-                    (android.app.AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
-            alarms.cancel(endAlarmIntent("", "", ""));
-            // si ya se posteó (llegó a cero antes de cancelar), fuera de la barra
-            manager().cancel(BkRestEndReceiver.REST_END_NOTIFICATION_ID);
+            cancelEndAlarmNative(
+                    getContext(),
+                    call.getInt("requestCode", REST_END_REQUEST_CODE),
+                    call.getInt("notificationId", BkRestEndReceiver.REST_END_NOTIFICATION_ID));
             call.resolve();
         } catch (Exception e) {
             call.reject(e.toString());
         }
+    }
+
+    /**
+     * v0.28.0 reloj — cancelar una alarma de fin SIN bridge: lo usa también
+     * BkWearListenerService cuando el Galaxy Watch cancela una cuenta atrás
+     * y el WebView puede estar muerto. El PendingIntent casa por componente
+     * + request code, no por extras, así que vale uno vacío.
+     */
+    static void cancelEndAlarmNative(Context context, int requestCode, int notificationId) {
+        android.app.AlarmManager alarms =
+                (android.app.AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(context, BkRestEndReceiver.class);
+        PendingIntent operation = PendingIntent.getBroadcast(
+                context, requestCode, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        alarms.cancel(operation);
+        // si ya se posteó (llegó a cero antes de cancelar), fuera de la barra
+        NotificationManager manager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        manager.cancel(notificationId);
     }
 
     /**
@@ -241,6 +272,55 @@ public class BkOngoingPlugin extends Plugin {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             getContext().startActivity(intent);
             call.resolve();
+        } catch (Exception e) {
+            call.reject(e.toString());
+        }
+    }
+
+    // ---------- reloj Wear OS (v0.28.0) — ver BkWear.java ----------
+
+    @Override
+    public void load() {
+        // BkWearListenerService corre en este proceso pero sin bridge: le
+        // dejamos un sumidero para que una cancelación desde el reloj llegue
+        // a la web como evento del plugin (nativeShell.onWearTimerCancelled)
+        BkWearEvents.setSink(kind -> {
+            JSObject data = new JSObject();
+            data.put("kind", kind);
+            getBridge().executeOnMainThread(() -> notifyListeners("timerCancelled", data, true));
+        });
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        BkWearEvents.setSink(null);
+    }
+
+    /** Publica el estado de un temporizador para el reloj (DataItem /berserk/timer/&lt;kind&gt;). */
+    @PluginMethod
+    public void syncTimer(PluginCall call) {
+        try {
+            String kind = call.getString("kind", "");
+            String state = call.getString("state", "");
+            if (!BkWear.isKind(kind) || !BkWear.isState(state)) {
+                call.reject("syncTimer: kind/state inválidos");
+                return;
+            }
+            long targetEpochMs = call.getLong("targetEpochMs", 0L);
+            long totalMs = call.getLong("totalMs", 0L);
+            String title = call.getString("title", "");
+            BkWear.publishTimer(getContext(), kind, state, targetEpochMs, totalMs, title);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(e.toString());
+        }
+    }
+
+    /** Estado del enlace con el reloj (Play services, reloj conectado, app instalada). */
+    @PluginMethod
+    public void getWearStatus(PluginCall call) {
+        try {
+            BkWear.status(getContext(), call);
         } catch (Exception e) {
             call.reject(e.toString());
         }

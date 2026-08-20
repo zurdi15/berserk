@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- v0.28.0 reloj: capacidad que anuncia la shell; la app del reloj la
+         busca (CapabilityClient) para saber a qué nodo mandar sus órdenes -->
+    <string-array name="android_wear_capabilities">
+        <item>berserk_phone</item>
+    </string-array>
+</resources>

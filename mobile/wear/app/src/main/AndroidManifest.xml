@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <!-- notificaciones (ongoing + "¡Tiempo!") son permiso de runtime desde API 33 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- re-programar las alarmas de fin tras reinicio/actualización -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- el aviso a 0:00 va por AlarmManager exacto: Wear OS 5+ deniega
+         SCHEDULE_EXACT_ALARM por defecto, pero USE_EXACT_ALARM (API 33+) se
+         concede en la instalación a apps de alarmas/temporizadores, que es
+         justo lo que es esta. Sin exactitud se degrada a inexacta (ver TimerAlarms). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <uses-library
+            android:name="com.google.android.wearable"
+            android:required="true" />
+        <!-- depende de la app del móvil: sin ella no hay nada que pintar -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="false" />
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=".main">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Play services despierta este servicio (aunque la app esté
+             cerrada) con cada DataItem bajo /berserk/ del móvil -->
+        <service
+            android:name=".sync.TimerListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/berserk/" />
+            </intent-filter>
+        </service>
+
+        <!-- fin de cuenta atrás (vibración + "¡Tiempo!") -->
+        <receiver
+            android:name=".alarm.TimerAlarmReceiver"
+            android:exported="false" />
+
+        <!-- tras reiniciar o actualizar: las alarmas se pierden → rehidratar -->
+        <receiver
+            android:name=".sync.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

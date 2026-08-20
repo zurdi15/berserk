@@ -8,8 +8,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   checkNativeShellUpdate,
+  getWearStatus,
+  hasWearBridge,
+  onWearTimerCancelled,
   openNativeShellDownload,
   scheduleNativeRestNotification,
+  syncWearTimer,
 } from '../nativeShell'
 
 type CapacitorStub = {
@@ -113,5 +117,84 @@ describe('openNativeShellDownload', () => {
       'https://github.com/zurdi15/berserk/releases/download/v0.16.0/berserk-v0.16.0.apk',
       '_blank',
     )
+  })
+})
+
+// v0.28.0 reloj: el puente a la Data Layer es opcional (las shells anteriores
+// no tienen syncTimer) y SIEMPRE silencioso — nada del reloj puede romper el
+// descanso del móvil.
+describe('reloj Wear OS — syncWearTimer / getWearStatus / onWearTimerCancelled', () => {
+  it('fuera del shell o sin syncTimer (APK vieja): no-op sin error', async () => {
+    expect(hasWearBridge()).toBe(false)
+    await expect(
+      syncWearTimer({ kind: 'rest', state: 'running', targetEpochMs: 1, totalMs: 1, title: 'x' }),
+    ).resolves.toBeUndefined()
+    installCapacitor({})
+    expect(hasWearBridge()).toBe(false)
+    await expect(syncWearTimer({ kind: 'rest', state: 'stopped' })).resolves.toBeUndefined()
+    expect(await getWearStatus()).toBeNull()
+  })
+
+  it('con syncTimer: publica el payload completo (defaults para lo opcional)', async () => {
+    const syncTimer = vi.fn().mockResolvedValue(undefined)
+    installCapacitor({ syncTimer })
+    expect(hasWearBridge()).toBe(true)
+    await syncWearTimer({ kind: 'cardio', state: 'running', targetEpochMs: 5_000, totalMs: 4_000, title: 'Cardio · Cinta' })
+    expect(syncTimer).toHaveBeenCalledWith({
+      kind: 'cardio',
+      state: 'running',
+      targetEpochMs: 5_000,
+      totalMs: 4_000,
+      title: 'Cardio · Cinta',
+    })
+    await syncWearTimer({ kind: 'cardio', state: 'stopped' })
+    expect(syncTimer).toHaveBeenLastCalledWith({ kind: 'cardio', state: 'stopped', targetEpochMs: 0, totalMs: 0, title: '' })
+  })
+
+  it('un fallo nativo (sin Play Services) no se propaga', async () => {
+    installCapacitor({ syncTimer: vi.fn().mockRejectedValue(new Error('no gms')) })
+    await expect(syncWearTimer({ kind: 'rest', state: 'stopped' })).resolves.toBeUndefined()
+  })
+
+  it('getWearStatus normaliza la respuesta nativa (y un fallo es null)', async () => {
+    installCapacitor({
+      getWearStatus: vi.fn().mockResolvedValue({ playServices: true, connected: true, appInstalled: true, watchName: 'Galaxy Watch8' }),
+    })
+    expect(await getWearStatus()).toEqual({ playServices: true, connected: true, appInstalled: true, watchName: 'Galaxy Watch8' })
+
+    installCapacitor({ getWearStatus: vi.fn().mockResolvedValue({ playServices: true, watchName: null }) })
+    expect(await getWearStatus()).toEqual({ playServices: true, connected: false, appInstalled: false, watchName: null })
+
+    installCapacitor({ getWearStatus: vi.fn().mockRejectedValue(new Error('boom')) })
+    expect(await getWearStatus()).toBeNull()
+  })
+
+  it('onWearTimerCancelled: una suscripción por plugin, reparto por kind y baja', () => {
+    let handler: ((data: { kind?: string }) => void) | null = null
+    const addListener = vi.fn((_event: string, callback: (data: { kind?: string }) => void) => {
+      handler = callback
+      return Promise.resolve({ remove: () => Promise.resolve() })
+    })
+    installCapacitor({ syncTimer: vi.fn(), addListener })
+
+    const first = vi.fn()
+    const second = vi.fn()
+    const offFirst = onWearTimerCancelled(first)
+    onWearTimerCancelled(second)
+    expect(addListener).toHaveBeenCalledTimes(1)
+    expect(addListener).toHaveBeenCalledWith('timerCancelled', expect.any(Function))
+
+    handler!({ kind: 'rest' })
+    expect(first).toHaveBeenCalledWith('rest')
+    expect(second).toHaveBeenCalledWith('rest')
+
+    // kind desconocido: se ignora
+    handler!({ kind: 'nap' })
+    expect(first).toHaveBeenCalledTimes(1)
+
+    offFirst()
+    handler!({ kind: 'cardio' })
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(second).toHaveBeenCalledTimes(2)
   })
 })

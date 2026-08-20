@@ -2,7 +2,15 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { i18n } from '@/i18n'
-import { cancelNativeRestNotification, isNativeShell, scheduleNativeRestNotification, startNativeRestCountdown, stopNativeRestCountdown } from '@/utils/nativeShell'
+import {
+  cancelNativeRestNotification,
+  isNativeShell,
+  onWearTimerCancelled,
+  scheduleNativeRestNotification,
+  startNativeRestCountdown,
+  stopNativeRestCountdown,
+  syncWearTimer,
+} from '@/utils/nativeShell'
 
 // timestamps absolutos: el interval solo refresca la vista; si el móvil se
 // bloquea y los ticks no corren, el tiempo restante sigue siendo exacto
@@ -19,6 +27,13 @@ export const useRestTimerStore = defineStore('restTimer', () => {
   // se pide UNA vez por sesión de página, nunca en cada start(): repetir el
   // prompt del navegador en cada serie sería spam de permisos
   let permissionRequested = false
+
+  // v0.28.0 reloj (zurdi: "vamos directamente a por la C"): cancelar el
+  // descanso desde la muñeca. El móvil obedece con clear() — que además
+  // re-publica el stopped — para que web, barra del móvil y reloj converjan.
+  onWearTimerCancelled((kind) => {
+    if (kind === 'rest' && endsAt.value !== null) clear()
+  })
 
   const remaining = computed(() =>
     endsAt.value === null ? 0 : Math.max(0, Math.round((endsAt.value - now.value) / 1000)),
@@ -107,6 +122,17 @@ export const useRestTimerStore = defineStore('restTimer', () => {
       // v0.13.1: cuenta atrás VISIBLE en barra/bloqueo (cronómetro del
       // sistema, silenciosa) + la programada de abajo que SUENA al llegar
       void startNativeRestCountdown(endsAt.value, i18n.global.t('timer.restOngoingTitle'))
+      // v0.28.0 reloj: el mismo endsAt absoluto viaja a la Data Layer para
+      // el Galaxy Watch (cuenta atrás en la esfera + vibración a cero)
+      void syncWearTimer({
+        kind: 'rest',
+        state: 'running',
+        targetEpochMs: endsAt.value,
+        totalMs: seconds * 1000,
+        title: exerciseName
+          ? `${i18n.global.t('timer.restOngoingTitle')} · ${exerciseName}`
+          : i18n.global.t('timer.restOngoingTitle'),
+      })
       void scheduleNativeRestNotification(
         endsAt.value,
         i18n.global.t('timer.notifyTitle'),
@@ -131,6 +157,7 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     if (isNativeShell()) {
       void cancelNativeRestNotification()
       void stopNativeRestCountdown()
+      void syncWearTimer({ kind: 'rest', state: 'stopped' })
     }
     endsAt.value = null
     total.value = 0

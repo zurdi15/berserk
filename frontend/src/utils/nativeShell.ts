@@ -28,9 +28,16 @@ interface OngoingPlugin {
   startCountdown: (options: Record<string, unknown>) => Promise<unknown>
   stop: (options: { id: number }) => Promise<unknown>
   scheduleEndAlarm?: (options: Record<string, unknown>) => Promise<unknown>
-  cancelEndAlarm?: () => Promise<unknown>
+  cancelEndAlarm?: (options?: Record<string, unknown>) => Promise<unknown>
   getAppInfo?: () => Promise<{ versionName?: string }>
   openUrl?: (options: { url: string }) => Promise<unknown>
+  // v0.28.0 reloj Wear OS (ver el bloque "reloj" al final)
+  syncTimer?: (options: Required<WearTimerSync>) => Promise<unknown>
+  getWearStatus?: () => Promise<Partial<WearStatus>>
+  addListener?: (
+    event: 'timerCancelled',
+    callback: (data: { kind?: string }) => void,
+  ) => Promise<{ remove: () => Promise<void> }> | { remove: () => Promise<void> }
 }
 
 interface CapacitorGlobal {
@@ -228,4 +235,185 @@ export async function openNativeShellDownload(version: string): Promise<void> {
   // shells viejos sin openUrl: Capacitor manda los hosts fuera de
   // allowNavigation al navegador del sistema
   window.open(url, '_blank')
+}
+
+// ---------- reloj Wear OS (v0.28.0) ----------
+// zurdi: "vamos directamente a por la C ... la experiencia más robusta".
+// La app del reloj (mobile/wear) NO habla con la web: el móvil publica el
+// estado de cada temporizador como DataItem de la Data Layer
+// (/berserk/timer/<kind>, vía BkOngoing.syncTimer) y el reloj lo pinta con
+// la Ongoing Activity API. Aquí solo viaja la VERDAD del móvil (el mismo
+// endsAt/startedAt absoluto de las notificaciones ongoing): el reloj no
+// calcula nada. Todo no-op en web y en shells sin syncTimer (APK anterior).
+
+export type WearTimerKind = 'rest' | 'cardio' | 'workout'
+
+export interface WearTimerSync {
+  kind: WearTimerKind
+  state: 'running' | 'stopped'
+  /** fin (cuenta atrás) o inicio (crono hacia arriba), epoch ms */
+  targetEpochMs?: number
+  /** duración total de la cuenta atrás (barra de progreso del reloj) */
+  totalMs?: number
+  /** ya localizado ("Descanso · Press banca"); el reloj solo lo pinta */
+  title?: string
+}
+
+export interface WearStatus {
+  playServices: boolean
+  connected: boolean
+  appInstalled: boolean
+  watchName: string | null
+}
+
+/** ¿Esta shell sabe hablar con el reloj? (marca de capacidad, como getAppInfo) */
+export function hasWearBridge(): boolean {
+  return typeof ongoingPlugin()?.syncTimer === 'function'
+}
+
+export async function syncWearTimer(sync: WearTimerSync): Promise<void> {
+  const plugin = ongoingPlugin()
+  if (!plugin?.syncTimer) return
+  try {
+    await plugin.syncTimer({ targetEpochMs: 0, totalMs: 0, title: '', ...sync })
+  } catch {
+    // sin Play Services o sin reloj: el móvil sigue igual
+  }
+}
+
+export async function getWearStatus(): Promise<WearStatus | null> {
+  const plugin = ongoingPlugin()
+  if (!plugin?.getWearStatus) return null
+  try {
+    const status = await plugin.getWearStatus()
+    return {
+      playServices: status.playServices === true,
+      connected: status.connected === true,
+      appInstalled: status.appInstalled === true,
+      watchName: typeof status.watchName === 'string' && status.watchName ? status.watchName : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+type WearCancelListener = (kind: WearTimerKind) => void
+const wearCancelListeners = new Set<WearCancelListener>()
+// se suscribe UNA vez por instancia del plugin (no por oyente): si el plugin
+// cambia (tests, o un bridge recreado) se vuelve a suscribir
+let wearCancelSubscribedTo: OngoingPlugin | null = null
+
+function isWearTimerKind(value: unknown): value is WearTimerKind {
+  return value === 'rest' || value === 'cardio' || value === 'workout'
+}
+
+/**
+ * Cancelación hecha DESDE el reloj (evento `timerCancelled` del plugin, que
+ * a su vez ya hizo la limpieza nativa — notificación y alarma — y publicó el
+ * stopped). Quien tenga el temporizador en la web lo cierra por su lado.
+ * Devuelve la función para darse de baja.
+ */
+export function onWearTimerCancelled(listener: WearCancelListener): () => void {
+  wearCancelListeners.add(listener)
+  const plugin = ongoingPlugin()
+  if (plugin?.addListener && wearCancelSubscribedTo !== plugin) {
+    wearCancelSubscribedTo = plugin
+    try {
+      void plugin.addListener('timerCancelled', (event) => {
+        const kind = event?.kind
+        if (!isWearTimerKind(kind)) return
+        for (const callback of [...wearCancelListeners]) callback(kind)
+      })
+    } catch {
+      wearCancelSubscribedTo = null
+    }
+  }
+  return () => {
+    wearCancelListeners.delete(listener)
+  }
+}
+
+// cuenta atrás de cardio en la barra del móvil: hasta v0.28.0 el cardio solo
+// existía en la web; ahora sigue el mismo camino que el descanso (y el mismo
+// id que conoce BkWearListenerService para cancelarla desde el reloj)
+const CARDIO_COUNTDOWN_ID = 1004
+
+export async function startNativeCardioCountdown(endsAtMs: number, title: string): Promise<void> {
+  const plugin = ongoingPlugin()
+  if (!plugin) return
+  try {
+    await ensureNativeNotificationPermission()
+    await plugin.startCountdown({ id: CARDIO_COUNTDOWN_ID, whenMs: endsAtMs, title, channelName: title })
+  } catch {
+    // sin permiso: la tarjeta sigue contando
+  }
+}
+
+export async function stopNativeCardioCountdown(): Promise<void> {
+  const plugin = ongoingPlugin()
+  if (!plugin) return
+  try {
+    await plugin.stop({ id: CARDIO_COUNTDOWN_ID })
+  } catch {
+    // nada que parar
+  }
+}
+
+// Fin de cardio SONORO en el móvil: misma alarma exacta que el descanso
+// (BkOngoing.scheduleEndAlarm) con su propio request code y sus propios ids,
+// para que no se pise con la del descanso. Sin ella, con la web muerta a
+// las 0:00 la cuenta atrás ongoing se quedaría clavada en la barra hasta
+// volver a abrir la app. Solo en shells v0.28.0+ (marca: syncTimer): una
+// shell anterior IGNORA los parámetros y cancelaría la alarma del DESCANSO.
+const CARDIO_END_REQUEST_CODE = 2002
+const CARDIO_END_NOTIFICATION_ID = 1005
+
+export async function scheduleNativeCardioEndAlarm(endsAtMs: number, title: string, body: string): Promise<void> {
+  const cap = capacitor()
+  if (!cap) return
+  try {
+    await ensureNativeNotificationPermission()
+    const ongoing = cap.Plugins?.BkOngoing
+    if (ongoing?.scheduleEndAlarm && hasWearBridge()) {
+      await ongoing.scheduleEndAlarm({
+        whenMs: endsAtMs,
+        title,
+        body,
+        channelName: title,
+        requestCode: CARDIO_END_REQUEST_CODE,
+        notificationId: CARDIO_END_NOTIFICATION_ID,
+        cancelNotificationId: CARDIO_COUNTDOWN_ID,
+      })
+      return
+    }
+    await cap.Plugins?.LocalNotifications?.schedule({
+      notifications: [
+        {
+          id: CARDIO_END_NOTIFICATION_ID,
+          title,
+          body,
+          schedule: { at: new Date(endsAtMs), allowWhileIdle: true },
+          smallIcon: 'ic_stat_berserk',
+        },
+      ],
+    })
+  } catch {
+    // sin permiso o plugin roto: el reloj y la tarjeta siguen avisando
+  }
+}
+
+export async function cancelNativeCardioEndAlarm(): Promise<void> {
+  const cap = capacitor()
+  if (!cap) return
+  try {
+    const ongoing = cap.Plugins?.BkOngoing
+    if (ongoing?.cancelEndAlarm && hasWearBridge()) {
+      await ongoing.cancelEndAlarm({ requestCode: CARDIO_END_REQUEST_CODE, notificationId: CARDIO_END_NOTIFICATION_ID })
+    }
+    await cap.Plugins?.LocalNotifications?.cancel({
+      notifications: [{ id: CARDIO_END_NOTIFICATION_ID }],
+    })
+  } catch {
+    // nada que cancelar
+  }
 }
