@@ -27,3 +27,17 @@ class StopPolicyTest {
         assertEquals(StopAction.STOP, StopPolicy.onStopped(null, TimerSpec.REASON_FINISHED))
     }
 }
+
+class SameInstanceTest {
+    private val spec = TimerSpec(TimerKind.REST, true, 100_000L, 60_000L, "", 40_000L)
+    private val timer = ActiveTimer(spec, receivedAtEpochMs = 40_000L)
+
+    @Test
+    fun `the same DataItem re-applied is the same instance, a new start is not`() {
+        assertEquals(true, timer.isSameInstance(spec))
+        assertEquals(true, timer.isSameInstance(spec.copy(title = "otro título", reason = "")))
+        assertEquals(false, timer.isSameInstance(spec.copy(sentAtEpochMs = 41_000L)))
+        assertEquals(false, timer.isSameInstance(spec.copy(targetEpochMs = 130_000L)))
+        assertEquals(false, timer.isSameInstance(spec.copy(kind = TimerKind.CARDIO)))
+    }
+}

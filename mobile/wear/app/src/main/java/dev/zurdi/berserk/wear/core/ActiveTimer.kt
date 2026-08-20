@@ -44,4 +44,12 @@ data class ActiveTimer(
         if (!kind.countsDown || spec.totalMs <= 0L) 0f else 1f - progress(nowEpochMs)
 
     fun isDue(nowEpochMs: Long): Boolean = kind.countsDown && remainingMs(nowEpochMs) <= 0L
+
+    /**
+     * v0.33.2: ¿es este DataItem la MISMA instancia que ya tenemos? (mismo
+     * arranque y mismo fin). Volver a aplicarla —restore al abrir la app,
+     * reconexión— no debe reiniciar nada; solo un arranque nuevo sustituye.
+     */
+    fun isSameInstance(other: TimerSpec): Boolean =
+        other.kind == kind && other.sentAtEpochMs == spec.sentAtEpochMs && other.targetEpochMs == spec.targetEpochMs
 }

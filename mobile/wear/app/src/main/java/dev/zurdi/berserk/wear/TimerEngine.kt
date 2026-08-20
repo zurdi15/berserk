@@ -53,6 +53,14 @@ class TimerEngine private constructor(context: Context) {
             }
             return
         }
+        // v0.33.2 (zurdi: "al llegar al final se abre para ver el OK y se pone a
+        // parpadear, como si la app se abriese varias veces"): al abrirse por la
+        // alarma, onResume relee la Data Layer y el DataItem aún dice running (el
+        // móvil publica el finished 3 s después). Tratarlo como nuevo silenciaba
+        // la alarma, lo daba por vencido y la rearmaba con otro full-screen
+        // intent → la app se relanzaba → otra relectura. Misma instancia ya
+        // terminada aquí (avisando o con OK): no hay nada que cambiar.
+        if (current != null && current.isSameInstance(spec) && current.isFinished) return
         // una serie nueva mientras la anterior aún avisa: el usuario ya está a otra cosa
         if (current?.isAlarming == true) silenceAlarm(spec.kind)
         val timer = ActiveTimer(spec, receivedAtEpochMs = nowEpochMs)
