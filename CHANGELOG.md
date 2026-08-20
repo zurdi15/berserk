@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.35.3 - 2026-08-20
+
+### Cambiado
+- Reloj: el halo del anillo es más sutil y difuminado, y el texto del botón Cancelar va centrado.
+
 ## 0.35.2 - 2026-08-20
 
 ### Cambiado
