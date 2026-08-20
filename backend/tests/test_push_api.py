@@ -78,6 +78,10 @@ def test_scheduler_fires_due_and_purges_dead_subscriptions(client: TestClient, a
         return not sub.endpoint.endswith("/dead")
 
     monkeypatch.setattr(push_service, "send_to_subscription", fake_send)
+    # el hilo real se para: aquí se dispara a mano, si no compite con el test
+    # por el timer vencido y la cuenta sale 0 o 2 según quién llegue antes
+    scheduler: push_service.PushScheduler = app.state.push_scheduler
+    scheduler.stop()
     client.put("/api/v1/push/subscriptions", json=SUB)
     client.put("/api/v1/push/subscriptions", json={**SUB, "endpoint": "https://push.example/dead"})
 
@@ -87,7 +91,6 @@ def test_scheduler_fires_due_and_purges_dead_subscriptions(client: TestClient, a
     # vencido hace demasiado: se descarta sin avisar
     client.put("/api/v1/push/timers/d-old", json={"kind": "rest", "fire_at": (now - timedelta(hours=1)).isoformat(), "title": "viejo"})
 
-    scheduler: push_service.PushScheduler = app.state.push_scheduler
     assert scheduler.fire_due() == 1
     endpoints = sorted(e for e, _ in sent)
     assert endpoints == ["https://push.example/abc", "https://push.example/dead"]

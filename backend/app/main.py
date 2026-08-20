@@ -1,5 +1,6 @@
 import logging
 import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -25,8 +26,22 @@ def create_app(engine: Engine | None = None) -> FastAPI:
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         engine = make_engine(settings.db_url)
 
+    # v0.36.1: el hilo del Web Push vive con el servidor, no con create_app()
+    # — arranca y para con el ciclo de vida ASGI (uvicorn y TestClient `with`).
+    # Lifespan y no add_event_handler: la imagen de producción llevaba una
+    # FastAPI sin ese método y el push quedó apagado en silencio (v0.36.0)
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        scheduler = getattr(app.state, "push_scheduler", None)
+        if scheduler:
+            scheduler.start()
+        yield
+        if scheduler:
+            scheduler.stop()
+
     app = FastAPI(
         title="berserk",
+        lifespan=lifespan,
         description="Workout tracker self-hosted",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
@@ -56,10 +71,6 @@ def create_app(engine: Engine | None = None) -> FastAPI:
         try:
             app.state.push_keys = VapidKeys(settings.data_dir / "vapid.pem", settings.vapid_subject)
             app.state.push_scheduler = PushScheduler(app.state.sessionmaker, app.state.push_keys)
-            # el hilo vive con el servidor, no con create_app(): arranca y
-            # para con el ciclo de vida ASGI (uvicorn y TestClient `with`)
-            app.add_event_handler("startup", app.state.push_scheduler.start)
-            app.add_event_handler("shutdown", app.state.push_scheduler.stop)
         except Exception as exc:  # noqa: BLE001 — sin push antes que sin app
             logging.getLogger("berserk.push").warning("web push desactivado: %s", exc)
 
