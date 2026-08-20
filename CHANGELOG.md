@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.35.1 - 2026-08-20
+
+### Cambiado
+- Reloj: el anillo de la cuenta atrás vuelve al diseño original (trazo fino con halo, círculo completo) y los botones OK y Cancelar son compactos y del mismo tamaño.
+- App Android: el velo de fin de temporizador muestra "Descanso terminado" / "Cardio terminado", un 0:00 en grande y el ejercicio.
+
 ## 0.35.0 - 2026-08-20
 
 ### Arreglado
