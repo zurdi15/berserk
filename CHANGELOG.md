@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.33.1 - 2026-08-20
+
+### Arreglado
+- Reloj: el anillo de la cuenta atrás se llena con el tiempo transcurrido (antes mostraba el restante y parecía un círculo fijo), sobre una pista gris tenue; el botón Cancelar usa los colores de berserk.
+
 ## 0.33.0 - 2026-08-20
 
 ### Añadido
