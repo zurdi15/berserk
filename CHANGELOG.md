@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.35.0 - 2026-08-20
+
+### Arreglado
+- Reloj: el anillo de la cuenta atrás ya se llena de verdad — la duración del temporizador llegaba al reloj como 0 por un fallo de lectura en la app Android; ahora viaja bien y, por si acaso, el reloj la deduce si faltara.
+
+### Cambiado
+- App Android: al terminar un descanso o un cardio ya no hay pantalla aparte — se abre la app y un velo con halo ámbar, el nombre del ejercicio y el OK cubre la pantalla hasta que lo pulsas (o hasta que lo callas desde la notificación o el reloj).
+- Reloj y móvil: fuera los textos de "¡Tiempo!" y "Pulsa OK…"; la pantalla de alarma del reloj queda con el halo, el nombre y un OK más pequeño y con aire; en las notificaciones el ejercicio es el titular y el tipo va debajo.
+
 ## 0.34.1 - 2026-08-20
 
 ### Cambiado
