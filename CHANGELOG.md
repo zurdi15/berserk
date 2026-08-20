@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.35.2 - 2026-08-20
+
+### Cambiado
+- El diálogo de descartar entreno usa el mismo patrón que el resto de confirmaciones: Cancelar y Descartar ocupan la fila entera a partes iguales, con Cancelar a la izquierda.
+
 ## 0.35.1 - 2026-08-20
 
 ### Cambiado
