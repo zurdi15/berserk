@@ -24,6 +24,10 @@ vi.mock('@/api/auth', () => ({
 }))
 
 vi.mock('@/api/domain', () => ({
+  // v0.27.0: el avatar del hub es AvatarPicker, que importa estas tres
+  avatarUrl: vi.fn(() => '/api/v1/users/1/avatar'),
+  uploadAvatar: vi.fn(),
+  deleteAvatar: vi.fn(),
   getSharing: vi.fn(() => Promise.resolve({
     given: [],
     received: [],
@@ -90,6 +94,7 @@ describe('ProfileView', () => {
         plugins: [createI18nInstance()],
         stubs: {
           SettingsCard: true,
+          AccountCard: true,
           PasswordCard: true,
           SharingCard: true,
           AdminCard: true,
@@ -154,9 +159,59 @@ describe('ProfileView', () => {
     expect(wrapper.find('[data-testid="profile-identity"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('test')
     expect(wrapper.find('[data-testid="profile-activity"]').exists()).toBe(true)
-    for (const tab of ['settings', 'routines', 'library', 'sharing']) {
+    for (const tab of ['settings', 'account', 'routines', 'library', 'sharing']) {
       expect(wrapper.find(`[data-testid="profile-link-${tab}"]`).exists()).toBe(true)
     }
+  })
+
+  // v0.27.0 (zurdi: "el tema del perfil y los ajustes está descolocado"):
+  // Ajustes = la web app; Cuenta = tú. Y bajo el avatar no cuelga nada.
+  describe('v0.27.0: Ajustes (web app) vs Cuenta (identidad)', () => {
+    it('the identity header has no "Editar"/"Quitar foto" buttons — the avatar itself is the control', async () => {
+      const auth = useAuthStore()
+      auth.user = { ...auth.user!, has_avatar: true, avatar_version: 'abc' }
+      wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="profile-avatar-btn"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="profile-edit-link"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="profile-avatar-remove"]').exists()).toBe(false)
+    })
+
+    it('the account row is right below settings and opens AccountCard + PasswordCard', async () => {
+      wrapper = build()
+      await flushPromises()
+
+      const rows = wrapper.findAll('[data-testid^="profile-link-"]')
+      expect(rows.map((r) => r.attributes('data-testid')).slice(0, 2)).toEqual([
+        'profile-link-settings',
+        'profile-link-account',
+      ])
+      expect(rows[1].text()).toContain('Cuenta')
+
+      await openSection(wrapper, 'account')
+      expect(wrapper.findComponent({ name: 'AccountCard' }).exists()).toBe(true)
+      expect(wrapper.findComponent({ name: 'PasswordCard' }).exists()).toBe(true)
+    })
+
+    it('the settings section no longer carries the password card (that lives in Cuenta now)', async () => {
+      wrapper = build()
+      await flushPromises()
+
+      await openSection(wrapper, 'settings')
+      expect(wrapper.findComponent({ name: 'SettingsCard' }).exists()).toBe(true)
+      expect(wrapper.findComponent({ name: 'PasswordCard' }).exists()).toBe(false)
+      expect(wrapper.findComponent({ name: 'AccountCard' }).exists()).toBe(false)
+    })
+
+    it('#account in the hash lands straight on the account section', async () => {
+      mockRoute.hash = '#account'
+      wrapper = build()
+      await flushPromises()
+
+      expect(wrapper.findComponent({ name: 'AccountCard' }).exists()).toBe(true)
+      expect(wrapper.find('[data-testid="profile-identity"]').exists()).toBe(false)
+    })
   })
 
   it('facelift: a section opens from its row and the back row returns to the hub', async () => {

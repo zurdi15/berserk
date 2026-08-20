@@ -1,7 +1,7 @@
 export const es = {
   app: {
     notificationsDenied: 'Notificaciones desactivadas: actívalas en Ajustes de Android → Aplicaciones → berserk para el cronómetro y el aviso de descanso',
-    shellUpdateAvailable: 'Hay una versión nueva de la app: descárgala en Perfil → Configuración',
+    shellUpdateAvailable: 'Hay una versión nueva de la app: descárgala en Perfil → Ajustes',
     name: 'berserk',
     nav: {
       today: 'Hoy',
@@ -126,15 +126,16 @@ export const es = {
     tab: 'Perfil',
     // facelift: hub de perfil
     settingsTab: 'Ajustes',
+    // v0.27.0: la sección de identidad — "Cuenta" y no "Perfil" para no
+    // titular "Perfil › Perfil" (ver ProfileView.vue)
+    accountTab: 'Cuenta',
     sharingTab: 'Compartir',
     activity: 'Tu actividad reciente',
-    editProfile: 'Editar',
     changeAvatar: 'Cambiar foto de perfil',
     removeAvatar: 'Quitar foto',
     routinesTab: 'Rutinas',
     libraryTab: 'Biblioteca',
     adminTab: 'Admin',
-    settings: 'Configuración',
     updateShell: 'Actualizar app a v{version}',
     theme: 'Tema',
     themeDark: 'Oscuro',
@@ -148,6 +149,9 @@ export const es = {
     password: 'Contraseña',
     currentPassword: 'Contraseña actual',
     newPassword: 'Nueva contraseña',
+    repeatPassword: 'Repite la nueva contraseña',
+    passwordMismatch: 'Las contraseñas no coinciden.',
+    saveUsername: 'Guardar nombre',
     sharing: 'Compartir',
     sharingGiven: 'Compartido con',
     sharingReceived: 'Compartido por',

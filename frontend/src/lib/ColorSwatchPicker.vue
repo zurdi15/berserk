@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // item (v0.4.0): extraído del picker de color inline de SettingsCard.vue
 // (perfil propio) para reutilizarlo en AdminCard.vue (editar a OTRO
-// usuario) sin duplicar el marcado — SettingsCard sigue con su copia propia
-// por ahora (toca tokens/base.css/SettingsCard, terreno de un hermano en
-// paralelo esta ronda); puede adoptar este componente en la próxima.
+// usuario) sin duplicar el marcado.
+// v0.27.0: la copia inline murió por fin — el color de usuario se mudó de
+// SettingsCard a AccountCard (sección Cuenta) y allí usa este componente,
+// así que ya no hay dos marcados que mantener en paralelo.
 import { useI18n } from 'vue-i18n'
 import { USER_COLOR_SWATCHES } from '@/tokens/userColors'
 

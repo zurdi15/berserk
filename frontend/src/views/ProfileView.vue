@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
-import { avatarUrl, deleteAvatar, listWorkouts, uploadAvatar } from '@/api/domain'
+import { listWorkouts } from '@/api/domain'
 import { toastApiError } from '@/utils/apiErrors'
 import { getMondayOfWeek, todayIso } from '@/utils/dates'
 import { getViewCache, setViewCache } from '@/utils/viewCache'
@@ -13,7 +13,9 @@ import BkListRow from '@/lib/BkListRow.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkButton from '@/lib/BkButton.vue'
 import type { RuneName } from '@/lib/runes'
+import AvatarPicker from '@/components/profile/AvatarPicker.vue'
 import SettingsCard from '@/components/profile/SettingsCard.vue'
+import AccountCard from '@/components/profile/AccountCard.vue'
 import PasswordCard from '@/components/profile/PasswordCard.vue'
 import SharingCard from '@/components/profile/SharingCard.vue'
 import AdminCard from '@/components/profile/AdminCard.vue'
@@ -29,7 +31,13 @@ import { useAuthStore } from '@/stores/auth'
 // por defecto (#profile) y cada sección se abre a pantalla con fila "‹
 // Perfil" de vuelta. Ajustes y Compartir (antes apiladas dentro de la
 // pestaña Perfil) son ahora secciones propias.
-type ProfileTab = 'profile' | 'settings' | 'routines' | 'library' | 'sharing' | 'admin'
+// v0.27.0 (zurdi: "el tema del perfil y los ajustes está descolocado y poco
+// coherente"): Ajustes se parte en dos secciones con criterio claro —
+// #settings es la WEB APP (tema, idioma, unidades, zona horaria, versión) y
+// #account eres TÚ (foto, nombre, color, contraseña). Se llama "Cuenta" y no
+// "Perfil" a propósito: la pantalla contenedora ya es Perfil, y un
+// "Perfil › Perfil" no dice nada.
+type ProfileTab = 'profile' | 'settings' | 'account' | 'routines' | 'library' | 'sharing' | 'admin'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -38,7 +46,7 @@ const auth = useAuthStore()
 // item 1 (v0.3.2): #admin no es válido para un no-admin — cae al default
 // (ver useTabHash), aunque llegue por hash de un enlace viejo/compartido
 function validProfileTabs(): ProfileTab[] {
-  const base: ProfileTab[] = ['profile', 'settings', 'routines', 'library', 'sharing']
+  const base: ProfileTab[] = ['profile', 'settings', 'account', 'routines', 'library', 'sharing']
   return auth.user?.is_admin ? [...base, 'admin'] : base
 }
 
@@ -60,6 +68,8 @@ watch(activeTab, () => {
 const hubRows = computed(() => {
   const rows: { tab: ProfileTab; label: string; rune: RuneName }[] = [
     { tab: 'settings', label: t('profile.settingsTab'), rune: 'dagaz' },
+    // mannaz ᛗ ("hombre/persona") para Cuenta — la identidad
+    { tab: 'account', label: t('profile.accountTab'), rune: 'mannaz' },
     { tab: 'routines', label: t('profile.routinesTab'), rune: 'raidho' },
     { tab: 'library', label: t('profile.libraryTab'), rune: 'kenaz' },
     { tab: 'sharing', label: t('profile.sharingTab'), rune: 'gebo' },
@@ -109,53 +119,6 @@ const weekDots = computed(() => {
   })
 })
 
-const initial = computed(() => (auth.user?.username?.[0] ?? '?').toUpperCase())
-
-// v0.19.x (zurdi: "que se pueda poner foto de perfil"): tocar el avatar abre
-// el picker; subir refresca /auth/me y con él avatar_version — la URL del
-// <img> cambia sola (v0.25.2: adiós al Date.now() por montaje, que
-// refetcheaba la foto completa en CADA visita al perfil)
-const avatarInput = ref<HTMLInputElement | null>(null)
-const avatarBusy = ref(false)
-// v0.26.0 (zurdi: "no me gusta nada el iconito del navegador de imagen
-// rota"): si la foto falla, se cae a la INICIAL de siempre — el mismo
-// placeholder que sin avatar. Reset al cambiar de versión (re-subida).
-const avatarError = ref(false)
-watch(() => auth.user?.avatar_version, () => {
-  avatarError.value = false
-})
-
-function pickAvatar() {
-  avatarInput.value?.click()
-}
-
-async function onAvatarPicked(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  ;(event.target as HTMLInputElement).value = ''
-  if (!file) return
-  try {
-    avatarBusy.value = true
-    await uploadAvatar(file)
-    await auth.refreshMe()
-  } catch (error) {
-    toastApiError(error)
-  } finally {
-    avatarBusy.value = false
-  }
-}
-
-async function removeAvatar() {
-  try {
-    avatarBusy.value = true
-    await deleteAvatar()
-    await auth.refreshMe()
-  } catch (error) {
-    toastApiError(error)
-  } finally {
-    avatarBusy.value = false
-  }
-}
-
 function openSection(tab: ProfileTab) {
   activeTab.value = tab
 }
@@ -168,6 +131,7 @@ const sectionTitle = computed(() => {
   const labels: Record<ProfileTab, string> = {
     profile: t('profile.tab'),
     settings: t('profile.settingsTab'),
+    account: t('profile.accountTab'),
     routines: t('profile.routinesTab'),
     library: t('profile.libraryTab'),
     sharing: t('profile.sharingTab'),
@@ -200,55 +164,11 @@ async function handleLogout() {
     <div v-if="activeTab === 'profile'" class="space-y-4 bk-stagger">
       <!-- cabecera de identidad: avatar con anillo del color de usuario
            (dato, no token — style inline como BkUser) + nombre grande -->
+      <!-- v0.27.0: bajo el avatar ya no cuelgan "Editar"/"Quitar foto" — el
+           avatar ES el botón de cambiar foto, y quitarla vive en Cuenta -->
       <div class="flex flex-col items-center gap-2 pt-2" :style="{ '--bk-stagger-i': 0 }" data-testid="profile-identity">
-        <!-- tocar el avatar cambia/pone la foto (input file oculto) -->
-        <button
-          type="button"
-          class="bk-press relative flex items-center justify-center w-18 h-18 rounded-full bg-slab border-2 font-display font-bold text-3xl text-ink overflow-hidden"
-          :style="{ borderColor: auth.user?.color || 'var(--bk-accent-aurora)' }"
-          :disabled="avatarBusy || undefined"
-          :aria-label="t('profile.changeAvatar')"
-          data-testid="profile-avatar-btn"
-          @click="pickAvatar"
-        >
-          <img
-            v-if="auth.user?.has_avatar && auth.user && !avatarError"
-            :src="avatarUrl(auth.user.id, auth.user.avatar_version)"
-            alt=""
-            class="absolute inset-0 w-full h-full object-cover"
-            data-testid="profile-avatar-img"
-            @error="avatarError = true"
-          />
-          <template v-else>{{ initial }}</template>
-        </button>
-        <input
-          ref="avatarInput"
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          class="hidden"
-          data-testid="profile-avatar-input"
-          @change="onAvatarPicked"
-        />
+        <AvatarPicker />
         <h1 class="bk-title text-ink">{{ auth.user?.username }}</h1>
-        <div class="flex items-center gap-4">
-          <button
-            type="button"
-            class="bk-press text-sm text-aurora underline decoration-dotted"
-            data-testid="profile-edit-link"
-            @click="openSection('settings')"
-          >
-            {{ t('profile.editProfile') }}
-          </button>
-          <button
-            v-if="auth.user?.has_avatar"
-            type="button"
-            class="bk-press text-sm text-ink-faint underline decoration-dotted"
-            data-testid="profile-avatar-remove"
-            @click="removeAvatar"
-          >
-            {{ t('profile.removeAvatar') }}
-          </button>
-        </div>
       </div>
 
       <!-- actividad reciente: 7 puntos de la semana -->
@@ -305,8 +225,14 @@ async function handleLogout() {
         <h1 class="bk-title text-ink flex-1 text-center pr-12">{{ sectionTitle }}</h1>
       </div>
 
-      <div v-if="activeTab === 'settings'" class="space-y-4 bk-stagger">
-        <div :style="{ '--bk-stagger-i': 0 }"><SettingsCard /></div>
+      <!-- un único hijo: bk-rise, como el resto de secciones de una tarjeta -->
+      <Transition name="bk-rise" appear>
+        <SettingsCard v-if="activeTab === 'settings'" />
+      </Transition>
+
+      <!-- Cuenta: identidad (foto, nombre, color) + contraseña -->
+      <div v-if="activeTab === 'account'" class="space-y-4 bk-stagger">
+        <div :style="{ '--bk-stagger-i': 0 }"><AccountCard /></div>
         <div :style="{ '--bk-stagger-i': 1 }"><PasswordCard /></div>
       </div>
 

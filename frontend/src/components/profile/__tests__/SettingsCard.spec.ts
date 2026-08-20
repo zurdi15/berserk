@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createI18nInstance } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
-import { USER_COLOR_SWATCHES } from '@/tokens/userColors'
 import SettingsCard from '../SettingsCard.vue'
 
 vi.mock('@/api/auth', () => ({
@@ -129,33 +128,13 @@ describe('SettingsCard', () => {
     expect(updateSettings).toHaveBeenCalledWith({ timezone: 'Europe/Madrid' })
   })
 
-  it('renders the default swatch plus one per curated color', () => {
+  // v0.27.0: el picker de color YA NO vive aquí — se mudó a AccountCard
+  // (sección Cuenta) junto al resto de la identidad; sus tests, con él
+  it('no longer owns the user-color picker (moved to AccountCard)', () => {
     build()
 
-    expect(wrapper!.find('[data-testid="color-swatch-default"]').exists()).toBe(true)
-    expect(wrapper!.findAll('[data-testid="color-swatch"]')).toHaveLength(USER_COLOR_SWATCHES.length)
-  })
-
-  it('picking a preset swatch calls updateSettings with that hex', async () => {
-    const { updateSettings } = await import('@/api/auth')
-    vi.mocked(updateSettings).mockClear()
-    build()
-
-    await wrapper!.findAll('[data-testid="color-swatch"]')[0].trigger('click')
-    await flushPromises()
-
-    expect(updateSettings).toHaveBeenCalledWith({ color: USER_COLOR_SWATCHES[0] })
-  })
-
-  it('picking the default option clears the color back to null (the theme aurora)', async () => {
-    const { updateSettings } = await import('@/api/auth')
-    vi.mocked(updateSettings).mockClear()
-    build()
-
-    await wrapper!.get('[data-testid="color-swatch-default"]').trigger('click')
-    await flushPromises()
-
-    expect(updateSettings).toHaveBeenCalledWith({ color: null })
+    expect(wrapper!.find('[data-testid="color-swatch-default"]').exists()).toBe(false)
+    expect(wrapper!.findAll('[data-testid="color-swatch"]')).toHaveLength(0)
   })
 
   describe('v0.4.0: theme picker (Oscuro / Claro / Sistema)', () => {

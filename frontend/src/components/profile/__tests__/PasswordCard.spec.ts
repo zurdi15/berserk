@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -33,9 +33,11 @@ describe('PasswordCard', () => {
     // Fill in password fields
     const currentField = wrapper.find('[data-testid="current-password-field"] input')
     const newField = wrapper.find('[data-testid="new-password-field"] input')
+    const repeatField = wrapper.find('[data-testid="repeat-password-field"] input')
 
     await currentField.setValue('oldpass')
     await newField.setValue('newpass1')
+    await repeatField.setValue('newpass1')
     await wrapper.vm.$nextTick()
 
     // Click submit button
@@ -67,9 +69,11 @@ describe('PasswordCard', () => {
     // Fill in fields
     const currentField = wrapper.find('[data-testid="current-password-field"] input')
     const newField = wrapper.find('[data-testid="new-password-field"] input')
+    const repeatField = wrapper.find('[data-testid="repeat-password-field"] input')
 
     await currentField.setValue('oldpass')
     await newField.setValue('newpass1')
+    await repeatField.setValue('newpass1')
     await wrapper.vm.$nextTick()
 
     // Submit
@@ -113,10 +117,10 @@ describe('PasswordCard', () => {
       expect(changePassword).not.toHaveBeenCalled()
     })
 
-    it('a valid new password shows no inline error and the submit button is enabled', async () => {
+    it('a valid new password, repeated, shows no inline error and enables the submit button', async () => {
       const wrapper = build()
-      const newField = wrapper.find('[data-testid="new-password-field"] input')
-      await newField.setValue('brandnew1')
+      await wrapper.find('[data-testid="new-password-field"] input').setValue('brandnew1')
+      await wrapper.find('[data-testid="repeat-password-field"] input').setValue('brandnew1')
       await wrapper.vm.$nextTick()
 
       expect(wrapper.find('[data-testid="new-password-field"]').text()).not.toContain('debe tener al menos')
@@ -129,6 +133,57 @@ describe('PasswordCard', () => {
 
       expect(wrapper.find('[data-testid="new-password-field"]').text()).not.toContain('La contraseña')
       expect(wrapper.find('[data-testid="change-password-btn"]').attributes('disabled')).toBeDefined()
+    })
+  })
+
+  // v0.27.0 (zurdi: "cambiar la contraseña de forma robusta, pidiendo la
+  // actual y repitiendo dos veces la nueva"): la confirmación es de cliente,
+  // el backend nunca la ve — evita quedarse fuera por una errata
+  describe('v0.27.0: repeat-new-password confirmation', () => {
+    it('a mismatching repeat shows an inline error and blocks the API call', async () => {
+      const { changePassword } = await import('@/api/auth')
+
+      const wrapper = build()
+      await wrapper.find('[data-testid="current-password-field"] input').setValue('oldpass')
+      await wrapper.find('[data-testid="new-password-field"] input').setValue('brandnew1')
+      await wrapper.find('[data-testid="repeat-password-field"] input').setValue('brandnew2')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="repeat-password-field"]').text()).toContain(
+        'Las contraseñas no coinciden.',
+      )
+      expect(wrapper.find('[data-testid="change-password-btn"]').attributes('disabled')).toBeDefined()
+
+      await wrapper.find('[data-testid="change-password-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(changePassword).not.toHaveBeenCalled()
+    })
+
+    it('a valid new password with the repeat still empty blocks submit but stays quiet (no error yet)', async () => {
+      const wrapper = build()
+      await wrapper.find('[data-testid="new-password-field"] input').setValue('brandnew1')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="repeat-password-field"]').text()).not.toContain('no coinciden')
+      expect(wrapper.find('[data-testid="change-password-btn"]').attributes('disabled')).toBeDefined()
+    })
+
+    it('a successful change clears all three fields', async () => {
+      const { changePassword } = await import('@/api/auth')
+      vi.mocked(changePassword).mockResolvedValue(undefined)
+
+      const wrapper = build()
+      await wrapper.find('[data-testid="current-password-field"] input').setValue('oldpass')
+      await wrapper.find('[data-testid="new-password-field"] input').setValue('brandnew1')
+      await wrapper.find('[data-testid="repeat-password-field"] input').setValue('brandnew1')
+      await wrapper.find('[data-testid="change-password-btn"]').trigger('click')
+      await flushPromises()
+
+      for (const id of ['current-password-field', 'new-password-field', 'repeat-password-field']) {
+        const input = wrapper.find(`[data-testid="${id}"] input`).element as HTMLInputElement
+        expect(input.value).toBe('')
+      }
     })
   })
 })

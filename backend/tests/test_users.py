@@ -199,6 +199,43 @@ def test_settings_reject_hex_without_hash(client: TestClient):
     assert resp.status_code == 422
 
 
+# v0.27.0: renombrarse a uno mismo desde la sección Cuenta (antes solo el
+# admin podía renombrar, y a OTRA cuenta)
+def test_update_own_username(client: TestClient, app):
+    resp = client.patch("/api/v1/users/me", json={"username": "berserker"})
+    assert resp.status_code == 200
+    assert resp.json()["username"] == "berserker"
+
+    # el cambio es real: el login con el nombre nuevo funciona, con la misma
+    # contraseña (renombrar no toca la sesión ni el hash)
+    renamed = login(app, "berserker", "admin1234")
+    assert renamed.get("/api/v1/auth/me").json()["username"] == "berserker"
+
+
+def test_update_own_username_rejects_taken_name(client: TestClient):
+    make_user(client, "freyja")
+    resp = client.patch("/api/v1/users/me", json={"username": "freyja"})
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "username_taken"
+
+
+def test_update_own_username_accepts_own_current_name(client: TestClient):
+    # guardar el formulario sin tocar el nombre no debe verse como colisión
+    # consigo mismo (el unique se compara contra OTRAS filas, no la propia)
+    resp = client.patch("/api/v1/users/me", json={"username": "admin"})
+    assert resp.status_code == 200
+    assert resp.json()["username"] == "admin"
+
+
+def test_update_own_username_rejects_too_short(client: TestClient):
+    assert client.patch("/api/v1/users/me", json={"username": "ab"}).status_code == 422
+
+
+def test_update_own_username_explicit_null_is_ignored(client: TestClient):
+    resp = client.patch("/api/v1/users/me", json={"username": None})
+    assert resp.status_code == 200 and resp.json()["username"] == "admin"
+
+
 def test_directory_requires_auth(anon: TestClient):
     # item 11: autenticado sí, admin-only NO — pero sigue exigiendo sesión
     assert anon.get("/api/v1/users/directory").status_code == 401

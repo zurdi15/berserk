@@ -13,6 +13,14 @@ _COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 
 class SettingsIn(BaseModel):
+    # v0.27.0 (zurdi: "poder cambiar el nombre de usuario, que ahora mismo no
+    # se puede"): hasta ahora renombrar era privilegio del admin sobre OTRA
+    # cuenta (UserUpdateIn.username); el propio usuario ya puede hacerlo desde
+    # su sección Cuenta. Mismas reglas de longitud que Credentials.username
+    # (bootstrap/invitación) y que UserUpdateIn, reutilizadas en vez de
+    # inventar otras aquí. No anulable: un null explícito se ignora, igual que
+    # locale/units/timezone (ver update_settings).
+    username: str | None = Field(None, min_length=3, max_length=50)
     locale: Literal["es", "en"] | None = None
     units: Literal["kg", "lb"] | None = None
     timezone: str | None = Field(None, max_length=50)
