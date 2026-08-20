@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -50,10 +51,7 @@ import dev.zurdi.berserk.wear.core.TimerKind
 import dev.zurdi.berserk.wear.notify.Haptics
 import dev.zurdi.berserk.wear.sync.PhoneLink
 import dev.zurdi.berserk.wear.ui.theme.Slab
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-private const val TICK_MS = 250L
 
 /** últimos segundos: el anillo y los dígitos pasan a ámbar, el halo respira y hay tic háptico 3-2-1 */
 private const val URGENT_MS = 10_000L
@@ -82,10 +80,13 @@ fun TimerApp(
     // arranca apagada hasta la primera lectura (sub-segundo): mejor que una runa optimista
     val phonePresence by presenceFlow.collectAsState(initial = PhoneLink.PhonePresence.NONE)
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    // v0.35.4 (zurdi: "que el anillo se vaya pintando progresivamente en vez de
+    // a saltitos"): el reloj de la pantalla avanza por FOTOGRAMA mientras la
+    // app está abierta (antes, cada 250 ms — 1,5° por tic en un descanso de
+    // 60 s, que se notaba); el halo ya animaba así, el coste es el mismo
     LaunchedEffect(Unit) {
         while (true) {
-            now = System.currentTimeMillis()
-            delay(TICK_MS)
+            withFrameMillis { now = System.currentTimeMillis() }
         }
     }
     val scope = rememberCoroutineScope()
