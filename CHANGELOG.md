@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.34.0 - 2026-08-20
+
+### Añadido
+- App Android: al terminar un descanso o un cardio, el móvil vibra hasta que pulsas OK (en la pantalla de "¡Tiempo!" que se abre sola aunque esté bloqueado, o en la notificación), con tope de 60 segundos — igual que el reloj. El OK del móvil calla el reloj y el del reloj calla el móvil.
+
+### Arreglado
+- Si la conexión con el servidor se corta a medias (wifi sin salida, servidor mudo), la app ya no se queda colgada: a los 8 segundos pasa a modo sin conexión, los cambios del entreno se encolan y se reenvían al volver la red, y "Añadir ejercicio" ignora toques repetidos mientras uno sigue en curso.
+- Reloj: el anillo de la cuenta atrás se dibuja más hacia dentro (antes quedaba bajo el cristal) y deja un hueco arriba para la hora.
+
 ## 0.33.2 - 2026-08-20
 
 ### Arreglado
