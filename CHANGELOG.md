@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.36.0 - 2026-08-20
+
+### Añadido
+- Avisos de fin de descanso y de cardio por notificación push en la web app, también con la app cerrada. Funciona en iPhone sin app nativa: añade berserk a la pantalla de inicio (Compartir → Añadir a pantalla de inicio), ábrelo desde ahí y activa «Avisos en este dispositivo» en Ajustes. Con el botón «Probar» compruebas que llegan.
+- Los avisos programados sobreviven a un reinicio del servidor; cancelar el descanso a mano también cancela el aviso.
+
 ## 0.35.4 - 2026-08-20
 
 ### Cambiado
