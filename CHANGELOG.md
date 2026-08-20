@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.30.0 - 2026-08-20
+
+### Añadido
+- Notificaciones del móvil rediseñadas: el descanso, el cardio y el tiempo de entreno salen en una tarjeta con la imagen del ejercicio (o de la rutina), su nombre y el cronómetro en grande — también el aviso de fin.
+
+### Cambiado
+- Reloj: cuando suena la alarma, la app se abre directamente (también con la pantalla apagada o bloqueada) para pulsar OK sin pasar por la notificación; al dar al OK vuelves a la esfera.
+
 ## 0.29.0 - 2026-08-20
 
 ### Añadido
