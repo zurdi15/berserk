@@ -13,7 +13,7 @@
 
     <string name="ok">OK</string>
     <string name="cancel">Cancelar</string>
-    <string name="workout_elapsed">Entrenando · %1$s</string>
+    <string name="workout_elapsed">%1$s</string>
 
     <string name="phone_connected">Móvil conectado</string>
     <string name="phone_remote">Móvil solo por Internet</string>

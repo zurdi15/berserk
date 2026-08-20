@@ -335,8 +335,22 @@ private fun IdleScreen(presence: PhoneLink.PhonePresence, notificationsGranted: 
     }
 }
 
+// v0.36.1 (zurdi: "en el title deja solo el nombre del ejercicio"): el móvil
+// manda "Descanso · Press banca" / "Cardio · Correr" (así lo lee la
+// notificación, que no tiene más contexto), pero en la esfera el anillo y el
+// número ya dicen qué es — se queda solo lo que va tras el último separador.
+// Lo mismo con la línea del crono del entreno bajo la cuenta atrás: sin
+// "Entrenando ·", solo el tiempo (strings.xml).
+private const val TITLE_SEPARATOR = " · "
+
+internal fun displayTitle(title: String): String {
+    val idx = title.lastIndexOf(TITLE_SEPARATOR)
+    if (idx < 0) return title
+    return title.substring(idx + TITLE_SEPARATOR.length).trim().ifEmpty { title }
+}
+
 @Composable
-private fun titleOf(timer: ActiveTimer): String = timer.spec.title.ifEmpty {
+private fun titleOf(timer: ActiveTimer): String = displayTitle(timer.spec.title).ifEmpty {
     stringResource(
         when (timer.kind) {
             TimerKind.REST -> R.string.kind_rest
