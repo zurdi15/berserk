@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.29.0 - 2026-08-20
+
+### Añadido
+- Reloj: al llegar a cero, la vibración ya no es un único aviso — sigue en bucle hasta que pulsas OK (en la pantalla, en la notificación o descartándola), con un tope de 60 segundos.
+- Reloj: capa visual — anillo de progreso con halo que respira, últimos 10 segundos en ámbar con tic háptico 3-2-1 si tienes la pantalla abierta, pantalla de "¡Tiempo!" con halo pulsante al ritmo de la vibración y runa iluminada en reposo.
+
+### Cambiado
+- El móvil le dice al reloj si un temporizador terminó solo o lo cancelaste: solo cancelar (o empezar otra serie) calla la alarma del reloj.
+
 ## 0.28.0 - 2026-08-20
 
 ### Añadido
