@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.28.0 - 2026-08-20
+
+### Añadido
+- App para Galaxy Watch (Wear OS): la cuenta atrás del descanso, el countdown de cardio y el tiempo de entreno salen en el reloj — indicador en la esfera con el tiempo corriendo, pantalla propia con el tiempo en grande y vibración en la muñeca al llegar a cero; también se puede cancelar desde el reloj. Va como APK aparte en cada release (`berserk-wear-vX.Y.Z.apk`; instalación en `mobile/wear/README.md`) y necesita la app Android de la misma versión.
+- La app Android muestra el countdown de cardio en la barra de notificaciones (cronómetro del sistema) y avisa con sonido al terminar, igual que el descanso.
+- Ajustes indica si el móvil ve un reloj y si ese reloj tiene la app de berserk.
+
+### Cambiado
+- La app Android pide Android 6.0 o superior (antes 5.1): lo exige el enlace con el reloj.
+
 ## 0.27.0 - 2026-08-20
 
 ### Añadido
