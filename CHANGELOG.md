@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.35.4 - 2026-08-20
+
+### Cambiado
+- Reloj: el anillo de la cuenta atrás avanza de forma continua, sin saltos.
+
 ## 0.35.3 - 2026-08-20
 
 ### Cambiado
