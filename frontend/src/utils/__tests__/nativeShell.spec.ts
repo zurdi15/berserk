@@ -13,6 +13,7 @@ import {
   onWearTimerCancelled,
   openNativeShellDownload,
   scheduleNativeRestNotification,
+  startNativeRestCountdown,
   syncWearTimer,
 } from '../nativeShell'
 
@@ -199,5 +200,19 @@ describe('reloj Wear OS — syncWearTimer / getWearStatus / onWearTimerCancelled
     handler!({ kind: 'cardio' })
     expect(first).toHaveBeenCalledTimes(1)
     expect(second).toHaveBeenCalledTimes(2)
+  })
+})
+
+// v0.30.0: la tarjeta "bonita" del móvil recibe subtítulo e imagen ABSOLUTA
+describe('startNativeRestCountdown — extras para la tarjeta del móvil', () => {
+  it('manda subtítulo e imagen absoluta; sin extras, cadenas vacías', async () => {
+    const startCountdown = vi.fn().mockResolvedValue(undefined)
+    installCapacitor({ startCountdown })
+    await startNativeRestCountdown(5_000, 'Descanso', { subtitle: 'Press banca', imageUrl: '/api/v1/exercises/7/image' })
+    expect(startCountdown).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1002, whenMs: 5_000, title: 'Descanso', subtitle: 'Press banca', imageUrl: expect.stringMatching(/^https?:\/\/.+\/api\/v1\/exercises\/7\/image$/) }),
+    )
+    await startNativeRestCountdown(6_000, 'Descanso')
+    expect(startCountdown).toHaveBeenLastCalledWith(expect.objectContaining({ subtitle: '', imageUrl: '' }))
   })
 })

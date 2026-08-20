@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- v0.29.0: la alarma que vibra hasta el OK vive en un shortService -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- v0.30.0: la alarma abre la app directamente (full-screen intent) -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- re-programar las alarmas de fin tras reinicio/actualización -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- el aviso a 0:00 va por AlarmManager exacto: Wear OS 5+ deniega
@@ -37,6 +39,8 @@
             android:name=".ui.MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:taskAffinity=".main">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

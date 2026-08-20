@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v0.30.0 (zurdi: "como Spotify"): tarjeta compacta — imagen, título/ejercicio
+     y el cronómetro del SISTEMA grande a la derecha (Chronometer en RemoteViews:
+     lo pinta Android, la app no tiene que estar viva) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
+
+    <ImageView
+        android:id="@+id/bk_art"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:scaleType="centerCrop"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/bk_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="@android:style/TextAppearance.Material.Notification.Title"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/bk_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="@android:style/TextAppearance.Material.Notification"
+            android:singleLine="true"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <Chronometer
+        android:id="@+id/bk_chrono"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/bk_chrono"
+        android:textSize="24sp"
+        android:fontFamily="sans-serif-medium"
+        android:includeFontPadding="false" />
+</LinearLayout>

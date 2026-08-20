@@ -57,6 +57,31 @@ export function isNativeShell(): boolean {
   return capacitor() !== null
 }
 
+// ---------- v0.30.0: notificaciones "bonitas" en el móvil ----------
+// zurdi: "la notificación y el timer en la barra del móvil molaría que fuese
+// más bonita, con una imagen del ejercicio, como Spotify". La shell pinta una
+// tarjeta propia (RemoteViews: imagen del ejercicio + cronómetro grande) si
+// recibe subtítulo e imagen; las shells anteriores ignoran estos campos.
+export interface NativeTimerExtras {
+  /** segunda línea: el ejercicio ("Press banca") */
+  subtitle?: string
+  /** ruta o URL de la imagen (p.ej. exerciseImageUrl(id)); se manda absoluta — la shell la baja con la cookie del WebView */
+  imageUrl?: string
+}
+
+function absoluteUrl(path?: string): string {
+  if (!path) return ''
+  try {
+    return new URL(path, globalThis.location?.origin ?? 'https://berserk.ginnugagap.net').href
+  } catch {
+    return ''
+  }
+}
+
+function extrasPayload(extras?: NativeTimerExtras): { subtitle: string; imageUrl: string } {
+  return { subtitle: extras?.subtitle ?? '', imageUrl: absoluteUrl(extras?.imageUrl) }
+}
+
 // ---------- permiso (una sola petición viva a la vez) ----------
 
 let permissionPromise: Promise<boolean> | null = null
@@ -87,6 +112,7 @@ export async function scheduleNativeRestNotification(
   endsAtMs: number,
   title: string,
   body: string,
+  extras?: NativeTimerExtras,
 ): Promise<void> {
   const cap = capacitor()
   if (!cap) return
@@ -101,7 +127,7 @@ export async function scheduleNativeRestNotification(
     // de "scheduleEndAlarm no crashea". Los shells viejos caen al fallback
     // inexacto de LocalNotifications hasta que se actualicen.
     if (ongoing?.scheduleEndAlarm && ongoing.getAppInfo) {
-      await ongoing.scheduleEndAlarm({ whenMs: endsAtMs, title, body, channelName: title })
+      await ongoing.scheduleEndAlarm({ whenMs: endsAtMs, title, body, channelName: title, ...extrasPayload(extras) })
       return
     }
     await cap.Plugins?.LocalNotifications?.schedule({
@@ -142,12 +168,12 @@ function ongoingPlugin(): OngoingPlugin | null {
 const REST_COUNTDOWN_ID = 1002
 const WORKOUT_CHRONO_ID = 1003
 
-export async function startNativeRestCountdown(endsAtMs: number, title: string): Promise<void> {
+export async function startNativeRestCountdown(endsAtMs: number, title: string, extras?: NativeTimerExtras): Promise<void> {
   const plugin = ongoingPlugin()
   if (!plugin) return
   try {
     await ensureNativeNotificationPermission()
-    await plugin.startCountdown({ id: REST_COUNTDOWN_ID, whenMs: endsAtMs, title, channelName: title })
+    await plugin.startCountdown({ id: REST_COUNTDOWN_ID, whenMs: endsAtMs, title, channelName: title, ...extrasPayload(extras) })
   } catch {
     // sin permiso: el CTA de la app sigue contando
   }
@@ -163,12 +189,12 @@ export async function stopNativeRestCountdown(): Promise<void> {
   }
 }
 
-export async function startNativeWorkoutChronometer(startedAtMs: number, title: string): Promise<void> {
+export async function startNativeWorkoutChronometer(startedAtMs: number, title: string, extras?: NativeTimerExtras): Promise<void> {
   const plugin = ongoingPlugin()
   if (!plugin) return
   try {
     await ensureNativeNotificationPermission()
-    await plugin.startChronometer({ id: WORKOUT_CHRONO_ID, whenMs: startedAtMs, title, channelName: title })
+    await plugin.startChronometer({ id: WORKOUT_CHRONO_ID, whenMs: startedAtMs, title, channelName: title, ...extrasPayload(extras) })
   } catch {
     // sin permiso: el header del entreno sigue mostrando el crono
   }
@@ -353,12 +379,12 @@ export function onWearTimerCancelled(listener: WearCancelListener): () => void {
 // id que conoce BkWearListenerService para cancelarla desde el reloj)
 const CARDIO_COUNTDOWN_ID = 1004
 
-export async function startNativeCardioCountdown(endsAtMs: number, title: string): Promise<void> {
+export async function startNativeCardioCountdown(endsAtMs: number, title: string, extras?: NativeTimerExtras): Promise<void> {
   const plugin = ongoingPlugin()
   if (!plugin) return
   try {
     await ensureNativeNotificationPermission()
-    await plugin.startCountdown({ id: CARDIO_COUNTDOWN_ID, whenMs: endsAtMs, title, channelName: title })
+    await plugin.startCountdown({ id: CARDIO_COUNTDOWN_ID, whenMs: endsAtMs, title, channelName: title, ...extrasPayload(extras) })
   } catch {
     // sin permiso: la tarjeta sigue contando
   }
@@ -383,7 +409,7 @@ export async function stopNativeCardioCountdown(): Promise<void> {
 const CARDIO_END_REQUEST_CODE = 2002
 const CARDIO_END_NOTIFICATION_ID = 1005
 
-export async function scheduleNativeCardioEndAlarm(endsAtMs: number, title: string, body: string): Promise<void> {
+export async function scheduleNativeCardioEndAlarm(endsAtMs: number, title: string, body: string, extras?: NativeTimerExtras): Promise<void> {
   const cap = capacitor()
   if (!cap) return
   try {
@@ -398,6 +424,7 @@ export async function scheduleNativeCardioEndAlarm(endsAtMs: number, title: stri
         requestCode: CARDIO_END_REQUEST_CODE,
         notificationId: CARDIO_END_NOTIFICATION_ID,
         cancelNotificationId: CARDIO_COUNTDOWN_ID,
+        ...extrasPayload(extras),
       })
       return
     }

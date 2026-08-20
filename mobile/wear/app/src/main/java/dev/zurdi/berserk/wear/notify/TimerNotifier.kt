@@ -72,10 +72,17 @@ class TimerNotifier(context: Context) {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         if (alarming) {
             val ack = AlarmService.ackIntent(ctx, timer.kind)
+            // v0.30.0 (zurdi: "que abriese la app directamente"): full-screen
+            // intent, el mecanismo de las apps de alarma — con la pantalla
+            // apagada o en reposo, el sistema lanza la Activity (AlarmScreen
+            // con su OK) en vez de la notificación con opciones
+            val open = alarmActivityIntent(timer.kind)
             builder
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setVibrate(VIBRATION)
+                .setContentIntent(open)
+                .setFullScreenIntent(open, true)
                 .addAction(R.drawable.ic_stat_berserk, ctx.getString(R.string.ok), ack)
                 .setDeleteIntent(ack)
         } else {
@@ -147,6 +154,15 @@ class TimerNotifier(context: Context) {
                 TimerKind.CARDIO -> R.string.kind_cardio
                 TimerKind.WORKOUT -> R.string.kind_workout
             },
+        )
+    }
+
+    private fun alarmActivityIntent(kind: TimerKind): PendingIntent {
+        val intent = Intent(ctx, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra(MainActivity.EXTRA_FROM_ALARM, true)
+        return PendingIntent.getActivity(
+            ctx, 5001 + kind.ordinal, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 

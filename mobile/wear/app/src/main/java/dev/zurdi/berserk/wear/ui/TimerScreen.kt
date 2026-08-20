@@ -65,7 +65,13 @@ private const val URGENT_MS = 10_000L
  * persistido que pintan las notificaciones; la pantalla solo hace tic.
  */
 @Composable
-fun TimerApp(engine: TimerEngine, link: PhoneLink, appVersion: String, notificationsGranted: Boolean) {
+fun TimerApp(
+    engine: TimerEngine,
+    link: PhoneLink,
+    appVersion: String,
+    notificationsGranted: Boolean,
+    onAlarmAcknowledged: () -> Unit = {},
+) {
     val board by engine.board.collectAsState()
     val reachableFlow = remember(link) { link.phoneReachable() }
     val phoneReachable by reachableFlow.collectAsState(initial = true)
@@ -89,7 +95,10 @@ fun TimerApp(engine: TimerEngine, link: PhoneLink, appVersion: String, notificat
         when {
             alarming != null -> AlarmScreen(
                 timer = alarming,
-                onAcknowledge = { engine.acknowledge(alarming.kind) },
+                onAcknowledge = {
+                    engine.acknowledge(alarming.kind)
+                    onAlarmAcknowledged()
+                },
             )
             primary != null -> RunningScreen(
                 timer = primary,

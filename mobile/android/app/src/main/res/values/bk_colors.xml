@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- v0.30.0 tarjeta de notificación — tokens de berserk (frontend/src/tokens) -->
+    <color name="bk_aurora">#4FD8C4</color>
+    <!-- aurora-deep: legible tanto sobre el fondo claro como el oscuro de las notificaciones -->
+    <color name="bk_chrono">#2BA893</color>
+    <color name="bk_void">#0A0C0F</color>
+</resources>

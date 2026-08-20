@@ -1047,7 +1047,7 @@ describe('WorkoutExerciseCard', () => {
     await drawerForm().trigger('submit')
     await flushPromises()
 
-    expect(startSpy).toHaveBeenCalledWith(60, 'Press banca')
+    expect(startSpy).toHaveBeenCalledWith(60, 'Press banca', undefined)
   })
 
   it('starts the rest timer with the routine rest_seconds when the workout came from a routine', async () => {
@@ -1060,7 +1060,7 @@ describe('WorkoutExerciseCard', () => {
     await drawerForm().trigger('submit')
     await flushPromises()
 
-    expect(startSpy).toHaveBeenCalledWith(120, 'Press banca')
+    expect(startSpy).toHaveBeenCalledWith(120, 'Press banca', undefined)
   })
 
   it('does not start the rest timer when restEnabled is false (retro editor)', async () => {
@@ -1420,7 +1420,7 @@ describe('v0.5.0 superseries: rest gating and chips', () => {
     await drawerForm().trigger('submit')
     await flushPromises()
 
-    expect(startSpy).toHaveBeenCalledWith(60, 'Press banca')
+    expect(startSpy).toHaveBeenCalledWith(60, 'Press banca', undefined)
   })
 
   it('a loose exercise (default props: no label) keeps firing auto-rest — only group members are gated', async () => {
@@ -1433,7 +1433,7 @@ describe('v0.5.0 superseries: rest gating and chips', () => {
     await drawerForm().trigger('submit')
     await flushPromises()
 
-    expect(startSpy).toHaveBeenCalledWith(60, 'Press banca')
+    expect(startSpy).toHaveBeenCalledWith(60, 'Press banca', undefined)
   })
 
   // v0.7.0 (feedback de zurdi): chip y acento del grupo suben al CONTENEDOR

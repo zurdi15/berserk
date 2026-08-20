@@ -1,22 +1,19 @@
 package dev.zurdi.berserk;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
 /**
- * v0.13.2 — dispara cuando la alarma del fin de descanso llega a cero
- * (AlarmManager.setAlarmClock, ver BkOngoingPlugin.scheduleEndAlarm) y
- * postea la notificación SONORA. Canal HIGH aparte del de los cronómetros
- * silenciosos: aquí sí queremos sonido, vibración y heads-up.
+ * v0.13.2 — dispara cuando la alarma de fin (descanso o, desde v0.28.0,
+ * cardio) llega a cero y postea la notificación SONORA (canal HIGH aparte del
+ * de los cronómetros silenciosos). v0.30.0: la tarjeta bonita de
+ * BkNotifications, con la imagen del ejercicio si la alarma la traía — se
+ * baja en segundo plano con goAsync (un receiver tiene ~10 s).
  */
 public class BkRestEndReceiver extends BroadcastReceiver {
 
-    static final String ALERT_CHANNEL_ID = "berserk-alerts";
+    static final String ALERT_CHANNEL_ID = BkNotifications.CHANNEL_ALERTS;
     static final int REST_END_NOTIFICATION_ID = 1001;
 
     @Override
@@ -24,46 +21,21 @@ public class BkRestEndReceiver extends BroadcastReceiver {
         // v0.16.0: un throw aquí también cierra el proceso entero (los
         // receivers corren en el hilo principal de la app) — mejor un aviso
         // que no suena que la app muerta
+        final PendingResult pending = goAsync();
         try {
-            NotificationManager manager =
-                    (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-
-            NotificationChannel channel = new NotificationChannel(
-                    ALERT_CHANNEL_ID,
-                    intent.getStringExtra("channelName"),
-                    NotificationManager.IMPORTANCE_HIGH);
-            channel.enableVibration(true);
-            manager.createNotificationChannel(channel);
-
-            int icon = context.getResources().getIdentifier(
-                    "ic_stat_berserk", "drawable", context.getPackageName());
-            if (icon == 0) icon = context.getApplicationInfo().icon;
-
-            PendingIntent contentIntent = null;
-            Intent launch = context.getPackageManager()
-                    .getLaunchIntentForPackage(context.getPackageName());
-            if (launch != null) {
-                launch.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                contentIntent = PendingIntent.getActivity(
-                        context, 1, launch,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            }
-
-            Notification notification = new Notification.Builder(context, ALERT_CHANNEL_ID)
-                    .setSmallIcon(icon)
-                    .setContentTitle(intent.getStringExtra("title"))
-                    .setContentText(intent.getStringExtra("body"))
-                    .setAutoCancel(true)
-                    .setContentIntent(contentIntent)
-                    .setVisibility(Notification.VISIBILITY_PUBLIC)
-                    .build();
-            // v0.28.0: ids parametrizados — la misma alarma avisa del fin de
-            // cardio (ver BkOngoingPlugin.endAlarmIntent); sin extras, descanso
-            manager.notify(intent.getIntExtra("notificationId", REST_END_NOTIFICATION_ID), notification);
-
             // el cronómetro ongoing de la cuenta atrás ya no pinta nada útil
-            manager.cancel(intent.getIntExtra("cancelNotificationId", 1002));
-        } catch (Exception ignored) {
+            BkNotifications.cancel(context, intent.getIntExtra("cancelNotificationId", 1002));
+            BkNotifications.postEnd(
+                    context,
+                    intent.getIntExtra("notificationId", REST_END_NOTIFICATION_ID),
+                    intent.getStringExtra("title"),
+                    intent.getStringExtra("body"),
+                    intent.getStringExtra("subtitle"),
+                    intent.getStringExtra("channelName"),
+                    intent.getStringExtra("imageUrl"),
+                    pending::finish);
+        } catch (Exception e) {
+            pending.finish();
         }
     }
 }

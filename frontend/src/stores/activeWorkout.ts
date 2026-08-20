@@ -7,6 +7,7 @@ import type { ExerciseHistoryOut, PersonalRecordOut, SetIn, SetLogOut, SetOut, W
 import { i18n } from '@/i18n'
 import { normalizeSupersets } from '@/lib/supersets'
 import { isNativeShell, startNativeWorkoutChronometer, stopNativeWorkoutChronometer, syncWearTimer } from '@/utils/nativeShell'
+import { routineImageUrl } from '@/api/domain'
 import { online } from '@/offline/net'
 import * as outbox from '@/offline/outbox'
 import { useRestTimerStore } from '@/stores/restTimer'
@@ -53,7 +54,9 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
         const parsedMs = startedAt ? Date.parse(`${startedAt}Z`) : Date.now()
         const startedMs = Number.isFinite(parsedMs) ? parsedMs : Date.now()
         const title = i18n.global.t('workout.ongoingTitle')
-        void startNativeWorkoutChronometer(startedMs, title)
+        // v0.30.0: la imagen de la rutina (si la tiene) ilustra la tarjeta de la barra del móvil
+        const routineId = workout.value.routine_id
+        void startNativeWorkoutChronometer(startedMs, title, { imageUrl: routineId != null ? routineImageUrl(routineId) : undefined })
         // v0.28.0 reloj: el crono del entreno también va a la Data Layer —
         // el reloj lo pinta pequeño bajo la cuenta atrás, o en la esfera si
         // no hay ninguna en marcha

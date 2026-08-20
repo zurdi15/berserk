@@ -113,7 +113,8 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     }
   }
 
-  function start(seconds: number, exerciseName?: string) {
+  // v0.30.0: imageUrl = imagen del ejercicio para la tarjeta de la barra del móvil
+  function start(seconds: number, exerciseName?: string, imageUrl?: string) {
     // cancelar timeout de gracia anterior si existe
     if (graceTimeout) clearTimeout(graceTimeout)
     total.value = seconds
@@ -124,7 +125,7 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     if (isNativeShell()) {
       // v0.13.1: cuenta atrás VISIBLE en barra/bloqueo (cronómetro del
       // sistema, silenciosa) + la programada de abajo que SUENA al llegar
-      void startNativeRestCountdown(endsAt.value, i18n.global.t('timer.restOngoingTitle'))
+      void startNativeRestCountdown(endsAt.value, i18n.global.t('timer.restOngoingTitle'), { subtitle: exerciseName, imageUrl })
       // v0.28.0 reloj: el mismo endsAt absoluto viaja a la Data Layer para
       // el Galaxy Watch (cuenta atrás en la esfera + vibración a cero)
       void syncWearTimer({
@@ -142,6 +143,7 @@ export const useRestTimerStore = defineStore('restTimer', () => {
         exerciseName
           ? i18n.global.t('timer.notifyBodyWithExercise', { exercise: exerciseName })
           : i18n.global.t('timer.notifyBody'),
+        { subtitle: exerciseName, imageUrl },
       )
     }
     now.value = Date.now()

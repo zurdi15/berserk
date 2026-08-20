@@ -36,19 +36,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "BkOngoing")
 public class BkOngoingPlugin extends Plugin {
 
-    private static final String CHANNEL_ID = "berserk-ongoing";
-
-    private NotificationManager manager() {
-        return (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
-    }
-
-    private void ensureChannel(String name) {
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID, name, NotificationManager.IMPORTANCE_LOW);
-        channel.setShowBadge(false);
-        manager().createNotificationChannel(channel);
-    }
-
     private PendingIntent launchIntent() {
         Intent intent = getContext().getPackageManager()
                 .getLaunchIntentForPackage(getContext().getPackageName());
@@ -59,58 +46,42 @@ public class BkOngoingPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    private int smallIcon() {
-        int res = getContext().getResources().getIdentifier(
-                "ic_stat_berserk", "drawable", getContext().getPackageName());
-        return res != 0 ? res : getContext().getApplicationInfo().icon;
-    }
-
-    private Notification.Builder base(String title, String text, String channelName) {
-        ensureChannel(channelName);
-        return new Notification.Builder(getContext(), CHANNEL_ID)
-                .setSmallIcon(smallIcon())
-                .setContentTitle(title)
-                .setContentText(text)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setShowWhen(true)
-                .setContentIntent(launchIntent())
-                .setVisibility(Notification.VISIBILITY_PUBLIC);
-    }
-
-    /** Cronómetro hacia ARRIBA desde whenMs (tiempo de entreno). */
+    /**
+     * Cronómetro hacia ARRIBA desde whenMs (tiempo de entreno). v0.30.0: la
+     * tarjeta la monta BkNotifications (imagen + cronómetro grande); subtitle
+     * e imageUrl son opcionales (bundles anteriores no los mandan).
+     */
     @PluginMethod
     public void startChronometer(PluginCall call) {
         try {
-            long whenMs = call.getLong("whenMs", System.currentTimeMillis());
-            int id = call.getInt("id", 1003);
-            Notification.Builder builder = base(
+            BkNotifications.postTimer(
+                    getContext(),
+                    call.getInt("id", 1003),
                     call.getString("title", "berserk"),
-                    call.getString("text", ""),
-                    call.getString("channelName", "berserk"))
-                    .setWhen(whenMs)
-                    .setUsesChronometer(true);
-            manager().notify(id, builder.build());
+                    call.getString("subtitle", ""),
+                    call.getLong("whenMs", System.currentTimeMillis()),
+                    false,
+                    call.getString("channelName", "berserk"),
+                    call.getString("imageUrl", ""));
             call.resolve();
         } catch (Exception e) {
             call.reject(e.toString());
         }
     }
 
-    /** Cuenta ATRÁS hasta whenMs (descanso). */
+    /** Cuenta ATRÁS hasta whenMs (descanso, cardio). */
     @PluginMethod
     public void startCountdown(PluginCall call) {
         try {
-            long whenMs = call.getLong("whenMs", System.currentTimeMillis());
-            int id = call.getInt("id", 1002);
-            Notification.Builder builder = base(
+            BkNotifications.postTimer(
+                    getContext(),
+                    call.getInt("id", 1002),
                     call.getString("title", "berserk"),
-                    call.getString("text", ""),
-                    call.getString("channelName", "berserk"))
-                    .setWhen(whenMs)
-                    .setUsesChronometer(true)
-                    .setChronometerCountDown(true);
-            manager().notify(id, builder.build());
+                    call.getString("subtitle", ""),
+                    call.getLong("whenMs", System.currentTimeMillis()),
+                    true,
+                    call.getString("channelName", "berserk"),
+                    call.getString("imageUrl", ""));
             call.resolve();
         } catch (Exception e) {
             call.reject(e.toString());
@@ -120,7 +91,7 @@ public class BkOngoingPlugin extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         try {
-            manager().cancel(call.getInt("id", 1003));
+            BkNotifications.cancel(getContext(), call.getInt("id", 1003));
             call.resolve();
         } catch (Exception e) {
             call.reject(e.toString());
@@ -134,13 +105,16 @@ public class BkOngoingPlugin extends Plugin {
 
     private PendingIntent endAlarmIntent(
             int requestCode, String title, String body, String channelName,
-            int notificationId, int cancelNotificationId) {
+            int notificationId, int cancelNotificationId, String subtitle, String imageUrl) {
         Intent intent = new Intent(getContext(), BkRestEndReceiver.class);
         intent.putExtra("title", title);
         intent.putExtra("body", body);
         intent.putExtra("channelName", channelName);
         intent.putExtra("notificationId", notificationId);
         intent.putExtra("cancelNotificationId", cancelNotificationId);
+        // v0.30.0: la tarjeta del fin lleva el ejercicio y su imagen
+        intent.putExtra("subtitle", subtitle);
+        intent.putExtra("imageUrl", imageUrl);
         return PendingIntent.getBroadcast(
                 getContext(), requestCode, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -170,7 +144,9 @@ public class BkOngoingPlugin extends Plugin {
                     call.getString("body", ""),
                     call.getString("channelName", "berserk"),
                     call.getInt("notificationId", BkRestEndReceiver.REST_END_NOTIFICATION_ID),
-                    call.getInt("cancelNotificationId", 1002));
+                    call.getInt("cancelNotificationId", 1002),
+                    call.getString("subtitle", ""),
+                    call.getString("imageUrl", ""));
             boolean exactAllowed = Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms();
             if (exactAllowed) {
                 try {

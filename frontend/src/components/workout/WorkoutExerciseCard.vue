@@ -16,6 +16,7 @@ import { primaryRune as resolvePrimaryRune } from '@/lib/runeResolve'
 import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { useRestTimerStore } from '@/stores/restTimer'
+import { exerciseImageUrl } from '@/api/domain'
 import {
   cancelNativeCardioEndAlarm,
   onWearTimerCancelled,
@@ -165,6 +166,8 @@ watch(
 )
 
 const name = computed(() => exerciseName(props.exercise, props.locale))
+// v0.30.0: la imagen del ejercicio viaja a las notificaciones del móvil (descanso y cardio)
+const exerciseImage = computed(() => (props.exercise?.has_image ? exerciseImageUrl(props.exercise.id) : undefined))
 
 // v0.28.0 reloj + shell (zurdi: "vamos directamente a por la C"): el
 // countdown de cardio sale de la web — cuenta atrás ongoing en la barra del
@@ -180,11 +183,12 @@ let cardioStopReason: WearStopReason = 'cancelled'
 watch(resumedActive, (timer, previous) => {
   if (timer) {
     const title = `${t('timer.cardioOngoingTitle')} · ${name.value}`
-    void startNativeCardioCountdown(timer.endsAt, title)
+    void startNativeCardioCountdown(timer.endsAt, title, { subtitle: name.value, imageUrl: exerciseImage.value })
     void scheduleNativeCardioEndAlarm(
       timer.endsAt,
       t('workout.cardio.timeUp'),
       t('timer.notifyBodyWithExercise', { exercise: name.value }),
+      { subtitle: name.value, imageUrl: exerciseImage.value },
     )
     void syncWearTimer({
       kind: 'cardio',
@@ -425,7 +429,7 @@ async function submitNewSet(value: SetIn) {
   // v0.9.4 (zurdi): un bloque de cardio no descansa — ni control ni timer
   if (props.restEnabled && autoRestFires.value && !isCardio.value) {
     // nombre del ejercicio → cuerpo de la notificación de fin de descanso
-    restTimer.start(effectiveRestSeconds.value, name.value)
+    restTimer.start(effectiveRestSeconds.value, name.value, exerciseImage.value)
   }
   if (result.new_records.length) emit('recorded', result.new_records)
   emit('logged', result.new_records.length > 0)
