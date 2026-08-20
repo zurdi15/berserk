@@ -515,3 +515,41 @@ class BodyEntry(Base):
     arm_cm: Mapped[float | None] = mapped_column(Float, default=None)
     thigh_cm: Mapped[float | None] = mapped_column(Float, default=None)
     hip_cm: Mapped[float | None] = mapped_column(Float, default=None)
+
+
+class PushSubscription(Base):
+    """v0.36.0 Web Push: un navegador/PWA suscrito a avisos. Un usuario puede
+    tener varios (móvil + tablet); el endpoint es único por navegador y, si
+    cambia de cuenta, pasa al último que lo registró (ver routers/push.py)."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    endpoint: Mapped[str] = mapped_column(String(1024), unique=True)
+    p256dh: Mapped[str] = mapped_column(String(255))
+    auth: Mapped[str] = mapped_column(String(64))
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class PushTimer(Base):
+    """v0.36.0: aviso de fin de descanso/cardio pendiente de disparar. Vive en
+    BD para sobrevivir al reinicio del pod (ver services/push.py); se borra al
+    dispararse o al cancelarlo el cliente."""
+
+    __tablename__ = "push_timers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    client_id: Mapped[str] = mapped_column(String(64), unique=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    fire_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    title: Mapped[str] = mapped_column(String(120))
+    body: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

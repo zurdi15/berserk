@@ -12,6 +12,7 @@ import {
   syncWearTimer,
   type WearStopReason,
 } from '@/utils/nativeShell'
+import { cancelWebPushTimer, scheduleWebPushTimer } from '@/utils/webPush'
 
 // timestamps absolutos: el interval solo refresca la vista; si el móvil se
 // bloquea y los ticks no corren, el tiempo restante sigue siendo exacto
@@ -148,6 +149,18 @@ export const useRestTimerStore = defineStore('restTimer', () => {
         { subtitle: exerciseName, imageUrl },
       )
     }
+    else {
+      // v0.36.0 Web Push (PWA, iPhone incluido): el backend avisa a la hora
+      // exacta aunque la PWA esté cerrada — no-op si no está activado en Ajustes
+      void scheduleWebPushTimer(
+        'rest',
+        endsAt.value,
+        i18n.global.t('timer.notifyTitle'),
+        exerciseName
+          ? i18n.global.t('timer.notifyBodyWithExercise', { exercise: exerciseName })
+          : i18n.global.t('timer.notifyBody'),
+      )
+    }
     now.value = Date.now()
     vibrated = false
     restExerciseName = exerciseName ?? null
@@ -165,6 +178,10 @@ export const useRestTimerStore = defineStore('restTimer', () => {
       void cancelNativeRestNotification(reason)
       void stopNativeRestCountdown()
       void syncWearTimer({ kind: 'rest', state: 'stopped', reason })
+    } else if (reason === 'cancelled' && endsAt.value !== null) {
+      // un descanso cancelado a mano no debe sonar luego en el iPhone; si
+      // terminó solo (finished) el backend ya lo disparó o está en ello
+      void cancelWebPushTimer('rest')
     }
     endsAt.value = null
     total.value = 0

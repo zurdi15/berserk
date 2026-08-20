@@ -18,6 +18,9 @@ export default defineConfig({
         // el shell offline necesita las fuentes latin en el precache (por defecto
         // workbox solo mete js/css/html); los demás subsets quedan online-only
         globPatterns: ['**/*.{js,css,html,svg,png,ico}', 'assets/*-latin-[0-9w]*.woff2'],
+        // v0.36.0 Web Push: handlers push/notificationclick propios (public/
+        // sw-push.js) sin renunciar al precache generado — ver ese fichero
+        importScripts: ['sw-push.js'],
       },
       manifest: {
         name: 'berserk',

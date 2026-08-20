@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { checkNativeShellUpdate, getWearStatus, isNativeShell, openNativeShellDownload, type WearStatus } from '@/utils/nativeShell'
 import { setTheme } from '@/utils/theme'
+import { disableWebPush, enableWebPush, getWebPushState, sendWebPushTest, type WebPushState } from '@/utils/webPush'
 // v0.14.2 (zurdi: "pon en algún sitio la versión actual"): la versión del
 // bundle desplegado — verdad de build (package.json en el momento de
 // compilar), la misma que ve el shell Android porque carga este bundle del
@@ -54,6 +55,35 @@ const wearStatusLabel = computed(() => {
   if (status.connected) return t('profile.wear.appMissing')
   return t('profile.wear.none')
 })
+// v0.36.0 Web Push (zurdi: el iPhone de su novia, sin app nativa): estado
+// del aviso por push en ESTE navegador; la fila solo aparece donde tiene
+// sentido (nunca en la shell, que ya avisa en nativo)
+const pushState = ref<WebPushState>(getWebPushState())
+const pushBusy = ref(false)
+async function togglePush() {
+  pushBusy.value = true
+  try {
+    pushState.value = pushState.value === 'on' ? await disableWebPush() : await enableWebPush()
+    if (pushState.value === 'off') toast.push('error', t('profile.push.failed'))
+  } catch (error) {
+    pushState.value = getWebPushState()
+    toastApiError(error)
+  } finally {
+    pushBusy.value = false
+  }
+}
+async function testPush() {
+  pushBusy.value = true
+  try {
+    const count = await sendWebPushTest()
+    toast.push('info', count ? t('profile.push.testSent', { count }) : t('profile.push.testNone'))
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    pushBusy.value = false
+  }
+}
+
 onMounted(() => {
   void checkNativeShellUpdate(appVersion).then(({ available }) => {
     shellUpdateAvailable.value = available
@@ -146,6 +176,32 @@ function pickTheme(mode: ThemeMode) {
         data-testid="timer-notification-select"
         @update:model-value="(val) => setTimerNotificationStyle(val as TimerNotificationStyle)"
       />
+
+      <!-- v0.36.0 Web Push: avisos de fin de descanso/cardio en la PWA (iPhone
+           incluido, instalada en la pantalla de inicio). Oculta en la shell. -->
+      <div v-if="pushState !== 'unsupported'" class="space-y-2" data-testid="push-row">
+        <p class="text-xs font-semibold text-ink-muted uppercase tracking-wide">{{ $t('profile.push.label') }}</p>
+        <p v-if="pushState === 'needs-install'" class="text-2xs text-ink-faint">{{ $t('profile.push.needsInstall') }}</p>
+        <p v-else-if="pushState === 'denied'" class="text-2xs text-ink-faint">{{ $t('profile.push.denied') }}</p>
+        <template v-else>
+          <p class="text-2xs text-ink-faint">{{ pushState === 'on' ? $t('profile.push.on') : $t('profile.push.hint') }}</p>
+          <div class="grid grid-cols-2 gap-2">
+            <BkButton
+              :variant="pushState === 'on' ? 'ghost' : 'primary'"
+              size="sm"
+              block
+              :disabled="pushBusy"
+              data-testid="push-toggle"
+              @click="togglePush"
+            >
+              {{ pushState === 'on' ? $t('profile.push.disable') : $t('profile.push.enable') }}
+            </BkButton>
+            <BkButton v-if="pushState === 'on'" variant="ghost" size="sm" block :disabled="pushBusy" data-testid="push-test" @click="testPush">
+              {{ $t('profile.push.test') }}
+            </BkButton>
+          </div>
+        </template>
+      </div>
 
       <!-- v0.14.2: versión desplegada, visible para poder verificar que la
            PWA/shell ya corre el último bundle -->

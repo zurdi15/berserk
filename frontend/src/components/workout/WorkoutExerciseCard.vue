@@ -42,6 +42,8 @@ import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
 import BkStepper from '@/lib/BkStepper.vue'
 import type { RuneName } from '@/lib/runes'
+import { cancelWebPushTimer, scheduleWebPushTimer } from '@/utils/webPush'
+
 import CardioCountdown from './CardioCountdown.vue'
 import CardioStartSheet from './CardioStartSheet.vue'
 import { formatDuration } from './duration'
@@ -197,10 +199,13 @@ watch(resumedActive, (timer, previous) => {
       totalMs: timer.targetSeconds * 1000,
       title,
     })
+    // v0.36.0 Web Push (PWA): no-op en la shell y si no está activado en Ajustes
+    void scheduleWebPushTimer('cardio', timer.endsAt, t('timer.cardioOver'), name.value)
   } else if (previous) {
     void stopNativeCardioCountdown()
     void cancelNativeCardioEndAlarm(cardioStopReason)
     void syncWearTimer({ kind: 'cardio', state: 'stopped', reason: cardioStopReason })
+    if (cardioStopReason === 'cancelled') void cancelWebPushTimer('cardio')
     cardioStopReason = 'cancelled'
   }
 })

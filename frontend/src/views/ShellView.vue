@@ -17,6 +17,7 @@ import { useToastStore } from '@/stores/toast'
 import NativeAlarmOverlay from '@/components/shell/NativeAlarmOverlay.vue'
 import { bootSplashActive, runBootSplash } from '@/utils/bootSplash'
 import { checkNativeShellUpdate, ensureNativeNotificationPermission, isNativeShell } from '@/utils/nativeShell'
+import { refreshWebPushSubscription } from '@/utils/webPush'
 // v0.16.0: la versión del bundle (verdad de build, ver SettingsCard.vue) —
 // contra ella se compara la versionName del shell para avisar de APK nueva
 import { version as appVersion } from '../../package.json'
@@ -211,6 +212,9 @@ let disposeBackOnline: (() => void) | null = null
 let disposeDrained: (() => void) | null = null
 
 onMounted(() => {
+  // v0.36.0 Web Push: re-subir la suscripción de este navegador si el aviso
+  // está activo (los servicios push rotan endpoints); no-op en la shell
+  void refreshWebPushSubscription()
   // v0.21.4 (zurdi: "prefetch de las 5 secciones nada más entrar + un
   // splashart mientras carga"): el splash cubre la app mientras
   // prefetchSections calienta el viewCache; el RouterView de abajo se monta

@@ -1,3 +1,4 @@
+import logging
 import threading
 from pathlib import Path
 
@@ -9,9 +10,10 @@ from sqlalchemy.engine import Engine
 from .auth import get_current_user, require_admin
 from .config import get_settings
 from .db import make_engine, make_sessionmaker
-from .routers import admin, auth, backup, body, calendar as calendar_router, exercises, image_search, media, progress as progress_router, rotation, routines, sharing, social, users, workouts
+from .routers import admin, auth, backup, body, calendar as calendar_router, exercises, image_search, media, progress as progress_router, push, rotation, routines, sharing, social, users, workouts
 from .seed import ensure_catalog
 from .services.images import backfill_lq_async
+from .services.push import PushScheduler, VapidKeys
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 API_PREFIX = "/api/v1"
@@ -43,6 +45,23 @@ def create_app(engine: Engine | None = None) -> FastAPI:
     # antes de esta versión, o un backup restaurado sin ellas) — hilo daemon,
     # el arranque no espera
     backfill_lq_async(settings.data_dir / "uploads")
+
+    # v0.36.0 Web Push: par VAPID (se genera la primera vez) + hilo daemon que
+    # dispara los avisos de fin de descanso/cardio a su hora. Desactivable con
+    # BK_PUSH_ENABLED=0; si el fichero de claves no se puede escribir, la app
+    # arranca igual sin push (el router responde 503 push_disabled)
+    app.state.push_keys = None
+    app.state.push_scheduler = None
+    if settings.push_enabled:
+        try:
+            app.state.push_keys = VapidKeys(settings.data_dir / "vapid.pem", settings.vapid_subject)
+            app.state.push_scheduler = PushScheduler(app.state.sessionmaker, app.state.push_keys)
+            # el hilo vive con el servidor, no con create_app(): arranca y
+            # para con el ciclo de vida ASGI (uvicorn y TestClient `with`)
+            app.add_event_handler("startup", app.state.push_scheduler.start)
+            app.add_event_handler("shutdown", app.state.push_scheduler.stop)
+        except Exception as exc:  # noqa: BLE001 — sin push antes que sin app
+            logging.getLogger("berserk.push").warning("web push desactivado: %s", exc)
 
     # protegidos: cualquier usuario con sesión
     app.include_router(
@@ -80,6 +99,9 @@ def create_app(engine: Engine | None = None) -> FastAPI:
     )
     app.include_router(
         image_search.router, prefix=API_PREFIX, dependencies=[Depends(get_current_user)]
+    )
+    app.include_router(
+        push.router, prefix=API_PREFIX, dependencies=[Depends(get_current_user)]
     )
     # solo admin: gestión de usuarios e invitaciones
     app.include_router(

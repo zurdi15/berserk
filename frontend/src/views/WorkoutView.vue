@@ -20,6 +20,7 @@ import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { cancelNativeCardioEndAlarm, stopNativeCardioCountdown, syncWearTimer, type WearStopReason } from '@/utils/nativeShell'
+import { cancelWebPushTimer } from '@/utils/webPush'
 import {
   clearPersistedCardioCountdown,
   getPersistedCardioCountdown,
@@ -493,6 +494,7 @@ function dropCardioCountdown(reason: WearStopReason = 'cancelled') {
   void stopNativeCardioCountdown()
   void cancelNativeCardioEndAlarm(reason)
   void syncWearTimer({ kind: 'cardio', state: 'stopped', reason })
+  if (reason === 'cancelled') void cancelWebPushTimer('cardio')
 }
 
 async function checkPersistedCardioCountdown() {

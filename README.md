@@ -41,6 +41,7 @@
 - **Multi-user read sharing** — grant another account read access to your training so a coach or training partner can follow along.
 - **Invite-only signup** — no public registration; new accounts are created from single-use invite links issued by an admin.
 - **PWA** — installable, works offline for the shell, no app store required.
+- **Push alerts on iPhone** — no iOS app needed: install the PWA to the Home Screen (Share → Add to Home Screen), turn on *Alerts on this device* in Settings, and the rest/cardio end notification arrives through Web Push even with the app closed. The server generates its VAPID keys on first start (`vapid.pem` in the data dir); `BK_PUSH_ENABLED=0` turns it off.
 - **Android shell & Galaxy Watch app** — an optional Android APK (system-rendered rest/cardio/workout timers, exact end-of-rest alarm) and a Wear OS companion that shows the running countdown on the watch face and buzzes your wrist at zero — no store, no account, just two APKs signed with the same key.
 - **ES/EN** — full Spanish and English UI.
 - **kg/lb** — per-user unit preference, converted consistently across logging, history and charts.
