@@ -117,6 +117,13 @@ const initial = computed(() => (auth.user?.username?.[0] ?? '?').toUpperCase())
 // refetcheaba la foto completa en CADA visita al perfil)
 const avatarInput = ref<HTMLInputElement | null>(null)
 const avatarBusy = ref(false)
+// v0.26.0 (zurdi: "no me gusta nada el iconito del navegador de imagen
+// rota"): si la foto falla, se cae a la INICIAL de siempre — el mismo
+// placeholder que sin avatar. Reset al cambiar de versión (re-subida).
+const avatarError = ref(false)
+watch(() => auth.user?.avatar_version, () => {
+  avatarError.value = false
+})
 
 function pickAvatar() {
   avatarInput.value?.click()
@@ -205,11 +212,12 @@ async function handleLogout() {
           @click="pickAvatar"
         >
           <img
-            v-if="auth.user?.has_avatar && auth.user"
+            v-if="auth.user?.has_avatar && auth.user && !avatarError"
             :src="avatarUrl(auth.user.id, auth.user.avatar_version)"
             alt=""
             class="absolute inset-0 w-full h-full object-cover"
             data-testid="profile-avatar-img"
+            @error="avatarError = true"
           />
           <template v-else>{{ initial }}</template>
         </button>

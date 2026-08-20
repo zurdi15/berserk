@@ -4,12 +4,14 @@ import { useI18n } from 'vue-i18n'
 
 import type { BodyEntryOut, BodyIn } from '@/api/domain'
 import { bodyPhotoUrl, deleteBody, deleteBodyPhoto, listBody, listBodyPhotos, uploadBodyPhoto, upsertBody } from '@/api/domain'
+import BkMedia from '@/lib/BkMedia.vue'
 import type { BodyPhotoOut } from '@/api/domain'
 import { useDisplayUnits } from '@/composables/useDisplayUnits'
 import { toastApiError } from '@/utils/apiErrors'
 import { todayIso } from '@/utils/dates'
 import { displayToKg, formatWeight, kgToDisplay } from '@/utils/units'
 import { useAthleteStore } from '@/stores/athlete'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { updateSettings } from '@/api/auth'
@@ -119,13 +121,30 @@ function measuresLine(entry: BodyEntryOut): string {
 }
 
 async function load() {
+  // v0.26.0 (zurdi: "Cuerpo no se aprovecha del prefetch"): hidratar de las
+  // claves que el splash ya calienta (solo vista propia) y refrescar en fondo
+  const own = athlete.userId === undefined
+  let hydrated = false
+  if (own) {
+    const cachedEntries = getViewCache<BodyEntryOut[]>('body:entries:me')
+    const cachedPhotos = getViewCache<BodyPhotoOut[]>('body:photos:me')
+    if (cachedEntries) {
+      entries.value = cachedEntries
+      if (cachedPhotos) photos.value = cachedPhotos
+      hydrated = true
+    }
+  }
   try {
     entries.value = await listBody(athlete.userId)
     // v0.12.0: fotos de progreso — PRIVADAS: solo en la vista propia (el
     // backend tampoco las serviría de otro usuario)
     if (isViewingSelf.value) photos.value = await listBodyPhotos()
+    if (own) {
+      setViewCache('body:entries:me', entries.value)
+      setViewCache('body:photos:me', photos.value)
+    }
   } catch (error) {
-    toastApiError(error)
+    if (!hydrated) toastApiError(error)
   }
 }
 
@@ -513,7 +532,10 @@ watch(() => athlete.userId, load, { immediate: true })
               :aria-pressed="selectedPhotoIds.includes(photo.id) ? 'true' : 'false'"
               @click="togglePhotoSelect(photo.id)"
             >
-              <img :src="bodyPhotoUrl(photo.id)" alt="" class="w-full aspect-square object-cover rounded-sm" />
+              <!-- v0.26.0: BkMedia = blur-up + placeholder custom en error -->
+              <div class="w-full aspect-square rounded-sm overflow-hidden">
+                <BkMedia :src="bodyPhotoUrl(photo.id)" size="fill" />
+              </div>
               <span class="block bk-metric text-2xs text-ink-faint mt-0.5">{{ photo.date }}</span>
             </button>
             <span class="absolute top-1 right-1 rounded-sm bg-void/60">
@@ -543,7 +565,11 @@ watch(() => athlete.userId, load, { immediate: true })
     <BkSheet :open="compareOpen" :title="t('body.photos.compareTitle')" @close="compareOpen = false">
       <div class="grid grid-cols-2 gap-2" data-testid="body-photo-comparison">
         <div v-for="photo in comparePair" :key="photo.id" class="space-y-1">
-          <img :src="bodyPhotoUrl(photo.id)" alt="" class="w-full rounded-sm object-cover" />
+          <!-- v0.26.0: marco 9:16 uniforme — ambos lados del comparador
+               idénticos, con blur-up y placeholder custom via BkMedia -->
+          <div class="w-full aspect-[9/16] rounded-sm overflow-hidden">
+            <BkMedia :src="bodyPhotoUrl(photo.id)" size="fill" />
+          </div>
           <p class="bk-metric text-xs text-ink-faint text-center">{{ photo.date }}</p>
         </div>
       </div>

@@ -30,6 +30,7 @@ from sqlalchemy.engine import Engine
 from ..config import get_settings
 from ..db import make_engine, make_sessionmaker
 from ..seed import ensure_catalog
+from .images import backfill_lq_async
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 APP_NAME = "berserk"
@@ -251,6 +252,9 @@ def restore_backup(app: FastAPI, zip_path: Path) -> dict:
                 shutil.copyfileobj(src, dst)
             # v0.24.0: los assets van y vuelven con la DB (formato 2)
             uploads_replaced = _restore_uploads(zip_path, uploads_root, pre_restore_uploads)
+            # v0.26.0: un backup viejo puede venir sin LQIPs — rellenar en fondo
+            if uploads_replaced:
+                backfill_lq_async(uploads_root)
 
             previous_revision = _db_revision(db_path)
             cfg = _alembic_config()

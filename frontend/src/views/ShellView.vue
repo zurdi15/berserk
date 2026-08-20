@@ -165,8 +165,16 @@ const activeIndex = computed(() => {
 // v0.25.2: versión ESTABLE (avatar_version cambia solo al subir otra foto)
 // — el Date.now() de antes rompía la caché en cada arranque
 const auth = useAuthStore()
+// v0.26.0: un avatar que falla al cargar cae a la runa/etiqueta de siempre
+// (nunca el icono de imagen rota del navegador)
+const navAvatarError = ref(false)
+watch(() => auth.user?.avatar_version, () => {
+  navAvatarError.value = false
+})
 const navAvatarSrc = computed(() =>
-  auth.user?.has_avatar ? avatarUrl(auth.user.id, auth.user.avatar_version) : null,
+  auth.user?.has_avatar && !navAvatarError.value
+    ? avatarUrl(auth.user.id, auth.user.avatar_version)
+    : null,
 )
 
 // item 1 (v0.4.0, desktop nav polish): indicador deslizante también arriba,
@@ -365,6 +373,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
                   class="relative w-5 h-5 rounded-full object-cover border"
                   :class="route.name === 'profile' ? 'border-aurora' : 'border-line-strong'"
                   data-testid="nav-avatar-desktop"
+                  @error="navAvatarError = true"
                 />
                 <BkRune v-else :name="item.rune" :size="20" :carve="false" class="relative" />
               </span>
@@ -492,6 +501,7 @@ watch(activeIndex, () => nextTick(updateIndicator))
                   class="relative rounded-full object-cover border"
                   :class="route.name === 'profile' ? 'border-aurora' : 'border-line-strong'"
                   data-testid="nav-avatar"
+                  @error="navAvatarError = true"
                 />
               </span>
               <span v-else><BkRune :name="item.rune" :size="22" :carve="false" class="relative" /></span>

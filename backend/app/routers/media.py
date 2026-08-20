@@ -22,6 +22,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..models import BodyPhoto, Exercise, ExerciseNote, Routine, User
 from ..schemas.media import BodyPhotoOut, ExerciseNoteIn, ExerciseNoteOut
+from ..services.images import generate_lq, lq_path_for
 from .exercises import _can_edit, get_visible_exercise
 from .routines import _editable_routine, _visible_template
 
@@ -52,6 +53,21 @@ async def _read_image(file: UploadFile) -> tuple[bytes, str]:
     return data, ext
 
 
+def _serve_image(path: Path, lq: bool, headers: dict | None = None) -> FileResponse:
+    # v0.26.0 LQIP: ?lq=1 sirve la miniatura borrosa si existe (fallback a la
+    # original — una imagen sin LQIP aún es mejor que un 404)
+    if lq:
+        lq_file = lq_path_for(path)
+        if lq_file.is_file():
+            return FileResponse(lq_file, headers=headers)
+    return FileResponse(path, headers=headers)
+
+
+def _remove_with_lq(path: Path) -> None:
+    _delete_quietly(path)
+    _delete_quietly(lq_path_for(path))
+
+
 def _delete_quietly(path: Path) -> None:
     # el fichero puede no existir (backup restaurado sin uploads, borrado a
     # mano): la operación de DB no debe fallar por eso
@@ -73,22 +89,26 @@ async def upload_exercise_image(
         raise HTTPException(status_code=404, detail="not_found")
     data, ext = await _read_image(file)
     filename = f"{uuid.uuid4().hex}{ext}"
-    (_uploads_dir("exercises") / filename).write_bytes(data)
+    target = _uploads_dir("exercises") / filename
+    target.write_bytes(data)
+    generate_lq(target)
     if exercise.image_path:
-        _delete_quietly(_uploads_dir("exercises") / exercise.image_path)
+        _remove_with_lq(_uploads_dir("exercises") / exercise.image_path)
     exercise.image_path = filename
     db.commit()
 
 
 @router.get("/exercises/{exercise_id}/image")
-def get_exercise_image(exercise_id: int, user: CurrentUser, db: Session = Depends(get_db)):
+def get_exercise_image(
+    exercise_id: int, user: CurrentUser, db: Session = Depends(get_db), lq: bool = False
+):
     exercise = get_visible_exercise(db, user.id, exercise_id)
     if exercise is None or not exercise.image_path:
         raise HTTPException(status_code=404, detail="not_found")
     path = _uploads_dir("exercises") / exercise.image_path
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not_found")
-    return FileResponse(path)
+    return _serve_image(path, lq)
 
 
 @router.delete("/exercises/{exercise_id}/image", status_code=204)
@@ -97,7 +117,7 @@ def delete_exercise_image(exercise_id: int, user: CurrentUser, db: Session = Dep
     if exercise is None or not _can_edit(exercise.owner_id, user):
         raise HTTPException(status_code=404, detail="not_found")
     if exercise.image_path:
-        _delete_quietly(_uploads_dir("exercises") / exercise.image_path)
+        _remove_with_lq(_uploads_dir("exercises") / exercise.image_path)
         exercise.image_path = None
         db.commit()
 
@@ -114,15 +134,19 @@ async def upload_routine_image(
     routine = _editable_routine(db, user, routine_id)
     data, ext = await _read_image(file)
     filename = f"{uuid.uuid4().hex}{ext}"
-    (_uploads_dir("routines") / filename).write_bytes(data)
+    target = _uploads_dir("routines") / filename
+    target.write_bytes(data)
+    generate_lq(target)
     if routine.image_path:
-        _delete_quietly(_uploads_dir("routines") / routine.image_path)
+        _remove_with_lq(_uploads_dir("routines") / routine.image_path)
     routine.image_path = filename
     db.commit()
 
 
 @router.get("/routines/{routine_id}/image")
-def get_routine_image(routine_id: int, user: CurrentUser, db: Session = Depends(get_db)):
+def get_routine_image(
+    routine_id: int, user: CurrentUser, db: Session = Depends(get_db), lq: bool = False
+):
     # misma regla de visibilidad que el resto de la rutina (propia, global o
     # plantilla legacy) — _visible_template ya lanza 404 si no aplica.
     # v0.23.0 (zurdi: "asumiendo otro user como admin fallan las imágenes de
@@ -141,14 +165,14 @@ def get_routine_image(routine_id: int, user: CurrentUser, db: Session = Depends(
     path = _uploads_dir("routines") / routine.image_path
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not_found")
-    return FileResponse(path)
+    return _serve_image(path, lq)
 
 
 @router.delete("/routines/{routine_id}/image", status_code=204)
 def delete_routine_image(routine_id: int, user: CurrentUser, db: Session = Depends(get_db)):
     routine = _editable_routine(db, user, routine_id)
     if routine.image_path:
-        _delete_quietly(_uploads_dir("routines") / routine.image_path)
+        _remove_with_lq(_uploads_dir("routines") / routine.image_path)
         routine.image_path = None
         db.commit()
 
@@ -162,17 +186,21 @@ async def upload_avatar(file: UploadFile, user: CurrentUser, db: Session = Depen
     # que la imagen de ejercicio: uuid.ext en disco, columna con el nombre
     data, ext = await _read_image(file)
     filename = f"{uuid.uuid4().hex}{ext}"
-    (_uploads_dir("avatars") / filename).write_bytes(data)
+    target = _uploads_dir("avatars") / filename
+    target.write_bytes(data)
+    generate_lq(target)
     db_user = db.get(User, user.id)
     assert db_user is not None
     if db_user.avatar_path:
-        _delete_quietly(_uploads_dir("avatars") / db_user.avatar_path)
+        _remove_with_lq(_uploads_dir("avatars") / db_user.avatar_path)
     db_user.avatar_path = filename
     db.commit()
 
 
 @router.get("/users/{user_id}/avatar")
-def get_avatar(user_id: int, user: CurrentUser, db: Session = Depends(get_db)):
+def get_avatar(
+    user_id: int, user: CurrentUser, db: Session = Depends(get_db), lq: bool = False
+):
     # visible para cualquier usuario autenticado de la instancia: el avatar
     # es identidad (perfil hoy; feed/compartidos mañana), no dato de entreno
     target = db.get(User, user_id)
@@ -183,14 +211,14 @@ def get_avatar(user_id: int, user: CurrentUser, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="not_found")
     # v0.25.2: el cliente versiona la URL (?v=avatar_version, uuid nuevo por
     # subida) — cachear fuerte es seguro y evita refetches por visita
-    return FileResponse(path, headers={"Cache-Control": "private, max-age=604800"})
+    return _serve_image(path, lq, headers={"Cache-Control": "private, max-age=604800"})
 
 
 @router.delete("/users/me/avatar", status_code=204)
 def delete_avatar(user: CurrentUser, db: Session = Depends(get_db)):
     db_user = db.get(User, user.id)
     if db_user is not None and db_user.avatar_path:
-        _delete_quietly(_uploads_dir("avatars") / db_user.avatar_path)
+        _remove_with_lq(_uploads_dir("avatars") / db_user.avatar_path)
         db_user.avatar_path = None
         db.commit()
 
@@ -255,7 +283,9 @@ async def upload_body_photo(
 ):
     data, ext = await _read_image(file)
     filename = f"{uuid.uuid4().hex}{ext}"
-    (_uploads_dir("body") / filename).write_bytes(data)
+    target = _uploads_dir("body") / filename
+    target.write_bytes(data)
+    generate_lq(target)
     photo = BodyPhoto(owner_id=user.id, date=photo_date, path=filename)
     db.add(photo)
     db.commit()
@@ -263,7 +293,9 @@ async def upload_body_photo(
 
 
 @router.get("/body/photos/{photo_id}/file")
-def get_body_photo(photo_id: int, user: CurrentUser, db: Session = Depends(get_db)):
+def get_body_photo(
+    photo_id: int, user: CurrentUser, db: Session = Depends(get_db), lq: bool = False
+):
     photo = db.get(BodyPhoto, photo_id)
     # v0.23.0: mismo bypass admin que exercise/routine image — bajo act-as la
     # LISTA ya sale (fetch con cabecera), pero el <img> del fichero llega con
@@ -273,7 +305,7 @@ def get_body_photo(photo_id: int, user: CurrentUser, db: Session = Depends(get_d
     path = _uploads_dir("body") / photo.path
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not_found")
-    return FileResponse(path)
+    return _serve_image(path, lq)
 
 
 @router.delete("/body/photos/{photo_id}", status_code=204)
@@ -281,6 +313,6 @@ def delete_body_photo(photo_id: int, user: CurrentUser, db: Session = Depends(ge
     photo = db.get(BodyPhoto, photo_id)
     if photo is None or photo.owner_id != user.id:
         raise HTTPException(status_code=404, detail="not_found")
-    _delete_quietly(_uploads_dir("body") / photo.path)
+    _remove_with_lq(_uploads_dir("body") / photo.path)
     db.delete(photo)
     db.commit()

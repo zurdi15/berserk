@@ -25,7 +25,8 @@ from ..auth import CurrentUser
 from ..db import get_db
 from ..models import Exercise
 from .exercises import _can_edit
-from .media import MAX_IMAGE_BYTES, _delete_quietly, _uploads_dir
+from .media import MAX_IMAGE_BYTES, _remove_with_lq, _uploads_dir
+from ..services.images import generate_lq
 
 router = APIRouter(tags=["image-search"])
 
@@ -127,9 +128,11 @@ def import_exercise_image(
 
     # mismo destino y limpieza que upload_exercise_image (media.py)
     filename = f"{uuid.uuid4().hex}{suffix}"
-    (_uploads_dir("exercises") / filename).write_bytes(data)
+    target = _uploads_dir("exercises") / filename
+    target.write_bytes(data)
+    generate_lq(target)
     if exercise.image_path:
-        _delete_quietly(_uploads_dir("exercises") / exercise.image_path)
+        _remove_with_lq(_uploads_dir("exercises") / exercise.image_path)
     exercise.image_path = filename
     # una imagen nueva resetea el encuadre al neutro — el de la foto anterior
     # no significa nada sobre esta

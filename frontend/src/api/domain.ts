@@ -754,6 +754,10 @@ export const deleteAvatar = () => api<void>('/users/me/avatar', { method: 'DELET
 // v0.25.2: la versión ESTABLE (user.avatar_version, uuid nuevo por subida)
 // sustituye al Date.now() por montaje — con Cache-Control en el backend, el
 // navegador reusa la foto entre visitas y solo refetchea al cambiarla
+// v0.26.0 LQIP: variante low-res de cualquier URL de media de la API — el
+// backend sirve la miniatura .lq.jpg con ?lq=1 (fallback a la original)
+export const lqUrl = (url: string) => `${url}${url.includes('?') ? '&' : '?'}lq=1`
+
 export const avatarUrl = (userId: number, version?: string | number | null) =>
   `/api/v1/users/${userId}/avatar${version ? `?v=${version}` : ''}`
 

@@ -11,6 +11,7 @@ from .config import get_settings
 from .db import make_engine, make_sessionmaker
 from .routers import admin, auth, backup, body, calendar as calendar_router, exercises, image_search, media, progress as progress_router, rotation, routines, sharing, social, users, workouts
 from .seed import ensure_catalog
+from .services.images import backfill_lq_async
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 API_PREFIX = "/api/v1"
@@ -37,6 +38,11 @@ def create_app(engine: Engine | None = None) -> FastAPI:
     # sembrar el catálogo global (idempotente)
     with app.state.sessionmaker() as session:
         ensure_catalog(session)
+
+    # v0.26.0 LQIP: generar en fondo las miniaturas que falten (subidas de
+    # antes de esta versión, o un backup restaurado sin ellas) — hilo daemon,
+    # el arranque no espera
+    backfill_lq_async(settings.data_dir / "uploads")
 
     # protegidos: cualquier usuario con sesión
     app.include_router(

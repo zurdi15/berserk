@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { exerciseImageUrl, type ExerciseOut } from '@/api/domain'
+import { exerciseImageUrl, lqUrl, type ExerciseOut } from '@/api/domain'
 import BkRune from './BkRune.vue'
 import type { RuneName } from './runes'
 
@@ -53,9 +53,15 @@ const url = computed(() => {
 // otra rutina en el mismo hero: un error viejo no condena a la nueva foto
 watch(url, () => {
   errored.value = false
+  fullLoaded.value = false
+  lqErrored.value = false
 })
 
 const showImage = computed(() => url.value !== null && !errored.value)
+// v0.26.0 blur-up: miniatura lq debajo + foto real fundiendo encima
+const fullLoaded = ref(false)
+const lqErrored = ref(false)
+const lqSrc = computed(() => (url.value?.startsWith('/api/') ? lqUrl(url.value) : null))
 const runeName = computed<RuneName>(() => props.rune ?? 'berserk')
 const mediaKey = computed(() => (showImage.value ? `img-${url.value}` : `rune-${runeName.value}`))
 </script>
@@ -68,11 +74,21 @@ const mediaKey = computed(() => (showImage.value ? `img-${url.value}` : `rune-${
     <Transition name="bk-fade" mode="out-in">
       <div :key="mediaKey" class="absolute inset-0 z-0" aria-hidden="true">
         <img
+          v-if="showImage && lqSrc && !fullLoaded && !lqErrored"
+          :src="lqSrc"
+          alt=""
+          class="absolute inset-0 w-full h-full object-cover blur-md scale-110"
+          decoding="async"
+          @error="lqErrored = true"
+        />
+        <img
           v-if="showImage"
           :src="url!"
           alt=""
-          class="w-full h-full object-cover"
+          class="relative w-full h-full object-cover transition-opacity duration-300"
+          :class="lqSrc && !fullLoaded ? 'opacity-0' : 'opacity-100'"
           decoding="async"
+          @load="fullLoaded = true"
           @error="errored = true"
         />
         <!-- modo transparente (v5): la runa respira detrás, tenue y

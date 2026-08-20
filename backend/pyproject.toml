@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.6",
     "bcrypt>=4.2",
     "python-multipart>=0.0.12",
+    "pillow>=12.3.0",
 ]
 
 [dependency-groups]

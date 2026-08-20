@@ -10,6 +10,7 @@ import { exerciseName } from '@/components/routines/exerciseName'
 import { toastApiError } from '@/utils/apiErrors'
 import { foldSearchText } from '@/utils/searchFold'
 import { useAthleteStore } from '@/stores/athlete'
+import { getViewCache, setViewCache } from '@/utils/viewCache'
 import BkField from '@/lib/BkField.vue'
 import BkMedia from '@/lib/BkMedia.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -40,6 +41,21 @@ const ready = ref(false)
 const trainedIds = ref<Set<number>>(new Set())
 
 async function load() {
+  // v0.26.0 (zurdi: "Entrenos no se aprovecha del prefetch"): hidratar de
+  // las claves que el splash ya calienta (solo datos PROPIOS — el modo
+  // atleta sigue network-first) y refrescar en fondo
+  const own = athlete.userId === undefined
+  if (own) {
+    const cachedExercises = getViewCache<ExerciseOut[]>('progress:catalog:me')
+    const cachedTrained = getViewCache<number[]>('progress:trained:me')
+    const cachedGroups = getViewCache<MuscleGroupOut[]>('mgroups:me')
+    if (cachedExercises && cachedTrained && cachedGroups) {
+      allExercises.value = cachedExercises
+      trainedIds.value = new Set(cachedTrained)
+      muscleGroups.value = cachedGroups
+      ready.value = true
+    }
+  }
   try {
     // catálogo completo con hilo de atleta: buscamos entre los ejercicios de
     // quien se está viendo, no siempre los propios — luego se filtra en cliente
@@ -51,8 +67,13 @@ async function load() {
     allExercises.value = list
     trainedIds.value = new Set(trained.exercise_ids)
     muscleGroups.value = groups
+    if (own) {
+      setViewCache('progress:catalog:me', list)
+      setViewCache('progress:trained:me', trained.exercise_ids)
+      setViewCache('mgroups:me', groups)
+    }
   } catch (error) {
-    toastApiError(error)
+    if (!ready.value) toastApiError(error)
   } finally {
     ready.value = true
   }

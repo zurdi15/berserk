@@ -251,3 +251,56 @@ def test_avatar_version_tracks_uploads_and_file_is_cacheable(client: TestClient)
     )
     v2 = client.get("/api/v1/auth/me").json()["avatar_version"]
     assert v2 and v2 != v1
+
+
+def test_lqip_generated_on_upload_and_served_with_lq_param(client: TestClient, app):
+    """v0.26.0 — cada subida genera su miniatura .lq.jpg; ?lq=1 la sirve (y
+    cae a la original si no existe); borrar la imagen borra ambas.
+    OJO: el PNG-fixture de este módulo es hex troceado que Pillow rechaza —
+    aquí hace falta una imagen REAL, generada con la propia Pillow."""
+    import io
+
+    from PIL import Image
+
+    from app.config import get_settings
+    from app.services.images import backfill_lq, lq_path_for
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (200, 300), (79, 216, 196)).save(buffer, format="PNG")
+    real_png = buffer.getvalue()
+
+    bench = _bench(client)
+    uploads = get_settings().data_dir / "uploads" / "exercises"
+    # el data_dir se comparte con el resto de la suite: identificar MI
+    # fichero por diff antes/después, no asumiendo el directorio vacío
+    before = set(uploads.iterdir()) if uploads.is_dir() else set()
+    assert (
+        client.post(
+            f"/api/v1/exercises/{bench}/image", files={"file": ("f.png", real_png, "image/png")}
+        ).status_code
+        == 204
+    )
+    originals = [f for f in set(uploads.iterdir()) - before if not f.name.endswith(".lq.jpg")]
+    assert len(originals) == 1
+    lq_file = lq_path_for(originals[0])
+    assert lq_file.is_file()
+
+    full = client.get(f"/api/v1/exercises/{bench}/image")
+    small = client.get(f"/api/v1/exercises/{bench}/image?lq=1")
+    assert small.status_code == 200
+    assert small.content == lq_file.read_bytes()
+    assert small.content != full.content
+
+    # sin LQIP en disco, ?lq=1 cae a la original (mejor que un 404)
+    lq_file.unlink()
+    fallback = client.get(f"/api/v1/exercises/{bench}/image?lq=1")
+    assert fallback.content == full.content
+
+    # el backfill lo regenera
+    assert backfill_lq(get_settings().data_dir / "uploads") >= 1
+    assert lq_file.is_file()
+
+    # borrar la imagen limpia original + LQIP
+    assert client.delete(f"/api/v1/exercises/{bench}/image").status_code == 204
+    assert not originals[0].exists()
+    assert not lq_file.exists()

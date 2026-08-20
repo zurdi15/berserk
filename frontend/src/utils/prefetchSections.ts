@@ -39,6 +39,9 @@ import {
   getSocialFeed,
   getStats,
   getStreak,
+  getTrainedExercises,
+  listBody,
+  listBodyPhotos,
   listExercises,
   listMuscleGroups,
   listRoutines,
@@ -73,6 +76,9 @@ export async function prefetchSections(): Promise<void> {
     statsR,
     routinesR,
     templatesR,
+    trainedR,
+    bodyR,
+    bodyPhotosR,
   ] = await Promise.allSettled([
     getStreak(),
     getMonth(year, month),
@@ -87,6 +93,10 @@ export async function prefetchSections(): Promise<void> {
     getStats(),
     listRoutines(),
     listRoutineTemplates(),
+    // v0.26.0 (zurdi: "Entrenos y Cuerpo no se aprovechan del prefetch")
+    getTrainedExercises(),
+    listBody(),
+    listBodyPhotos(),
   ])
 
   const streak = ok<{ weeks: number }>(streakR)
@@ -102,6 +112,9 @@ export async function prefetchSections(): Promise<void> {
   const stats = ok<StatsOut>(statsR)
   const routines = ok<RoutineOut[]>(routinesR)
   const templates = ok<RoutineOut[]>(templatesR)
+  const trained = ok<{ exercise_ids: number[] }>(trainedR)
+  const bodyEntries = ok<unknown[]>(bodyR)
+  const bodyPhotos = ok<unknown[]>(bodyPhotosR)
 
   // HOY — snapshot completo o nada (ver regla arriba); TodaySnapshot vive en
   // TodayView, aquí se replica su shape campo a campo (claves compartidas =
@@ -135,6 +148,10 @@ export async function prefetchSections(): Promise<void> {
   if (exercises) setViewCache('progress:catalog:me', exercises)
   if (records) setViewCache('progress:records:me', records)
   if (stats) setViewCache('progress:stats:me', stats)
+  // v0.26.0: el picker de Entrenos y la sección Cuerpo también hidratan
+  if (trained) setViewCache('progress:trained:me', trained.exercise_ids)
+  if (bodyEntries) setViewCache('body:entries:me', bodyEntries)
+  if (bodyPhotos) setViewCache('body:photos:me', bodyPhotos)
 
   // PERFIL — puntos de la semana (mismo derivado que ProfileView.loadWeek)
   if (weekWorkouts) setViewCache('profile:week', [...new Set(weekWorkouts.map((w) => w.date))])

@@ -18,6 +18,10 @@ vi.mock('@/api/domain', () => ({
   getStats: vi.fn(async () => ({ total_workouts: 7 })),
   listRoutines: vi.fn(async () => [{ id: 3, name: 'Push' }]),
   listRoutineTemplates: vi.fn(async () => [{ id: 4, name: 'Global' }]),
+  // v0.26.0: Entrenos (trained) y Cuerpo también se precalientan
+  getTrainedExercises: vi.fn(async () => ({ exercise_ids: [5] })),
+  listBody: vi.fn(async () => [{ date: '2026-08-19', weight_kg: 80 }]),
+  listBodyPhotos: vi.fn(async () => [{ id: 2, date: '2026-08-19' }]),
 }))
 
 import * as domain from '@/api/domain'
@@ -59,6 +63,10 @@ describe('prefetchSections', () => {
     expect(getViewCache('progress:catalog:me')).toEqual([{ id: 5, name_es: 'Press banca' }])
     expect(getViewCache('progress:records:me')).toEqual([{ id: 9, kind: 'max_weight' }])
     expect(getViewCache('progress:stats:me')).toEqual({ total_workouts: 7 })
+    // v0.26.0: picker de Entrenos + Cuerpo
+    expect(getViewCache('progress:trained:me')).toEqual([5])
+    expect(getViewCache('body:entries:me')).toEqual([{ date: '2026-08-19', weight_kg: 80 }])
+    expect(getViewCache('body:photos:me')).toEqual([{ id: 2, date: '2026-08-19' }])
 
     // PERFIL: fechas de la semana, deduplicadas (mismo derivado que loadWeek)
     expect(getViewCache('profile:week')).toEqual(['2026-08-18', '2026-08-19'])

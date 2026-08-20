@@ -50,10 +50,14 @@ describe('BkChip', () => {
 describe('BkMedia', () => {
   it('renders the exercise image when has_image, via exerciseImageUrl', () => {
     const wrapper = mount(BkMedia, { props: { exercise: { id: 7, has_image: true } } })
-    const img = wrapper.find('img')
-    expect(img.exists()).toBe(true)
-    expect(img.attributes('src')).toBe('/api/v1/exercises/7/image')
-    expect(img.attributes('loading')).toBe('lazy')
+    // v0.26.0 blur-up: DOS imgs — la miniatura ?lq=1 (aria-hidden) debajo y
+    // la real encima; la real es la última
+    const imgs = wrapper.findAll('img')
+    expect(imgs).toHaveLength(2)
+    expect(imgs[0].attributes('src')).toBe('/api/v1/exercises/7/image?lq=1')
+    expect(imgs[0].attributes('aria-hidden')).toBe('true')
+    expect(imgs[1].attributes('src')).toBe('/api/v1/exercises/7/image')
+    expect(imgs[1].attributes('loading')).toBe('lazy')
   })
 
   it('falls back to the rune well when the exercise has no image', () => {
@@ -64,7 +68,8 @@ describe('BkMedia', () => {
 
   it('flips to the rune fallback when the <img> errors (stale has_image)', async () => {
     const wrapper = mount(BkMedia, { props: { exercise: { id: 7, has_image: true } } })
-    await wrapper.find('img').trigger('error')
+    // el error se dispara en la img REAL (la última): cae al pozo rúnico
+    await wrapper.findAll('img').at(-1)!.trigger('error')
     expect(wrapper.find('img').exists()).toBe(false)
     expect(wrapper.find('svg').exists()).toBe(true)
   })
@@ -73,7 +78,7 @@ describe('BkMedia', () => {
     const wrapper = mount(BkMedia, {
       props: { exercise: { id: 7, has_image: true }, src: '/api/v1/body/photos/3/file' },
     })
-    expect(wrapper.find('img').attributes('src')).toBe('/api/v1/body/photos/3/file')
+    expect(wrapper.findAll('img').at(-1)!.attributes('src')).toBe('/api/v1/body/photos/3/file')
   })
 
   it('a null rune (primaryRune sin mapeo) falls back to the house bindrune, not to nothing', () => {

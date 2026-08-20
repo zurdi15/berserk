@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { exerciseImageUrl, type ExerciseOut } from '@/api/domain'
+import { exerciseImageUrl, lqUrl, type ExerciseOut } from '@/api/domain'
 import { imageFramingStyle } from '@/utils/imageFraming'
 import BkRune from './BkRune.vue'
 import type { RuneName } from './runes'
@@ -31,6 +31,13 @@ const props = withDefaults(
 )
 
 const errored = ref(false)
+// v0.26.0 blur-up: el LQIP (miniatura borrosa) pinta al instante y la
+// imagen real funde encima al cargar — solo para media de NUESTRA API
+// (una src externa no tiene variante lq)
+const fullLoaded = ref(false)
+// la capa lq también puede fallar (red, 500): se esconde sola — jamás el
+// icono de imagen rota del navegador
+const lqErrored = ref(false)
 
 const url = computed(() => {
   if (props.src) return props.src
@@ -44,9 +51,12 @@ const url = computed(() => {
 // anterior no debe condenar a la nueva imagen al fallback
 watch(url, () => {
   errored.value = false
+  fullLoaded.value = false
+  lqErrored.value = false
 })
 
 const showImage = computed(() => url.value !== null && !errored.value)
+const lqSrc = computed(() => (url.value?.startsWith('/api/') ? lqUrl(url.value) : null))
 const runeName = computed<RuneName>(() => props.rune ?? 'berserk')
 
 // v0.21.4: encuadre WYSIWYG — solo aplica a fotos de EJERCICIO (src suelto
@@ -72,15 +82,30 @@ const runeSizes = { xs: 18, sm: 22, md: 28, lg: 40, tallSm: 30, tall: 40, fill: 
 </script>
 
 <template>
-  <div class="shrink-0 overflow-hidden" :class="sizeClasses[size]">
+  <div class="relative shrink-0 overflow-hidden" :class="sizeClasses[size]">
+    <!-- blur-up (v0.26.0): la miniatura .lq.jpg debajo, borrosa y con el
+         MISMO encuadre; la real funde encima al terminar de cargar. El
+         scale-110 del blur esconde el halo de los bordes del filtro. -->
+    <img
+      v-if="showImage && lqSrc && !fullLoaded && !lqErrored"
+      :src="lqSrc"
+      alt=""
+      aria-hidden="true"
+      class="absolute inset-0 w-full h-full object-cover blur-sm scale-110"
+      :style="framing"
+      decoding="async"
+      @error="lqErrored = true"
+    />
     <img
       v-if="showImage"
       :src="url!"
       :alt="alt"
-      class="w-full h-full object-cover"
+      class="relative w-full h-full object-cover transition-opacity duration-300"
+      :class="lqSrc && !fullLoaded ? 'opacity-0' : 'opacity-100'"
       :style="framing"
       loading="lazy"
       decoding="async"
+      @load="fullLoaded = true"
       @error="errored = true"
     />
     <div v-else class="w-full h-full bg-slab flex items-center justify-center" :aria-hidden="alt ? undefined : 'true'">
