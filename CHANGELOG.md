@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.37.0 - 2026-08-20
+
+### Añadido
+- Aviso «Nueva versión disponible · Actualizar» en la parte superior cuando hay una versión nueva de la app: un toque y se recarga con la última, sin tener que cerrar la app del todo (en la PWA de iPhone podía quedarse días en la versión vieja). Se comprueba al abrir, al volver a la app y cada hora.
+
 ## 0.36.2 - 2026-08-20
 
 ### Arreglado
