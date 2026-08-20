@@ -19,7 +19,10 @@ import dev.zurdi.berserk.wear.notify.Haptics
 import dev.zurdi.berserk.wear.notify.TimerNotifier
 import dev.zurdi.berserk.wear.state.TimerRepository
 import dev.zurdi.berserk.wear.sync.DataMapFields
+import dev.zurdi.berserk.wear.sync.PhoneLink
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -127,6 +130,8 @@ class TimerEngine private constructor(context: Context) {
         val current = repository.board.value.timers[kind]
         if (current != null && current.isAlarming) {
             repository.update { it.with(current.copy(acknowledgedAtEpochMs = nowEpochMs)).pruned(nowEpochMs) }
+            // v0.34.0: un OK vale para los dos — el móvil también está sonando
+            CoroutineScope(Dispatchers.IO).launch { PhoneLink(ctx).requestAck(kind) }
         }
         silenceAlarm(kind)
         notifier.render(repository.board.value, nowEpochMs)

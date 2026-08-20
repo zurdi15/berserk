@@ -491,7 +491,7 @@ function formatCardioDuration(seconds: number): string {
 function dropCardioCountdown(reason: WearStopReason = 'cancelled') {
   clearPersistedCardioCountdown()
   void stopNativeCardioCountdown()
-  void cancelNativeCardioEndAlarm()
+  void cancelNativeCardioEndAlarm(reason)
   void syncWearTimer({ kind: 'cardio', state: 'stopped', reason })
 }
 

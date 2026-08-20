@@ -13,6 +13,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.drawable.Icon;
 import android.media.ThumbnailUtils;
 import android.os.Build;
 import android.os.Bundle;
@@ -110,6 +111,47 @@ final class BkNotifications {
                 if (done != null) done.run();
             }
         });
+    }
+
+    static Bitmap cachedArt(String url) {
+        return url == null || url.isEmpty() ? null : ART.get(url);
+    }
+
+    static void notifyRaw(Context ctx, int id, Notification notification) {
+        notify(ctx, id, notification);
+    }
+
+    /**
+     * v0.34.0: la notificación de la alarma en bucle (es la del foreground
+     * service BkAlarmService): ongoing, OK como acción y al descartar, y
+     * full-screen intent a la pantalla nativa de "¡Tiempo!" — con el móvil
+     * bloqueado o apagado, el sistema la abre sola; en uso, sale como aviso
+     * flotante con su OK.
+     */
+    static Notification alarmNotification(Context ctx, String kind, String title, String body, String subtitle,
+                                          String channelName, String imageUrl, Bitmap art) {
+        ensureAlertsChannel(ctx, channelName);
+        PendingIntent ack = BkAlarmService.ackIntent(ctx, kind);
+        PendingIntent open = PendingIntent.getActivity(
+                ctx, 4201 + ("cardio".equals(kind) ? 1 : 0),
+                BkAlarmActivity.intent(ctx, kind, title, subtitle, imageUrl),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder builder = new Notification.Builder(ctx, CHANNEL_ALERTS)
+                .setSmallIcon(smallIcon(ctx))
+                .setColor(ctx.getColor(R.color.bk_aurora))
+                .setContentTitle(title)
+                .setContentText(TextUtils.isEmpty(subtitle) ? body : subtitle)
+                .setCategory(Notification.CATEGORY_ALARM)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setContentIntent(open)
+                .setFullScreenIntent(open, true)
+                .setDeleteIntent(ack)
+                .addAction(new Notification.Action.Builder(
+                        Icon.createWithResource(ctx, smallIcon(ctx)), ctx.getString(R.string.bk_alarm_ok), ack).build())
+                .setVisibility(Notification.VISIBILITY_PUBLIC);
+        if (art != null) builder.setLargeIcon(art);
+        return builder.build();
     }
 
     static void cancel(Context ctx, int id) {

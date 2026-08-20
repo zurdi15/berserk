@@ -25,15 +25,29 @@ public class BkRestEndReceiver extends BroadcastReceiver {
         try {
             // el cronómetro ongoing de la cuenta atrás ya no pinta nada útil
             BkNotifications.cancel(context, intent.getIntExtra("cancelNotificationId", 1002));
-            BkNotifications.postEnd(
-                    context,
-                    intent.getIntExtra("notificationId", REST_END_NOTIFICATION_ID),
+            String kind = intent.getStringExtra("kind");
+            if (kind == null) kind = "rest";
+            int notificationId = intent.getIntExtra("notificationId", REST_END_NOTIFICATION_ID);
+            // v0.34.0: vibra hasta el OK (BkAlarmService); si no se puede ni pedir, el aviso único de siempre
+            boolean started = BkAlarmService.start(
+                    context, kind, notificationId,
                     intent.getStringExtra("title"),
                     intent.getStringExtra("body"),
                     intent.getStringExtra("subtitle"),
                     intent.getStringExtra("channelName"),
-                    intent.getStringExtra("imageUrl"),
-                    pending::finish);
+                    intent.getStringExtra("imageUrl"));
+            if (started) {
+                pending.finish();
+            } else {
+                BkNotifications.postEnd(
+                        context, notificationId,
+                        intent.getStringExtra("title"),
+                        intent.getStringExtra("body"),
+                        intent.getStringExtra("subtitle"),
+                        intent.getStringExtra("channelName"),
+                        intent.getStringExtra("imageUrl"),
+                        pending::finish);
+            }
         } catch (Exception e) {
             pending.finish();
         }

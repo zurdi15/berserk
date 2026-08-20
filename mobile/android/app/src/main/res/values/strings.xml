@@ -4,4 +4,8 @@
     <string name="title_activity_main">berserk</string>
     <string name="package_name">dev.zurdi.berserk</string>
     <string name="custom_url_scheme">dev.zurdi.berserk</string>
+    <!-- v0.34.0: pantalla nativa de la alarma de fin -->
+    <string name="bk_alarm_time_up">¡Tiempo!</string>
+    <string name="bk_alarm_ok">OK</string>
+    <string name="bk_alarm_hint">Pulsa OK para parar la alarma</string>
 </resources>

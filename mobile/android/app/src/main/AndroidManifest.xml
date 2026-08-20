@@ -24,6 +24,22 @@
              descanso cuando dispara la alarma (ver BkOngoingPlugin) -->
         <receiver android:name=".BkRestEndReceiver" android:exported="false" />
 
+        <!-- v0.34.0: la alarma que vibra hasta el OK (shortService desde la
+             alarma exacta, como en el reloj) y su pantalla, que se abre sola
+             aunque el móvil esté bloqueado -->
+        <service
+            android:name=".BkAlarmService"
+            android:exported="false"
+            android:foregroundServiceType="shortService" />
+        <activity
+            android:name=".BkAlarmActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/BkAlarmTheme" />
+
         <!-- v0.28.0 reloj: órdenes del Galaxy Watch (cancelar cuenta atrás)
              por MessageClient; Play services lo arranca aunque la app esté
              cerrada. El estado hacia el reloj va por DataItems (BkWear). -->
@@ -51,6 +67,9 @@
          de manifiesto, no de runtime; el usuario puede vetarlo por app -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- v0.34.0: alarma de fin en bucle (shortService) y su pantalla sobre el bloqueo -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- v0.16.0: setAlarmClock (aviso de fin de descanso, BkOngoingPlugin)
          exige permiso de alarmas exactas en Android 13+ — sin él lanzaba
          SecurityException y la app se CERRABA al registrar una serie.

@@ -12,13 +12,42 @@ export const online = ref(typeof navigator === 'undefined' ? true : navigator.on
 type BackOnlineCallback = () => void
 const backOnlineCallbacks = new Set<BackOnlineCallback>()
 
+// v0.34.0: sonda mientras estamos offline — si la app se queda quieta no hay
+// ninguna petición que descubra que la red volvió, y el replay del outbox
+// espera a markOnline(). Solo en la app (tras attachNetListeners): los tests
+// importan este módulo sin querer timers.
+const PROBE_MS = 15_000
+let probe: ReturnType<typeof setInterval> | null = null
+let listenersAttached = false
+
+function startProbe() {
+  if (probe !== null || !listenersAttached) return
+  probe = setInterval(() => {
+    fetch('/api/v1/auth/status', { cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(5_000) })
+      .then((response) => {
+        if (response.ok) markOnline()
+      })
+      .catch(() => {
+        // seguimos offline
+      })
+  }, PROBE_MS)
+}
+
+function stopProbe() {
+  if (probe === null) return
+  clearInterval(probe)
+  probe = null
+}
+
 export function markOffline() {
   online.value = false
+  startProbe()
 }
 
 export function markOnline() {
   const wasOffline = !online.value
   online.value = true
+  stopProbe()
   if (wasOffline) {
     for (const callback of backOnlineCallbacks) callback()
   }
@@ -33,6 +62,8 @@ export function onBackOnline(callback: BackOnlineCallback): () => void {
 // los listeners del navegador se registran UNA vez desde ShellView (no aquí
 // en import-time: los tests importan este módulo sin querer listeners)
 export function attachNetListeners() {
+  listenersAttached = true
+  if (!online.value) startProbe()
   window.addEventListener('online', markOnline)
   window.addEventListener('offline', markOffline)
   document.addEventListener('visibilitychange', () => {

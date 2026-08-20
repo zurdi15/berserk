@@ -33,6 +33,23 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
 
 const BASE = '/api/v1'
 
+// v0.34.0 (zurdi: "si se va la conexión con el backend la app se vuelve loca,
+// se queda pillada, y si le das varias veces a añadir un ejercicio luego se
+// añaden todos de golpe"): fetch no tiene timeout, y cuando la red muere "a
+// medias" (wifi asociada sin salida, servidor que no contesta) la petición se
+// quedaba colgada minutos — ni error ni offline, así que cada toque lanzaba
+// otra petición que acababa llegando toda junta. Un timeout convierte ese
+// limbo en OfflineError: las mutaciones del entreno caen al outbox y las
+// lecturas a la cache. Las subidas (apiForm) tienen más margen.
+const REQUEST_TIMEOUT_MS = 8_000
+const UPLOAD_TIMEOUT_MS = 30_000
+
+function timedSignal(ms: number): { signal: AbortSignal; clear: () => void } {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  return { signal: controller.signal, clear: () => clearTimeout(timer) }
+}
+
 // v0.17.0 act-as: mientras un admin actúa como otro usuario (ver
 // utils/actAs.ts), TODA petición lleva el header — el backend resuelve al
 // objetivo en get_current_user, así que lecturas y mutaciones van "como si
@@ -110,16 +127,20 @@ function toSlug(detail: unknown): { slug: string; field?: string } {
 // Content-Type manual) y sin cache de lecturas (solo se usa para POSTs)
 export async function apiForm<T = unknown>(path: string, form: FormData): Promise<T> {
   let response: Response
+  const timed = timedSignal(UPLOAD_TIMEOUT_MS)
   try {
     response = await fetch(`${BASE}${path}`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: actAsHeader(),
       body: form,
+      signal: timed.signal,
     })
   } catch {
     markOffline()
     throw new OfflineError()
+  } finally {
+    timed.clear()
   }
   markOnline()
   if (!response.ok) {
@@ -140,6 +161,7 @@ export async function api<T = unknown>(
 ): Promise<T> {
   const method = options.method ?? 'GET'
   let response: Response
+  const timed = timedSignal(REQUEST_TIMEOUT_MS)
   try {
     response = await fetch(`${BASE}${path}`, {
       method,
@@ -149,6 +171,7 @@ export async function api<T = unknown>(
         ...actAsHeader(),
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: timed.signal,
     })
   } catch {
     // v0.6.0 offline: fetch solo LANZA por fallo de red/CORS, nunca por un
@@ -160,6 +183,8 @@ export async function api<T = unknown>(
       if (cached.hit) return cached.data
     }
     throw new OfflineError()
+  } finally {
+    timed.clear()
   }
   // cualquier respuesta real (aunque sea un 4xx) prueba que hay servidor
   markOnline()

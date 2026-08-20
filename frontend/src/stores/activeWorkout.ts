@@ -249,12 +249,18 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   // bloque que se está mirando (null/omitido = sin bloque, como siempre)
   async function addExercise(exercise_id: number, blockLabel: string | null = null) {
     if (!offline()) {
-      await domain.addWorkoutExercise(workout.value!.id, {
-        exercise_id,
-        block_label: blockLabel ?? undefined,
-      })
-      await refresh()
-      return
+      try {
+        await domain.addWorkoutExercise(workout.value!.id, {
+          exercise_id,
+          block_label: blockLabel ?? undefined,
+        })
+        await refresh()
+        return
+      } catch (error) {
+        if (!(error instanceof OfflineError)) throw error
+        // v0.34.0: la red murió (o el timeout saltó) al añadir — misma caída
+        // a la rama offline que logSet: el ejercicio aparece ya y se encola
+      }
     }
     const tempId = outbox.nextTempId()
     workout.value!.exercises = [

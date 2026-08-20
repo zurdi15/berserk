@@ -146,7 +146,7 @@ export async function scheduleNativeRestNotification(
     // de "scheduleEndAlarm no crashea". Los shells viejos caen al fallback
     // inexacto de LocalNotifications hasta que se actualicen.
     if (ongoing?.scheduleEndAlarm && ongoing.getAppInfo) {
-      await ongoing.scheduleEndAlarm({ whenMs: endsAtMs, title, body, channelName: title, ...extrasPayload(extras) })
+      await ongoing.scheduleEndAlarm({ whenMs: endsAtMs, title, body, channelName: title, kind: 'rest', ...extrasPayload(extras) })
       return
     }
     await cap.Plugins?.LocalNotifications?.schedule({
@@ -165,11 +165,17 @@ export async function scheduleNativeRestNotification(
   }
 }
 
-export async function cancelNativeRestNotification(): Promise<void> {
+/**
+ * v0.34.0: con reason 'finished' (el clear automático a los 3 s de llegar a
+ * cero) la shell NO calla la alarma — vibra hasta el OK, como el reloj; solo
+ * 'cancelled' (el usuario, u otra serie) la para. Las shells anteriores
+ * ignoran el parámetro y cancelan como siempre.
+ */
+export async function cancelNativeRestNotification(reason: WearStopReason = 'cancelled'): Promise<void> {
   const cap = capacitor()
   if (!cap) return
   try {
-    if (cap.Plugins?.BkOngoing?.cancelEndAlarm) await cap.Plugins.BkOngoing.cancelEndAlarm()
+    if (cap.Plugins?.BkOngoing?.cancelEndAlarm) await cap.Plugins.BkOngoing.cancelEndAlarm({ reason })
     await cap.Plugins?.LocalNotifications?.cancel({
       notifications: [{ id: REST_NOTIFICATION_ID }],
     })
@@ -443,6 +449,7 @@ export async function scheduleNativeCardioEndAlarm(endsAtMs: number, title: stri
         requestCode: CARDIO_END_REQUEST_CODE,
         notificationId: CARDIO_END_NOTIFICATION_ID,
         cancelNotificationId: CARDIO_COUNTDOWN_ID,
+        kind: 'cardio',
         ...extrasPayload(extras),
       })
       return
@@ -463,13 +470,13 @@ export async function scheduleNativeCardioEndAlarm(endsAtMs: number, title: stri
   }
 }
 
-export async function cancelNativeCardioEndAlarm(): Promise<void> {
+export async function cancelNativeCardioEndAlarm(reason: WearStopReason = 'cancelled'): Promise<void> {
   const cap = capacitor()
   if (!cap) return
   try {
     const ongoing = cap.Plugins?.BkOngoing
     if (ongoing?.cancelEndAlarm && hasWearBridge()) {
-      await ongoing.cancelEndAlarm({ requestCode: CARDIO_END_REQUEST_CODE, notificationId: CARDIO_END_NOTIFICATION_ID })
+      await ongoing.cancelEndAlarm({ requestCode: CARDIO_END_REQUEST_CODE, notificationId: CARDIO_END_NOTIFICATION_ID, reason })
     }
     await cap.Plugins?.LocalNotifications?.cancel({
       notifications: [{ id: CARDIO_END_NOTIFICATION_ID }],

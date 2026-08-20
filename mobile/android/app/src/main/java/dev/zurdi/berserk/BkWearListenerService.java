@@ -17,6 +17,10 @@ public class BkWearListenerService extends WearableListenerService {
 
     @Override
     public void onMessageReceived(MessageEvent event) {
+        if (BkWear.CMD_ACK.equals(event.getPath())) {
+            BkAlarmService.stopIfRunning();
+            return;
+        }
         if (!BkWear.CMD_CANCEL.equals(event.getPath())) return;
         String kind = new String(event.getData(), StandardCharsets.UTF_8).trim();
         if (!BkWear.isKind(kind)) return;

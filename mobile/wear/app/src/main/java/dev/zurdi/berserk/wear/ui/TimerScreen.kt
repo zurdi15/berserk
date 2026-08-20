@@ -60,8 +60,6 @@ private const val TICK_MS = 250L
 /** últimos segundos: el anillo y los dígitos pasan a ámbar, el halo respira y hay tic háptico 3-2-1 */
 private const val URGENT_MS = 10_000L
 
-private val RING_PADDING = 2.dp
-private val RING_STROKE = 7.dp
 
 /**
  * Una sola pantalla con cuatro estados, por prioridad: alarma esperando el
@@ -152,14 +150,18 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
                 // v0.33.1: el arco es el tiempo TRANSCURRIDO (empieza vacío) sobre
                 // una pista gris tenue — la fracción restante llenaba el anillo
                 // casi entero desde el principio y se leía como fondo
-                GlowRing(progress = timer.elapsedFraction(now), color = accent, glow = glow, centerInset = RING_PADDING + RING_STROKE / 2, drawCore = false)
+                GlowRing(progress = timer.elapsedFraction(now), color = accent, glow = glow, drawCore = false)
+                // v0.34.0: hacia dentro (el borde queda bajo el cristal del Watch 8) y
+                // con hueco a las 12 para la hora — ver RING_* en Glow.kt
                 CircularProgressIndicator(
                     progress = { timer.elapsedFraction(now) },
                     modifier = Modifier.fillMaxSize().padding(RING_PADDING),
+                    startAngle = RING_START_ANGLE,
+                    endAngle = RING_START_ANGLE + RING_SWEEP - 360f,
                     strokeWidth = RING_STROKE,
                     colors = ProgressIndicatorDefaults.colors(
                         indicatorColor = accent,
-                        trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f),
+                        trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.22f),
                     ),
                 )
             } else {
@@ -234,7 +236,7 @@ private fun AlarmScreen(timer: ActiveTimer, onAcknowledge: () -> Unit) {
     ScreenScaffold { contentPadding ->
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Halo(color = ember, alpha = 0.22f + 0.30f * pulse, radiusFraction = 1f)
-            GlowRing(progress = 1f, color = ember, glow = pulse, track = Color.Transparent)
+            GlowRing(progress = 1f, color = ember, glow = pulse, startAngle = -90f, maxSweep = 360f, track = Color.Transparent)
             Column(
                 modifier = Modifier
                     .fillMaxSize()

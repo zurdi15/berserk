@@ -36,6 +36,8 @@ final class BkWear {
     static final String CAPABILITY_WATCH = "berserk_watch";
     static final String PATH_PREFIX = "/berserk/timer/";
     static final String CMD_CANCEL = "/berserk/cmd/cancel";
+    /** v0.34.0: el OK del reloj calla la alarma del móvil */
+    static final String CMD_ACK = "/berserk/cmd/ack";
     static final int SCHEMA = 1;
 
     // ids de las notificaciones ongoing del móvil que el reloj puede cancelar

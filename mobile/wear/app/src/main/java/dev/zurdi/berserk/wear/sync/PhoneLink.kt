@@ -42,6 +42,15 @@ class PhoneLink(context: Context) {
         }
     }
 
+    /** v0.34.0: el OK del reloj calla también la alarma del móvil. */
+    suspend fun requestAck(kind: TimerKind): Boolean {
+        val node = phoneNode() ?: return false
+        return runCatching {
+            messageClient.sendMessage(node.id, PATH_CMD_ACK, kind.wireName.toByteArray(Charsets.UTF_8)).await()
+            true
+        }.getOrElse { false }
+    }
+
     /**
      * v0.32.1 (zurdi: "no veo que la runa se apague cuando quito el Bluetooth
      * del móvil"): el Galaxy Watch, sin Bluetooth, llega al móvil por
@@ -92,6 +101,7 @@ class PhoneLink(context: Context) {
         private const val PRESENCE_POLL_MS = 10_000L
         const val PATH_CMD_CANCEL = "/berserk/cmd/cancel"
         const val PATH_CMD_SYNC = "/berserk/cmd/sync"
+        const val PATH_CMD_ACK = "/berserk/cmd/ack"
         private const val TAG = "BkWear"
     }
 }

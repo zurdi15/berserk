@@ -160,7 +160,7 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     // v0.13.0 shell Android: un descanso cancelado a mano no debe sonar
     // luego — la reprogramación de start() ya sustituye por id fijo
     if (isNativeShell()) {
-      void cancelNativeRestNotification()
+      void cancelNativeRestNotification(reason)
       void stopNativeRestCountdown()
       void syncWearTimer({ kind: 'rest', state: 'stopped', reason })
     }

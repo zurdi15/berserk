@@ -107,8 +107,10 @@ public class BkOngoingPlugin extends Plugin {
 
     private PendingIntent endAlarmIntent(
             int requestCode, String title, String body, String channelName,
-            int notificationId, int cancelNotificationId, String subtitle, String imageUrl) {
+            int notificationId, int cancelNotificationId, String subtitle, String imageUrl, String kind) {
         Intent intent = new Intent(getContext(), BkRestEndReceiver.class);
+        // v0.34.0: el tipo viaja con la alarma (OK cruzado con el reloj, pantalla nativa)
+        intent.putExtra("kind", kind);
         intent.putExtra("title", title);
         intent.putExtra("body", body);
         intent.putExtra("channelName", channelName);
@@ -148,7 +150,10 @@ public class BkOngoingPlugin extends Plugin {
                     call.getInt("notificationId", BkRestEndReceiver.REST_END_NOTIFICATION_ID),
                     call.getInt("cancelNotificationId", 1002),
                     call.getString("subtitle", ""),
-                    call.getString("imageUrl", ""));
+                    call.getString("imageUrl", ""),
+                    call.getString("kind", "rest"));
+            // una cuenta atrás nueva calla cualquier alarma que aún esté sonando
+            BkAlarmService.stopIfRunning();
             boolean exactAllowed = Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms();
             if (exactAllowed) {
                 try {
@@ -181,6 +186,12 @@ public class BkOngoingPlugin extends Plugin {
     @PluginMethod
     public void cancelEndAlarm(PluginCall call) {
         try {
+            // v0.34.0: el clear automático de la web al TERMINAR (gracia de 3 s)
+            // no debe callar la alarma — solo cancelar o empezar otra serie
+            if ("finished".equals(call.getString("reason", "cancelled"))) {
+                call.resolve();
+                return;
+            }
             cancelEndAlarmNative(
                     getContext(),
                     call.getInt("requestCode", REST_END_REQUEST_CODE),
@@ -198,6 +209,7 @@ public class BkOngoingPlugin extends Plugin {
      * + request code, no por extras, así que vale uno vacío.
      */
     static void cancelEndAlarmNative(Context context, int requestCode, int notificationId) {
+        BkAlarmService.stopIfRunning();
         android.app.AlarmManager alarms =
                 (android.app.AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(context, BkRestEndReceiver.class);

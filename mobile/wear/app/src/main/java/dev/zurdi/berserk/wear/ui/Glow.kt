@@ -55,29 +55,46 @@ fun GlowRing(
     color: Color,
     glow: Float,
     modifier: Modifier = Modifier,
-    centerInset: Dp = 13.dp,
+    centerInset: Dp = RING_CENTER_INSET,
     haloWidth: Dp = 22.dp,
     drawCore: Boolean = true,
+    /** grados desde las 3 en punto, en sentido horario (el convenio de drawArc y de Material 3) */
+    startAngle: Float = RING_START_ANGLE,
+    /** recorrido total del arco al 100 % — menos de 360 deja un hueco (para la hora de arriba) */
+    maxSweep: Float = RING_SWEEP,
     track: Color = Color.White.copy(alpha = 0.08f),
 ) {
     Canvas(modifier = modifier.fillMaxSize()) {
-        val stroke = 6.dp.toPx()
+        val stroke = 7.dp.toPx()
         val halo = haloWidth.toPx()
         val inset = centerInset.toPx()
         val arcSize = Size(size.width - inset * 2f, size.height - inset * 2f)
         val topLeft = Offset(inset, inset)
         if (drawCore) {
-            drawArc(track, -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+            drawArc(track, startAngle, maxSweep, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
         }
-        val sweep = 360f * progress.coerceIn(0f, 1f)
+        val sweep = maxSweep * progress.coerceIn(0f, 1f)
         if (sweep > 0f) {
-            drawArc(color.copy(alpha = 0.30f * glow), -90f, sweep, false, topLeft, arcSize, style = Stroke(halo, cap = StrokeCap.Round))
+            drawArc(color.copy(alpha = 0.30f * glow), startAngle, sweep, false, topLeft, arcSize, style = Stroke(halo, cap = StrokeCap.Round))
             if (drawCore) {
-                drawArc(color, -90f, sweep, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+                drawArc(color, startAngle, sweep, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
             }
         }
     }
 }
+
+/**
+ * v0.34.0 (zurdi, fotos del Watch 8: "el anillo sigue sin verse"): el anillo
+ * nítido iba a 5,5 dp del borde y en el Watch 8 eso queda bajo la curvatura
+ * del cristal — lo que se veía era el halo. Centro a 16 dp (8 dp de margen +
+ * medio trazo de 8 dp) y un hueco de 60° a las 12 para no pisar la hora: el
+ * arco nace a la 1 (300° desde las 3) y se llena en sentido horario hasta las 11.
+ */
+val RING_PADDING: Dp = 12.dp
+val RING_STROKE: Dp = 8.dp
+val RING_CENTER_INSET: Dp = 16.dp
+const val RING_START_ANGLE = 300f
+const val RING_SWEEP = 300f
 
 /** Halo radial de fondo (centro → transparente). */
 @Composable

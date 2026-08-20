@@ -72,3 +72,23 @@ describe('api client offline behavior', () => {
     expect(online.value).toBe(true)
   })
 })
+
+// v0.34.0: una petición que no contesta (red "a medias") no puede quedarse
+// colgada — el timeout la convierte en OfflineError y marca offline
+describe('timeout del cliente', () => {
+  it('una petición colgada salta a OfflineError a los 8 s', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    })))
+    const { api, OfflineError } = await import('../client')
+    const { online } = await import('@/offline/net')
+    const pending = api('/workouts/1/exercises', { method: 'POST', body: { exercise_id: 1 } })
+    const outcome = pending.then(() => 'resolved', (error: unknown) => error)
+    await vi.advanceTimersByTimeAsync(8_100)
+    expect(await outcome).toBeInstanceOf(OfflineError)
+    expect(online.value).toBe(false)
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+})

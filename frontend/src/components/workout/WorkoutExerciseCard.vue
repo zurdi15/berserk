@@ -200,7 +200,7 @@ watch(resumedActive, (timer, previous) => {
     })
   } else if (previous) {
     void stopNativeCardioCountdown()
-    void cancelNativeCardioEndAlarm()
+    void cancelNativeCardioEndAlarm(cardioStopReason)
     void syncWearTimer({ kind: 'cardio', state: 'stopped', reason: cardioStopReason })
     cardioStopReason = 'cancelled'
   }

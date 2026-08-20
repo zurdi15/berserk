@@ -109,7 +109,13 @@ watch(
   },
 )
 
+// v0.34.0: un toque mientras el anterior sigue en vuelo se ignora — con la
+// red a medias cada toque lanzaba otra alta que luego llegaba toda junta
+const busy = ref(false)
+
 async function pick(exercise: ExerciseOut) {
+  if (busy.value) return
+  busy.value = true
   try {
     if (supersetMode.value && props.actions.addSupersetPair) {
       if (firstPick.value === null) {
@@ -128,6 +134,8 @@ async function pick(exercise: ExerciseOut) {
     emit('close')
   } catch (error) {
     toastApiError(error)
+  } finally {
+    busy.value = false
   }
 }
 
