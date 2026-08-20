@@ -14,10 +14,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import android.graphics.BlurMaskFilter
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.PaintingStyle
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
@@ -25,9 +30,9 @@ import androidx.compose.ui.unit.dp
 
 /**
  * v0.29.0 (zurdi: "molarían algunos efectos visuales de glow"). Todo el
- * brillo es pintura barata: un arco ancho y translúcido bajo el arco fino, y
- * un gradiente radial de fondo — nada de blur por RenderEffect, que en un
- * reloj cuesta batería. Lo que "respira" es solo la opacidad.
+ * brillo es pintura barata: un gradiente radial de fondo y, desde v0.35.3, un
+ * arco desenfocado con BlurMaskFilter bajo el arco fino (un blur de Paint,
+ * no un RenderEffect de capa entera). Lo que "respira" es solo la opacidad.
  */
 
 /** 0.55 → 1 → 0.55 en bucle; el periodo marca el ritmo (la alarma va al de su vibración) */
@@ -66,7 +71,6 @@ fun GlowRing(
 ) {
     Canvas(modifier = modifier.fillMaxSize()) {
         val stroke = 6.dp.toPx()
-        val halo = haloWidth.toPx()
         val inset = centerInset.toPx()
         val arcSize = Size(size.width - inset * 2f, size.height - inset * 2f)
         val topLeft = Offset(inset, inset)
@@ -75,7 +79,21 @@ fun GlowRing(
         }
         val sweep = maxSweep * progress.coerceIn(0f, 1f)
         if (sweep > 0f) {
-            drawArc(color.copy(alpha = 0.30f * glow), startAngle, sweep, false, topLeft, arcSize, style = Stroke(halo, cap = StrokeCap.Round))
+            // v0.35.3 (zurdi: "el glow es muy tosco; más sutil y difuminado"): un
+            // desenfoque gaussiano real (BlurMaskFilter) sobre un trazo algo más
+            // ancho que el arco, en vez de la banda translúcida de antes
+            drawIntoCanvas { canvas ->
+                val paint = Paint().apply {
+                    style = PaintingStyle.Stroke
+                    strokeWidth = stroke * 2.2f
+                    strokeCap = StrokeCap.Round
+                    this.color = color.copy(alpha = 0.22f * glow)
+                    asFrameworkPaint().maskFilter = BlurMaskFilter(haloWidth.toPx() * 0.55f, BlurMaskFilter.Blur.NORMAL)
+                }
+                canvas.drawArc(
+                    Rect(topLeft, arcSize), startAngle, sweep, false, paint,
+                )
+            }
             if (drawCore) {
                 drawArc(color, startAngle, sweep, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
             }

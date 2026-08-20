@@ -203,7 +203,8 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
                         ),
                         modifier = Modifier.width(ACTION_WIDTH),
                     ) {
-                        Text(stringResource(R.string.cancel))
+                        // v0.35.3: centrado explícito — el CompactButton reserva sitio para un icono
+                        Text(text = stringResource(R.string.cancel), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
