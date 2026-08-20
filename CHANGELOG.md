@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.34.1 - 2026-08-20
+
+### Cambiado
+- Notificaciones del móvil: si la rutina no tiene foto, la tarjeta muestra su runa (como el hero del pre-inicio); si el ejercicio no tiene foto, la runa de su grupo muscular.
+
 ## 0.34.0 - 2026-08-20
 
 ### Añadido
