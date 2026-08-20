@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.31.0 - 2026-08-20
+
+### Añadido
+- Now Bar de Samsung en el móvil: en Android 16 el descanso, el cardio y el tiempo de entreno son *Live Updates* — chip con el cronómetro en la barra de estado, tarjeta en la pantalla de bloqueo y presencia en la Now Bar de One UI 8 (con la imagen del ejercicio).
+- Reloj preparado para la Now Bar: los temporizadores se publican también como Live Update, que Wear OS 7 (One UI 9 Watch) pintará en cuanto llegue al Galaxy Watch 8; en Wear OS 6 no cambia nada.
+
+### Cambiado
+- La app Android se moderniza a Capacitor 8 (Android 16 como objetivo, edge-to-edge: el contenido se extiende bajo las barras del sistema y sus iconos siguen al tema). Requiere Android 7.0 o superior.
+- En Android 16 la tarjeta de notificación a medida deja paso a la tarjeta estándar promovida (la plataforma no admite vistas propias en los Live Updates); en Android 15 y anteriores se mantiene la de v0.30.0.
+- El reloj deja de recibir las notificaciones puenteadas del móvil: su propia app ya muestra los temporizadores y la alarma, y duplicaban.
+
 ## 0.30.0 - 2026-08-20
 
 ### Añadido
