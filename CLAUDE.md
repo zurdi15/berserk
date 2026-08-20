@@ -67,11 +67,19 @@ Thin Capacitor Android shell: a WebView pointed at the production server URL in 
 
 ## Releases and deployment
 
-**Every feature ships end to end** — it is not done when the code is merged, it is done when the new version runs in the cluster and the user has been told. The five steps, in order:
+**Every feature ships end to end** — it is not done when the code is merged, it is done when the new version runs in the cluster and the user has been told. The six steps, in order:
 
 1. **Release commit.** Version `0.x.y` is kept in sync across `backend/pyproject.toml` (+`uv.lock`), `frontend/package.json` (+lock), and `mobile/package.json` (+lock). A release is a `chore: release vX.Y.Z` commit bumping all of them plus a Spanish CHANGELOG entry (sections: Añadido/Cambiado/Arreglado/Eliminado, written for end users). Feature work goes in its own commit(s) before it; releases land straight on `main` (no PR — see the git history).
-2. **Push and tag.** `git push origin main`, then a `v*` tag pushed separately. The tag triggers `release.yml` (multi-arch Docker image → `ghcr.io/zurdi15/berserk:X.Y.Z` + `:latest`) and `android.yml` (signed APK attached to the GitHub Release). Wait for the image to actually exist before step 3 — ArgoCD will happily try to pull a tag that is not published yet.
-3. **Bump the service in ginnugagap.** The homelab is a single-node K3s cluster driven by ArgoCD GitOps from the `zurdi15/ginnugagap` repo (`master`, auto-sync + self-heal). Berserk's manifests live in `k8s/apps/berserk/`; the deploy is one line — `image:` in `deployment.yaml`. Work on the server checkout over SSH (host `ginnugagap`, user `ymir`, key `~/.ssh/ginnugagap`):
+2. **Push and tag.** `git push origin main`, then a `v*` tag pushed separately. The tag triggers `release.yml` (multi-arch Docker image → `ghcr.io/zurdi15/berserk:X.Y.Z` + `:latest`) and `android.yml` (signed APK). Wait for the image to actually exist before step 4 — ArgoCD will happily try to pull a tag that is not published yet.
+3. **Create the GitHub Release** — nothing automates this, and `android.yml` *needs* it: its last step polls for the Release for 10 minutes and then fails the run, so the APK builds fine and is thrown away. Title is the bare tag, body is that version's CHANGELOG section with the `## X.Y.Z - date` heading stripped:
+
+   ```bash
+   awk '/^## X\.Y\.Z/{f=1;next} /^## /{f=0} f' CHANGELOG.md > /tmp/notes.md
+   gh release create vX.Y.Z --title vX.Y.Z --notes-file /tmp/notes.md --latest
+   ```
+
+   If the APK run already failed for this reason, create the Release and re-dispatch it against the tag — that is what the `workflow_dispatch` input exists for: `gh workflow run android.yml --ref vX.Y.Z -f tag=vX.Y.Z`. Confirm the `berserk-vX.Y.Z.apk` asset actually landed on the Release afterwards.
+4. **Bump the service in ginnugagap.** The homelab is a single-node K3s cluster driven by ArgoCD GitOps from the `zurdi15/ginnugagap` repo (`master`, auto-sync + self-heal). Berserk's manifests live in `k8s/apps/berserk/`; the deploy is one line — `image:` in `deployment.yaml`. Work on the server checkout over SSH (host `ginnugagap`, user `ymir`, key `~/.ssh/ginnugagap`):
 
    ```bash
    ssh ginnugagap 'cd ~/valhalla/ginnugagap \
@@ -80,7 +88,7 @@ Thin Capacitor Android shell: a WebView pointed at the production server URL in 
    ```
 
    The commit message convention in that repo is bare `berserk: X.Y.Z` (not Conventional Commits — match the neighbours).
-4. **Force the ArgoCD refresh, then confirm it rolled out.** Do not wait on auto-sync: push the refresh so ArgoCD re-reads the repo now. The `argocd` binary is **not** installed on the host — this homelab drives it by annotating the `Application` (the same thing the Telegram bot's `/argocd` hard-refresh button does). The `Application` objects live in the `argocd` namespace, while the workloads live in `apps`:
+5. **Force the ArgoCD refresh, then confirm it rolled out.** Do not wait on auto-sync: push the refresh so ArgoCD re-reads the repo now. The `argocd` binary is **not** installed on the host — this homelab drives it by annotating the `Application` (the same thing the Telegram bot's `/argocd` hard-refresh button does). The `Application` objects live in the `argocd` namespace, while the workloads live in `apps`:
 
    ```bash
    ssh ginnugagap 'kubectl -n argocd annotate application berserk argocd.argoproj.io/refresh=hard --overwrite'
@@ -95,7 +103,7 @@ Thin Capacitor Android shell: a WebView pointed at the production server URL in 
    ```
 
    For a real end-to-end check, the version is baked into the served bundle — pull the `/assets/index-*.js` referenced by `https://berserk.ginnugagap.net/` and grep it for `X.Y.Z`. A tag that fails to pull leaves the old pod serving happily, so silence is not success.
-5. **Notify over Telegram.** Use the `telegram-notify` skill, which lives in the ginnugagap repo (`telegram_bot/claude-skill/SKILL.md`, symlinked into `~/.claude/skills/` **on the server**, not on the dev machine). From here it is reachable over SSH by absolute path — the wrapper is not on `PATH` in a non-interactive shell:
+6. **Notify over Telegram.** Use the `telegram-notify` skill, which lives in the ginnugagap repo (`telegram_bot/claude-skill/SKILL.md`, symlinked into `~/.claude/skills/` **on the server**, not on the dev machine). From here it is reachable over SSH by absolute path — the wrapper is not on `PATH` in a non-interactive shell:
 
    ```bash
    ssh ginnugagap '~/valhalla/ginnugagap/telegram_bot/notify.py -s ok -p berserk \
