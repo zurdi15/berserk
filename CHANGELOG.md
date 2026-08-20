@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.32.1 - 2026-08-20
+
+### Arreglado
+- Reloj: la runa de la pantalla de reposo distingue tres estados — móvil cerca por Bluetooth (encendida con halo), móvil solo por Internet (tenue) y sin móvil (apagada) — y se actualiza aunque el sistema no avise del cambio.
+
 ## 0.32.0 - 2026-08-20
 
 ### Cambiado
