@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.31.2 - 2026-08-20
+
+### Cambiado
+- Reloj: el anillo de cuenta atrás usa el indicador circular de Material 3 (más grueso y pegado al borde) con el halo detrás.
+- Reloj: se retira el servicio de primer plano de v0.31.1 — el tiempo en la Now Bar de One UI 8 Watch se activa en *Ajustes → Now Bar → berserk → Icono con texto* (ajuste por app), sin que la app tenga que hacer nada.
+
 ## 0.31.1 - 2026-08-20
 
 ### Cambiado
