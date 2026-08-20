@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.36.2 - 2026-08-20
+
+### Arreglado
+- Los avisos push no llegaban a activarse en el servidor (Ajustes devolvía «no disponibles en este servidor»).
+
 ## 0.36.1 - 2026-08-20
 
 ### Cambiado
