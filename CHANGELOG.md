@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.32.0 - 2026-08-20
+
+### Cambiado
+- Reloj: la pantalla de reposo se queda con la hora arriba, la runa en el centro —encendida con halo si el móvil está al alcance, apagada si no— y la versión pequeña abajo; desaparecen los textos de "sin temporizador", la ayuda y "móvil conectado".
+
 ## 0.31.2 - 2026-08-20
 
 ### Cambiado
