@@ -5,7 +5,11 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [vue()],
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // v0.37.0: módulo virtual de vite-plugin-pwa, inexistente fuera del build
+      'virtual:pwa-register': fileURLToPath(new URL('./src/test/stubs/pwa-register.ts', import.meta.url)),
+    },
   },
   test: {
     environment: 'happy-dom',

@@ -1,6 +1,8 @@
 export const es = {
   app: {
     notificationsDenied: 'Notificaciones desactivadas: actívalas en Ajustes de Android → Aplicaciones → berserk para el cronómetro y el aviso de descanso',
+    updateAvailable: 'Nueva versión disponible',
+    updateNow: 'Actualizar',
     shellUpdateAvailable: 'Hay una versión nueva de la app: descárgala en Perfil → Ajustes',
     name: 'berserk',
     nav: {

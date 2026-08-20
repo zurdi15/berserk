@@ -17,6 +17,7 @@ import { useAuthStore } from './stores/auth'
 import { useAthleteStore } from './stores/athlete'
 import { useActiveWorkoutStore } from './stores/activeWorkout'
 import { initTheme } from './utils/theme'
+import { initAppUpdate } from './utils/appUpdate'
 
 // el script inline de index.html ya aplicó la clase/meta correctas antes del
 // primer paint (evita el flash) — esto reafirma el estado y, sobre todo,
@@ -45,3 +46,5 @@ setUnauthorizedHandler(() => {
 })
 
 app.mount('#app')
+// v0.37.0: registro del service worker + aviso de versión nueva (ver appUpdate.ts)
+initAppUpdate()

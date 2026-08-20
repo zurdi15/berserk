@@ -9,7 +9,12 @@ export default defineConfig({
     vue(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // v0.37.0: el SW nuevo espera a que el usuario pulse "Actualizar" (ver
+      // utils/appUpdate.ts) — con autoUpdate la PWA de iOS se quedaba en la
+      // versión vieja hasta que alguien la mataba del todo. El registro lo
+      // hace appUpdate.ts, no el script inyectado
+      registerType: 'prompt',
+      injectRegister: false,
       // shell precacheado, datos siempre online: sin cache de runtime del API
       workbox: {
         // el fallback de navegación del SW no debe interceptar /api/*: si no,

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { online } from '@/offline/net'
 import * as outbox from '@/offline/outbox'
 import { getActAs, switchActAs } from '@/utils/actAs'
+import { applyAppUpdate, updateAvailable } from '@/utils/appUpdate'
 import AthleteBanner from './AthleteBanner.vue'
 
 // facelift: las tres bandas de estado del shell (atleta, act-as, offline)
@@ -25,6 +26,18 @@ function exitActAs() {
 
 <template>
   <div>
+    <!-- v0.37.0: hay un bundle nuevo esperando — se aplica al pulsar, no solo
+         al cerrar la app del todo (que en iOS casi nunca pasa) -->
+    <div
+      v-if="updateAvailable"
+      data-testid="update-banner"
+      class="flex items-center justify-between gap-2 px-4 py-1.5 border-b border-aurora bg-stone text-sm"
+    >
+      <span class="text-aurora">{{ t('app.updateAvailable') }}</span>
+      <button type="button" data-testid="update-apply" class="bk-press font-semibold text-ink hover:text-aurora" @click="applyAppUpdate">
+        {{ t('app.updateNow') }}
+      </button>
+    </div>
     <AthleteBanner />
     <!-- v0.17.0 act-as: banda PERSISTENTE mientras un admin actúa como otro
          usuario — acento ember (no aurora: el modo atleta es "ver", esto es
