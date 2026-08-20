@@ -123,6 +123,7 @@ export const es = {
     autoRest: 'Descanso automático',
     cancelRest: 'Cancelar descanso',
     alarmOk: 'OK',
+    cardioOver: 'Cardio terminado',
   },
   profile: {
     tab: 'Perfil',

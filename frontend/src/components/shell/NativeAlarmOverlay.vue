@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import BkButton from '@/lib/BkButton.vue'
@@ -45,6 +45,14 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibility)
 })
 
+// v0.35.1 (zurdi: "si solo pone el nombre del ejercicio lo veo soso; pon un
+// 00:00 o 'descanso terminado'"): qué terminó, el 0:00 en grande y el ejercicio
+const finishedLabel = computed(() => {
+  if (alarm.value?.kind === 'cardio') return t('timer.cardioOver')
+  if (alarm.value?.kind === 'rest') return t('timer.notifyTitle')
+  return alarm.value?.title ?? ''
+})
+
 async function acknowledge() {
   alarm.value = null
   await ackNativeAlarm()
@@ -61,9 +69,15 @@ async function acknowledge() {
       data-testid="native-alarm-overlay"
     >
       <div class="bk-alarm-halo" aria-hidden="true" />
-      <p class="bk-metric relative text-4xl text-ember text-center text-balance" data-testid="native-alarm-title">
-        {{ alarm.subtitle || alarm.title }}
-      </p>
+      <div class="relative flex flex-col items-center gap-3">
+        <p class="font-display text-xs uppercase tracking-widest text-ink-muted" data-testid="native-alarm-label">
+          {{ finishedLabel }}
+        </p>
+        <p class="bk-metric text-7xl text-ember tabular-nums bk-timer-done-pop" aria-hidden="true">0:00</p>
+        <p class="bk-metric text-2xl text-ink text-center text-balance" data-testid="native-alarm-title">
+          {{ alarm.subtitle || alarm.title }}
+        </p>
+      </div>
       <BkButton variant="ember" size="lg" class="relative min-w-44" data-testid="native-alarm-ok" @click="acknowledge">
         {{ t('timer.alarmOk') }}
       </BkButton>

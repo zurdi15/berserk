@@ -121,6 +121,7 @@ export const en = {
     autoRest: 'Auto rest',
     cancelRest: 'Cancel rest',
     alarmOk: 'OK',
+    cardioOver: 'Cardio over',
   },
   profile: {
     tab: 'Profile',

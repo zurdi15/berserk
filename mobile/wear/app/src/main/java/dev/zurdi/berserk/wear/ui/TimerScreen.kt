@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,13 +36,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.AppScaffold
-import androidx.wear.compose.material3.Button
-import androidx.wear.compose.material3.CircularProgressIndicator
+import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.ButtonDefaults
-import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import dev.zurdi.berserk.wear.R
@@ -59,6 +57,9 @@ private const val TICK_MS = 250L
 
 /** últimos segundos: el anillo y los dígitos pasan a ámbar, el halo respira y hay tic háptico 3-2-1 */
 private const val URGENT_MS = 10_000L
+
+/** v0.35.1: OK y Cancelar, compactos y del mismo ancho */
+private val ACTION_WIDTH = 104.dp
 
 
 /**
@@ -150,20 +151,9 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
                 // v0.33.1: el arco es el tiempo TRANSCURRIDO (empieza vacío) sobre
                 // una pista gris tenue — la fracción restante llenaba el anillo
                 // casi entero desde el principio y se leía como fondo
-                GlowRing(progress = timer.elapsedFraction(now), color = accent, glow = glow, drawCore = true, track = Color.Transparent)
-                // v0.34.0: hacia dentro (el borde queda bajo el cristal del Watch 8) y
-                // con hueco a las 12 para la hora — ver RING_* en Glow.kt
-                CircularProgressIndicator(
-                    progress = { timer.elapsedFraction(now) },
-                    modifier = Modifier.fillMaxSize().padding(RING_PADDING),
-                    startAngle = RING_START_ANGLE,
-                    endAngle = RING_START_ANGLE + RING_SWEEP - 360f,
-                    strokeWidth = RING_STROKE,
-                    colors = ProgressIndicatorDefaults.colors(
-                        indicatorColor = accent,
-                        trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.22f),
-                    ),
-                )
+                // v0.35.1: el anillo de la primera versión (pista tenue, halo y arco
+                // fino), que se llena con el tiempo transcurrido
+                GlowRing(progress = timer.elapsedFraction(now), color = accent, glow = glow)
             } else {
                 Halo(color = MaterialTheme.colorScheme.primary, alpha = 0.08f + 0.05f * pulse, radiusFraction = 0.8f)
             }
@@ -203,13 +193,15 @@ private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, 
                 }
                 if (countsDown) {
                     Spacer(Modifier.height(10.dp))
-                    // colores explícitos: el tonal por defecto de M3 salía lavanda
-                    FilledTonalButton(
+                    // v0.35.1: botón compacto, mismo ancho que el OK de la alarma;
+                    // colores explícitos (el tonal por defecto de M3 salía lavanda)
+                    CompactButton(
                         onClick = onCancel,
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = Slab,
                             contentColor = MaterialTheme.colorScheme.primary,
                         ),
+                        modifier = Modifier.width(ACTION_WIDTH),
                     ) {
                         Text(stringResource(R.string.cancel))
                     }
@@ -262,21 +254,16 @@ private fun AlarmScreen(timer: ActiveTimer, onAcknowledge: () -> Unit) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(18.dp))
-                Button(
+                Spacer(Modifier.height(16.dp))
+                CompactButton(
                     onClick = onAcknowledge,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = ember,
                         contentColor = MaterialTheme.colorScheme.onSecondary,
                     ),
-                    modifier = Modifier.fillMaxWidth(0.46f),
+                    modifier = Modifier.width(ACTION_WIDTH),
                 ) {
-                    Text(
-                        text = stringResource(R.string.ok),
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    Text(text = stringResource(R.string.ok), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 }
             }
         }

@@ -65,7 +65,7 @@ fun GlowRing(
     track: Color = Color.White.copy(alpha = 0.08f),
 ) {
     Canvas(modifier = modifier.fillMaxSize()) {
-        val stroke = 7.dp.toPx()
+        val stroke = 6.dp.toPx()
         val halo = haloWidth.toPx()
         val inset = centerInset.toPx()
         val arcSize = Size(size.width - inset * 2f, size.height - inset * 2f)
@@ -84,17 +84,16 @@ fun GlowRing(
 }
 
 /**
- * v0.34.0 (zurdi, fotos del Watch 8: "el anillo sigue sin verse"): el anillo
- * nítido iba a 5,5 dp del borde y en el Watch 8 eso queda bajo la curvatura
- * del cristal — lo que se veía era el halo. Centro a 16 dp (8 dp de margen +
- * medio trazo de 8 dp) y un hueco de 60° a las 12 para no pisar la hora: el
- * arco nace a la 1 (300° desde las 3) y se llena en sentido horario hasta las 11.
+ * v0.35.1 (zurdi, con el anillo por fin visible: "como no era un tema
+ * estético, déjalo como la primera versión, ahora lo veo muy gordo"): el
+ * diseño de v0.29 — trazo de 6 dp con su halo, círculo completo desde las
+ * 12, centrado a 13 dp del borde. El "anillo invisible" nunca fue el dibujo:
+ * era totalMs = 0 (ver BkOngoingPlugin.optLong); lo de v0.34.0 (16 dp, 8 dp,
+ * hueco de 60°) fue un palo de ciego y se retira.
  */
-val RING_PADDING: Dp = 12.dp
-val RING_STROKE: Dp = 8.dp
-val RING_CENTER_INSET: Dp = 16.dp
-const val RING_START_ANGLE = 300f
-const val RING_SWEEP = 300f
+val RING_CENTER_INSET: Dp = 13.dp
+const val RING_START_ANGLE = -90f
+const val RING_SWEEP = 360f
 
 /** Halo radial de fondo (centro → transparente). */
 @Composable
