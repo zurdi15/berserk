@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.33.0 - 2026-08-20
+
+### Añadido
+- App Android: en Ajustes puedes elegir cómo se muestra el cronómetro en la barra — "Chip en vivo (Now Bar)" (notificación en tiempo real de Android 16; en Samsung hay que activar "Notificaciones en vivo para todas las aplicaciones" en Opciones de desarrollador) o "Tarjeta con imagen" (la tarjeta grande con la foto del ejercicio y el cronómetro).
+
+### Cambiado
+- Notificaciones del móvil: el ejercicio es el titular y el tipo (descanso, cardio, entrenando) va debajo, sin repetir el nombre.
+
+### Arreglado
+- El cronómetro del entreno se apaga siempre al terminar o descartar el entreno.
+
 ## 0.32.1 - 2026-08-20
 
 ### Arreglado
