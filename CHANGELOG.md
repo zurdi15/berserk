@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.31.1 - 2026-08-20
+
+### Cambiado
+- Reloj: el temporizador en curso corre como servicio de primer plano, con el color de berserk y categoría de entreno, para que la Now Bar de One UI 8 Watch pueda mostrarlo con su tiempo como hace con las apps de Samsung (por confirmar en el reloj; la vía oficial sigue siendo Wear OS 7).
+
 ## 0.31.0 - 2026-08-20
 
 ### Añadido
