@@ -18,6 +18,7 @@
     <string name="workout_elapsed">Training · %1$s</string>
 
     <string name="phone_connected">Phone connected</string>
+    <string name="phone_remote">Phone reachable over the internet only</string>
     <string name="phone_disconnected">Phone not connected</string>
     <string name="notifications_needed">Allow notifications to see timers on the watch face</string>
     <string name="version">v%1$s</string>

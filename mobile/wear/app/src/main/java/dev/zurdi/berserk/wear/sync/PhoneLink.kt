@@ -7,6 +7,9 @@ import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import dev.zurdi.berserk.wear.core.TimerKind
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
@@ -39,16 +42,54 @@ class PhoneLink(context: Context) {
         }
     }
 
-    /** ¿Hay un móvil con berserk al alcance? Emite el estado inicial y cada cambio. */
-    fun phoneReachable(): Flow<Boolean> = callbackFlow {
-        val listener = CapabilityClient.OnCapabilityChangedListener { info -> trySend(info.nodes.isNotEmpty()) }
+    /**
+     * v0.32.1 (zurdi: "no veo que la runa se apague cuando quito el Bluetooth
+     * del móvil"): el Galaxy Watch, sin Bluetooth, llega al móvil por
+     * Wi-Fi/Internet (la conexión remota de Galaxy Wearable) y la Data Layer
+     * sigue funcionando por ahí — el móvil sigue "al alcance", pero no cerca.
+     * Tres estados, y un sondeo de respaldo: el listener de capacidades no
+     * siempre avisa de un cambio de alcance.
+     */
+    fun phonePresence(): Flow<PhonePresence> = callbackFlow {
+        val listener = CapabilityClient.OnCapabilityChangedListener { info -> trySend(classify(info.nodes)) }
         capabilityClient.addListener(listener, CAPABILITY_PHONE)
-        trySend(phoneNode() != null)
-        awaitClose { capabilityClient.removeListener(listener, CAPABILITY_PHONE) }
+        trySend(readPresence())
+        val poller = launch {
+            while (isActive) {
+                delay(PRESENCE_POLL_MS)
+                trySend(readPresence())
+            }
+        }
+        awaitClose {
+            poller.cancel()
+            capabilityClient.removeListener(listener, CAPABILITY_PHONE)
+        }
+    }
+
+    private suspend fun readPresence(): PhonePresence = classify(
+        runCatching { capabilityClient.getCapability(CAPABILITY_PHONE, CapabilityClient.FILTER_REACHABLE).await().nodes }
+            .getOrDefault(emptySet()),
+    )
+
+    private fun classify(nodes: Set<Node>): PhonePresence = when {
+        nodes.any { it.isNearby } -> PhonePresence.NEARBY
+        nodes.isNotEmpty() -> PhonePresence.REMOTE
+        else -> PhonePresence.NONE
+    }
+
+    /** Cómo se ve el móvil desde el reloj. */
+    enum class PhonePresence {
+        /** conectado directamente (Bluetooth) */
+        NEARBY,
+        /** al alcance solo por Wi-Fi/Internet: la Data Layer funciona, con más latencia */
+        REMOTE,
+        /** ningún móvil con berserk al alcance */
+        NONE,
     }
 
     companion object {
         const val CAPABILITY_PHONE = "berserk_phone"
+        private const val PRESENCE_POLL_MS = 10_000L
         const val PATH_CMD_CANCEL = "/berserk/cmd/cancel"
         const val PATH_CMD_SYNC = "/berserk/cmd/sync"
         private const val TAG = "BkWear"

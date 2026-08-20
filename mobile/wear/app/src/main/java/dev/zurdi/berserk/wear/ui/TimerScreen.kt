@@ -78,8 +78,9 @@ fun TimerApp(
     onAlarmAcknowledged: () -> Unit = {},
 ) {
     val board by engine.board.collectAsState()
-    val reachableFlow = remember(link) { link.phoneReachable() }
-    val phoneReachable by reachableFlow.collectAsState(initial = true)
+    val presenceFlow = remember(link) { link.phonePresence() }
+    // arranca apagada hasta la primera lectura (sub-segundo): mejor que una runa optimista
+    val phonePresence by presenceFlow.collectAsState(initial = PhoneLink.PhonePresence.NONE)
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -113,7 +114,7 @@ fun TimerApp(
                 },
             )
             else -> IdleScreen(
-                phoneReachable = phoneReachable,
+                presence = phonePresence,
                 notificationsGranted = notificationsGranted,
                 appVersion = appVersion,
             )
@@ -283,20 +284,38 @@ private fun AlarmScreen(timer: ActiveTimer, onAcknowledge: () -> Unit) {
  * móvil conectado o no, apagada o con glow, y la versión abajo pequeñita;
  * mantén la hora arriba"). La hora la pone el AppScaffold (TimeText).
  */
+/**
+ * v0.32.0 (zurdi: "el texto sobra; la runa en el centro como indicador de
+ * móvil conectado o no, apagada o con glow, y la versión abajo pequeñita;
+ * mantén la hora arriba"). La hora la pone el AppScaffold (TimeText).
+ * v0.32.1: tres estados — cerca (Bluetooth): encendida con halo que respira;
+ * remoto (solo Wi-Fi/Internet): tenue, sin halo; sin móvil: apagada.
+ */
 @Composable
-private fun IdleScreen(phoneReachable: Boolean, notificationsGranted: Boolean, appVersion: String) {
+private fun IdleScreen(presence: PhoneLink.PhonePresence, notificationsGranted: Boolean, appVersion: String) {
     val aurora = MaterialTheme.colorScheme.primary
     val pulse by rememberPulse(periodMs = 3_000, label = "idle")
-    // conectado: runa encendida con halo que respira; sin móvil: apagada, sin halo
-    val runeTint = if (phoneReachable) aurora else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+    val nearby = presence == PhoneLink.PhonePresence.NEARBY
+    val runeTint = when (presence) {
+        PhoneLink.PhonePresence.NEARBY -> aurora
+        PhoneLink.PhonePresence.REMOTE -> aurora.copy(alpha = 0.55f)
+        PhoneLink.PhonePresence.NONE -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+    }
+    val description = stringResource(
+        when (presence) {
+            PhoneLink.PhonePresence.NEARBY -> R.string.phone_connected
+            PhoneLink.PhonePresence.REMOTE -> R.string.phone_remote
+            PhoneLink.PhonePresence.NONE -> R.string.phone_disconnected
+        },
+    )
     ScreenScaffold { contentPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding), contentAlignment = Alignment.Center) {
-            if (phoneReachable) {
+            if (nearby) {
                 Halo(color = aurora, alpha = 0.07f + 0.05f * pulse, radiusFraction = 0.7f)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(contentAlignment = Alignment.Center) {
-                    if (phoneReachable) {
+                    if (nearby) {
                         Box(
                             modifier = Modifier
                                 .size(96.dp)
@@ -308,7 +327,7 @@ private fun IdleScreen(phoneReachable: Boolean, notificationsGranted: Boolean, a
                     }
                     Icon(
                         painter = painterResource(R.drawable.ic_stat_berserk),
-                        contentDescription = stringResource(if (phoneReachable) R.string.phone_connected else R.string.phone_disconnected),
+                        contentDescription = description,
                         tint = runeTint,
                         modifier = Modifier.size(44.dp),
                     )
