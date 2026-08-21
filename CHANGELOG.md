@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.37.1 - 2026-08-21
+
+### Arreglado
+- Reloj: los cronómetros del reloj iban unos segundos por delante de los del móvil. El reloj mide ahora el desfase entre ambas horas y cuenta con la del móvil (esfera, notificación y alarma). Requiere actualizar el APK del móvil y el del reloj.
+
 ## 0.37.0 - 2026-08-20
 
 ### Añadido
