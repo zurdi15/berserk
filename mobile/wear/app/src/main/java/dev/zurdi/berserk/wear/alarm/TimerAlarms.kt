@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import dev.zurdi.berserk.wear.core.ActiveTimer
+import dev.zurdi.berserk.wear.core.PhoneClock
 import dev.zurdi.berserk.wear.core.TimerKind
 
 /**
@@ -23,7 +24,8 @@ class TimerAlarms(context: Context) {
     fun schedule(timer: ActiveTimer) {
         if (!timer.kind.countsDown) return
         val operation = operation(timer.kind)
-        val at = timer.targetEpochMs
+        // v0.37.1: AlarmManager va en hora de pared del RELOJ; el fin llega en la del móvil
+        val at = PhoneClock.toWatchEpoch(timer.targetEpochMs)
         val exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
         try {
             if (exactAllowed) {

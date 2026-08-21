@@ -1,6 +1,7 @@
 package dev.zurdi.berserk.wear.sync
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.Node
@@ -13,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.nio.ByteBuffer
 
 /**
  * El móvil, visto desde el reloj: se localiza por la capacidad que anuncia la
@@ -40,6 +42,20 @@ class PhoneLink(context: Context) {
             Log.w(TAG, "cancelación de ${kind.wireName} no entregada", it)
             false
         }
+    }
+
+    /**
+     * v0.37.1: ping de reloj (ver core/PhoneClock). Cuerpo = el monotónico del
+     * reloj al enviar; el móvil lo devuelve junto a su epoch por PATH_CLOCK_PONG
+     * y TimerListenerService cierra el cálculo. Fire-and-forget.
+     */
+    suspend fun pingClock(): Boolean {
+        val node = phoneNode() ?: return false
+        val payload = ByteBuffer.allocate(8).putLong(SystemClock.elapsedRealtime()).array()
+        return runCatching {
+            messageClient.sendMessage(node.id, PATH_CMD_CLOCK, payload).await()
+            true
+        }.getOrElse { false }
     }
 
     /** v0.34.0: el OK del reloj calla también la alarma del móvil. */
@@ -102,6 +118,8 @@ class PhoneLink(context: Context) {
         const val PATH_CMD_CANCEL = "/berserk/cmd/cancel"
         const val PATH_CMD_SYNC = "/berserk/cmd/sync"
         const val PATH_CMD_ACK = "/berserk/cmd/ack"
+        const val PATH_CMD_CLOCK = "/berserk/cmd/clock"
+        const val PATH_CLOCK_PONG = "/berserk/clock/pong"
         private const val TAG = "BkWear"
     }
 }

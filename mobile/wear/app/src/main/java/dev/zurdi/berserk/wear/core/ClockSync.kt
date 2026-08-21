@@ -7,10 +7,11 @@ import kotlin.math.abs
  * reloj que pintan tiempo en vivo (Status.TimerPart / StopwatchPart) exigen
  * la base monotónica SystemClock.elapsedRealtime(): aquí vive la conversión.
  *
- * NO se corrige el desfase entre relojes a partir de sentAt: el Galaxy Watch
- * sincroniza la hora con el móvil, y una "corrección" confundiría un DataItem
- * entregado tarde (reconexión, arranque, app recién instalada) con un reloj
- * mal puesto, desplazando el fin minutos enteros. Solo se mide, para el log.
+ * NO se corrige el desfase entre relojes a partir de sentAt: una "corrección"
+ * confundiría un DataItem entregado tarde (reconexión, arranque, app recién
+ * instalada) con un reloj mal puesto, desplazando el fin minutos enteros. Aquí
+ * solo se mide, para el log. v0.37.1: el desfase real se mide con ida y vuelta
+ * (PhoneClock) y todo el reloj trabaja en la hora del móvil vía PhoneClock.now().
  */
 object ClockSync {
     const val SKEW_WARN_MS = 5_000L

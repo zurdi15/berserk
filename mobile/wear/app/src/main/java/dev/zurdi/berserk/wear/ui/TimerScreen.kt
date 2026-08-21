@@ -46,6 +46,7 @@ import androidx.wear.compose.material3.Text
 import dev.zurdi.berserk.wear.R
 import dev.zurdi.berserk.wear.TimerEngine
 import dev.zurdi.berserk.wear.core.ActiveTimer
+import dev.zurdi.berserk.wear.core.PhoneClock
 import dev.zurdi.berserk.wear.core.TimerFormat
 import dev.zurdi.berserk.wear.core.TimerKind
 import dev.zurdi.berserk.wear.notify.Haptics
@@ -79,15 +80,19 @@ fun TimerApp(
     val presenceFlow = remember(link) { link.phonePresence() }
     // arranca apagada hasta la primera lectura (sub-segundo): mejor que una runa optimista
     val phonePresence by presenceFlow.collectAsState(initial = PhoneLink.PhonePresence.NONE)
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableLongStateOf(PhoneClock.now()) }
     // v0.35.4 (zurdi: "que el anillo se vaya pintando progresivamente en vez de
     // a saltitos"): el reloj de la pantalla avanza por FOTOGRAMA mientras la
     // app está abierta (antes, cada 250 ms — 1,5° por tic en un descanso de
     // 60 s, que se notaba); el halo ya animaba así, el coste es el mismo
     LaunchedEffect(Unit) {
         while (true) {
-            withFrameMillis { now = System.currentTimeMillis() }
+            withFrameMillis { now = PhoneClock.now() }
         }
+    }
+    // v0.37.1: al abrir la app y al (re)aparecer el móvil, afinar el desfase de relojes
+    LaunchedEffect(phonePresence) {
+        if (phonePresence != PhoneLink.PhonePresence.NONE) engine.syncClock()
     }
     val scope = rememberCoroutineScope()
 

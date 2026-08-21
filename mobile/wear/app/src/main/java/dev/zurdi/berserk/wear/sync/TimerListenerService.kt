@@ -10,6 +10,7 @@ import dev.zurdi.berserk.wear.TimerEngine
 import dev.zurdi.berserk.wear.core.TimerKind
 import dev.zurdi.berserk.wear.core.TimerSpec
 import kotlinx.coroutines.runBlocking
+import java.nio.ByteBuffer
 
 /**
  * Entrada de la Data Layer. Play services lo enlaza (y arranca el proceso si
@@ -39,9 +40,15 @@ class TimerListenerService : WearableListenerService() {
     }
 
     override fun onMessageReceived(event: MessageEvent) {
-        // reservado para órdenes del móvil; hoy solo "vuelve a leer la Data Layer"
-        if (event.path == PhoneLink.PATH_CMD_SYNC) {
-            runBlocking { TimerEngine.get(applicationContext).restoreFromDataLayer() }
+        when (event.path) {
+            PhoneLink.PATH_CMD_SYNC -> runBlocking { TimerEngine.get(applicationContext).restoreFromDataLayer() }
+            // v0.37.1: respuesta al ping de reloj — t0 (nuestro monotónico) + epoch del móvil
+            PhoneLink.PATH_CLOCK_PONG -> {
+                val data = event.data
+                if (data.size < 16) return
+                val buffer = ByteBuffer.wrap(data)
+                TimerEngine.get(applicationContext).onClockPong(buffer.getLong(), buffer.getLong())
+            }
         }
     }
 

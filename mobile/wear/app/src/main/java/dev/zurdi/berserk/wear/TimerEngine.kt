@@ -2,6 +2,7 @@ package dev.zurdi.berserk.wear
 
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataMapItem
@@ -10,6 +11,7 @@ import dev.zurdi.berserk.wear.alarm.AlarmService
 import dev.zurdi.berserk.wear.alarm.TimerAlarms
 import dev.zurdi.berserk.wear.core.ActiveTimer
 import dev.zurdi.berserk.wear.core.ClockSync
+import dev.zurdi.berserk.wear.core.PhoneClock
 import dev.zurdi.berserk.wear.core.StopAction
 import dev.zurdi.berserk.wear.core.StopPolicy
 import dev.zurdi.berserk.wear.core.TimerBoard
@@ -41,12 +43,50 @@ class TimerEngine private constructor(context: Context) {
 
     val board: StateFlow<TimerBoard> get() = repository.board
 
+    // v0.37.1: el desfase móvil↔reloj medido la última vez sobrevive al proceso
+    private val clockPrefs = ctx.getSharedPreferences("bk_clock", Context.MODE_PRIVATE)
+
+    init {
+        if (clockPrefs.contains(KEY_CLOCK_OFFSET)) {
+            PhoneClock.restore(
+                PhoneClock.Sample(
+                    offsetMs = clockPrefs.getLong(KEY_CLOCK_OFFSET, 0L),
+                    rttMs = clockPrefs.getLong(KEY_CLOCK_RTT, PhoneClock.MAX_RTT_MS),
+                    // monotónico de OTRO arranque: se da por vieja para que la primera
+                    // muestra nueva la sustituya, pero mientras tanto corrige
+                    atElapsedMs = Long.MIN_VALUE / 2,
+                ),
+            )
+        }
+    }
+
+    /** Pide al móvil su hora (ver PhoneClock). Barato; se lanza con cada DataItem y al abrir la app. */
+    fun syncClock() {
+        CoroutineScope(Dispatchers.IO).launch { PhoneLink(ctx).pingClock() }
+    }
+
+    /** Pong del móvil: si el desfase cambia de verdad, alarmas y notificaciones se re-programan con él. */
+    @Synchronized
+    fun onClockPong(t0ElapsedMs: Long, phoneEpochMs: Long) {
+        val before = PhoneClock.offsetMs()
+        val sample = PhoneClock.onPong(t0ElapsedMs, phoneEpochMs, SystemClock.elapsedRealtime(), System.currentTimeMillis()) ?: return
+        clockPrefs.edit().putLong(KEY_CLOCK_OFFSET, sample.offsetMs).putLong(KEY_CLOCK_RTT, sample.rttMs).apply()
+        if (!PhoneClock.isSignificantChange(before, sample.offsetMs)) return
+        Log.i(TAG, "desfase con el móvil: ${sample.offsetMs} ms (rtt ${sample.rttMs} ms), antes $before ms")
+        val now = PhoneClock.now()
+        val board = repository.board.value
+        board.live.filter { it.kind.countsDown && !it.isFinished }.forEach { alarms.schedule(it) }
+        notifier.render(board, now)
+    }
+
     /** Lo que dice el móvil. */
     @Synchronized
-    fun apply(spec: TimerSpec, nowEpochMs: Long = System.currentTimeMillis()) {
+    fun apply(spec: TimerSpec, nowEpochMs: Long = PhoneClock.now()) {
         if (ClockSync.isSuspicious(spec.sentAtEpochMs, nowEpochMs)) {
             Log.w(TAG, "${spec.kind.wireName}: sentAt difiere ${ClockSync.skewMs(spec.sentAtEpochMs, nowEpochMs)} ms de ahora (entrega tardía o reloj desajustado)")
         }
+        // cada DataItem es una ocasión de afinar el desfase de relojes
+        if (spec.running) syncClock()
         val current = repository.board.value.timers[spec.kind]
         if (!spec.running) {
             when (StopPolicy.onStopped(current, spec.reason)) {
@@ -88,7 +128,7 @@ class TimerEngine private constructor(context: Context) {
 
     /** Fuera ese temporizador (cancelado en el móvil, DataItem borrado, cancelación local). Calla también la alarma. */
     @Synchronized
-    fun stop(kind: TimerKind, nowEpochMs: Long = System.currentTimeMillis()) {
+    fun stop(kind: TimerKind, nowEpochMs: Long = PhoneClock.now()) {
         alarms.cancel(kind)
         silenceAlarm(kind)
         val board = repository.update { it.without(kind).pruned(nowEpochMs) }
@@ -107,7 +147,7 @@ class TimerEngine private constructor(context: Context) {
 
     /** La cuenta atrás llegó a cero (alarma, DataItem en el filo, o finished del móvil con alarma tardía). */
     @Synchronized
-    fun onCountdownDue(kind: TimerKind, nowEpochMs: Long = System.currentTimeMillis()) {
+    fun onCountdownDue(kind: TimerKind, nowEpochMs: Long = PhoneClock.now()) {
         val current = repository.board.value.timers[kind] ?: return
         if (current.isFinished) return
         val finished = current.copy(finishedAtEpochMs = nowEpochMs)
@@ -126,7 +166,7 @@ class TimerEngine private constructor(context: Context) {
 
     /** El usuario se ha dado por enterado (botón, acción de la notificación, descarte) — o el tope de la alarma. */
     @Synchronized
-    fun acknowledge(kind: TimerKind, nowEpochMs: Long = System.currentTimeMillis()) {
+    fun acknowledge(kind: TimerKind, nowEpochMs: Long = PhoneClock.now()) {
         val current = repository.board.value.timers[kind]
         if (current != null && current.isAlarming) {
             repository.update { it.with(current.copy(acknowledgedAtEpochMs = nowEpochMs)).pruned(nowEpochMs) }
@@ -144,10 +184,11 @@ class TimerEngine private constructor(context: Context) {
 
     /** Tras reinicio/actualización: re-pintar y re-programar desde lo persistido, y luego la verdad del móvil. */
     suspend fun rehydrate() {
-        val now = System.currentTimeMillis()
+        val now = PhoneClock.now()
         val board = repository.board.value
         board.live.forEach { alarms.schedule(it) }
         notifier.render(board, now)
+        syncClock()
         restoreFromDataLayer()
     }
 
@@ -181,6 +222,8 @@ class TimerEngine private constructor(context: Context) {
     companion object {
         /** una cuenta atrás vencida hace más de esto al llegar no merece ni aviso */
         const val STALE_AFTER_MS = 15_000L
+        private const val KEY_CLOCK_OFFSET = "offsetMs"
+        private const val KEY_CLOCK_RTT = "rttMs"
         private const val TAG = "BkWear"
 
         @Volatile

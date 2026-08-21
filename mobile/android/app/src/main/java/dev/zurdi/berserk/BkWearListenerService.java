@@ -4,8 +4,10 @@ import android.app.NotificationManager;
 import android.content.Context;
 
 import com.google.android.gms.wearable.MessageEvent;
+import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.WearableListenerService;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -17,6 +19,18 @@ public class BkWearListenerService extends WearableListenerService {
 
     @Override
     public void onMessageReceived(MessageEvent event) {
+        if (BkWear.CMD_CLOCK.equals(event.getPath())) {
+            // v0.37.1 (zurdi: "el del reloj suele ir unos segundos por delante"):
+            // el reloj mide el desfase de relojes con ida y vuelta — se le
+            // devuelve su t0 tal cual y nuestro epoch lo más tarde posible
+            byte[] data = event.getData();
+            if (data == null || data.length < 8) return;
+            long t0 = ByteBuffer.wrap(data).getLong();
+            byte[] reply = ByteBuffer.allocate(16).putLong(t0).putLong(System.currentTimeMillis()).array();
+            Wearable.getMessageClient(getApplicationContext())
+                    .sendMessage(event.getSourceNodeId(), BkWear.PATH_CLOCK_PONG, reply);
+            return;
+        }
         if (BkWear.CMD_ACK.equals(event.getPath())) {
             BkAlarmService.stopIfRunning();
             return;

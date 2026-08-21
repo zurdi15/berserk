@@ -38,6 +38,9 @@ final class BkWear {
     static final String CMD_CANCEL = "/berserk/cmd/cancel";
     /** v0.34.0: el OK del reloj calla la alarma del móvil */
     static final String CMD_ACK = "/berserk/cmd/ack";
+    // v0.37.1: ping de reloj del watch (cuerpo = su monotónico) y nuestra respuesta (t0 + nuestro epoch)
+    static final String CMD_CLOCK = "/berserk/cmd/clock";
+    static final String PATH_CLOCK_PONG = "/berserk/clock/pong";
     static final int SCHEMA = 1;
 
     // ids de las notificaciones ongoing del móvil que el reloj puede cancelar
