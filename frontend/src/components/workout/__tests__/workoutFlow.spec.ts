@@ -1535,7 +1535,7 @@ describe('v0.38.1: botón «Completar ejercicio»', () => {
     // la raíz del template lleva comentarios delante de BkCard: para VTU es un
     // fragmento, así que los attrs se leen en la <section> real
     expect(wrapper.find('section').attributes('data-completed')).toBe('true')
-    expect(wrapper.find('section').classes()).toContain('border-aurora')
+    expect(wrapper.find('section').classes()).toContain('bk-done')
     // no se pliega ni cambia de contenido: series, fantasma, foto y «Añadir
     // serie» siguen ahí (v0.39.0, zurdi: al completar sin series se iba la foto)
     expect(wrapper.find('[data-testid="set-row-1"]').exists()).toBe(true)
@@ -1543,6 +1543,11 @@ describe('v0.38.1: botón «Completar ejercicio»', () => {
     expect(wrapper.find('[data-testid="exercise-image-20"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="add-set-20"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="set-count-20"]').text()).toContain('1')
+    // v0.39.1: pero registrar MÁS queda apagado — añadir serie y el check de
+    // ghost; editar lo ya registrado sigue vivo
+    expect(wrapper.get('[data-testid="add-set-20"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="ghost-check-20"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="edit-set-1"]').attributes('disabled')).toBeUndefined()
 
     const button = wrapper.get('[data-testid="exercise-done-20"]')
     expect(button.text()).toBe('Completado')
@@ -1566,7 +1571,7 @@ describe('v0.38.1: botón «Completar ejercicio»', () => {
     await wrapper.setProps({ workoutExercise: { ...pushExercise, sets: [], completed: true } })
     await flushPromises()
     expect(section().classes()).toContain('bk-done-pulse')
-    expect(section().classes()).toContain('border-aurora')
+    expect(section().classes()).toContain('bk-done')
     expect(wrapper.find('[data-testid="exercise-image-20"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(true)
 

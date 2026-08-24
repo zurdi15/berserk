@@ -716,9 +716,12 @@ async function onDeleteSet(setId: number) {
 // un check, pon un botón en la parte baja de la card ... cuando está
 // completado que no colapse, ponle un border"): el gesto es el botón
 // «Completar ejercicio» de la última fila, a la derecha de «Añadir serie»;
-// hecho = borde aurora, botón en «Completado» (tocarlo des-marca) y sin
-// series fantasma — la card no se pliega. Solo en vivo y si el store sabe
-// (el editor retroactivo no lo implementa).
+// hecho = halo aurora (.bk-done) y botón en «Completado» (tocarlo des-marca)
+// — la card no se pliega ni cambia de contenido. v0.39.1 (zurdi: "que se
+// deshabilite el poder añadir serie, etc."): hecha, se apagan los caminos
+// para registrar MÁS (añadir serie, check y fila de ghost, registrar/empezar
+// cardio, chip de progresión); editar o borrar lo ya registrado sigue vivo.
+// Solo en vivo y si el store sabe (el editor retroactivo no lo implementa).
 const canMarkDone = computed(() => props.live && typeof props.actions.setExerciseCompleted === 'function')
 const markingDone = ref(false)
 // v0.39.0 (zurdi: "una animación pequeñita de feedback al completar"): un
@@ -955,7 +958,7 @@ async function moveDown() {
        (la utilidad gana a la capa de .bk-slab, ver base.css) -->
   <BkCard
     :id="`workout-exercise-${workoutExercise.id}`"
-    :class="[completed && 'border-aurora', justCompleted && 'bk-done-pulse']"
+    :class="[completed && 'bk-done', justCompleted && 'bk-done-pulse']"
     :data-completed="completed ? 'true' : undefined"
     @animationend="onCardAnimationEnd"
   >
@@ -1057,7 +1060,8 @@ async function moveDown() {
       <button
         v-if="progressionSuggestion != null"
         type="button"
-        class="bk-press w-full flex items-center gap-1.5 rounded-lg border border-aurora/40 bg-aurora/5 px-2 py-1 text-left"
+        class="bk-press w-full flex items-center gap-1.5 rounded-lg border border-aurora/40 bg-aurora/5 px-2 py-1 text-left disabled:opacity-50"
+        :disabled="completed"
         :title="t('workout.progressionTitle')"
         :data-testid="`progression-hint-${workoutExercise.id}`"
         @click="openSuggested"
@@ -1115,7 +1119,8 @@ async function moveDown() {
         <button
           v-if="exercise"
           type="button"
-          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1"
+          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1 disabled:opacity-50"
+          :disabled="completed"
           :aria-label="t('workout.nextSet')"
           @click="openNew"
         >
@@ -1129,7 +1134,7 @@ async function moveDown() {
           v-if="g === 1"
           :model-value="false"
           size="md"
-          :disabled="quickLogging || !exercise"
+          :disabled="quickLogging || !exercise || completed"
           :data-testid="`ghost-check-${workoutExercise.id}`"
           :aria-label="t('workout.logSet')"
           @update:model-value="quickLog"
@@ -1205,6 +1210,7 @@ async function moveDown() {
         v-if="exercise && !isCardio"
         variant="ghost"
         size="sm"
+        :disabled="completed"
         :data-testid="`add-set-${workoutExercise.id}`"
         @click="openNew"
       >
@@ -1223,6 +1229,7 @@ async function moveDown() {
           variant="ghost"
           size="sm"
           block
+          :disabled="completed"
           :data-testid="`cardio-log-${workoutExercise.id}`"
           @click="openNew"
         >
@@ -1233,6 +1240,7 @@ async function moveDown() {
           variant="primary"
           size="sm"
           block
+          :disabled="completed"
           :data-testid="`cardio-start-${workoutExercise.id}`"
           @click="cardioStartOpen = true"
         >

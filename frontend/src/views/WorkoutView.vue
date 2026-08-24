@@ -295,12 +295,13 @@ function stepTitle(step: WorkoutStep): string {
   return step.label ?? t('workout.blockGeneral')
 }
 
-// progreso del step: ejercicios con al menos una serie efectiva — alimenta
-// tanto la barra segmentada como la línea "{done}/{total} ejercicios".
-// v0.38.0 (zurdi: "debería completarse bloque si todos los ejercicios están
-// en check terminado"): el check de "hecho" también cuenta, con o sin series
+// progreso del step — alimenta tanto la barra segmentada como la línea
+// "{done}/{total} ejercicios". Hasta v0.39.0 contaba cualquier ejercicio con
+// una serie efectiva; v0.39.1 (zurdi: "solo debería rellenarse al darle a
+// completar ejercicio, ahora mismo se rellena con la primera serie"): cuenta
+// SOLO el check de hecho — registrar series no mueve el progreso.
 function exerciseDone(we: WorkoutExerciseOut): boolean {
-  return (we.completed ?? false) || we.sets.some((s) => !s.is_warmup)
+  return we.completed ?? false
 }
 
 function stepCounts(step: WorkoutStep): { done: number; total: number } {
@@ -310,7 +311,7 @@ function stepCounts(step: WorkoutStep): { done: number; total: number } {
 }
 
 // facelift: segmentos de BkSegmentedProgress — uno por step, fill = fracción
-// de ejercicios del step con alguna serie efectiva, punto en el actual
+// de ejercicios del step dados por hechos, punto en el actual
 const stepSegments = computed(() =>
   workoutSteps.value.map((step) => ({ ...stepCounts(step), label: stepTitle(step) })),
 )
@@ -751,6 +752,11 @@ const completableSetCount = computed(() => {
   return pending
 })
 
+// v0.39.1: "Completar todo el bloque" se ofrece mientras quede algún
+// ejercicio del bloque visible sin dar por hecho — ya no solo con series
+// pendientes, porque el progreso del bloque es el check, no las series
+const pendingBlockExercises = computed(() => visibleEntries.value.filter((e) => !(e.we.completed ?? false)).length)
+
 async function completeBlock() {
   if (completingBlock.value) return
   completingBlock.value = true
@@ -759,16 +765,20 @@ async function completeBlock() {
     for (const entry of visibleBlocks.value.flatMap((b) => b.entries)) {
       if (entry.we.completed) continue
       const target = targetSetsFor(entry.we)
-      if (target == null) continue
-      let pending = target - entry.we.sets.filter((s) => !s.is_warmup).length
-      while (pending > 0) {
-        const body = quickSetBody(entry.we)
-        if (!body) break
-        const result = await activeWorkout.logSet(entry.we.id, body)
-        if (result.new_records.length) sessionRecords.value.push(...result.new_records)
-        logged += 1
-        pending -= 1
+      if (target != null) {
+        let pending = target - entry.we.sets.filter((s) => !s.is_warmup).length
+        while (pending > 0) {
+          const body = quickSetBody(entry.we)
+          if (!body) break
+          const result = await activeWorkout.logSet(entry.we.id, body)
+          if (result.new_records.length) sessionRecords.value.push(...result.new_records)
+          logged += 1
+          pending -= 1
+        }
       }
+      // v0.39.1: completar el bloque ES dar por hechos sus ejercicios (con o
+      // sin objetivo) — es lo único que rellena el progreso
+      await activeWorkout.setExerciseCompleted(entry.we.id, true)
     }
   } catch (error) {
     toastApiError(error)
@@ -1059,7 +1069,7 @@ onBeforeUnmount(() => {
       <!-- facelift: completar de un toque todas las series pendientes (con
            objetivo de rutina) del bloque visible — ver completeBlock() -->
       <BkButton
-        v-if="stepperActive && completableSetCount > 0"
+        v-if="stepperActive && pendingBlockExercises > 0"
         variant="soft"
         block
         :loading="completingBlock"

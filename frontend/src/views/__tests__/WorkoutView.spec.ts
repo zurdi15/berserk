@@ -196,6 +196,7 @@ describe('WorkoutView', () => {
         set: { id: 900, set_number: 1, reps: 8, weight_kg: 40, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
         new_records: [],
       } as never)
+      const doneSpy = vi.spyOn(activeWorkout, 'setExerciseCompleted').mockResolvedValue(undefined)
 
       const wrapper = build()
       await flushPromises()
@@ -209,6 +210,10 @@ describe('WorkoutView', () => {
       expect(logSpy).toHaveBeenCalledWith(2, { is_warmup: false, reps: 10, weight_kg: 20 })
       // el step 'Tirón' (ejercicio 3) NO se toca
       expect(logSpy).not.toHaveBeenCalledWith(3, expect.anything())
+      // v0.39.1: completar el bloque también da por hechos sus ejercicios
+      expect(doneSpy).toHaveBeenCalledWith(1, true)
+      expect(doneSpy).toHaveBeenCalledWith(2, true)
+      expect(doneSpy).not.toHaveBeenCalledWith(3, true)
 
       // restaurar el default del módulo para el resto de tests
       vi.mocked(domain.listExercises).mockImplementation(async () => [] as never)
@@ -1517,16 +1522,19 @@ describe('WorkoutView v0.38.0: ejercicio actual', () => {
     }
   }
 
-  it('a checked exercise counts as done in the block progress even without sets', async () => {
+  it('only a checked exercise counts as done in the block progress — sets alone do not (v0.39.1)', async () => {
     const activeWorkout = useActiveWorkoutStore()
     vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
-    activeWorkout.workout = workoutWith([wex(1, 'Empuje', [], true), wex(2, 'Empuje'), wex(3, 'Tirón')])
+    // 1 en check sin series; 2 con serie pero sin check → 1/2
+    activeWorkout.workout = workoutWith([wex(1, 'Empuje', [], true), wex(2, 'Empuje', [set(10, '2026-08-24T10:05:00')]), wex(3, 'Tirón')])
 
     const wrapper = build()
     await flushPromises()
 
     expect(wrapper.get('[data-testid="block-title"]').text()).toContain('1/2 ejercicios')
     expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('1')
+    // y el fill del segmento se anima hasta su ancho (bk-fill-animate)
+    expect(wrapper.find('[role="progressbar"] .bk-fill-animate').exists()).toBe(true)
     wrapper.unmount()
   })
 
@@ -1615,6 +1623,7 @@ describe('WorkoutView v0.38.0: ejercicio actual', () => {
       set: { id: 900, set_number: 1, reps: 10, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
       new_records: [],
     } as never)
+    const doneSpy = vi.spyOn(activeWorkout, 'setExerciseCompleted').mockResolvedValue(undefined)
 
     const wrapper = build()
     await flushPromises()
@@ -1623,6 +1632,9 @@ describe('WorkoutView v0.38.0: ejercicio actual', () => {
 
     expect(logSpy).toHaveBeenCalledTimes(1)
     expect(logSpy).toHaveBeenCalledWith(2, { is_warmup: false, reps: 10, weight_kg: 20 })
+    // solo el pendiente se marca; el que ya estaba en check no se toca
+    expect(doneSpy).toHaveBeenCalledTimes(1)
+    expect(doneSpy).toHaveBeenCalledWith(2, true)
     vi.mocked(domain.listExercises).mockImplementation(async () => [] as never)
     wrapper.unmount()
   })

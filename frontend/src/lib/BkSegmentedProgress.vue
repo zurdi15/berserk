@@ -55,8 +55,10 @@ function fillPercent(segment: { done: number; total: number }): number {
         :class="i === current && 'outline outline-1 outline-aurora/40'"
         aria-hidden="true"
       >
+        <!-- v0.39.1: el fill se desliza hasta el ancho nuevo (bk-fill-animate)
+             en vez de saltar de golpe al completar un ejercicio -->
         <span
-          class="block h-full rounded-full"
+          class="bk-fill-animate block h-full rounded-full"
           :class="i === current ? 'bg-aurora' : 'bg-aurora-deep'"
           :style="{ width: `${fillPercent(segment)}%` }"
         />

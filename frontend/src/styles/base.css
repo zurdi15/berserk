@@ -415,17 +415,34 @@ body::before {
 }
 
 /* v0.39.0 (zurdi: "una animación pequeñita de feedback al completar el
-   ejercicio"): la card da UN latido con halo aurora al marcarse hecha —
-   corto (dur-4), con el muelle del sistema, y encima de la sombra de la losa
-   para que no la pise. La card la quita al terminar (animationend). */
+   ejercicio"): la card da UN latido al marcarse hecha — corto (dur-4), con
+   el muelle del sistema. v0.39.1 (zurdi: "queda raro que en el latido se vea
+   un glow pero luego desaparezca"): la card hecha CONSERVA un halo aurora
+   suave (.bk-done, fuera de la capa para ganar a .bk-slab) y el latido
+   termina exactamente en él — sube al halo fuerte y se asienta en el suave,
+   nada se apaga. La card quita el latido al terminar (animationend). */
+.bk-done {
+  border-color: var(--bk-accent-aurora);
+  box-shadow: var(--bk-shadow-aurora-soft), var(--bk-slab-shadow);
+}
 .bk-done-pulse {
   animation: bk-done-pulse var(--bk-dur-4) var(--bk-ease-spring) 1;
 }
 @keyframes bk-done-pulse {
   0% { transform: scale(1); box-shadow: var(--bk-slab-shadow); }
   35% { transform: scale(1.015); box-shadow: var(--bk-shadow-aurora), var(--bk-slab-shadow); }
-  100% { transform: scale(1); box-shadow: var(--bk-slab-shadow); }
+  100% { transform: scale(1); box-shadow: var(--bk-shadow-aurora-soft), var(--bk-slab-shadow); }
 }
 @media (prefers-reduced-motion: reduce) {
   .bk-done-pulse { animation: none; }
+}
+
+/* v0.39.1 (zurdi: "en el progreso de bloque molaría una animación de que se
+   rellena progresivamente, en vez de rellenarse de golpe"): el fill de cada
+   segmento de BkSegmentedProgress se desliza hasta su ancho nuevo */
+.bk-fill-animate {
+  transition: width var(--bk-dur-4) var(--bk-ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-fill-animate { transition: none; }
 }
