@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.39.1 - 2026-08-25
+
+### Cambiado
+- El progreso del bloque (barra y «n/m ejercicios») solo cuenta los ejercicios marcados con «Completar ejercicio»; registrar series ya no lo mueve. La barra se rellena con una transición en vez de a saltos, y «Completar todo el bloque» además de registrar las series pendientes da por hechos todos los ejercicios del bloque (se ofrece mientras quede alguno sin marcar).
+- Un ejercicio completado conserva un halo permanente (el latido de feedback termina en él, ya no se apaga) y deja de admitir más series: «Añadir serie», el check y la fila de la serie pendiente, «Registrar»/«Empezar» de cardio y la sugerencia de progresión quedan deshabilitados; editar o borrar lo ya registrado sigue disponible.
+
 ## 0.39.0 - 2026-08-25
 
 ### Añadido
