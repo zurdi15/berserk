@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.39.0 - 2026-08-25
+
+### Añadido
+- Al completar un ejercicio, la card da un pequeño latido con halo como feedback (una vez, sin animación si el sistema tiene «reducir movimiento»).
+- Reloj: en la página del ejercicio, la siguiente serie se ajusta antes de registrarla — steppers de reps y de carga (kg o lb según tu ajuste, o nivel de máquina), con los mismos pasos y topes que el formulario del móvil. «+ Serie» registra lo que ves; cada serie registrada, desde el móvil o desde el reloj, vuelve a proponer la siguiente. Requiere actualizar el APK del móvil y el del reloj.
+
+### Arreglado
+- Al completar un ejercicio sin ninguna serie registrada desaparecía su imagen: la card ya no cambia de contenido al marcarla (series pendientes incluidas), solo el borde y el botón.
+
 ## 0.38.1 - 2026-08-25
 
 ### Cambiado
