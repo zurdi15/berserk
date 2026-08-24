@@ -508,8 +508,11 @@ async function submitNewSet(value: SetIn) {
 const targetSets = computed<number | null>(() => routineTargetRow.value?.target_sets ?? null)
 
 const pendingGhostCount = computed(() => {
-  // v0.38.1: hecho = no queda nada pendiente, aunque falten series objetivo
-  if (isCardio.value || !props.exercise || completed.value) return 0
+  // v0.39.0 (zurdi: "cuando le das a completado y no hay ninguna serie, la
+  // imagen desaparece"): hecho NO quita las series pendientes — la sección
+  // imagen+series se pinta solo con series o ghosts, y sin ellos se iba la
+  // foto. La card queda idéntica al completarla: solo borde y botón.
+  if (isCardio.value || !props.exercise) return 0
   if (props.live && targetSets.value != null) {
     return Math.max(0, targetSets.value - effectiveSetCount.value)
   }
@@ -718,6 +721,16 @@ async function onDeleteSet(setId: number) {
 // (el editor retroactivo no lo implementa).
 const canMarkDone = computed(() => props.live && typeof props.actions.setExerciseCompleted === 'function')
 const markingDone = ref(false)
+// v0.39.0 (zurdi: "una animación pequeñita de feedback al completar"): un
+// latido de la card (.bk-done-pulse) al pasar a hecho — venga del botón, del
+// reloj o del fin de cardio —; nunca al des-marcar ni al montar ya hecha
+const justCompleted = ref(false)
+watch(completed, (now, before) => {
+  if (now && !before) justCompleted.value = true
+})
+function onCardAnimationEnd(event: AnimationEvent) {
+  if (event.animationName === 'bk-done-pulse') justCompleted.value = false
+}
 
 async function setCompleted(value: boolean) {
   if (!props.actions.setExerciseCompleted || markingDone.value) return
@@ -942,8 +955,9 @@ async function moveDown() {
        (la utilidad gana a la capa de .bk-slab, ver base.css) -->
   <BkCard
     :id="`workout-exercise-${workoutExercise.id}`"
-    :class="completed && 'border-aurora'"
+    :class="[completed && 'border-aurora', justCompleted && 'bk-done-pulse']"
     :data-completed="completed ? 'true' : undefined"
+    @animationend="onCardAnimationEnd"
   >
     <!-- v0.7.0 (feedback de zurdi): el chip "Superserie A" y el acento del
          grupo suben al CONTENEDOR del bloque (ver WorkoutView.vue) — la card

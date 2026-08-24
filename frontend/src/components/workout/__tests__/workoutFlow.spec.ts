@@ -1524,7 +1524,7 @@ describe('v0.38.1: botón «Completar ejercicio»', () => {
     retro.unmount()
   })
 
-  it('a completed exercise keeps its sets and actions, gets the aurora border and no ghosts; the button un-marks it', async () => {
+  it('a completed exercise keeps its sets, ghosts, image and actions, and gets the aurora border; the button un-marks it', async () => {
     const setExerciseCompleted = vi.fn(async () => {})
     const wrapper = mountCard({
       workoutExercise: { ...pushExercise, completed: true },
@@ -1536,11 +1536,12 @@ describe('v0.38.1: botón «Completar ejercicio»', () => {
     // fragmento, así que los attrs se leen en la <section> real
     expect(wrapper.find('section').attributes('data-completed')).toBe('true')
     expect(wrapper.find('section').classes()).toContain('border-aurora')
-    // no se pliega: series y «Añadir serie» siguen ahí; las series fantasma
-    // no (hecho = nada pendiente)
+    // no se pliega ni cambia de contenido: series, fantasma, foto y «Añadir
+    // serie» siguen ahí (v0.39.0, zurdi: al completar sin series se iba la foto)
     expect(wrapper.find('[data-testid="set-row-1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="exercise-image-20"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="add-set-20"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="set-count-20"]').text()).toContain('1')
 
     const button = wrapper.get('[data-testid="exercise-done-20"]')
@@ -1549,6 +1550,40 @@ describe('v0.38.1: botón «Completar ejercicio»', () => {
     await button.trigger('click')
     await flushPromises()
     expect(setExerciseCompleted).toHaveBeenCalledWith(20, false)
+    wrapper.unmount()
+  })
+
+  it('v0.39.0: completing an exercise with no sets keeps the image, and the card pulses once until the animation ends', async () => {
+    const wrapper = mountCard({
+      workoutExercise: { ...pushExercise, sets: [] },
+      actions: makeActions({ setExerciseCompleted: vi.fn(async () => {}) }),
+    })
+    await flushPromises()
+    const section = () => wrapper.find('section')
+    expect(section().classes()).not.toContain('bk-done-pulse')
+
+    // el store confirma el flag (el mock no lo hace): se simula el prop nuevo
+    await wrapper.setProps({ workoutExercise: { ...pushExercise, sets: [], completed: true } })
+    await flushPromises()
+    expect(section().classes()).toContain('bk-done-pulse')
+    expect(section().classes()).toContain('border-aurora')
+    expect(wrapper.find('[data-testid="exercise-image-20"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(true)
+
+    // otra animación de dentro no lo apaga; la del latido sí
+    section().element.dispatchEvent(new Event('animationend'))
+    await flushPromises()
+    expect(section().classes()).toContain('bk-done-pulse')
+    const end = new Event('animationend') as Event & { animationName?: string }
+    Object.defineProperty(end, 'animationName', { value: 'bk-done-pulse' })
+    section().element.dispatchEvent(end)
+    await flushPromises()
+    expect(section().classes()).not.toContain('bk-done-pulse')
+
+    // des-marcar no late
+    await wrapper.setProps({ workoutExercise: { ...pushExercise, sets: [], completed: false } })
+    await flushPromises()
+    expect(section().classes()).not.toContain('bk-done-pulse')
     wrapper.unmount()
   })
 })

@@ -413,3 +413,19 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .bk-alarm-halo { animation: none; opacity: 0.8; }
 }
+
+/* v0.39.0 (zurdi: "una animación pequeñita de feedback al completar el
+   ejercicio"): la card da UN latido con halo aurora al marcarse hecha —
+   corto (dur-4), con el muelle del sistema, y encima de la sombra de la losa
+   para que no la pise. La card la quita al terminar (animationend). */
+.bk-done-pulse {
+  animation: bk-done-pulse var(--bk-dur-4) var(--bk-ease-spring) 1;
+}
+@keyframes bk-done-pulse {
+  0% { transform: scale(1); box-shadow: var(--bk-slab-shadow); }
+  35% { transform: scale(1.015); box-shadow: var(--bk-shadow-aurora), var(--bk-slab-shadow); }
+  100% { transform: scale(1); box-shadow: var(--bk-slab-shadow); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-done-pulse { animation: none; }
+}
