@@ -560,6 +560,8 @@ export const en = {
     progressionTitle: 'You hit every target rep last session — try going up',
     nextSet: 'Next set',
     setDone: 'Set {n} done',
+    markDone: 'Mark exercise as done',
+    done: 'Done',
     finished: 'Workout complete!',
     blockLabel: 'Block: {name}',
     reps: 'Reps',

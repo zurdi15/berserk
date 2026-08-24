@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,9 +37,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.pager.HorizontalPager
+import androidx.wear.compose.foundation.pager.rememberPagerState
+import androidx.wear.compose.material3.AnimatedPage
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.HorizontalPagerScaffold
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
@@ -46,6 +51,7 @@ import androidx.wear.compose.material3.Text
 import dev.zurdi.berserk.wear.R
 import dev.zurdi.berserk.wear.TimerEngine
 import dev.zurdi.berserk.wear.core.ActiveTimer
+import dev.zurdi.berserk.wear.core.ExerciseSpec
 import dev.zurdi.berserk.wear.core.PhoneClock
 import dev.zurdi.berserk.wear.core.TimerFormat
 import dev.zurdi.berserk.wear.core.TimerKind
@@ -60,6 +66,12 @@ private const val URGENT_MS = 10_000L
 /** v0.35.1: OK y Cancelar, compactos y del mismo ancho */
 private val ACTION_WIDTH = 104.dp
 
+/** v0.38.0: tras "+ Serie"/"Terminar", los botones esperan al estado nuevo del móvil (o esto) */
+private const val COMMAND_BUSY_MS = 3_000L
+
+/** v0.38.0: cuánto se enseña "Abre berserk en el móvil" tras una orden sin web viva */
+private const val UNDELIVERED_HINT_MS = 3_000L
+
 
 /**
  * Una sola pantalla con cuatro estados, por prioridad: alarma esperando el
@@ -67,6 +79,9 @@ private val ACTION_WIDTH = 104.dp
  * con halo, el crono del entreno pequeño debajo y cancelar), y reposo
  * (estado del enlace con el móvil). La fuente de verdad es el mismo tablero
  * persistido que pintan las notificaciones; la pantalla solo hace tic.
+ * v0.38.0: con entreno en marcha y ejercicio actual publicado, el tiempo es la
+ * primera página de un pager horizontal y la segunda es el ejercicio
+ * ("+ Serie" / "Terminar", ver ExercisePage).
  */
 @Composable
 fun TimerApp(
@@ -77,6 +92,8 @@ fun TimerApp(
     onAlarmAcknowledged: () -> Unit = {},
 ) {
     val board by engine.board.collectAsState()
+    val exerciseSpec by engine.exercise.collectAsState()
+    val undeliveredAt by engine.commandUndeliveredAt.collectAsState()
     val presenceFlow = remember(link) { link.phonePresence() }
     // arranca apagada hasta la primera lectura (sub-segundo): mejor que una runa optimista
     val phonePresence by presenceFlow.collectAsState(initial = PhoneLink.PhonePresence.NONE)
@@ -108,15 +125,24 @@ fun TimerApp(
                     onAlarmAcknowledged()
                 },
             )
-            primary != null -> RunningScreen(
+            primary != null -> WorkoutScreens(
                 timer = primary,
                 workout = board.workout(),
+                exercise = board.exerciseFor(exerciseSpec),
                 now = now,
+                undeliveredAt = undeliveredAt,
                 onCancel = {
                     // optimista: se para aquí; si el móvil no está al alcance, su
                     // DataItem lo resucitará al reconectar mientras no haya vencido
                     engine.cancelLocally(primary.kind)
                     scope.launch { link.requestCancel(primary.kind) }
+                },
+                // sin móvil al alcance no hay ni acuse: se avisa como si lo hubiera devuelto
+                onLogSet = { exercise ->
+                    scope.launch { if (!link.requestLogSet(exercise.weid)) engine.onCommandUndelivered() }
+                },
+                onComplete = { exercise ->
+                    scope.launch { if (!link.requestCompleteExercise(exercise.weid)) engine.onCommandUndelivered() }
                 },
             )
             else -> IdleScreen(
@@ -124,6 +150,151 @@ fun TimerApp(
                 notificationsGranted = notificationsGranted,
                 appVersion = appVersion,
             )
+        }
+    }
+}
+
+/**
+ * v0.38.0 (zurdi: "añadir serie desde el reloj y poder finalizar ejercicio"):
+ * sin ejercicio actual, la pantalla del tiempo a secas; con él, un pager —
+ * página 0 el tiempo, página 1 el ejercicio. Una cuenta atrás NUEVA (la serie
+ * se registró, desde aquí o desde el móvil, y arrancó el descanso) devuelve a
+ * la página del tiempo: es lo que toca mirar.
+ */
+@Composable
+private fun WorkoutScreens(
+    timer: ActiveTimer,
+    workout: ActiveTimer?,
+    exercise: ExerciseSpec?,
+    now: Long,
+    undeliveredAt: Long,
+    onCancel: () -> Unit,
+    onLogSet: (ExerciseSpec) -> Unit,
+    onComplete: (ExerciseSpec) -> Unit,
+) {
+    if (exercise == null) {
+        RunningScreen(timer = timer, workout = workout, now = now, onCancel = onCancel)
+        return
+    }
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    LaunchedEffect(timer.spec.sentAtEpochMs, timer.kind) {
+        if (timer.kind.countsDown && pagerState.currentPage != 0) pagerState.animateScrollToPage(0)
+    }
+    HorizontalPagerScaffold(pagerState = pagerState) {
+        HorizontalPager(state = pagerState) { page ->
+            AnimatedPage(pageIndex = page, pagerState = pagerState) {
+                if (page == 0) {
+                    RunningScreen(timer = timer, workout = workout, now = now, onCancel = onCancel)
+                } else {
+                    ExercisePage(
+                        exercise = exercise,
+                        now = now,
+                        undeliveredAt = undeliveredAt,
+                        onLogSet = onLogSet,
+                        onComplete = onComplete,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * v0.38.0: el ejercicio actual — nombre, series hechas/objetivo y la siguiente
+ * serie tal y como la registraría el check del móvil, con "+ Serie" (solo si
+ * hay prefill: canLog) y "Terminar". Tras una orden los botones esperan al
+ * estado nuevo del móvil (sentAt cambia) o unos segundos; si el móvil devuelve
+ * que su web no estaba viva, se dice en vez de quedarse mudo.
+ */
+@Composable
+private fun ExercisePage(
+    exercise: ExerciseSpec,
+    now: Long,
+    undeliveredAt: Long,
+    onLogSet: (ExerciseSpec) -> Unit,
+    onComplete: (ExerciseSpec) -> Unit,
+) {
+    val aurora = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
+    var busyUntil by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(exercise.sentAtEpochMs, undeliveredAt) { busyUntil = 0L }
+    val busy = now < busyUntil
+    val phoneClosed = undeliveredAt > 0L && now - undeliveredAt in 0L..UNDELIVERED_HINT_MS
+    val send: ((ExerciseSpec) -> Unit) -> Unit = { action ->
+        Haptics.tick(context)
+        busyUntil = now + COMMAND_BUSY_MS
+        action(exercise)
+    }
+
+    ScreenScaffold { contentPadding ->
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Halo(color = aurora, alpha = 0.08f, radiusFraction = 0.8f)
+            Column(
+                modifier = Modifier.fillMaxSize().padding(contentPadding).padding(horizontal = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = exercise.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = exercise.progressLabel,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = aurora,
+                    )
+                    if (exercise.nextLabel.isNotEmpty()) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = exercise.nextLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (phoneClosed) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = stringResource(R.string.phone_app_closed),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                CompactButton(
+                    onClick = { send(onLogSet) },
+                    enabled = exercise.canLog && !busy,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = aurora,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                    modifier = Modifier.width(ACTION_WIDTH),
+                ) {
+                    Text(text = stringResource(R.string.exercise_add_set), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                }
+                Spacer(Modifier.height(6.dp))
+                CompactButton(
+                    onClick = { send(onComplete) },
+                    enabled = !busy,
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = Slab,
+                        contentColor = aurora,
+                    ),
+                    modifier = Modifier.width(ACTION_WIDTH),
+                ) {
+                    Text(text = stringResource(R.string.exercise_finish), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                }
+            }
         }
     }
 }

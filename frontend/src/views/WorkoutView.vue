@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/client'
-import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RotationOut, RoutineOut, SetIn, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
+import type { ExerciseOut, MuscleGroupOut, PersonalRecordOut, RotationOut, RoutineOut, SetIn, SetOut, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
 import { getRotation, listExercises, listMuscleGroups, listRoutines, routineImageUrl } from '@/api/domain'
 import { getViewCache } from '@/utils/viewCache'
 import { resolveNewSetDefaults } from '@/components/workout/setDefaults'
@@ -19,7 +19,7 @@ import { toastApiError } from '@/utils/apiErrors'
 import { useActiveWorkoutStore } from '@/stores/activeWorkout'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
-import { cancelNativeCardioEndAlarm, stopNativeCardioCountdown, syncWearTimer, type WearStopReason } from '@/utils/nativeShell'
+import { cancelNativeCardioEndAlarm, stopNativeCardioCountdown, syncWearExercise, syncWearTimer, type WearStopReason } from '@/utils/nativeShell'
 import { cancelWebPushTimer } from '@/utils/webPush'
 import {
   clearPersistedCardioCountdown,
@@ -202,15 +202,110 @@ const visibleBlocks = computed<WorkoutBlock[]>(() =>
   stepperActive.value ? workoutSteps.value[currentStepSafe.value]?.blocks ?? [] : workoutBlocks.value,
 )
 
+// ── v0.38.0 EL EJERCICIO ACTUAL (zurdi: "al entrar a entrenamiento o
+// desbloquear móvil ... scroll al ejercicio actual (el último en haber
+// registrado serie o el primero si no se ha registrado nada en ese bloque)")
+// Del bloque VISIBLE: el ejercicio de la serie más reciente (completed_at)
+// si no está dado por hecho; si lo está, el siguiente pendiente tras él; sin
+// series, el primero pendiente. null = nada pendiente (o sin entreno). Lo
+// usan el scroll de abajo y la card `current`, que es la que se manda al
+// reloj (ver WorkoutExerciseCard.wearPayload).
+const visibleEntries = computed(() => visibleBlocks.value.flatMap((b) => b.entries))
+
+function setLoggedAt(set: SetOut): number {
+  if (!set.completed_at) return 0
+  const at = parseUtc(set.completed_at).getTime()
+  return Number.isFinite(at) ? at : 0
+}
+
+const lastLoggedWeid = computed<number | null>(() => {
+  let best: number | null = null
+  let bestAt = 0
+  for (const entry of visibleEntries.value) {
+    for (const set of entry.we.sets) {
+      const at = setLoggedAt(set)
+      if (at > bestAt) {
+        bestAt = at
+        best = entry.we.id
+      }
+    }
+  }
+  return best
+})
+
+const currentExerciseId = computed<number | null>(() => {
+  const entries = visibleEntries.value
+  const pending = (entry: { we: WorkoutExerciseOut }) => !(entry.we.completed ?? false)
+  const lastIdx = entries.findIndex((e) => e.we.id === lastLoggedWeid.value)
+  if (lastIdx !== -1) {
+    if (pending(entries[lastIdx])) return entries[lastIdx].we.id
+    const next = entries.slice(lastIdx + 1).find(pending)
+    if (next) return next.we.id
+  }
+  return entries.find(pending)?.we.id ?? null
+})
+
+// sin ejercicio actual (bloque entero hecho, sin entreno): el reloj lo sabe.
+// El caso con ejercicio lo publica la propia card marcada `current`.
+// immediate: abrir la vista con el bloque ya entero en check también vacía
+// el DataItem (que persiste con lo último que publicó alguna card)
+watch(
+  currentExerciseId,
+  (id) => {
+    if (id === null) void syncWearExercise({ state: 'none' })
+  },
+  { immediate: true },
+)
+
+// Scroll a la card actual dentro de <main> (el único scroller, ver
+// ShellView): posición por la cadena de offsetTop — inmune al transform de
+// la entrada bk-stagger, que getBoundingClientRect sí arrastraría — menos el
+// header sticky del entreno. Sin serie registrada en el bloque, arriba del
+// todo (header + stepper a la vista). Asignación directa a scrollTop, como
+// resetMainScroll.
+function scrollToCurrentExercise() {
+  const main = document.querySelector('main')
+  if (!main || !activeWorkout.workout) return
+  if (lastLoggedWeid.value === null || currentExerciseId.value === null) {
+    main.scrollTop = 0
+    return
+  }
+  const card = document.getElementById(`workout-exercise-${currentExerciseId.value}`)
+  if (!card) return
+  let top = 0
+  let node: HTMLElement | null = card
+  while (node && node !== main) {
+    top += node.offsetTop
+    node = node.offsetParent as HTMLElement | null
+  }
+  const header = document.querySelector<HTMLElement>('[data-testid="workout-header-sticky"]')
+  main.scrollTop = Math.max(0, top - (header?.offsetHeight ?? 0) - 8)
+}
+
+// cuándo: al montar con entreno, al volver a la vista (keep-alive) y al
+// volver la app a primer plano (desbloquear el móvil) con esta vista activa
+let viewActive = false
+
+function onVisibilityChange() {
+  if (document.visibilityState !== 'visible' || !viewActive) return
+  void nextTick(scrollToCurrentExercise)
+}
+
 function stepTitle(step: WorkoutStep): string {
   return step.label ?? t('workout.blockGeneral')
 }
 
 // progreso del step: ejercicios con al menos una serie efectiva — alimenta
-// tanto la barra segmentada como la línea "{done}/{total} ejercicios"
+// tanto la barra segmentada como la línea "{done}/{total} ejercicios".
+// v0.38.0 (zurdi: "debería completarse bloque si todos los ejercicios están
+// en check terminado"): el check de "hecho" también cuenta, con o sin series
+function exerciseDone(we: WorkoutExerciseOut): boolean {
+  return (we.completed ?? false) || we.sets.some((s) => !s.is_warmup)
+}
+
 function stepCounts(step: WorkoutStep): { done: number; total: number } {
   const entries = step.blocks.flatMap((b) => b.entries)
-  const done = entries.filter((e) => e.we.sets.some((s) => !s.is_warmup)).length
+  const done = entries.filter((e) => exerciseDone(e.we)).length
   return { done, total: entries.length }
 }
 
@@ -646,6 +741,8 @@ function quickSetBody(we: WorkoutExerciseOut): SetIn | null {
 const completableSetCount = computed(() => {
   let pending = 0
   for (const entry of visibleBlocks.value.flatMap((b) => b.entries)) {
+    // v0.38.0: un ejercicio dado por hecho no tiene series pendientes
+    if (entry.we.completed) continue
     const target = targetSetsFor(entry.we)
     if (target == null) continue
     const effective = entry.we.sets.filter((s) => !s.is_warmup).length
@@ -660,6 +757,7 @@ async function completeBlock() {
   let logged = 0
   try {
     for (const entry of visibleBlocks.value.flatMap((b) => b.entries)) {
+      if (entry.we.completed) continue
       const target = targetSetsFor(entry.we)
       if (target == null) continue
       let pending = target - entry.we.sets.filter((s) => !s.is_warmup).length
@@ -711,6 +809,12 @@ onMounted(async () => {
   // corriendo" no tendría con qué workout compararse
   await checkPersistedCardioCountdown()
   startTicker()
+  // también aquí: fuera de un <KeepAlive> (tests, otro shell) onActivated no dispara
+  viewActive = true
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  // v0.38.0: con entreno vivo, la vista abre en el ejercicio actual
+  await nextTick()
+  scrollToCurrentExercise()
 })
 
 // v0.17.0 keep-alive (zurdi: "no desmontar el entrenamiento"): la vista
@@ -720,10 +824,14 @@ onMounted(async () => {
 // disparo se salta (el montaje ya hizo todo el trabajo).
 let activatedOnce = false
 onActivated(() => {
+  viewActive = true
   if (!activatedOnce) {
     activatedOnce = true
     return
   }
+  // v0.38.0: volver al entreno = scroll al ejercicio actual (tras el reset a
+  // 0 que ShellView hace al cambiar de sección; el DOM retenido ya está)
+  void nextTick(scrollToCurrentExercise)
   // catálogo/rotación en fondo: una rutina editada mientras tanto se refleja
   // sin costar nada al pintado instantáneo (loadCatalog solo reemplaza refs)
   void loadCatalog()
@@ -746,9 +854,15 @@ onActivated(() => {
 // pausar el crono de re-render mientras la vista vive oculta bajo el
 // keep-alive: el elapsed se recalcula desde started_at al volver, así que
 // no se pierde nada por no tickear en fondo
-onDeactivated(stopTicker)
+onDeactivated(() => {
+  viewActive = false
+  stopTicker()
+})
 
-onBeforeUnmount(stopTicker)
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  stopTicker()
+})
 
 // v0.5.0 (modelo de scroll único, ver ShellView.vue): las tres ramas del
 // v-if/else-if/else (FinishSummary / entreno en curso / idle) FLUYEN contra
@@ -906,6 +1020,7 @@ onBeforeUnmount(stopTicker)
               :superset-last="supersetLastByIndex[entry.index]"
               :superset-next="entry.we.id === supersetNextUpId"
               :block-labels="workoutBlockLabels"
+              :current="entry.we.id === currentExerciseId"
               @recorded="onRecorded"
               @logged="onLogged(entry.index, $event)"
               @new-block="openNewBlockFor(entry.we.id)"
@@ -932,6 +1047,7 @@ onBeforeUnmount(stopTicker)
           :superset-last="true"
           :superset-next="false"
           :block-labels="workoutBlockLabels"
+          :current="block.entries[0].we.id === currentExerciseId"
           @recorded="onRecorded"
           @logged="onLogged(block.entries[0].index, $event)"
           @new-block="openNewBlockFor(block.entries[0].we.id)"

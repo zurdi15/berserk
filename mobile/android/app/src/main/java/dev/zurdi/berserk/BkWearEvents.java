@@ -13,7 +13,13 @@ final class BkWearEvents {
         void onTimerCancelled(String kind);
     }
 
+    /** v0.38.0: "+ Serie" / "Terminar" desde el reloj sobre el ejercicio weid */
+    interface ExerciseSink {
+        void onExerciseCommand(String action, long weid);
+    }
+
     private static volatile Sink sink;
+    private static volatile ExerciseSink exerciseSink;
 
     private BkWearEvents() {}
 
@@ -21,8 +27,24 @@ final class BkWearEvents {
         sink = newSink;
     }
 
+    static void setExerciseSink(ExerciseSink newSink) {
+        exerciseSink = newSink;
+    }
+
     static void emitCancelled(String kind) {
         Sink current = sink;
         if (current != null) current.onTimerCancelled(kind);
+    }
+
+    /**
+     * true si había web viva que la recibiera. Si no (WebView muerto), el que
+     * llama se lo dice al reloj: la orden no vale nada sin la web, que es
+     * quien registra (outbox, descanso, PRs).
+     */
+    static boolean emitExerciseCommand(String action, long weid) {
+        ExerciseSink current = exerciseSink;
+        if (current == null) return false;
+        current.onExerciseCommand(action, weid);
+        return true;
     }
 }

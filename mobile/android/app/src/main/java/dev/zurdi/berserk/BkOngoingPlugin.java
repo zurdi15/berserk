@@ -221,7 +221,8 @@ public class BkOngoingPlugin extends Plugin {
      * + request code, no por extras, así que vale uno vacío.
      */
     static void cancelEndAlarmNative(Context context, int requestCode, int notificationId) {
-        BkAlarmService.stopIfRunning();
+        // v0.38.0: solo la alarma de ESTE tipo (el request code lo identifica)
+        BkAlarmService.stopIfRunning(requestCode == BkWear.CARDIO_END_REQUEST_CODE ? "cardio" : "rest");
         android.app.AlarmManager alarms =
                 (android.app.AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(context, BkRestEndReceiver.class);
@@ -293,12 +294,51 @@ public class BkOngoingPlugin extends Plugin {
             data.put("kind", kind);
             getBridge().executeOnMainThread(() -> notifyListeners("timerCancelled", data, true));
         });
+        // v0.38.0: órdenes del reloj sobre el ejercicio actual ("+ Serie",
+        // "Terminar") — la web las ejecuta por el mismo camino que sus botones
+        BkWearEvents.setExerciseSink((action, weid) -> {
+            JSObject data = new JSObject();
+            data.put("action", action);
+            data.put("weid", weid);
+            getBridge().executeOnMainThread(() -> notifyListeners("exerciseCommand", data, true));
+        });
     }
 
     @Override
     protected void handleOnDestroy() {
         BkWearEvents.setSink(null);
+        BkWearEvents.setExerciseSink(null);
         BkAlarmEvents.setSink(null);
+    }
+
+    /**
+     * v0.38.0 (zurdi: "añadir serie desde el reloj y poder finalizar
+     * ejercicio"): publica el ejercicio actual del entreno para el reloj
+     * (DataItem /berserk/exercise). state 'none' = no hay ejercicio actual.
+     * La PRESENCIA de este método es la marca de capacidad en nativeShell.ts.
+     */
+    @PluginMethod
+    public void syncExercise(PluginCall call) {
+        try {
+            String state = call.getString("state", "none");
+            if (!"exercise".equals(state) && !"none".equals(state)) {
+                call.reject("syncExercise: state inválido");
+                return;
+            }
+            BkWear.publishExercise(
+                    getContext(),
+                    state,
+                    optLong(call, "weid", 0L),
+                    call.getString("name", ""),
+                    call.getInt("setsDone", 0),
+                    call.getInt("setsTarget", 0),
+                    call.getString("nextLabel", ""),
+                    Boolean.TRUE.equals(call.getBoolean("canLog", false)),
+                    Boolean.TRUE.equals(call.getBoolean("completed", false)));
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(e.toString());
+        }
     }
 
     /** v0.35.0: ¿está sonando la alarma de fin? (la web lo pregunta al volver) */

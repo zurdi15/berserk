@@ -6,7 +6,7 @@ import * as domain from '@/api/domain'
 import type { ExerciseHistoryOut, PersonalRecordOut, SetIn, SetLogOut, SetOut, WorkoutExerciseOut, WorkoutOut } from '@/api/domain'
 import { i18n } from '@/i18n'
 import { normalizeSupersets } from '@/lib/supersets'
-import { isNativeShell, startNativeWorkoutChronometer, stopNativeWorkoutChronometer, syncWearTimer } from '@/utils/nativeShell'
+import { isNativeShell, startNativeWorkoutChronometer, stopNativeWorkoutChronometer, syncWearExercise, syncWearTimer } from '@/utils/nativeShell'
 import { routineImageUrl } from '@/api/domain'
 import { isValidRuneName } from '@/lib/runeResolve'
 import { runeDataUrl } from '@/utils/runeImage'
@@ -79,6 +79,8 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
       } else {
         void stopNativeWorkoutChronometer()
         void syncWearTimer({ kind: 'workout', state: 'stopped' })
+        // v0.38.0: sin entreno no hay ejercicio actual que enseñar en el reloj
+        void syncWearExercise({ state: 'none' })
       }
     },
     { immediate: true },
@@ -171,6 +173,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
           rest_seconds: item.rest_seconds ?? null,
           superset_group: item.superset_group ?? null,
           block_label: item.block_label ?? null,
+          completed: false,
           sets: [],
         }
       })
@@ -239,6 +242,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     if (!isNativeShell()) return
     void stopNativeWorkoutChronometer()
     void syncWearTimer({ kind: 'workout', state: 'stopped', reason: 'cancelled' })
+    void syncWearExercise({ state: 'none' })
   }
 
   async function finish(): Promise<WorkoutOut> {
@@ -290,6 +294,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
         rest_seconds: null,
         superset_group: null,
         block_label: blockLabel,
+        completed: false,
         sets: [],
       },
     ]
@@ -531,6 +536,32 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     })
   }
 
+  // v0.38.0 (zurdi: "check de marcar ejercicio como completado"): dar el
+  // ejercicio por hecho — o des-marcarlo — a mano, desde el reloj o solo al
+  // terminar un countdown de cardio. Misma pareja online/offline que
+  // setExerciseBlock: el PATCH viaja por el outbox si no hay red.
+  async function setExerciseCompleted(weid: number, completed: boolean) {
+    if (!offline()) {
+      try {
+        await domain.updateWorkoutExercise(workout.value!.id, weid, { completed })
+        await refresh()
+        return
+      } catch (error) {
+        if (!(error instanceof OfflineError)) throw error
+        // la red murió al marcar: cae a la rama offline como logSet/addExercise
+      }
+    }
+    const wex = localExercise(weid)
+    wex.completed = completed
+    outbox.enqueue({
+      id: outbox.newClientId(),
+      kind: 'setExerciseCompleted',
+      workoutId: workout.value!.id,
+      exerciseId: weid,
+      completed,
+    })
+  }
+
   async function discard() {
     // descartar exige red (v1): es la acción más destructiva del flujo y
     // reproducirla en diferido tras una cola de series sería tirar trabajo
@@ -547,6 +578,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     workout.value = null
     lastRecords.value = []
     historyCache.value.clear()
+    void syncWearExercise({ state: 'none' })
   }
 
   return {
@@ -572,6 +604,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     saveExerciseNote,
     setExerciseRest,
     setExerciseBlock,
+    setExerciseCompleted,
     reset,
   }
 })

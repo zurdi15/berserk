@@ -15,13 +15,24 @@ Web (restTimer.ts / WorkoutExerciseCard.vue / activeWorkout.ts)
                            └─ TimerAlarms        (AlarmManager exacto → TimerAlarmReceiver: vibra + "¡Tiempo!")
 Cancelar desde el reloj: PhoneLink → MessageClient /berserk/cmd/cancel → BkWearListenerService (móvil)
   → limpia notificación y alarma en nativo, publica `stopped`, y avisa a la web (evento timerCancelled).
+
+v0.38.0 — el ejercicio actual (segunda página del pager, con "+ Serie" y "Terminar"):
+Web (WorkoutView decide cuál es; la WorkoutExerciseCard `current` lo publica)
+  └─ nativeShell.ts::syncWearExercise → BkOngoing.syncExercise → BkWear.publishExercise
+       └─ DataItem /berserk/exercise (nombre, series hechas/objetivo, siguiente serie, canLog, completed)
+            └─ TimerListenerService → TimerEngine.applyExercise → ExerciseRepository (StateFlow)
+Órdenes: PhoneLink → /berserk/cmd/logSet | /berserk/cmd/completeExercise (cuerpo = weid)
+  → BkWearListenerService → evento `exerciseCommand` a la web (misma ruta que el check de la card:
+    outbox, descanso automático, PRs); sin WebView vivo el móvil contesta /berserk/cmd/undelivered
+    y el reloj enseña "Abre berserk en el móvil".
 ```
 
 Decisiones que conviene conocer antes de tocar nada:
 
 - **Sin foreground service.** Lo que se ve (cronómetro de la notificación, indicador de la esfera) lo renderiza Wear OS a partir de la notificación; el aviso a cero lo dispara una alarma. Así nada depende de que el proceso sobreviva ni de las restricciones de Android 12+ para arrancar servicios desde segundo plano.
 - **El móvil es la única verdad.** El reloj no calcula fines ni duraciones: recibe `targetEpochMs` absoluto y lo pinta. Si se cancela desde el reloj y el móvil no está al alcance, el DataItem del móvil seguirá diciendo `running` y lo resucitará al reconectar mientras no haya vencido.
-- **Un DataItem por temporizador**, para que un `stopped` del descanso nunca pise el crono del entreno. Los DataItems vencidos hace más de 15 s al llegar (reconexión, arranque) se ignoran sin vibrar a destiempo.
+- **Un DataItem por temporizador**, para que un `stopped` del descanso nunca pise el crono del entreno. Los DataItems vencidos hace más de 15 s al llegar (reconexión, arranque) se ignoran sin vibrar a destiempo. Y como persisten, un `stopped` viejo de OTRO tipo solo puede parar la alarma de su propio tipo (`AlarmService.stopIfRunning(kind)`, v0.38.0): al abrirse la app por la alarma se releen todos y antes apagaban la que acababa de empezar.
+- **El ejercicio actual solo se enseña con el crono del entreno en marcha y si se publicó después de arrancarlo** (`TimerBoard.exerciseFor`): el DataItem persiste y, si no, el reloj enseñaría el último ejercicio del entreno anterior.
 - **Mismo `applicationId` (`dev.zurdi.berserk`) y misma firma que la shell**: es lo que exige la Data Layer. El `namespace` del código es `dev.zurdi.berserk.wear`.
 
 ## Compilar

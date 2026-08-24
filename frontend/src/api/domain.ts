@@ -112,6 +112,10 @@ export interface WorkoutExerciseOut {
   // stepper) — null = sin bloque. La agrupación en steps es por ETIQUETA
   // (no por contigüidad, a diferencia de superset_group).
   block_label?: string | null
+  // v0.38.0 (zurdi: "check de marcar ejercicio como completado"): dado por
+  // hecho a mano (o solo al terminar un countdown de cardio). Opcional en el
+  // tipo por el mismo criterio que superset_group; resolución `?? false`.
+  completed?: boolean
   sets: SetOut[]
 }
 
@@ -520,6 +524,8 @@ export const updateWorkoutExercise = (wid: number, weid: number, body: {
   rest_seconds?: number | null
   // v0.18.1: mover el ejercicio de bloque mid-entreno (null = sin bloque)
   block_label?: string | null
+  // v0.38.0: check de "ejercicio hecho"
+  completed?: boolean
 }) =>
   api<WorkoutExerciseOut>(`/workouts/${wid}/exercises/${weid}`, { method: 'PATCH', body })
 

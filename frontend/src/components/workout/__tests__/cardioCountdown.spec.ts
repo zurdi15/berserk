@@ -74,6 +74,20 @@ describe('CardioCountdown (item 7)', () => {
     expect(vibrate).toHaveBeenCalledTimes(1)
   })
 
+  // v0.38.0: `finished` sale en el tick de llegar a cero — es el momento del
+  // aviso (notificación del sistema, como el descanso), `done` el del registro
+  it('emits finished at zero, before the hold, and done only after it', async () => {
+    const wrapper = build(5)
+    vi.advanceTimersByTime(5_000)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('finished')).toHaveLength(1)
+    expect(wrapper.emitted('done')).toBeFalsy()
+    vi.advanceTimersByTime(1_200)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('finished')).toHaveLength(1)
+    expect(wrapper.emitted('done')).toHaveLength(1)
+  })
+
   it('emits cancel when the cancel button is clicked, without emitting done', async () => {
     const wrapper = build(90)
     await wrapper.get('[data-testid="cardio-countdown-cancel"]').trigger('click')

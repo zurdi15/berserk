@@ -82,13 +82,22 @@ public class BkAlarmService extends Service {
         }
     }
 
-    /** Una serie nueva, un cancelar o el OK del reloj: fuera la alarma (idempotente). */
+    /** Una serie nueva: fuera la alarma, sea del tipo que sea (idempotente). */
     static void stopIfRunning() {
+        stopIfRunning(null);
+    }
+
+    /**
+     * v0.38.0: cancelar o acusar UN tipo (descanso o cardio) no debe callar la
+     * alarma del OTRO — el mismo fallo que tenía el reloj: un `cancelled` del
+     * descanso llegaba mientras sonaba el cardio y lo apagaba. null = cualquiera.
+     */
+    static void stopIfRunning(String kind) {
         BkAlarmService current = instance;
-        if (current != null) {
-            BkAlarmEvents.publish(BkAlarmEvents.idle());
-            current.finish(true);
-        }
+        if (current == null) return;
+        if (kind != null && !kind.equals(current.kind)) return;
+        BkAlarmEvents.publish(BkAlarmEvents.idle());
+        current.finish(true);
     }
 
     /** El OK del overlay de la web: como el de la notificación (calla también el reloj). */

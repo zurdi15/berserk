@@ -91,6 +91,23 @@ describe('active workout store — offline branches', () => {
     expect(snapshot.exercises[0].sets).toHaveLength(1)
   })
 
+  // v0.38.0 (zurdi: "check de marcar ejercicio como completado"): misma
+  // pareja que setExerciseBlock — flag local + PATCH encolado
+  it('setExerciseCompleted offline: flips the flag locally and queues the PATCH', async () => {
+    const store = useActiveWorkoutStore()
+    store.workout = baseWorkout()
+
+    await store.setExerciseCompleted(7, true)
+
+    expect(domain.updateWorkoutExercise).not.toHaveBeenCalled()
+    expect(store.workout!.exercises[0].completed).toBe(true)
+    expect(loadQueue()[0]).toMatchObject({ kind: 'setExerciseCompleted', workoutId: 4, exerciseId: 7, completed: true })
+
+    await store.setExerciseCompleted(7, false)
+    expect(store.workout!.exercises[0].completed).toBe(false)
+    expect(loadQueue()).toHaveLength(2)
+  })
+
   it('start offline from a cached routine builds the local copy with temp ids', async () => {
     vi.mocked(domain.listRoutines).mockResolvedValue([
       {

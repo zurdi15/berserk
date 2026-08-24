@@ -350,6 +350,13 @@ class WorkoutExercise(Base):
     # etiqueta (add_exercise la acepta): en el stepper del entreno, añadir un
     # ejercicio mientras miras un bloque lo mete en ESE bloque.
     block_label: Mapped[str | None] = mapped_column(String(40), default=None)
+    # v0.38.0 (zurdi: "check de marcar ejercicio como completado"): el
+    # usuario da el ejercicio por hecho aunque no llegue a las series
+    # objetivo (o sin objetivo). Gobierna el progreso del bloque en el
+    # frontend (un bloque se completa con todos sus ejercicios en check) y
+    # el "ejercicio actual" que se manda al reloj. Se pone solo al terminar
+    # un countdown de cardio; nunca lo toca el backend por su cuenta.
+    completed: Mapped[bool] = mapped_column(default=False)
 
     sets: Mapped[list["WorkoutSet"]] = relationship(
         cascade="all, delete-orphan",

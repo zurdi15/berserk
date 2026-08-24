@@ -12,6 +12,7 @@ import {
   syncWearTimer,
   type WearStopReason,
 } from '@/utils/nativeShell'
+import { showTimerNotification } from '@/utils/timerNotification'
 import { cancelWebPushTimer, scheduleWebPushTimer } from '@/utils/webPush'
 
 // timestamps absolutos: el interval solo refresca la vista; si el móvil se
@@ -66,37 +67,14 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     void Notification.requestPermission()
   }
 
-  async function notifyRestOver() {
-    // visible = las señales in-app (vibración + countdown en el CTA) ya
-    // avisan; la notificación del sistema es solo para cuando el móvil está
-    // bloqueado o en otra app — mostrarla también en foreground es ruido
-    if (typeof document === 'undefined' || document.visibilityState !== 'hidden') return
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-
+  // v0.38.0: la notificación en sí vive en utils/timerNotification.ts,
+  // compartida con el fin de cardio (mismo aviso para los dos)
+  function notifyRestOver() {
     const title = i18n.global.t('timer.notifyTitle')
     const body = restExerciseName
       ? i18n.global.t('timer.notifyBodyWithExercise', { exercise: restExerciseName })
       : i18n.global.t('timer.notifyBody')
-    const options: NotificationOptions = { body, icon: '/icons/pwa-192.png', tag: 'berserk-rest-timer' }
-
-    try {
-      // Android en concreto lanza "Illegal constructor" al hacer
-      // `new Notification()` desde una página con un service worker activo:
-      // hay que pasar por el registro cuando existe. vite-pwa (generateSW,
-      // ver vite.config.ts) no necesita código propio para esto —
-      // showNotification() es un método nativo de cualquier
-      // ServiceWorkerRegistration activa, generada o escrita a mano. En dev
-      // (SW deshabilitado) o navegadores sin SW, new Notification() es el
-      // camino pragmático: sigue siendo una PWA funcional sin él. El await
-      // solo se paga cuando de verdad hay SW que consultar — así el camino
-      // sin SW no cede el hilo de más.
-      let registration: ServiceWorkerRegistration | undefined
-      if ('serviceWorker' in navigator) registration = await navigator.serviceWorker.getRegistration()
-      if (registration) await registration.showNotification(title, options)
-      else new Notification(title, options)
-    } catch {
-      // notificación no soportada/bloqueada en este entorno: la vibración ya avisó
-    }
+    return showTimerNotification(title, body, 'berserk-rest-timer')
   }
 
   function tick() {

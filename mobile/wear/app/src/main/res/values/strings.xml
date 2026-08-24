@@ -13,6 +13,10 @@
 
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
+    <!-- v0.38.0: exercise page -->
+    <string name="exercise_add_set">+ Set</string>
+    <string name="exercise_finish">Finish</string>
+    <string name="phone_app_closed">Open berserk on the phone</string>
     <string name="workout_elapsed">%1$s</string>
 
     <string name="phone_connected">Phone connected</string>

@@ -10,10 +10,13 @@ import {
   checkNativeShellUpdate,
   getWearStatus,
   hasWearBridge,
+  hasWearExerciseBridge,
+  onWearExerciseCommand,
   onWearTimerCancelled,
   openNativeShellDownload,
   scheduleNativeRestNotification,
   startNativeRestCountdown,
+  syncWearExercise,
   syncWearTimer,
 } from '../nativeShell'
 
@@ -214,5 +217,66 @@ describe('startNativeRestCountdown — extras para la tarjeta del móvil', () =>
     )
     await startNativeRestCountdown(6_000, 'Descanso')
     expect(startCountdown).toHaveBeenLastCalledWith(expect.objectContaining({ subtitle: '', imageUrl: '' }))
+  })
+})
+
+// v0.38.0 (zurdi: "añadir serie desde el reloj y poder finalizar ejercicio"):
+// el ejercicio actual va al reloj por un DataItem propio y las órdenes vuelven
+// como evento `exerciseCommand`; misma disciplina que el puente de timers —
+// opcional (shells anteriores no tienen syncExercise) y silencioso
+describe('reloj Wear OS — syncWearExercise / onWearExerciseCommand', () => {
+  it('sin syncExercise: no-op sin error; con él, payload completo con defaults', async () => {
+    installCapacitor({})
+    expect(hasWearExerciseBridge()).toBe(false)
+    await expect(syncWearExercise({ state: 'none' })).resolves.toBeUndefined()
+
+    const syncExercise = vi.fn().mockResolvedValue(undefined)
+    installCapacitor({ syncExercise })
+    expect(hasWearExerciseBridge()).toBe(true)
+    await syncWearExercise({ state: 'exercise', weid: 20, name: 'Press banca', setsDone: 1, setsTarget: 3, nextLabel: '8 × 60 kg', canLog: true })
+    expect(syncExercise).toHaveBeenCalledWith({
+      state: 'exercise',
+      weid: 20,
+      name: 'Press banca',
+      setsDone: 1,
+      setsTarget: 3,
+      nextLabel: '8 × 60 kg',
+      canLog: true,
+      completed: false,
+    })
+    await syncWearExercise({ state: 'none' })
+    expect(syncExercise).toHaveBeenLastCalledWith({
+      state: 'none', weid: 0, name: '', setsDone: 0, setsTarget: 0, nextLabel: '', canLog: false, completed: false,
+    })
+
+    installCapacitor({ syncExercise: vi.fn().mockRejectedValue(new Error('no gms')) })
+    await expect(syncWearExercise({ state: 'none' })).resolves.toBeUndefined()
+  })
+
+  it('onWearExerciseCommand: reparte action + weid (también negativos), ignora lo malformado, y baja', () => {
+    let handler: ((data: Record<string, unknown>) => void) | null = null
+    const addListener = vi.fn((event: string, callback: (data: Record<string, unknown>) => void) => {
+      if (event === 'exerciseCommand') handler = callback
+      return Promise.resolve({ remove: () => Promise.resolve() })
+    })
+    installCapacitor({ syncExercise: vi.fn(), addListener })
+
+    const listener = vi.fn()
+    const off = onWearExerciseCommand(listener)
+    expect(addListener).toHaveBeenCalledWith('exerciseCommand', expect.any(Function))
+
+    handler!({ action: 'logSet', weid: 20 })
+    expect(listener).toHaveBeenCalledWith('logSet', 20)
+    // alta hecha sin red en el móvil: id temporal negativo, vale igual
+    handler!({ action: 'complete', weid: -3 })
+    expect(listener).toHaveBeenCalledWith('complete', -3)
+
+    handler!({ action: 'nap', weid: 1 })
+    handler!({ action: 'logSet', weid: 'x' })
+    expect(listener).toHaveBeenCalledTimes(2)
+
+    off()
+    handler!({ action: 'logSet', weid: 20 })
+    expect(listener).toHaveBeenCalledTimes(2)
   })
 })

@@ -1475,3 +1475,240 @@ describe('v0.5.0 superseries: rest gating and chips', () => {
     expect(byTestId('rest-toggle-20').exists()).toBe(true)
   })
 })
+
+// ── v0.38.0 (zurdi: "check de marcar ejercicio como completado") ────────────
+describe('v0.38.0: check de "ejercicio hecho"', () => {
+  it('shows the header check when the actions can mark, and marks through setExerciseCompleted', async () => {
+    const setExerciseCompleted = vi.fn(async () => {})
+    const wrapper = mountCard({ actions: makeActions({ setExerciseCompleted }) })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="exercise-done-20"]').trigger('click')
+    await flushPromises()
+
+    expect(setExerciseCompleted).toHaveBeenCalledWith(20, true)
+    wrapper.unmount()
+  })
+
+  it('is hidden without setExerciseCompleted (retro editor) and when the card is not live', async () => {
+    const plain = mountCard()
+    await flushPromises()
+    expect(plain.find('[data-testid="exercise-done-20"]').exists()).toBe(false)
+    plain.unmount()
+
+    const retro = mountCard({ live: false, actions: makeActions({ setExerciseCompleted: vi.fn(async () => {}) }) })
+    await flushPromises()
+    expect(retro.find('[data-testid="exercise-done-20"]').exists()).toBe(false)
+    retro.unmount()
+  })
+
+  it('a completed exercise collapses to its header (chip "Hecho", no sets, ghosts or footer) and the check un-marks it', async () => {
+    const setExerciseCompleted = vi.fn(async () => {})
+    const wrapper = mountCard({
+      workoutExercise: { ...pushExercise, completed: true },
+      actions: makeActions({ setExerciseCompleted }),
+    })
+    await flushPromises()
+
+    // la raíz del template lleva comentarios delante de BkCard: para VTU es un
+    // fragmento, así que los attrs se leen en la <section> real
+    expect(wrapper.find('section').attributes('data-completed')).toBe('true')
+    expect(wrapper.find('section').classes()).toContain('opacity-70')
+    expect(wrapper.find('[data-testid="exercise-done-chip-20"]').text()).toBe('Hecho')
+    expect(wrapper.find('[data-testid="set-row-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="add-set-20"]').exists()).toBe(false)
+    // el contador sigue en la cabecera
+    expect(wrapper.get('[data-testid="set-count-20"]').text()).toContain('1')
+
+    await wrapper.get('[data-testid="exercise-done-20"]').trigger('click')
+    await flushPromises()
+    expect(setExerciseCompleted).toHaveBeenCalledWith(20, false)
+    wrapper.unmount()
+  })
+})
+
+// ── v0.38.0 (zurdi: "añadir serie desde el reloj y poder finalizar
+// ejercicio"): la card `current` publica su estado al reloj y ejecuta sus
+// órdenes por el mismo camino que sus propios checks ───────────────────────
+type CapacitorStub = { isNativePlatform: () => boolean; Plugins: Record<string, unknown> }
+type ShellHandles = {
+  syncExercise: ReturnType<typeof vi.fn>
+  syncTimer: ReturnType<typeof vi.fn>
+  command: () => (data: Record<string, unknown>) => void
+}
+
+function installShell(): ShellHandles {
+  let handler: ((data: Record<string, unknown>) => void) | null = null
+  const syncExercise = vi.fn().mockResolvedValue(undefined)
+  const syncTimer = vi.fn().mockResolvedValue(undefined)
+  const addListener = vi.fn((event: string, callback: (data: Record<string, unknown>) => void) => {
+    if (event === 'exerciseCommand') handler = callback
+    return Promise.resolve({ remove: () => Promise.resolve() })
+  })
+  const stub: CapacitorStub = {
+    isNativePlatform: () => true,
+    Plugins: {
+      LocalNotifications: {
+        requestPermissions: vi.fn().mockResolvedValue({ display: 'granted' }),
+        schedule: vi.fn().mockResolvedValue(undefined),
+        cancel: vi.fn().mockResolvedValue(undefined),
+      },
+      BkOngoing: {
+        syncExercise,
+        syncTimer,
+        addListener,
+        startCountdown: vi.fn().mockResolvedValue(undefined),
+        startChronometer: vi.fn().mockResolvedValue(undefined),
+        stop: vi.fn().mockResolvedValue(undefined),
+        scheduleEndAlarm: vi.fn().mockResolvedValue(undefined),
+        cancelEndAlarm: vi.fn().mockResolvedValue(undefined),
+        getAppInfo: vi.fn().mockResolvedValue({ versionName: '0.38.0' }),
+      },
+    },
+  }
+  ;(globalThis as { Capacitor?: CapacitorStub }).Capacitor = stub
+  return { syncExercise, syncTimer, command: () => handler! }
+}
+
+function memoryStorage(): Storage {
+  const store = new Map<string, string>()
+  return {
+    getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+    setItem: (key: string, value: string) => { store.set(key, value) },
+    removeItem: (key: string) => { store.delete(key) },
+    clear: () => { store.clear() },
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() { return store.size },
+  } as Storage
+}
+
+describe('v0.38.0: el ejercicio actual en el reloj', () => {
+  afterEach(() => {
+    delete (globalThis as { Capacitor?: CapacitorStub }).Capacitor
+  })
+
+  it('the current card publishes name, progress and the next quick set; a non-current card publishes nothing', async () => {
+    const shell = installShell()
+    const wrapper = mountCard({ current: true, routines, routineId: 1 })
+    await flushPromises()
+
+    expect(shell.syncExercise).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state: 'exercise',
+        weid: 20,
+        name: 'Press banca',
+        setsDone: 1,
+        setsTarget: 3,
+        nextLabel: expect.stringMatching(/^5 × 100/),
+        canLog: true,
+        completed: false,
+      }),
+    )
+    wrapper.unmount()
+
+    shell.syncExercise.mockClear()
+    const other = mountCard({ current: false })
+    await flushPromises()
+    expect(shell.syncExercise).not.toHaveBeenCalled()
+    other.unmount()
+  })
+
+  it('a completed current card publishes completed=true with no quick set', async () => {
+    const shell = installShell()
+    const wrapper = mountCard({
+      current: true,
+      workoutExercise: { ...pushExercise, completed: true },
+      actions: makeActions({ setExerciseCompleted: vi.fn(async () => {}) }),
+    })
+    await flushPromises()
+    expect(shell.syncExercise).toHaveBeenLastCalledWith(
+      expect.objectContaining({ weid: 20, completed: true, canLog: false, nextLabel: '' }),
+    )
+    wrapper.unmount()
+  })
+
+  it('"+ Serie" from the watch logs the ghost set through actions.logSet — only for its own weid', async () => {
+    const shell = installShell()
+    const actions = makeActions()
+    const wrapper = mountCard({ current: true, actions })
+    await flushPromises()
+
+    shell.command()({ action: 'logSet', weid: 999 })
+    await flushPromises()
+    expect(actions.logSet).not.toHaveBeenCalled()
+
+    shell.command()({ action: 'logSet', weid: 20 })
+    await flushPromises()
+    expect(actions.logSet).toHaveBeenCalledWith(20, expect.objectContaining({ is_warmup: false, reps: 5, weight_kg: 100 }))
+    wrapper.unmount()
+  })
+
+  it('"Terminar" from the watch marks the exercise done through setExerciseCompleted', async () => {
+    const shell = installShell()
+    const setExerciseCompleted = vi.fn(async () => {})
+    const wrapper = mountCard({ current: true, actions: makeActions({ setExerciseCompleted }) })
+    await flushPromises()
+
+    shell.command()({ action: 'complete', weid: 20 })
+    await flushPromises()
+    expect(setExerciseCompleted).toHaveBeenCalledWith(20, true)
+    wrapper.unmount()
+  })
+})
+
+// ── v0.38.0 (zurdi: "al terminar un timer de cardio ... no se completa el
+// bloque" + "el fin de cardio no tiene el mismo feedback que el de descanso")
+describe('v0.38.0: fin de cardio — hecho automático y aviso al reloj con gracia', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('navigator', { vibrate: vi.fn() })
+    vi.stubGlobal('localStorage', memoryStorage())
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    delete (globalThis as { Capacitor?: CapacitorStub }).Capacitor
+  })
+
+  it('reaching zero logs the set, marks the exercise done, and tells the watch "finished" only after the 3 s grace', async () => {
+    const shell = installShell()
+    const setExerciseCompleted = vi.fn(async () => {})
+    const actions = makeActions({
+      logSet: vi.fn(async () => ({
+        set: { id: 1, set_number: 1, reps: null, weight_kg: null, duration_seconds: 1200, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+        new_records: [],
+      })),
+      setExerciseCompleted,
+    })
+    const wrapper = mountCard({
+      workoutExercise: cardioWorkoutExercise,
+      exercise: cardioExercise,
+      exerciseIds: [30],
+      workoutId: 1,
+      actions,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="cardio-start-30"]').trigger('click')
+    await flushPromises()
+    await byTestId('cardio-start-confirm').trigger('click')
+    await flushPromises()
+    expect(shell.syncTimer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'cardio', state: 'running' }))
+
+    vi.advanceTimersByTime(1_200_000)
+    await flushPromises()
+    vi.advanceTimersByTime(1_200)
+    await flushPromises()
+
+    expect(actions.logSet).toHaveBeenCalledWith(30, expect.objectContaining({ duration_seconds: 1200 }))
+    expect(setExerciseCompleted).toHaveBeenCalledWith(30, true)
+    // el reloj aún no sabe que terminó: su propia alarma exacta va primero
+    expect(shell.syncTimer).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'cardio', state: 'stopped' }))
+
+    vi.advanceTimersByTime(3_000)
+    await flushPromises()
+    expect(shell.syncTimer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'cardio', state: 'stopped', reason: 'finished' }))
+    wrapper.unmount()
+  })
+})

@@ -70,3 +70,22 @@ class TimerBoardTest {
         assertTrue(!workout.isDue(999_999L))
     }
 }
+
+class BoardExerciseTest {
+    private fun workout(sentAt: Long) =
+        ActiveTimer(TimerSpec(TimerKind.WORKOUT, true, 0L, 0L, "", sentAt), receivedAtEpochMs = sentAt)
+
+    private val exercise = ExerciseSpec(
+        weid = 20L, name = "Press banca", setsDone = 1, setsTarget = 3,
+        nextLabel = "8 × 60 kg", canLog = true, completed = false, sentAtEpochMs = 500L,
+    )
+
+    @Test
+    fun `the current exercise only shows with a live workout that started before it was published`() {
+        assertNull(TimerBoard().exerciseFor(exercise))
+        assertEquals(exercise, TimerBoard().with(workout(sentAt = 100L)).exerciseFor(exercise))
+        // publicado ANTES de arrancar este entreno: es del anterior, se calla
+        assertNull(TimerBoard().with(workout(sentAt = 900L)).exerciseFor(exercise))
+        assertNull(TimerBoard().with(workout(sentAt = 100L)).exerciseFor(null))
+    }
+}

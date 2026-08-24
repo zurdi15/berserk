@@ -1493,3 +1493,137 @@ describe('WorkoutView v0.5.0 superseries: render agrupado y encadenado', () => {
     expect(wrapper.find('[data-testid="superset-chip-21"]').exists()).toBe(false)
   })
 })
+
+// ── v0.38.0: el ejercicio actual — progreso con checks (zurdi: "debería
+// completarse bloque si todos los ejercicios están en check"), scroll al
+// entrar/desbloquear (zurdi: "scroll al ejercicio actual") y la card
+// `current` para el reloj ─────────────────────────────────────────────────
+describe('WorkoutView v0.38.0: ejercicio actual', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    push.mockClear()
+  })
+
+  const set = (id: number, at: string) => ({
+    id, set_number: 1, reps: 5, weight_kg: 50, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: at,
+  })
+  const wex = (id: number, label: string | null, sets: ReturnType<typeof set>[] = [], completed = false) => ({
+    id, exercise_id: id, position: id, note: null, rest_seconds: null, superset_group: null, block_label: label, completed, sets,
+  })
+  function workoutWith(exercises: ReturnType<typeof wex>[]) {
+    return {
+      id: 1, date: '2026-08-24', started_at: '2026-08-24T10:00:00', ended_at: null, routine_id: null,
+      note: null, feeling: null, stretched: false, exercises, muscle_tag_ids: [],
+    }
+  }
+
+  it('a checked exercise counts as done in the block progress even without sets', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+    activeWorkout.workout = workoutWith([wex(1, 'Empuje', [], true), wex(2, 'Empuje'), wex(3, 'Tirón')])
+
+    const wrapper = build()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="block-title"]').text()).toContain('1/2 ejercicios')
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('1')
+    wrapper.unmount()
+  })
+
+  it('the card of the most recently logged exercise of the visible block is current; if that one is checked, the next pending takes over', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+    activeWorkout.workout = workoutWith([
+      wex(1, 'Empuje', [set(10, '2026-08-24T10:05:00')]),
+      wex(2, 'Empuje', [set(11, '2026-08-24T10:02:00')]),
+      wex(3, 'Tirón', [set(12, '2026-08-24T10:30:00')]),
+    ])
+
+    const wrapper = build()
+    await flushPromises()
+    const currentOf = () =>
+      wrapper.findAllComponents(WorkoutExerciseCard).filter((c) => c.props('current')).map((c) => c.props('workoutExercise').id)
+    // el de Tirón es el último de TODO el entreno, pero no está a la vista
+    expect(currentOf()).toEqual([1])
+
+    activeWorkout.workout!.exercises[0].completed = true
+    await flushPromises()
+    expect(currentOf()).toEqual([2])
+    wrapper.unmount()
+  })
+
+  it('scrolls <main> to the current card on mount and when the app comes back to the foreground; to the top when nothing is logged yet', async () => {
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+    activeWorkout.workout = workoutWith([wex(1, null), wex(2, null, [set(10, '2026-08-24T10:05:00')]), wex(3, null)])
+
+    const main = document.createElement('main')
+    document.body.appendChild(main)
+    const host = document.createElement('div')
+    main.appendChild(host)
+    Object.defineProperty(main, 'offsetParent', { value: null, configurable: true })
+    const wrapper = mount(WorkoutView, { global: { plugins: [createI18nInstance()] }, attachTo: host })
+    await flushPromises()
+
+    const card = document.getElementById('workout-exercise-2')!
+    Object.defineProperty(card, 'offsetTop', { value: 640, configurable: true })
+    Object.defineProperty(card, 'offsetParent', { value: main, configurable: true })
+    const header = document.querySelector('[data-testid="workout-header-sticky"]')!
+    Object.defineProperty(header, 'offsetHeight', { value: 80, configurable: true })
+
+    // volver a primer plano (desbloquear el móvil) con la vista activa
+    main.scrollTop = 0
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(main.scrollTop).toBe(640 - 80 - 8)
+
+    // sin ninguna serie en el bloque: arriba del todo
+    main.scrollTop = 300
+    activeWorkout.workout!.exercises[1].sets = []
+    await flushPromises()
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(main.scrollTop).toBe(0)
+
+    wrapper.unmount()
+    main.remove()
+  })
+
+  it('"Completar todo el bloque" skips exercises already checked as done', async () => {
+    const catalog = [
+      { id: 1, name_es: 'A', name_en: 'A', measurement: 'strength', owner_id: null, muscle_groups: [] },
+      { id: 2, name_es: 'B', name_en: 'B', measurement: 'strength', owner_id: null, muscle_groups: [] },
+    ]
+    vi.mocked(domain.listExercises).mockImplementation(async () => catalog as never)
+    vi.mocked(domain.listRoutines).mockResolvedValueOnce([
+      {
+        id: 8, name: 'Bloques', description: null, rune: null, color: null,
+        exercises: [
+          { id: 91, exercise_id: 1, position: 0, target_sets: 2, target_reps: 8, target_weight_kg: 40, rest_seconds: null, superset_group: null, block_label: 'Empuje' },
+          { id: 92, exercise_id: 2, position: 1, target_sets: 1, target_reps: 10, target_weight_kg: 20, rest_seconds: null, superset_group: null, block_label: 'Empuje' },
+          { id: 93, exercise_id: 3, position: 2, target_sets: 3, target_reps: 5, target_weight_kg: 60, rest_seconds: null, superset_group: null, block_label: 'Tirón' },
+        ],
+      },
+    ] as never)
+    const activeWorkout = useActiveWorkoutStore()
+    vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+    const workout = workoutWith([wex(1, 'Empuje', [], true), wex(2, 'Empuje'), wex(3, 'Tirón')])
+    ;(workout as { routine_id: number | null }).routine_id = 8
+    activeWorkout.workout = workout
+    const logSpy = vi.spyOn(activeWorkout, 'logSet').mockResolvedValue({
+      set: { id: 900, set_number: 1, reps: 10, weight_kg: 20, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+      new_records: [],
+    } as never)
+
+    const wrapper = build()
+    await flushPromises()
+    await wrapper.get('[data-testid="complete-block-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(logSpy).toHaveBeenCalledTimes(1)
+    expect(logSpy).toHaveBeenCalledWith(2, { is_warmup: false, reps: 10, weight_kg: 20 })
+    vi.mocked(domain.listExercises).mockImplementation(async () => [] as never)
+    wrapper.unmount()
+  })
+})

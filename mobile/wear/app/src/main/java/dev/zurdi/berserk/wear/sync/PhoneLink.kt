@@ -58,13 +58,35 @@ class PhoneLink(context: Context) {
         }.getOrElse { false }
     }
 
-    /** v0.34.0: el OK del reloj calla también la alarma del móvil. */
+    /** v0.34.0: el OK del reloj calla también la alarma del móvil (v0.38.0: solo la de ese tipo). */
     suspend fun requestAck(kind: TimerKind): Boolean {
         val node = phoneNode() ?: return false
         return runCatching {
             messageClient.sendMessage(node.id, PATH_CMD_ACK, kind.wireName.toByteArray(Charsets.UTF_8)).await()
             true
         }.getOrElse { false }
+    }
+
+    /**
+     * v0.38.0 (zurdi: "añadir serie desde el reloj y poder finalizar
+     * ejercicio"): órdenes sobre el ejercicio actual, con el weid que se tenía
+     * en pantalla para que el móvil no actúe sobre otro si cambió entre medias.
+     * La web es quien registra; si no está viva el móvil contesta por
+     * PATH_CMD_UNDELIVERED (ver TimerListenerService). false = sin móvil al alcance.
+     */
+    suspend fun requestLogSet(weid: Long): Boolean = sendCommand(PATH_CMD_LOG_SET, weid.toString())
+
+    suspend fun requestCompleteExercise(weid: Long): Boolean = sendCommand(PATH_CMD_COMPLETE_EXERCISE, weid.toString())
+
+    private suspend fun sendCommand(path: String, body: String): Boolean {
+        val node = phoneNode() ?: return false
+        return runCatching {
+            messageClient.sendMessage(node.id, path, body.toByteArray(Charsets.UTF_8)).await()
+            true
+        }.getOrElse {
+            Log.w(TAG, "orden $path no entregada", it)
+            false
+        }
     }
 
     /**
@@ -120,6 +142,9 @@ class PhoneLink(context: Context) {
         const val PATH_CMD_ACK = "/berserk/cmd/ack"
         const val PATH_CMD_CLOCK = "/berserk/cmd/clock"
         const val PATH_CLOCK_PONG = "/berserk/clock/pong"
+        const val PATH_CMD_LOG_SET = "/berserk/cmd/logSet"
+        const val PATH_CMD_COMPLETE_EXERCISE = "/berserk/cmd/completeExercise"
+        const val PATH_CMD_UNDELIVERED = "/berserk/cmd/undelivered"
         private const val TAG = "BkWear"
     }
 }

@@ -129,8 +129,15 @@ class AlarmService : Service() {
             false
         }
 
-        fun stopIfRunning() {
-            instance?.finish()
+        /**
+         * v0.38.0 (zurdi: "reloj no se queda vibrando con fin de descanso/cardio"):
+         * SOLO la alarma de ese tipo. Al abrirse la app por la alarma, onResume
+         * relee TODOS los DataItems y el `stopped` viejo del OTRO tipo (el
+         * cardio de hace días, el descanso anterior) pasaba por stop(kind) →
+         * silenceAlarm → esto, y apagaba la alarma que acababa de empezar.
+         */
+        fun stopIfRunning(kind: TimerKind) {
+            instance?.takeIf { it.kind == kind }?.finish()
         }
 
         fun ackIntent(context: Context, kind: TimerKind): PendingIntent {

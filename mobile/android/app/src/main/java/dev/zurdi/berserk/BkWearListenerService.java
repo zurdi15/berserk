@@ -11,9 +11,11 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 /**
- * v0.28.0 reloj — órdenes que llegan del Galaxy Watch por MessageClient.
- * Hoy solo una: cancelar una cuenta atrás (/berserk/cmd/cancel, cuerpo =
- * kind). Play services arranca este servicio aunque la app esté cerrada.
+ * v0.28.0 reloj — órdenes que llegan del Galaxy Watch por MessageClient:
+ * cancelar una cuenta atrás (/berserk/cmd/cancel, cuerpo = kind), el OK de la
+ * alarma (v0.34.0), el ping de reloj (v0.37.1) y, desde v0.38.0, registrar la
+ * siguiente serie o dar por hecho el ejercicio actual (cuerpo = weid). Play
+ * services arranca este servicio aunque la app esté cerrada.
  */
 public class BkWearListenerService extends WearableListenerService {
 
@@ -32,7 +34,27 @@ public class BkWearListenerService extends WearableListenerService {
             return;
         }
         if (BkWear.CMD_ACK.equals(event.getPath())) {
-            BkAlarmService.stopIfRunning();
+            // v0.38.0: el OK del reloj calla la alarma de SU tipo, no la otra
+            String acked = event.getData() == null ? "" : new String(event.getData(), StandardCharsets.UTF_8).trim();
+            BkAlarmService.stopIfRunning(BkWear.isKind(acked) ? acked : null);
+            return;
+        }
+        if (BkWear.CMD_LOG_SET.equals(event.getPath()) || BkWear.CMD_COMPLETE_EXERCISE.equals(event.getPath())) {
+            // v0.38.0 (zurdi: "añadir serie desde el reloj y poder finalizar
+            // ejercicio"): la orden viaja a la web con el weid que el reloj tenía
+            // en pantalla. Sin WebView vivo no hay quien registre: se le dice al
+            // reloj (undelivered) para que avise en vez de quedarse esperando.
+            long weid;
+            try {
+                weid = Long.parseLong(new String(event.getData(), StandardCharsets.UTF_8).trim());
+            } catch (RuntimeException e) {
+                return;
+            }
+            String action = BkWear.CMD_LOG_SET.equals(event.getPath()) ? "logSet" : "complete";
+            if (!BkWearEvents.emitExerciseCommand(action, weid)) {
+                Wearable.getMessageClient(getApplicationContext())
+                        .sendMessage(event.getSourceNodeId(), BkWear.PATH_CMD_UNDELIVERED, event.getData());
+            }
             return;
         }
         if (!BkWear.CMD_CANCEL.equals(event.getPath())) return;

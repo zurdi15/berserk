@@ -11,6 +11,7 @@ import dev.zurdi.berserk.wear.alarm.AlarmService
 import dev.zurdi.berserk.wear.alarm.TimerAlarms
 import dev.zurdi.berserk.wear.core.ActiveTimer
 import dev.zurdi.berserk.wear.core.ClockSync
+import dev.zurdi.berserk.wear.core.ExerciseSpec
 import dev.zurdi.berserk.wear.core.PhoneClock
 import dev.zurdi.berserk.wear.core.StopAction
 import dev.zurdi.berserk.wear.core.StopPolicy
@@ -19,13 +20,16 @@ import dev.zurdi.berserk.wear.core.TimerKind
 import dev.zurdi.berserk.wear.core.TimerSpec
 import dev.zurdi.berserk.wear.notify.Haptics
 import dev.zurdi.berserk.wear.notify.TimerNotifier
+import dev.zurdi.berserk.wear.state.ExerciseRepository
 import dev.zurdi.berserk.wear.state.TimerRepository
 import dev.zurdi.berserk.wear.sync.DataMapFields
 import dev.zurdi.berserk.wear.sync.PhoneLink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
@@ -38,10 +42,27 @@ import kotlinx.coroutines.withContext
 class TimerEngine private constructor(context: Context) {
     private val ctx = context.applicationContext
     private val repository = TimerRepository.get(ctx)
+    private val exerciseRepository = ExerciseRepository.get(ctx)
     private val notifier = TimerNotifier(ctx)
     private val alarms = TimerAlarms(ctx)
 
     val board: StateFlow<TimerBoard> get() = repository.board
+
+    /** v0.38.0: el ejercicio actual tal cual llegó (ver TimerBoard.exerciseFor para cuándo enseñarlo) */
+    val exercise: StateFlow<ExerciseSpec?> get() = exerciseRepository.exercise
+
+    // v0.38.0: cuándo (hora del móvil) el móvil devolvió una orden sin web
+    // viva que la ejecutara — la pantalla lo enseña unos segundos
+    private val undeliveredAt = MutableStateFlow(0L)
+    val commandUndeliveredAt: StateFlow<Long> = undeliveredAt.asStateFlow()
+
+    fun applyExercise(spec: ExerciseSpec?) {
+        exerciseRepository.set(spec)
+    }
+
+    fun onCommandUndelivered() {
+        undeliveredAt.value = PhoneClock.now()
+    }
 
     // v0.37.1: el desfase móvil↔reloj medido la última vez sobrevive al proceso
     private val clockPrefs = ctx.getSharedPreferences("bk_clock", Context.MODE_PRIVATE)
@@ -177,8 +198,9 @@ class TimerEngine private constructor(context: Context) {
         notifier.render(repository.board.value, nowEpochMs)
     }
 
+    // v0.38.0: solo la alarma de ESE tipo — ver AlarmService.stopIfRunning
     private fun silenceAlarm(kind: TimerKind) {
-        AlarmService.stopIfRunning()
+        AlarmService.stopIfRunning(kind)
         notifier.cancelDone(kind)
     }
 
@@ -192,9 +214,13 @@ class TimerEngine private constructor(context: Context) {
         restoreFromDataLayer()
     }
 
-    /** Lee todos los DataItems de temporizadores y los aplica. Devuelve cuántos se aplicaron (0 si la Data Layer no responde). */
+    /**
+     * Lee todos los DataItems de temporizadores (y el del ejercicio actual) y
+     * los aplica. Devuelve cuántos temporizadores se aplicaron (0 si la Data
+     * Layer no responde).
+     */
     suspend fun restoreFromDataLayer(): Int = withContext(Dispatchers.IO) {
-        val uri = Uri.parse("wear://*${TimerKind.PATH_PREFIX}")
+        val uri = Uri.parse("wear://*$DATA_PREFIX")
         val buffer = try {
             Wearable.getDataClient(ctx).getDataItems(uri, DataClient.FILTER_PREFIX).await()
         } catch (e: Exception) {
@@ -204,6 +230,10 @@ class TimerEngine private constructor(context: Context) {
         try {
             var applied = 0
             for (item in buffer) {
+                if (item.uri.path == ExerciseSpec.PATH) {
+                    applyExercise(ExerciseSpec.decode(DataMapFields(DataMapItem.fromDataItem(item).dataMap)))
+                    continue
+                }
                 val kind = TimerKind.fromPath(item.uri.path) ?: continue
                 when (val decoded = TimerSpec.decode(DataMapFields(DataMapItem.fromDataItem(item).dataMap), kind)) {
                     is TimerSpec.Decoded.Ok -> {
@@ -222,6 +252,8 @@ class TimerEngine private constructor(context: Context) {
     companion object {
         /** una cuenta atrás vencida hace más de esto al llegar no merece ni aviso */
         const val STALE_AFTER_MS = 15_000L
+        /** todo lo que publica el móvil cuelga de aquí (temporizadores y ejercicio) */
+        private const val DATA_PREFIX = "/berserk/"
         private const val KEY_CLOCK_OFFSET = "offsetMs"
         private const val KEY_CLOCK_RTT = "rttMs"
         private const val TAG = "BkWear"

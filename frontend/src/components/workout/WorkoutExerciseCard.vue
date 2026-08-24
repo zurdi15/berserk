@@ -20,13 +20,17 @@ import { exerciseImageUrl } from '@/api/domain'
 import { runeDataUrl } from '@/utils/runeImage'
 import {
   cancelNativeCardioEndAlarm,
+  onWearExerciseCommand,
   onWearTimerCancelled,
   scheduleNativeCardioEndAlarm,
   startNativeCardioCountdown,
   stopNativeCardioCountdown,
+  syncWearExercise,
   syncWearTimer,
+  type WearExerciseSync,
   type WearStopReason,
 } from '@/utils/nativeShell'
+import { showTimerNotification } from '@/utils/timerNotification'
 import {
   clearPersistedCardioCountdown,
   getPersistedCardioCountdown,
@@ -111,6 +115,10 @@ const props = withDefaults(
     // el picker "Bloque: X" (solo en vivo y si actions.setExerciseBlock
     // existe)
     blockLabels?: string[]
+    // v0.38.0: ¿es ESTE el ejercicio actual del entreno (el último con serie
+    // del bloque visible, o el primero pendiente)? Lo decide WorkoutView; la
+    // card que lo es publica su estado al reloj (ver wearPayload)
+    current?: boolean
   }>(),
   {
     muscleGroups: () => [],
@@ -126,6 +134,7 @@ const props = withDefaults(
     supersetLast: true,
     supersetNext: false,
     blockLabels: () => [],
+    current: false,
   },
 )
 
@@ -181,8 +190,27 @@ const name = computed(() => exerciseName(props.exercise, props.locale))
 // lo paró el usuario (cancelled); si terminó solo (finished, auto-log) sigue
 // vibrando hasta su OK
 let cardioStopReason: WearStopReason = 'cancelled'
+// v0.38.0 (zurdi: "el fin de cardio no tiene el mismo feedback que el de
+// descanso"): el descanso le dice al reloj que terminó SOLO tras su gracia de
+// 3 s (restTimer.ts), así que la alarma exacta del propio reloj siempre
+// dispara antes y el `finished` solo confirma. El cardio lo publicaba nada
+// más registrar la serie — y el countdown de la web llega a cero medio
+// segundo ANTES del fin real —, con lo que el reloj podía recibir el
+// `finished` antes de su alarma y tener que darse por vencido desde la Data
+// Layer. Misma gracia aquí; un arranque nuevo la cancela.
+const WEAR_FINISHED_GRACE_MS = 3000
+let wearFinishedTimeout: ReturnType<typeof setTimeout> | null = null
+function scheduleWearCardioFinished() {
+  if (wearFinishedTimeout) clearTimeout(wearFinishedTimeout)
+  wearFinishedTimeout = setTimeout(() => {
+    wearFinishedTimeout = null
+    void syncWearTimer({ kind: 'cardio', state: 'stopped', reason: 'finished' })
+  }, WEAR_FINISHED_GRACE_MS)
+}
 watch(resumedActive, (timer, previous) => {
   if (timer) {
+    if (wearFinishedTimeout) clearTimeout(wearFinishedTimeout)
+    wearFinishedTimeout = null
     const title = `${t('timer.cardioOngoingTitle')} · ${name.value}`
     // en el móvil el ejercicio va como subtítulo: el título es solo el tipo
     void startNativeCardioCountdown(timer.endsAt, t('timer.cardioOngoingTitle'), { subtitle: name.value, imageUrl: exerciseImage.value })
@@ -204,11 +232,22 @@ watch(resumedActive, (timer, previous) => {
   } else if (previous) {
     void stopNativeCardioCountdown()
     void cancelNativeCardioEndAlarm(cardioStopReason)
-    void syncWearTimer({ kind: 'cardio', state: 'stopped', reason: cardioStopReason })
-    if (cardioStopReason === 'cancelled') void cancelWebPushTimer('cardio')
+    if (cardioStopReason === 'finished') {
+      scheduleWearCardioFinished()
+    } else {
+      void syncWearTimer({ kind: 'cardio', state: 'stopped', reason: 'cancelled' })
+      void cancelWebPushTimer('cardio')
+    }
     cardioStopReason = 'cancelled'
   }
 })
+
+// v0.38.0: el mismo aviso del sistema que el fin de descanso (solo con la
+// página oculta, ver utils/timerNotification.ts) — antes el cardio solo
+// vibraba y ponía "¡Tiempo!" en la card
+function onCountdownFinished() {
+  void showTimerNotification(t('timer.cardioOver'), name.value, 'berserk-cardio-timer')
+}
 // cancelado desde la muñeca: misma salida que el botón cancelar de la tarjeta
 const stopWearCancel = onWearTimerCancelled((kind) => {
   if (kind === 'cardio' && resumedActive.value) onResumedCancel()
@@ -560,6 +599,16 @@ async function onResumedDone() {
     // v0.9.4: sin descanso tras cardio — este camino SIEMPRE es cardio
     if (result.new_records.length) emit('recorded', result.new_records)
     emit('logged', result.new_records.length > 0)
+    // v0.38.0 (zurdi: "al terminar un timer de cardio ... no se completa el
+    // bloque"): un countdown que llega a cero ES el ejercicio hecho — se marca
+    // solo, y con él el bloque si era el único. Nunca bloquea el registro.
+    if (props.actions.setExerciseCompleted && !completed.value) {
+      try {
+        await props.actions.setExerciseCompleted(persisted.workoutExerciseId, true)
+      } catch (error) {
+        toastApiError(error)
+      }
+    }
   } catch (error) {
     // NO se limpia aquí: si fue un fallo transitorio (red caída al volver),
     // el countdown ya terminado (mostrando 0:00) se queda con su botón de
@@ -642,6 +691,85 @@ async function onDeleteSet(setId: number) {
     toastApiError(error)
   }
 }
+
+// ── v0.38.0 check de "ejercicio hecho" (zurdi: "check de marcar ejercicio
+// como completado") ────────────────────────────────────────────────────────
+// Un check en la cabecera da el ejercicio por hecho aunque falten series (o
+// no haya objetivo): la card se pliega a su cabecera, el bloque lo cuenta
+// como hecho (WorkoutView.stepCounts) y el "ejercicio actual" del reloj pasa
+// al siguiente pendiente. Des-marcar la despliega. Solo en vivo y si el
+// store sabe (el editor retroactivo no lo implementa).
+const completed = computed(() => props.workoutExercise.completed ?? false)
+const canMarkDone = computed(() => props.live && typeof props.actions.setExerciseCompleted === 'function')
+const markingDone = ref(false)
+
+async function setCompleted(value: boolean) {
+  if (!props.actions.setExerciseCompleted || markingDone.value) return
+  markingDone.value = true
+  try {
+    await props.actions.setExerciseCompleted(props.workoutExercise.id, value)
+  } catch (error) {
+    toastApiError(error)
+  } finally {
+    markingDone.value = false
+  }
+}
+
+// ── v0.38.0 el ejercicio actual, en el reloj (zurdi: "añadir serie desde el
+// reloj y poder finalizar ejercicio") ──────────────────────────────────────
+// La card que WorkoutView marca como `current` publica lo que el reloj
+// necesita pintar: nombre, series hechas/objetivo y la SIGUIENTE serie tal y
+// como la registraría el check de ghost (mismo prefill: ghostQuickBody). Solo
+// publica quien es actual — nunca "me voy" al dejar de serlo (lo publica la
+// siguiente, o WorkoutView el `none`), para que dos watchers no se pisen.
+const wearPayload = computed<WearExerciseSync | null>(() => {
+  if (!props.live || !props.current) return null
+  const canLog = !isCardio.value && !completed.value && ghostQuickBody.value !== null
+  return {
+    state: 'exercise',
+    weid: props.workoutExercise.id,
+    name: name.value,
+    setsDone: effectiveSetCount.value,
+    setsTarget: targetSets.value ?? 0,
+    nextLabel: canLog ? ghostLabel.value : '',
+    canLog,
+    completed: completed.value,
+  }
+})
+// se compara serializado: el computed devuelve un objeto nuevo con cualquier
+// dependencia (abrir el cajón, p. ej.) aunque el contenido no cambie, y cada
+// publicación es un DataItem nuevo para el reloj
+let lastWearPayload = ''
+watch(
+  wearPayload,
+  (payload) => {
+    // al dejar de ser actual se olvida lo último publicado: si vuelve a serlo
+    // con el MISMO contenido (marcar y des-marcar el siguiente, p. ej.) hay
+    // que republicar, porque entre medias el DataItem lo escribió otra card
+    if (!payload) {
+      lastWearPayload = ''
+      return
+    }
+    const serialized = JSON.stringify(payload)
+    if (serialized === lastWearPayload) return
+    lastWearPayload = serialized
+    void syncWearExercise(payload)
+  },
+  { immediate: true },
+)
+
+// órdenes del reloj: llegan con el weid que tenía en pantalla — solo actúa
+// la card de ESE ejercicio, por el mismo camino que sus propios botones
+// (quickLog = el check de ghost; complete = el check de la cabecera)
+const stopWearExerciseCommand = onWearExerciseCommand((action, weid) => {
+  if (!props.live || weid !== props.workoutExercise.id) return
+  if (action === 'complete') {
+    if (!completed.value) void setCompleted(true)
+    return
+  }
+  if (!isCardio.value && !completed.value && ghostQuickBody.value !== null) void quickLog()
+})
+onBeforeUnmount(stopWearExerciseCommand)
 
 // ── v0.18.1 picker de bloque (mismo idiom que el de descanso: línea
 // punteada que revela chips) ───────────────────────────────────────────────
@@ -743,7 +871,13 @@ async function moveDown() {
   <!-- v0.23.0 (zurdi: "la card de cardio tiene el borde más ancho a la
        izquierda"): el acento lateral de cardio (item 6 v0.3.0) muere — con
        el facelift leía como un borde descuadrado, no como acento -->
-  <BkCard>
+  <!-- v0.38.0: id estable por WorkoutExercise — WorkoutView hace scroll al
+       ejercicio actual buscándolo por aquí; plegada y tenue cuando está hecho -->
+  <BkCard
+    :id="`workout-exercise-${workoutExercise.id}`"
+    :class="completed && 'opacity-70'"
+    :data-completed="completed ? 'true' : undefined"
+  >
     <!-- v0.7.0 (feedback de zurdi): el chip "Superserie A" y el acento del
          grupo suben al CONTENEDOR del bloque (ver WorkoutView.vue) — la card
          ya no pinta nada de superserie salvo el chip "Siguiente"; el acento
@@ -779,18 +913,36 @@ async function moveDown() {
               :data-testid="`superset-next-${workoutExercise.id}`"
               class="text-xs text-aurora bg-aurora/15 border border-aurora rounded-full px-1.5 py-0.5 shrink-0"
             >{{ t('workout.supersetNext') }}</span>
+            <span
+              v-if="completed"
+              :data-testid="`exercise-done-chip-${workoutExercise.id}`"
+              class="text-xs text-aurora border border-aurora/40 rounded-full px-1.5 py-0.5 shrink-0"
+            >{{ t('workout.done') }}</span>
           </p>
         </div>
       </div>
-      <button
-        type="button"
-        :data-testid="`exercise-menu-${workoutExercise.id}`"
-        class="bk-press w-10 h-10 rounded-full text-xl text-ink-muted hover:text-ink hover:bg-slab shrink-0"
-        :aria-label="t('workout.exerciseMenu')"
-        @click="menuOpen = true"
-      >
-        ⋯
-      </button>
+      <div class="flex items-center gap-1 shrink-0">
+        <!-- v0.38.0: el check de "ejercicio hecho" — mismo gesto que el de
+             serie, a nivel de ejercicio; des-marcar despliega la card -->
+        <BkCheck
+          v-if="canMarkDone"
+          :model-value="completed"
+          size="md"
+          :disabled="markingDone"
+          :aria-label="t('workout.markDone')"
+          :data-testid="`exercise-done-${workoutExercise.id}`"
+          @update:model-value="setCompleted"
+        />
+        <button
+          type="button"
+          :data-testid="`exercise-menu-${workoutExercise.id}`"
+          class="bk-press w-10 h-10 rounded-full text-xl text-ink-muted hover:text-ink hover:bg-slab shrink-0"
+          :aria-label="t('workout.exerciseMenu')"
+          @click="menuOpen = true"
+        >
+          ⋯
+        </button>
+      </div>
     </div>
 
     <!-- v0.12.0: nota persistente del ejercicio ("asiento en el 5") — la
@@ -822,8 +974,10 @@ async function moveDown() {
          hagas la imagen más pequeña, acorta las series y hazlas más
          estrechas"): gap-3→gap-6 y la columna de series se acota (max-w-48)
          en vez de estirarse hasta el borde de la card -->
+    <!-- v0.38.0: hecho = la card se pliega a la cabecera (nombre, contador,
+         check); series, historial y acciones vuelven al des-marcar -->
     <div
-      v-if="workoutExercise.sets.length || pendingGhostCount"
+      v-if="!completed && (workoutExercise.sets.length || pendingGhostCount)"
       class="border-b border-line pb-3 mb-3"
       :class="!isCardio && 'flex items-center gap-6'"
     >
@@ -930,7 +1084,7 @@ async function moveDown() {
          check"): visible SIEMPRE que haya historial — es la referencia
          contra la que se entrena hoy, no solo el arranque -->
     <div
-      v-if="historyLines.length"
+      v-if="!completed && historyLines.length"
       class="text-xs text-ink-faint mb-3 space-y-0.5"
       data-testid="card-history-hint"
     >
@@ -953,6 +1107,7 @@ async function moveDown() {
         <CardioCountdown
           :target-seconds="resumedActive.targetSeconds"
           :ends-at="resumedActive.endsAt"
+          @finished="onCountdownFinished"
           @done="onResumedDone"
           @cancel="onResumedCancel"
         />
@@ -965,7 +1120,7 @@ async function moveDown() {
          empezar el countdown con el objetivo por defecto (auto-registra al
          llegar a 0, reutilizando la superficie de resume de arriba). -->
     <div
-      v-if="isCardio && recentCardio.length"
+      v-if="!completed && isCardio && recentCardio.length"
       class="mb-3 space-y-0.5"
       :data-testid="`cardio-recent-${workoutExercise.id}`"
     >
@@ -981,7 +1136,7 @@ async function moveDown() {
          extra (superar el objetivo) o las dos acciones de cardio (v0.10.0
          "no inline controls y formulario"); quitar el ejercicio vive en el
          kebab (acción de gestión, no de banco) -->
-    <div class="mt-3 flex items-center gap-2">
+    <div v-if="!completed" class="mt-3 flex items-center gap-2">
       <BkButton
         v-if="exercise && !isCardio"
         variant="ghost"

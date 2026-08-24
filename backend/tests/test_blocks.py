@@ -84,3 +84,24 @@ def test_copy_routine_preserves_block_labels(client: TestClient):
     copy = client.post(f"/api/v1/routines/{routine['id']}/copy").json()
     labels = [e["block_label"] for e in copy["exercises"]]
     assert labels == ["Empuje", "Empuje", "Tirón"]
+
+
+def test_patch_completed_flag_round_trip(client: TestClient):
+    """v0.38.0 (zurdi: "check de marcar ejercicio como completado"): el flag
+    nace en false, se marca y se desmarca por PATCH, y un PATCH de otra cosa
+    no lo toca (exclude_unset)."""
+    routine = make_routine_with_blocks(client)
+    workout = client.post("/api/v1/workouts", json={"routine_id": routine["id"]}).json()
+    wex = workout["exercises"][0]
+    assert wex["completed"] is False
+    url = f"/api/v1/workouts/{workout['id']}/exercises/{wex['id']}"
+
+    done = client.patch(url, json={"completed": True}).json()
+    assert done["completed"] is True
+    untouched = client.patch(url, json={"rest_seconds": 90}).json()
+    assert untouched["completed"] is True and untouched["rest_seconds"] == 90
+    undone = client.patch(url, json={"completed": False}).json()
+    assert undone["completed"] is False
+    # y el GET del entreno lo refleja
+    fetched = client.get(f"/api/v1/workouts/{workout['id']}").json()
+    assert fetched["exercises"][0]["completed"] is False

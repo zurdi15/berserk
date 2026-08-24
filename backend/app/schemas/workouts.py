@@ -67,6 +67,9 @@ class WorkoutExerciseOut(BaseModel):
     # v0.17.0 bloques: snapshot de la rutina (o etiqueta del alta ad-hoc en
     # el stepper) — None = sin bloque
     block_label: str | None
+    # v0.38.0: marcado a mano como hecho (o solo, al terminar un countdown
+    # de cardio) — el frontend cuenta el bloque como completo con todos en check
+    completed: bool
     sets: list[SetOut]
 
     model_config = {"from_attributes": True}
@@ -118,6 +121,8 @@ class WorkoutExercisePatchIn(BaseModel):
     # entreno"): mover el ejercicio de bloque en vivo — null explícito lo
     # saca a "sin bloque" (exclude_unset distingue omitido de null)
     block_label: str | None = Field(None, min_length=1, max_length=40)
+    # v0.38.0: check de "ejercicio hecho" (true) y su des-marcado (false)
+    completed: bool | None = None
 
 
 class ExerciseOrderIn(BaseModel):

@@ -22,6 +22,17 @@ data class TimerBoard(val timers: Map<TimerKind, ActiveTimer> = emptyMap()) {
     fun workout(): ActiveTimer? = live.firstOrNull { it.kind == TimerKind.WORKOUT }
 
     /**
+     * v0.38.0: el ejercicio actual solo vale con el entreno en marcha y si se
+     * publicó DESPUÉS de arrancar ese entreno — el DataItem persiste, y sin
+     * esto el reloj enseñaría el último ejercicio del entreno anterior hasta
+     * que el móvil abriera la vista de entreno del nuevo.
+     */
+    fun exerciseFor(spec: ExerciseSpec?): ExerciseSpec? {
+        val workout = workout() ?: return null
+        return spec?.takeIf { it.sentAtEpochMs >= workout.spec.sentAtEpochMs }
+    }
+
+    /**
      * v0.29.0: cuenta atrás que llegó a cero y aún espera el OK — manda sobre
      * todo lo demás en pantalla (la alarma es lo urgente, el crono puede esperar)
      */

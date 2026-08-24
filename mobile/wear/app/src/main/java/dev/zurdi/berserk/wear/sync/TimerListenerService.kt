@@ -7,6 +7,7 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import dev.zurdi.berserk.wear.TimerEngine
+import dev.zurdi.berserk.wear.core.ExerciseSpec
 import dev.zurdi.berserk.wear.core.TimerKind
 import dev.zurdi.berserk.wear.core.TimerSpec
 import kotlinx.coroutines.runBlocking
@@ -25,6 +26,15 @@ class TimerListenerService : WearableListenerService() {
         val engine = TimerEngine.get(applicationContext)
         for (event in dataEvents) {
             val item = event.dataItem
+            // v0.38.0: el ejercicio actual viaja en su propio DataItem
+            if (item.uri.path == ExerciseSpec.PATH) {
+                when (event.type) {
+                    DataEvent.TYPE_DELETED -> engine.applyExercise(null)
+                    DataEvent.TYPE_CHANGED ->
+                        engine.applyExercise(ExerciseSpec.decode(DataMapFields(DataMapItem.fromDataItem(item).dataMap)))
+                }
+                continue
+            }
             val kind = TimerKind.fromPath(item.uri.path) ?: continue
             when (event.type) {
                 DataEvent.TYPE_DELETED -> engine.stop(kind)
@@ -42,6 +52,8 @@ class TimerListenerService : WearableListenerService() {
     override fun onMessageReceived(event: MessageEvent) {
         when (event.path) {
             PhoneLink.PATH_CMD_SYNC -> runBlocking { TimerEngine.get(applicationContext).restoreFromDataLayer() }
+            // v0.38.0: la orden llegó al móvil pero su web no estaba viva para ejecutarla
+            PhoneLink.PATH_CMD_UNDELIVERED -> TimerEngine.get(applicationContext).onCommandUndelivered()
             // v0.37.1: respuesta al ping de reloj — t0 (nuestro monotónico) + epoch del móvil
             PhoneLink.PATH_CLOCK_PONG -> {
                 val data = event.data

@@ -9,12 +9,15 @@ interface TimerFields {
     fun string(key: String): String?
     fun long(key: String, default: Long): Long
     fun int(key: String, default: Int): Int
+    /** v0.38.0: los booleanos del ejercicio actual (ExerciseSpec) */
+    fun boolean(key: String, default: Boolean): Boolean
 }
 
 class MapTimerFields(private val map: Map<String, Any?>) : TimerFields {
     override fun string(key: String): String? = map[key] as? String
     override fun long(key: String, default: Long): Long = (map[key] as? Number)?.toLong() ?: default
     override fun int(key: String, default: Int): Int = (map[key] as? Number)?.toInt() ?: default
+    override fun boolean(key: String, default: Boolean): Boolean = (map[key] as? Boolean) ?: default
 }
 
 /**

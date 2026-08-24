@@ -35,6 +35,7 @@ export type OutboxEntry =
   | { id: string; kind: 'deleteSet'; workoutId: number; exerciseId: number; setId: number }
   | { id: string; kind: 'setExerciseRest'; workoutId: number; exerciseId: number; restSeconds: number | null }
   | { id: string; kind: 'setExerciseBlock'; workoutId: number; exerciseId: number; blockLabel: string | null }
+  | { id: string; kind: 'setExerciseCompleted'; workoutId: number; exerciseId: number; completed: boolean }
   | { id: string; kind: 'removeExercise'; workoutId: number; exerciseId: number }
   | { id: string; kind: 'setSupersetGroups'; workoutId: number; groups: { exerciseId: number; group: number | null }[] }
   | { id: string; kind: 'finishWorkout'; workoutId: number }
@@ -209,6 +210,13 @@ async function replayEntry(entry: OutboxEntry, idMap: Map<number, number>): Prom
       const exerciseId = resolveId(entry.exerciseId, idMap)
       if (workoutId === null || exerciseId === null) throw new ApiError(410, 'offline_dependency_lost')
       await domain.updateWorkoutExercise(workoutId, exerciseId, { block_label: entry.blockLabel })
+      return
+    }
+    case 'setExerciseCompleted': {
+      const workoutId = resolveId(entry.workoutId, idMap)
+      const exerciseId = resolveId(entry.exerciseId, idMap)
+      if (workoutId === null || exerciseId === null) throw new ApiError(410, 'offline_dependency_lost')
+      await domain.updateWorkoutExercise(workoutId, exerciseId, { completed: entry.completed })
       return
     }
     case 'removeExercise': {

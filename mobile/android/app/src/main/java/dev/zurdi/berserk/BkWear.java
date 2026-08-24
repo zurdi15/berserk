@@ -41,6 +41,13 @@ final class BkWear {
     // v0.37.1: ping de reloj del watch (cuerpo = su monotónico) y nuestra respuesta (t0 + nuestro epoch)
     static final String CMD_CLOCK = "/berserk/cmd/clock";
     static final String PATH_CLOCK_PONG = "/berserk/clock/pong";
+    // v0.38.0: el ejercicio actual (DataItem) y las órdenes del reloj sobre él
+    // (mensajes, cuerpo = weid en decimal); undelivered = la web no estaba
+    // viva para recibirla, para que el reloj avise en vez de quedarse mudo
+    static final String PATH_EXERCISE = "/berserk/exercise";
+    static final String CMD_LOG_SET = "/berserk/cmd/logSet";
+    static final String CMD_COMPLETE_EXERCISE = "/berserk/cmd/completeExercise";
+    static final String PATH_CMD_UNDELIVERED = "/berserk/cmd/undelivered";
     static final int SCHEMA = 1;
 
     // ids de las notificaciones ongoing del móvil que el reloj puede cancelar
@@ -86,6 +93,33 @@ final class BkWear {
         Wearable.getDataClient(ctx)
                 .putDataItem(request.asPutDataRequest())
                 .addOnFailureListener(e -> Log.w(TAG, "DataItem " + kind + " no publicado", e));
+    }
+
+    /**
+     * v0.38.0: el ejercicio actual del entreno, para la página de ejercicio
+     * del reloj. Un único DataItem (/berserk/exercise) que la web sustituye
+     * con cada cambio; state 'none' lo vacía (sin entreno, bloque hecho).
+     * Espejo de mobile/wear core/ExerciseSpec.kt y nativeShell.syncWearExercise.
+     */
+    static void publishExercise(Context ctx, String state, long weid, String name, int setsDone, int setsTarget,
+                                String nextLabel, boolean canLog, boolean completed) {
+        if (!playServicesAvailable(ctx)) return;
+        PutDataMapRequest request = PutDataMapRequest.create(PATH_EXERCISE);
+        DataMap map = request.getDataMap();
+        map.putInt("schema", SCHEMA);
+        map.putString("state", state);
+        map.putLong("weid", weid);
+        map.putString("name", name == null ? "" : name);
+        map.putInt("setsDone", setsDone);
+        map.putInt("setsTarget", setsTarget);
+        map.putString("nextLabel", nextLabel == null ? "" : nextLabel);
+        map.putBoolean("canLog", canLog);
+        map.putBoolean("completed", completed);
+        map.putLong("sentAtEpochMs", System.currentTimeMillis());
+        request.setUrgent();
+        Wearable.getDataClient(ctx)
+                .putDataItem(request.asPutDataRequest())
+                .addOnFailureListener(e -> Log.w(TAG, "DataItem exercise no publicado", e));
     }
 
     /**

@@ -117,6 +117,19 @@ describe('offline/outbox replay', () => {
     dispose()
   })
 
+  // v0.38.0: el check de "ejercicio hecho" viaja como PATCH, resolviendo ids temporales
+  it('replays setExerciseCompleted as a PATCH with the resolved ids', async () => {
+    outbox.enqueue({ id: 'uuid-start', kind: 'startWorkout', tempWorkoutId: -1, body: { routine_id: 9 }, tempExerciseIds: [-2] })
+    outbox.enqueue({ id: 'uuid-done', kind: 'setExerciseCompleted', workoutId: -1, exerciseId: -2, completed: true })
+    vi.mocked(domain.startWorkout).mockResolvedValue({ id: 100, exercises: [{ id: 200 }] } as never)
+    vi.mocked(domain.updateWorkoutExercise).mockResolvedValue({} as never)
+
+    await outbox.syncNow()
+
+    expect(domain.updateWorkoutExercise).toHaveBeenCalledWith(100, 200, { completed: true })
+    expect(outbox.pendingCount.value).toBe(0)
+  })
+
   it('a network failure mid-replay stops the drain and keeps the remaining queue intact', async () => {
     queueOfflineWorkoutChain()
     vi.mocked(domain.startWorkout).mockResolvedValue({ id: 100, exercises: [{ id: 200 }] } as never)

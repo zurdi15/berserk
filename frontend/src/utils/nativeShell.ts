@@ -36,8 +36,10 @@ interface OngoingPlugin {
   // v0.28.0 reloj Wear OS (ver el bloque "reloj" al final)
   syncTimer?: (options: WearTimerWire) => Promise<unknown>
   getWearStatus?: () => Promise<Partial<WearStatus>>
+  // v0.38.0: el ejercicio actual en el reloj (ver el bloque al final)
+  syncExercise?: (options: WearExerciseWire) => Promise<unknown>
   addListener?: (
-    event: 'timerCancelled' | 'alarmState',
+    event: 'timerCancelled' | 'alarmState' | 'exerciseCommand',
     callback: (data: Record<string, unknown>) => void,
   ) => Promise<{ remove: () => Promise<void> }> | { remove: () => Promise<void> }
   // v0.35.0: alarma de fin en bucle (BkAlarmService) — la web pinta el overlay
@@ -552,5 +554,97 @@ export function onNativeAlarm(listener: NativeAlarmListener): () => void {
   }
   return () => {
     alarmListeners.delete(listener)
+  }
+}
+
+// ---------- v0.38.0: el ejercicio actual, en el reloj ----------
+// zurdi: "añadir serie desde el reloj y poder finalizar ejercicio". El móvil
+// publica UN DataItem (/berserk/exercise) con el ejercicio en el que se está
+// (el último con serie registrada del bloque visible, o el primero pendiente
+// — lo decide WorkoutView y lo publica la propia card, que es quien sabe qué
+// serie viene: prefill, objetivo y si se puede registrar a ciegas). El reloj
+// lo pinta en una página propia con "+ Serie" y "Terminar", y manda órdenes
+// por MessageClient; la shell las reenvía a la web como evento
+// `exerciseCommand` — la web las ejecuta por el MISMO camino que el check de
+// la card (outbox, descanso automático, PRs). Todo no-op en web y en shells
+// sin syncExercise.
+
+export interface WearExerciseSync {
+  /** 'none' = no hay ejercicio actual (sin entreno, bloque terminado) */
+  state: 'exercise' | 'none'
+  weid?: number
+  /** nombre ya localizado */
+  name?: string
+  setsDone?: number
+  /** 0 = sin objetivo de rutina */
+  setsTarget?: number
+  /** la siguiente serie tal y como la registraría el check ("8 × 60 kg"); vacío si no hay prefill */
+  nextLabel?: string
+  /** ¿el reloj puede registrar la siguiente serie de un toque? */
+  canLog?: boolean
+  completed?: boolean
+}
+
+/** lo que recibe el plugin: todos los campos presentes (DataMap sin opcionales) */
+export type WearExerciseWire = Required<WearExerciseSync>
+
+export type WearExerciseAction = 'logSet' | 'complete'
+
+/** ¿Esta shell sabe mandar el ejercicio al reloj? */
+export function hasWearExerciseBridge(): boolean {
+  return typeof ongoingPlugin()?.syncExercise === 'function'
+}
+
+export async function syncWearExercise(sync: WearExerciseSync): Promise<void> {
+  const plugin = ongoingPlugin()
+  if (!plugin?.syncExercise) return
+  try {
+    await plugin.syncExercise({
+      weid: 0,
+      name: '',
+      setsDone: 0,
+      setsTarget: 0,
+      nextLabel: '',
+      canLog: false,
+      completed: false,
+      ...sync,
+    })
+  } catch {
+    // sin Play Services o sin reloj: el móvil sigue igual
+  }
+}
+
+type WearExerciseListener = (action: WearExerciseAction, weid: number) => void
+const wearExerciseListeners = new Set<WearExerciseListener>()
+let wearExerciseSubscribedTo: OngoingPlugin | null = null
+
+function isWearExerciseAction(value: unknown): value is WearExerciseAction {
+  return value === 'logSet' || value === 'complete'
+}
+
+/**
+ * Orden hecha DESDE el reloj (evento `exerciseCommand` del plugin): registrar
+ * la siguiente serie o dar el ejercicio por hecho. Lleva el weid que el reloj
+ * tenía en pantalla, para no actuar sobre otro ejercicio si el estado cambió
+ * entre medias. Devuelve la función para darse de baja.
+ */
+export function onWearExerciseCommand(listener: WearExerciseListener): () => void {
+  wearExerciseListeners.add(listener)
+  const plugin = ongoingPlugin()
+  if (plugin?.addListener && plugin.syncExercise && wearExerciseSubscribedTo !== plugin) {
+    wearExerciseSubscribedTo = plugin
+    try {
+      void plugin.addListener('exerciseCommand', (event) => {
+        const action = event?.action
+        const weid = event?.weid
+        if (!isWearExerciseAction(action) || typeof weid !== 'number' || !Number.isFinite(weid)) return
+        for (const callback of [...wearExerciseListeners]) callback(action, weid)
+      })
+    } catch {
+      wearExerciseSubscribedTo = null
+    }
+  }
+  return () => {
+    wearExerciseListeners.delete(listener)
   }
 }

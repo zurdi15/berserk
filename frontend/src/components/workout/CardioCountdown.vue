@@ -15,7 +15,10 @@ import { core } from '@/tokens'
 // en el remaining correcto en vez de en targetSeconds completo otra vez. Sin
 // endsAt, el comportamiento es el de siempre (arranque fresco desde ahora).
 const props = defineProps<{ targetSeconds: number; endsAt?: number }>()
-const emit = defineEmits<{ done: []; cancel: [] }>()
+// v0.38.0: `finished` sale en el MISMO tick en que se llega a cero (antes de
+// la espera de FINISH_HOLD_MS que precede a `done`) — es el momento del aviso,
+// no el del registro; el padre lo usa para la notificación del sistema
+const emit = defineEmits<{ done: []; cancel: []; finished: [] }>()
 
 const { t } = useI18n()
 
@@ -54,6 +57,7 @@ function tick() {
   // que este lane no toca (ver instrucciones) — se repite aquí el mismo
   // patrón inline en vez de importar ese store por un único efecto lateral
   navigator.vibrate?.([200, 100, 200])
+  emit('finished')
   holdTimeout = setTimeout(() => emit('done'), FINISH_HOLD_MS)
 }
 

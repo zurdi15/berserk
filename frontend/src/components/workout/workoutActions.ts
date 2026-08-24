@@ -34,6 +34,10 @@ export interface WorkoutActions {
   // opcional a propósito: solo el entreno en vivo lo implementa; la card
   // esconde el picker de bloque cuando la acción no existe (editor retro)
   setExerciseBlock?(weid: number, blockLabel: string | null): Promise<void>
+  // v0.38.0 (zurdi: "check de marcar ejercicio como completado"): dar el
+  // ejercicio por hecho (o des-marcarlo) — opcional como setExerciseBlock:
+  // solo el entreno en vivo lo implementa y la card esconde el check sin él
+  setExerciseCompleted?(weid: number, completed: boolean): Promise<void>
   // v0.12.0: nota persistente POR USUARIO y ejercicio ("asiento en el 5") —
   // se enseña en la card la siguiente sesión. Cacheada por store como el
   // historial; guardar vacío la borra. Sin rama offline (v1: exige red).
