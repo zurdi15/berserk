@@ -1,7 +1,7 @@
 {
   "name": "berserk-mobile",
   "private": true,
-  "version": "0.38.0",
+  "version": "0.38.1",
   "description": "Shell Android (Capacitor) de berserk — WebView contra el servidor",
   "scripts": {
     "sync": "cap sync android"

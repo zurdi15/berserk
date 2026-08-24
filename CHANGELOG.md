@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.38.1 - 2026-08-25
+
+### Cambiado
+- El «ejercicio hecho» ya no es un check en la cabecera: es el botón «Completar ejercicio» de la última fila de la card, a la derecha de «Añadir serie» (en cardio, bajo «Registrar» y «Empezar»). Al marcarlo la card no se pliega: conserva sus series y acciones, el borde se resalta, desaparecen las series pendientes y el botón queda en «Completado» — tócalo para desmarcar.
+
 ## 0.38.0 - 2026-08-24
 
 ### Añadido
