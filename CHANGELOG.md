@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.38.0 - 2026-08-24
+
+### Añadido
+- Check de «ejercicio hecho» en la cabecera de cada ejercicio del entreno: lo da por terminado aunque falten series o no haya objetivo (la card se pliega a su cabecera y el bloque lo cuenta como hecho); volver a tocarlo la despliega. Un bloque se completa con todos sus ejercicios en check.
+- Reloj: página del ejercicio actual — desliza a la izquierda desde el tiempo — con el nombre, las series hechas/objetivo y la siguiente serie tal y como la registraría el check del móvil. «+ Serie» la registra (y arranca el descanso, que devuelve a la página del tiempo) y «Terminar» da el ejercicio por hecho. Si la app del móvil no está abierta, el reloj avisa: «Abre berserk en el móvil».
+- Al entrar en Entreno, o al volver a la app (desbloquear el móvil) con el entreno a la vista, la lista salta al ejercicio actual: el último con serie registrada del bloque que estás viendo — o el siguiente pendiente si ese ya está en check —, y arriba del todo si en ese bloque aún no hay ninguna serie.
+
+### Cambiado
+- Un countdown de cardio que llega a cero, además de registrar la serie, marca el ejercicio como hecho — y con él el bloque, si era el único.
+- El fin de cardio avisa igual que el de descanso: notificación del sistema con la app en segundo plano y el mismo margen de 3 s antes de decirle al reloj que terminó, para que la alarma del propio reloj dispare siempre antes.
+
+### Arreglado
+- Reloj: la alarma de fin de descanso o de cardio se cortaba al abrirse la app por la propia alarma — al releer el estado, un temporizador viejo de otro tipo la apagaba. Ahora cada tipo solo calla lo suyo, en el reloj y en el móvil (cancelar o dar el OK a un descanso no apaga un cardio, ni al revés). Requiere actualizar el APK del móvil y el del reloj.
+
 ## 0.37.1 - 2026-08-21
 
 ### Arreglado
