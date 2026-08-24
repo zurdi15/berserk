@@ -21,7 +21,9 @@ Web (WorkoutView decide cuál es; la WorkoutExerciseCard `current` lo publica)
   └─ nativeShell.ts::syncWearExercise → BkOngoing.syncExercise → BkWear.publishExercise
        └─ DataItem /berserk/exercise (nombre, series hechas/objetivo, siguiente serie, canLog, completed)
             └─ TimerListenerService → TimerEngine.applyExercise → ExerciseRepository (StateFlow)
-Órdenes: PhoneLink → /berserk/cmd/logSet | /berserk/cmd/completeExercise (cuerpo = weid)
+Órdenes: PhoneLink → /berserk/cmd/logSet | /berserk/cmd/completeExercise (cuerpo = weid; desde v0.39.0
+  logSet puede ir como JSON {weid, reps?, load?} con lo ajustado en los steppers del reloj — la carga en
+  unidades de pantalla o nivel, tal como la publicó la web, que es quien convierte a kg)
   → BkWearListenerService → evento `exerciseCommand` a la web (misma ruta que el check de la card:
     outbox, descanso automático, PRs); sin WebView vivo el móvil contesta /berserk/cmd/undelivered
     y el reloj enseña "Abre berserk en el móvil".

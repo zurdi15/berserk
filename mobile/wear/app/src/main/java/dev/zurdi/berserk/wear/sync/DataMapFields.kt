@@ -9,4 +9,5 @@ class DataMapFields(private val map: DataMap) : TimerFields {
     override fun long(key: String, default: Long): Long = if (map.containsKey(key)) map.getLong(key, default) else default
     override fun int(key: String, default: Int): Int = if (map.containsKey(key)) map.getInt(key, default) else default
     override fun boolean(key: String, default: Boolean): Boolean = if (map.containsKey(key)) map.getBoolean(key, default) else default
+    override fun double(key: String, default: Double): Double = if (map.containsKey(key)) map.getDouble(key, default) else default
 }

@@ -13,9 +13,13 @@ final class BkWearEvents {
         void onTimerCancelled(String kind);
     }
 
-    /** v0.38.0: "+ Serie" / "Terminar" desde el reloj sobre el ejercicio weid */
+    /**
+     * v0.38.0: "+ Serie" / "Terminar" desde el reloj sobre el ejercicio weid.
+     * v0.39.0: con "+ Serie" viajan las reps y la carga que el usuario ajustó
+     * en el reloj (reps 0 / load NaN = no tocó ese stepper).
+     */
     interface ExerciseSink {
-        void onExerciseCommand(String action, long weid);
+        void onExerciseCommand(String action, long weid, int reps, double load);
     }
 
     private static volatile Sink sink;
@@ -41,10 +45,10 @@ final class BkWearEvents {
      * llama se lo dice al reloj: la orden no vale nada sin la web, que es
      * quien registra (outbox, descanso, PRs).
      */
-    static boolean emitExerciseCommand(String action, long weid) {
+    static boolean emitExerciseCommand(String action, long weid, int reps, double load) {
         ExerciseSink current = exerciseSink;
         if (current == null) return false;
-        current.onExerciseCommand(action, weid);
+        current.onExerciseCommand(action, weid, reps, load);
         return true;
     }
 }

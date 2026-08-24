@@ -102,7 +102,9 @@ final class BkWear {
      * Espejo de mobile/wear core/ExerciseSpec.kt y nativeShell.syncWearExercise.
      */
     static void publishExercise(Context ctx, String state, long weid, String name, int setsDone, int setsTarget,
-                                String nextLabel, boolean canLog, boolean completed) {
+                                String nextLabel, boolean canLog, boolean completed,
+                                int reps, String loadMode, double load, String loadUnit,
+                                double loadStep, double loadMin, double loadMax) {
         if (!playServicesAvailable(ctx)) return;
         PutDataMapRequest request = PutDataMapRequest.create(PATH_EXERCISE);
         DataMap map = request.getDataMap();
@@ -115,6 +117,17 @@ final class BkWear {
         map.putString("nextLabel", nextLabel == null ? "" : nextLabel);
         map.putBoolean("canLog", canLog);
         map.putBoolean("completed", completed);
+        // v0.39.0 (zurdi: "cambiar los pesos/niveles y las reps desde el
+        // reloj"): la siguiente serie desglosada para los steppers — reps 0 =
+        // sin stepper; loadMode none = sin carga. La carga va en unidades de
+        // pantalla (o nivel) tal y como la web la enseña: el reloj no convierte.
+        map.putInt("reps", reps);
+        map.putString("loadMode", loadMode == null ? "none" : loadMode);
+        map.putDouble("load", load);
+        map.putString("loadUnit", loadUnit == null ? "" : loadUnit);
+        map.putDouble("loadStep", loadStep);
+        map.putDouble("loadMin", loadMin);
+        map.putDouble("loadMax", loadMax);
         map.putLong("sentAtEpochMs", System.currentTimeMillis());
         request.setUrgent();
         Wearable.getDataClient(ctx)

@@ -8,6 +8,7 @@ import BkButton from '@/lib/BkButton.vue'
 import BkSelect from '@/lib/BkSelect.vue'
 import BkStepper from '@/lib/BkStepper.vue'
 import { CARDIO_DURATION_MAX_SECONDS, CARDIO_DURATION_STEP_SECONDS, formatDuration } from './duration'
+import { LEVEL_UI, WEIGHT_UI } from './loadSteps'
 import PlateCalculatorSheet from './PlateCalculatorSheet.vue'
 
 const props = withDefaults(
@@ -56,22 +57,14 @@ const { t } = useI18n()
 // nuevo modelo necesita.
 const units = computed(() => props.units)
 
-// paso/valores por defecto en el espacio de la unidad del usuario: 2.5 kg es
-// un incremento natural, 2.5 lb no lo es (los discos son de 5 lb)
-const WEIGHT_UI = {
-  kg: { step: 2.5, initial: 20, max: 500 },
-  lb: { step: 5, initial: 45, max: 1100 },
-} as const
-
 // v0.18.0 (zurdi: "el modo se pone cuando VAS A HACER el ejercicio — un día
 // la polea libre es la de kg y otro la de niveles"): el modo kg/nivel se
 // elige AQUÍ, por serie, con un toggle sobre la columna de carga. Default:
 // el modo de la última serie (initialSet lo trae del prefill/edición —
 // dentro del entreno, de la sesión anterior o de la serie que se corrige).
 // En nivel el valor viaja TAL CUAL en weight_kg (sin displayToKg/
-// kgToDisplay: el nivel 12 es 12 en cualquier unidad); rango generoso
-// (zurdi dijo "del 1 al 20" pero hay máquinas con más posiciones), paso 1.
-const LEVEL_UI = { step: 1, initial: 10, max: 100 } as const
+// kgToDisplay: el nivel 12 es 12 en cualquier unidad). Pasos y topes en
+// loadSteps.ts (v0.39.0: los comparte con los steppers del reloj).
 const mode = ref<LoadMode>(props.initialSet?.load_mode ?? 'weight')
 const isLevel = computed(() => mode.value === 'level')
 const loadStep = computed(() => (isLevel.value ? LEVEL_UI.step : WEIGHT_UI[props.units].step))

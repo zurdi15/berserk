@@ -583,6 +583,29 @@ export interface WearExerciseSync {
   /** ¿el reloj puede registrar la siguiente serie de un toque? */
   canLog?: boolean
   completed?: boolean
+  // v0.39.0 (zurdi: "cambiar los pesos/niveles y las reps desde el reloj"):
+  // la siguiente serie DESGLOSADA para los steppers del reloj. reps 0 = sin
+  // stepper de reps; loadMode 'none' = sin stepper de carga. La carga va en
+  // unidades de PANTALLA (kg/lb según el usuario) o como nivel plano, con el
+  // paso y los topes del cajón (loadSteps.ts); el reloj devuelve lo que
+  // enseña y la web lo pasa a kg (displayToKg) — el reloj no sabe de unidades.
+  reps?: number
+  loadMode?: WearLoadMode
+  load?: number
+  /** 'kg' | 'lb' con loadMode 'weight'; vacío con 'level'/'none' */
+  loadUnit?: string
+  loadStep?: number
+  loadMin?: number
+  loadMax?: number
+}
+
+export type WearLoadMode = 'weight' | 'level' | 'none'
+
+/** v0.39.0: lo que el usuario ajustó en el reloj antes de «+ Serie» — solo lo tocado */
+export interface WearSetTweak {
+  reps?: number
+  /** en unidades de pantalla (o nivel), tal como lo enseñaba el reloj */
+  load?: number
 }
 
 /** lo que recibe el plugin: todos los campos presentes (DataMap sin opcionales) */
@@ -607,6 +630,13 @@ export async function syncWearExercise(sync: WearExerciseSync): Promise<void> {
       nextLabel: '',
       canLog: false,
       completed: false,
+      reps: 0,
+      loadMode: 'none',
+      load: 0,
+      loadUnit: '',
+      loadStep: 0,
+      loadMin: 0,
+      loadMax: 0,
       ...sync,
     })
   } catch {
@@ -614,7 +644,7 @@ export async function syncWearExercise(sync: WearExerciseSync): Promise<void> {
   }
 }
 
-type WearExerciseListener = (action: WearExerciseAction, weid: number) => void
+type WearExerciseListener = (action: WearExerciseAction, weid: number, tweak: WearSetTweak) => void
 const wearExerciseListeners = new Set<WearExerciseListener>()
 let wearExerciseSubscribedTo: OngoingPlugin | null = null
 
@@ -638,7 +668,12 @@ export function onWearExerciseCommand(listener: WearExerciseListener): () => voi
         const action = event?.action
         const weid = event?.weid
         if (!isWearExerciseAction(action) || typeof weid !== 'number' || !Number.isFinite(weid)) return
-        for (const callback of [...wearExerciseListeners]) callback(action, weid)
+        // v0.39.0: con logSet pueden venir las reps y la carga ajustadas en el
+        // reloj; solo lo que sea un número válido y positivo
+        const tweak: WearSetTweak = {}
+        if (typeof event?.reps === 'number' && Number.isFinite(event.reps) && event.reps > 0) tweak.reps = Math.round(event.reps)
+        if (typeof event?.load === 'number' && Number.isFinite(event.load) && event.load > 0) tweak.load = event.load
+        for (const callback of [...wearExerciseListeners]) callback(action, weid, tweak)
       })
     } catch {
       wearExerciseSubscribedTo = null

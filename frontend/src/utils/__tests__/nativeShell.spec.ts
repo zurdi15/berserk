@@ -243,10 +243,13 @@ describe('reloj Wear OS — syncWearExercise / onWearExerciseCommand', () => {
       nextLabel: '8 × 60 kg',
       canLog: true,
       completed: false,
+      // v0.39.0: sin desglose = sin steppers en el reloj
+      reps: 0, loadMode: 'none', load: 0, loadUnit: '', loadStep: 0, loadMin: 0, loadMax: 0,
     })
     await syncWearExercise({ state: 'none' })
     expect(syncExercise).toHaveBeenLastCalledWith({
       state: 'none', weid: 0, name: '', setsDone: 0, setsTarget: 0, nextLabel: '', canLog: false, completed: false,
+      reps: 0, loadMode: 'none', load: 0, loadUnit: '', loadStep: 0, loadMin: 0, loadMax: 0,
     })
 
     installCapacitor({ syncExercise: vi.fn().mockRejectedValue(new Error('no gms')) })
@@ -266,17 +269,23 @@ describe('reloj Wear OS — syncWearExercise / onWearExerciseCommand', () => {
     expect(addListener).toHaveBeenCalledWith('exerciseCommand', expect.any(Function))
 
     handler!({ action: 'logSet', weid: 20 })
-    expect(listener).toHaveBeenCalledWith('logSet', 20)
+    expect(listener).toHaveBeenCalledWith('logSet', 20, {})
     // alta hecha sin red en el móvil: id temporal negativo, vale igual
     handler!({ action: 'complete', weid: -3 })
-    expect(listener).toHaveBeenCalledWith('complete', -3)
+    expect(listener).toHaveBeenCalledWith('complete', -3, {})
+    // v0.39.0: lo ajustado en los steppers del reloj viaja con la orden; lo
+    // que no sea un número positivo se ignora
+    handler!({ action: 'logSet', weid: 20, reps: 8, load: 62.5 })
+    expect(listener).toHaveBeenCalledWith('logSet', 20, { reps: 8, load: 62.5 })
+    handler!({ action: 'logSet', weid: 20, reps: 'ocho', load: -1 })
+    expect(listener).toHaveBeenLastCalledWith('logSet', 20, {})
 
     handler!({ action: 'nap', weid: 1 })
     handler!({ action: 'logSet', weid: 'x' })
-    expect(listener).toHaveBeenCalledTimes(2)
+    expect(listener).toHaveBeenCalledTimes(4)
 
     off()
     handler!({ action: 'logSet', weid: 20 })
-    expect(listener).toHaveBeenCalledTimes(2)
+    expect(listener).toHaveBeenCalledTimes(4)
   })
 })

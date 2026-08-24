@@ -40,6 +40,13 @@ class ExerciseRepository private constructor(context: Context) {
         put("canLog", spec.canLog)
         put("completed", spec.completed)
         put("sentAt", spec.sentAtEpochMs)
+        put("reps", spec.reps)
+        put("loadMode", spec.loadMode)
+        put("load", spec.load)
+        put("loadUnit", spec.loadUnit)
+        put("loadStep", spec.loadStep)
+        put("loadMin", spec.loadMin)
+        put("loadMax", spec.loadMax)
     }.toString()
 
     private fun decode(raw: String): ExerciseSpec? = runCatching {
@@ -53,6 +60,13 @@ class ExerciseRepository private constructor(context: Context) {
             canLog = json.optBoolean("canLog"),
             completed = json.optBoolean("completed"),
             sentAtEpochMs = json.getLong("sentAt"),
+            reps = json.optInt("reps"),
+            loadMode = json.optString("loadMode", ExerciseSpec.LOAD_NONE),
+            load = json.optDouble("load", 0.0),
+            loadUnit = json.optString("loadUnit"),
+            loadStep = json.optDouble("loadStep", 0.0),
+            loadMin = json.optDouble("loadMin", 0.0),
+            loadMax = json.optDouble("loadMax", 0.0),
         )
     }.getOrNull()
 

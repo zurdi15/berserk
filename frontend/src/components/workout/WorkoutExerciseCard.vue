@@ -28,6 +28,8 @@ import {
   syncWearExercise,
   syncWearTimer,
   type WearExerciseSync,
+  type WearLoadMode,
+  type WearSetTweak,
   type WearStopReason,
 } from '@/utils/nativeShell'
 import { showTimerNotification } from '@/utils/timerNotification'
@@ -37,7 +39,7 @@ import {
   setPersistedCardioCountdown,
   type PersistedCardioCountdown,
 } from '@/utils/uiPrefs'
-import { formatLoad } from '@/utils/units'
+import { displayToKg, formatLoad, kgToDisplay } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
 import BkCheck from '@/lib/BkCheck.vue'
@@ -54,6 +56,7 @@ import { formatDuration } from './duration'
 import { REST_MAX_SECONDS, REST_MIN_SECONDS, REST_PRESETS, REST_STEP_SECONDS, restFor } from './rest'
 import { suggestNextLoad } from './progression'
 import { resolveNewSetDefaults } from './setDefaults'
+import { LEVEL_UI, LOAD_MIN, WEIGHT_UI } from './loadSteps'
 import { formatHistorySetLines } from './setHistoryFormat'
 import SetForm from './SetForm.vue'
 import type { WorkoutActions } from './workoutActions'
@@ -557,7 +560,13 @@ const ghostLabel = computed(() => {
 
 const quickLogging = ref(false)
 
-async function quickLog() {
+// el check de ghost llama a quickLog() a secas; el reloj (v0.39.0) puede
+// traer lo que se ajustó en sus steppers
+function quickLog() {
+  return quickLogWith()
+}
+
+async function quickLogWith(tweak?: WearSetTweak) {
   if (quickLogging.value) return
   const body = ghostQuickBody.value
   if (!body) {
@@ -566,7 +575,7 @@ async function quickLog() {
   }
   quickLogging.value = true
   try {
-    await submitNewSet(body)
+    await submitNewSet(applyWearTweak(body, tweak))
   } catch (error) {
     toastApiError(error)
   } finally {
@@ -731,7 +740,37 @@ async function setCompleted(value: boolean) {
 // siguiente, o WorkoutView el `none`), para que dos watchers no se pisen.
 const wearPayload = computed<WearExerciseSync | null>(() => {
   if (!props.live || !props.current) return null
-  const canLog = !isCardio.value && !completed.value && ghostQuickBody.value !== null
+  const body = ghostQuickBody.value
+  const canLog = !isCardio.value && !completed.value && body !== null
+  // v0.39.0 (zurdi: "cambiar los pesos/niveles y las reps desde el reloj"):
+  // la siguiente serie desglosada para los steppers del reloj, con los
+  // mismos pasos/topes que el cajón (loadSteps.ts). La carga viaja en
+  // unidades de pantalla (o nivel plano) y vuelve igual: el reloj no
+  // convierte, lo hace applyWearTweak (displayToKg) al registrar.
+  const measurement = props.exercise?.measurement
+  const reps = canLog && body?.reps != null ? body.reps : 0
+  let loadMode: WearLoadMode = 'none'
+  let load = 0
+  let loadUnit = ''
+  let loadStep = 0
+  let loadMin = 0
+  let loadMax = 0
+  if (canLog && body?.weight_kg != null && (measurement === 'strength' || measurement === 'bodyweight')) {
+    if ((body.load_mode ?? 'weight') === 'level') {
+      loadMode = 'level'
+      load = body.weight_kg
+      loadStep = LEVEL_UI.step
+      loadMin = LOAD_MIN.level
+      loadMax = LEVEL_UI.max
+    } else {
+      loadMode = 'weight'
+      load = kgToDisplay(body.weight_kg, props.units)
+      loadUnit = props.units
+      loadStep = WEIGHT_UI[props.units].step
+      loadMin = LOAD_MIN.weight
+      loadMax = WEIGHT_UI[props.units].max
+    }
+  }
   return {
     state: 'exercise',
     weid: props.workoutExercise.id,
@@ -741,8 +780,28 @@ const wearPayload = computed<WearExerciseSync | null>(() => {
     nextLabel: canLog ? ghostLabel.value : '',
     canLog,
     completed: completed.value,
+    reps,
+    loadMode,
+    load,
+    loadUnit,
+    loadStep,
+    loadMin,
+    loadMax,
   }
 })
+
+// v0.39.0: lo ajustado en los steppers del reloj sobre el prefill del ghost —
+// reps tal cual; la carga vuelve en unidades de pantalla (o nivel) y aquí se
+// pasa a kg, el único idioma del backend
+function applyWearTweak(body: SetIn, tweak?: WearSetTweak): SetIn {
+  if (!tweak) return body
+  const next: SetIn = { ...body }
+  if (tweak.reps != null && next.reps != null) next.reps = tweak.reps
+  if (tweak.load != null && next.weight_kg != null) {
+    next.weight_kg = (next.load_mode ?? 'weight') === 'level' ? tweak.load : displayToKg(tweak.load, props.units)
+  }
+  return next
+}
 // se compara serializado: el computed devuelve un objeto nuevo con cualquier
 // dependencia (abrir el cajón, p. ej.) aunque el contenido no cambie, y cada
 // publicación es un DataItem nuevo para el reloj
@@ -768,13 +827,13 @@ watch(
 // órdenes del reloj: llegan con el weid que tenía en pantalla — solo actúa
 // la card de ESE ejercicio, por el mismo camino que sus propios botones
 // (quickLog = el check de ghost; complete = el check de la cabecera)
-const stopWearExerciseCommand = onWearExerciseCommand((action, weid) => {
+const stopWearExerciseCommand = onWearExerciseCommand((action, weid, tweak) => {
   if (!props.live || weid !== props.workoutExercise.id) return
   if (action === 'complete') {
     if (!completed.value) void setCompleted(true)
     return
   }
-  if (!isCardio.value && !completed.value && ghostQuickBody.value !== null) void quickLog()
+  if (!isCardio.value && !completed.value && ghostQuickBody.value !== null) void quickLogWith(tweak)
 })
 onBeforeUnmount(stopWearExerciseCommand)
 

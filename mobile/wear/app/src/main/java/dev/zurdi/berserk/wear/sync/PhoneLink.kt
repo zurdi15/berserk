@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import org.json.JSONObject
 import java.nio.ByteBuffer
 
 /**
@@ -74,7 +75,20 @@ class PhoneLink(context: Context) {
      * La web es quien registra; si no está viva el móvil contesta por
      * PATH_CMD_UNDELIVERED (ver TimerListenerService). false = sin móvil al alcance.
      */
-    suspend fun requestLogSet(weid: Long): Boolean = sendCommand(PATH_CMD_LOG_SET, weid.toString())
+    suspend fun requestLogSet(weid: Long, reps: Int? = null, load: Double? = null): Boolean {
+        // v0.39.0: con algo ajustado en el reloj el cuerpo es JSON {weid, reps?,
+        // load?} (solo lo tocado); sin nada, el weid plano de siempre
+        val body = if (reps == null && load == null) {
+            weid.toString()
+        } else {
+            JSONObject().apply {
+                put("weid", weid)
+                reps?.let { put("reps", it) }
+                load?.let { put("load", it) }
+            }.toString()
+        }
+        return sendCommand(PATH_CMD_LOG_SET, body)
+    }
 
     suspend fun requestCompleteExercise(weid: Long): Boolean = sendCommand(PATH_CMD_COMPLETE_EXERCISE, weid.toString())
 

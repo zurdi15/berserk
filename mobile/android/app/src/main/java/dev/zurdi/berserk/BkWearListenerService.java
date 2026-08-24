@@ -7,6 +7,9 @@ import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.WearableListenerService;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
@@ -44,14 +47,26 @@ public class BkWearListenerService extends WearableListenerService {
             // ejercicio"): la orden viaja a la web con el weid que el reloj tenía
             // en pantalla. Sin WebView vivo no hay quien registre: se le dice al
             // reloj (undelivered) para que avise en vez de quedarse esperando.
+            // v0.39.0: "+ Serie" puede venir como JSON {weid, reps?, load?} con lo
+            // ajustado en el reloj; el cuerpo plano (solo weid) sigue valiendo
+            String body = new String(event.getData(), StandardCharsets.UTF_8).trim();
             long weid;
+            int reps = 0;
+            double load = Double.NaN;
             try {
-                weid = Long.parseLong(new String(event.getData(), StandardCharsets.UTF_8).trim());
-            } catch (RuntimeException e) {
+                if (body.startsWith("{")) {
+                    JSONObject json = new JSONObject(body);
+                    weid = json.getLong("weid");
+                    reps = json.optInt("reps", 0);
+                    load = json.optDouble("load", Double.NaN);
+                } else {
+                    weid = Long.parseLong(body);
+                }
+            } catch (RuntimeException | JSONException e) {
                 return;
             }
             String action = BkWear.CMD_LOG_SET.equals(event.getPath()) ? "logSet" : "complete";
-            if (!BkWearEvents.emitExerciseCommand(action, weid)) {
+            if (!BkWearEvents.emitExerciseCommand(action, weid, reps, load)) {
                 Wearable.getMessageClient(getApplicationContext())
                         .sendMessage(event.getSourceNodeId(), BkWear.PATH_CMD_UNDELIVERED, event.getData());
             }

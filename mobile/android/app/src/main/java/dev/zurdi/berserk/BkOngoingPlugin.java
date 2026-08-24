@@ -296,10 +296,13 @@ public class BkOngoingPlugin extends Plugin {
         });
         // v0.38.0: órdenes del reloj sobre el ejercicio actual ("+ Serie",
         // "Terminar") — la web las ejecuta por el mismo camino que sus botones
-        BkWearEvents.setExerciseSink((action, weid) -> {
+        BkWearEvents.setExerciseSink((action, weid, reps, load) -> {
             JSObject data = new JSObject();
             data.put("action", action);
             data.put("weid", weid);
+            // v0.39.0: solo lo que el usuario tocó en el reloj (reps 0 / load NaN = sin tocar)
+            if (reps > 0) data.put("reps", reps);
+            if (!Double.isNaN(load)) data.put("load", load);
             getBridge().executeOnMainThread(() -> notifyListeners("exerciseCommand", data, true));
         });
     }
@@ -325,6 +328,10 @@ public class BkOngoingPlugin extends Plugin {
                 call.reject("syncExercise: state inválido");
                 return;
             }
+            Double load = call.getDouble("load");
+            Double loadStep = call.getDouble("loadStep");
+            Double loadMin = call.getDouble("loadMin");
+            Double loadMax = call.getDouble("loadMax");
             BkWear.publishExercise(
                     getContext(),
                     state,
@@ -334,7 +341,14 @@ public class BkOngoingPlugin extends Plugin {
                     call.getInt("setsTarget", 0),
                     call.getString("nextLabel", ""),
                     Boolean.TRUE.equals(call.getBoolean("canLog", false)),
-                    Boolean.TRUE.equals(call.getBoolean("completed", false)));
+                    Boolean.TRUE.equals(call.getBoolean("completed", false)),
+                    call.getInt("reps", 0),
+                    call.getString("loadMode", "none"),
+                    load == null ? 0d : load,
+                    call.getString("loadUnit", ""),
+                    loadStep == null ? 0d : loadStep,
+                    loadMin == null ? 0d : loadMin,
+                    loadMax == null ? 0d : loadMax);
             call.resolve();
         } catch (Exception e) {
             call.reject(e.toString());

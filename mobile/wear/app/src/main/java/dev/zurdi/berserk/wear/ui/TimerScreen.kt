@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +49,8 @@ import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.HorizontalPagerScaffold
 import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.IconButton
+import androidx.wear.compose.material3.IconButtonDefaults
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
@@ -59,6 +65,7 @@ import dev.zurdi.berserk.wear.notify.Haptics
 import dev.zurdi.berserk.wear.sync.PhoneLink
 import dev.zurdi.berserk.wear.ui.theme.Slab
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /** últimos segundos: el anillo y los dígitos pasan a ámbar, el halo respira y hay tic háptico 3-2-1 */
 private const val URGENT_MS = 10_000L
@@ -71,6 +78,9 @@ private const val COMMAND_BUSY_MS = 3_000L
 
 /** v0.38.0: cuánto se enseña "Abre berserk en el móvil" tras una orden sin web viva */
 private const val UNDELIVERED_HINT_MS = 3_000L
+
+/** v0.39.0: ancho del valor entre los botones de un stepper ("62.5 kg", "10 reps") */
+private val STEPPER_VALUE_WIDTH = 84.dp
 
 
 /**
@@ -138,8 +148,8 @@ fun TimerApp(
                     scope.launch { link.requestCancel(primary.kind) }
                 },
                 // sin móvil al alcance no hay ni acuse: se avisa como si lo hubiera devuelto
-                onLogSet = { exercise ->
-                    scope.launch { if (!link.requestLogSet(exercise.weid)) engine.onCommandUndelivered() }
+                onLogSet = { exercise, reps, load ->
+                    scope.launch { if (!link.requestLogSet(exercise.weid, reps, load)) engine.onCommandUndelivered() }
                 },
                 onComplete = { exercise ->
                     scope.launch { if (!link.requestCompleteExercise(exercise.weid)) engine.onCommandUndelivered() }
@@ -169,7 +179,7 @@ private fun WorkoutScreens(
     now: Long,
     undeliveredAt: Long,
     onCancel: () -> Unit,
-    onLogSet: (ExerciseSpec) -> Unit,
+    onLogSet: (ExerciseSpec, Int?, Double?) -> Unit,
     onComplete: (ExerciseSpec) -> Unit,
 ) {
     if (exercise == null) {
@@ -201,36 +211,54 @@ private fun WorkoutScreens(
 
 /**
  * v0.38.0: el ejercicio actual — nombre, series hechas/objetivo y la siguiente
- * serie tal y como la registraría el check del móvil, con "+ Serie" (solo si
- * hay prefill: canLog) y "Terminar". Tras una orden los botones esperan al
- * estado nuevo del móvil (sentAt cambia) o unos segundos; si el móvil devuelve
- * que su web no estaba viva, se dice en vez de quedarse mudo.
+ * serie, con "+ Serie" (solo si hay prefill: canLog) y "Terminar". Tras una
+ * orden los botones esperan al estado nuevo del móvil (sentAt cambia) o unos
+ * segundos; si el móvil devuelve que su web no estaba viva, se dice en vez de
+ * quedarse mudo.
+ * v0.39.0 (zurdi: "molaría poder cambiar los pesos/niveles y las reps desde
+ * el reloj"): la siguiente serie va desglosada en dos steppers (reps y carga,
+ * con el paso y los topes del formulario del móvil); "+ Serie" manda solo lo
+ * que se tocó y cada publicación nueva del móvil (sentAt) los resetea a su
+ * prefill. La columna hace scroll por si en esferas pequeñas no cabe todo.
  */
 @Composable
 private fun ExercisePage(
     exercise: ExerciseSpec,
     now: Long,
     undeliveredAt: Long,
-    onLogSet: (ExerciseSpec) -> Unit,
+    onLogSet: (ExerciseSpec, Int?, Double?) -> Unit,
     onComplete: (ExerciseSpec) -> Unit,
 ) {
     val aurora = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
     var busyUntil by remember { mutableLongStateOf(0L) }
+    var reps by remember(exercise.sentAtEpochMs) { mutableIntStateOf(exercise.reps) }
+    var load by remember(exercise.sentAtEpochMs) { mutableDoubleStateOf(exercise.load) }
+    var repsTouched by remember(exercise.sentAtEpochMs) { mutableStateOf(false) }
+    var loadTouched by remember(exercise.sentAtEpochMs) { mutableStateOf(false) }
     LaunchedEffect(exercise.sentAtEpochMs, undeliveredAt) { busyUntil = 0L }
     val busy = now < busyUntil
     val phoneClosed = undeliveredAt > 0L && now - undeliveredAt in 0L..UNDELIVERED_HINT_MS
-    val send: ((ExerciseSpec) -> Unit) -> Unit = { action ->
+    val send: (() -> Unit) -> Unit = { action ->
         Haptics.tick(context)
         busyUntil = now + COMMAND_BUSY_MS
-        action(exercise)
+        action()
+    }
+    val loadLabel = if (exercise.loadMode == ExerciseSpec.LOAD_LEVEL) {
+        stringResource(R.string.load_level, formatLoad(load))
+    } else {
+        "${formatLoad(load)} ${exercise.loadUnit}".trim()
     }
 
     ScreenScaffold { contentPadding ->
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Halo(color = aurora, alpha = 0.08f, radiusFraction = 0.8f)
             Column(
-                modifier = Modifier.fillMaxSize().padding(contentPadding).padding(horizontal = 22.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding)
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -239,17 +267,17 @@ private fun ExercisePage(
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = exercise.progressLabel,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = aurora,
                     )
-                    if (exercise.nextLabel.isNotEmpty()) {
+                    // sin steppers (prefill que no se desglosa) la siguiente serie va como etiqueta
+                    if (!exercise.hasReps && !exercise.hasLoad && exercise.nextLabel.isNotEmpty()) {
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = exercise.nextLabel,
@@ -259,6 +287,26 @@ private fun ExercisePage(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                }
+                if (exercise.hasReps) {
+                    Spacer(Modifier.height(4.dp))
+                    StepperRow(
+                        value = stringResource(R.string.reps_value, reps),
+                        canDec = reps > 1,
+                        canInc = reps < 100,
+                        onDec = { reps -= 1; repsTouched = true },
+                        onInc = { reps += 1; repsTouched = true },
+                    )
+                }
+                if (exercise.hasLoad) {
+                    Spacer(Modifier.height(4.dp))
+                    StepperRow(
+                        value = loadLabel,
+                        canDec = load - exercise.loadStep >= exercise.loadMin - 1e-9,
+                        canInc = exercise.loadMax <= 0.0 || load + exercise.loadStep <= exercise.loadMax + 1e-9,
+                        onDec = { load = roundLoad(load - exercise.loadStep); loadTouched = true },
+                        onInc = { load = roundLoad(load + exercise.loadStep); loadTouched = true },
+                    )
                 }
                 if (phoneClosed) {
                     Spacer(Modifier.height(2.dp))
@@ -272,7 +320,9 @@ private fun ExercisePage(
                 }
                 Spacer(Modifier.height(8.dp))
                 CompactButton(
-                    onClick = { send(onLogSet) },
+                    onClick = {
+                        send { onLogSet(exercise, reps.takeIf { repsTouched }, load.takeIf { loadTouched }) }
+                    },
                     enabled = exercise.canLog && !busy,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = aurora,
@@ -284,7 +334,7 @@ private fun ExercisePage(
                 }
                 Spacer(Modifier.height(6.dp))
                 CompactButton(
-                    onClick = { send(onComplete) },
+                    onClick = { send { onComplete(exercise) } },
                     enabled = !busy,
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = Slab,
@@ -298,6 +348,42 @@ private fun ExercisePage(
         }
     }
 }
+
+/** v0.39.0: [−] valor [+] — botones extra-pequeños (32 dp) para que quepan dos filas en la esfera */
+@Composable
+private fun StepperRow(value: String, canDec: Boolean, canInc: Boolean, onDec: () -> Unit, onInc: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        StepButton(label = "−", enabled = canDec, onClick = onDec)
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.width(STEPPER_VALUE_WIDTH),
+        )
+        StepButton(label = "+", enabled = canInc, onClick = onInc)
+    }
+}
+
+@Composable
+private fun StepButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(IconButtonDefaults.ExtraSmallButtonSize),
+        colors = IconButtonDefaults.filledTonalIconButtonColors(),
+    ) {
+        Text(text = label, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+/** 62.5 → "62.5", 60.0 → "60" (la coma la pone el locale) */
+private fun formatLoad(value: Double): String =
+    if (value == Math.floor(value)) "%.0f".format(value) else "%.1f".format(value)
+
+/** los pasos de 2.5 acumulan ruido binario: se redondea a centésimas */
+private fun roundLoad(value: Double): Double = (value * 100).roundToInt() / 100.0
 
 @Composable
 private fun RunningScreen(timer: ActiveTimer, workout: ActiveTimer?, now: Long, onCancel: () -> Unit) {

@@ -17,6 +17,9 @@
     <string name="exercise_add_set">+ Serie</string>
     <string name="exercise_finish">Terminar</string>
     <string name="phone_app_closed">Abre berserk en el móvil</string>
+    <!-- v0.39.0: steppers de la siguiente serie -->
+    <string name="reps_value">%1$d reps</string>
+    <string name="load_level">Nivel %1$s</string>
     <string name="workout_elapsed">%1$s</string>
 
     <string name="phone_connected">Móvil conectado</string>

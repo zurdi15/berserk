@@ -1636,6 +1636,15 @@ describe('v0.38.0: el ejercicio actual en el reloj', () => {
         nextLabel: expect.stringMatching(/^5 × 100/),
         canLog: true,
         completed: false,
+        // v0.39.0: la siguiente serie desglosada para los steppers, con los
+        // pasos/topes del cajón (kg: 2.5, 2.5–500)
+        reps: 5,
+        loadMode: 'weight',
+        load: 100,
+        loadUnit: 'kg',
+        loadStep: 2.5,
+        loadMin: 2.5,
+        loadMax: 500,
       }),
     )
     wrapper.unmount()
@@ -1674,6 +1683,27 @@ describe('v0.38.0: el ejercicio actual en el reloj', () => {
     shell.command()({ action: 'logSet', weid: 20 })
     await flushPromises()
     expect(actions.logSet).toHaveBeenCalledWith(20, expect.objectContaining({ is_warmup: false, reps: 5, weight_kg: 100 }))
+
+    // v0.39.0: lo ajustado en los steppers del reloj se aplica sobre el prefill
+    shell.command()({ action: 'logSet', weid: 20, reps: 6, load: 102.5 })
+    await flushPromises()
+    expect(actions.logSet).toHaveBeenLastCalledWith(20, expect.objectContaining({ reps: 6, weight_kg: 102.5 }))
+    wrapper.unmount()
+  })
+
+  it('v0.39.0: in lb the watch sees and returns display units; the set is logged in kg', async () => {
+    const shell = installShell()
+    const actions = makeActions()
+    const wrapper = mountCard({ current: true, actions, units: 'lb' })
+    await flushPromises()
+
+    expect(shell.syncExercise).toHaveBeenCalledWith(
+      expect.objectContaining({ reps: 5, loadMode: 'weight', load: 220.5, loadUnit: 'lb', loadStep: 5, loadMin: 2.5, loadMax: 1100 }),
+    )
+
+    shell.command()({ action: 'logSet', weid: 20, load: 225 })
+    await flushPromises()
+    expect(actions.logSet).toHaveBeenLastCalledWith(20, expect.objectContaining({ reps: 5, weight_kg: 102.06 }))
     wrapper.unmount()
   })
 
