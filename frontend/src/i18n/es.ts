@@ -574,10 +574,10 @@ export const es = {
     progressionTitle: 'La última sesión cumpliste todas las reps objetivo — prueba a subir',
     nextSet: 'Siguiente serie',
     setDone: 'Serie {n} hecha',
-    // v0.38.0 (zurdi: "check de marcar ejercicio como completado"): el check
-    // de la cabecera de la card y la etiqueta de la card plegada
-    markDone: 'Marcar ejercicio como hecho',
-    done: 'Hecho',
+    // v0.38.1 (zurdi: "botón en la parte baja de la card"): el botón de la
+    // última fila de la card y su estado una vez marcado
+    completeExercise: 'Completar ejercicio',
+    completed: 'Completado',
     finished: '¡Entreno terminado!',
     blockLabel: 'Bloque: {name}',
     reps: 'Reps',

@@ -1,5 +1,5 @@
 import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, getActivePinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '@/i18n'
@@ -159,6 +159,15 @@ async function openMenu(weid: number) {
 function drawerForm(): DOMWrapper<HTMLFormElement> {
   return new DOMWrapper(document.body.querySelector('form') as HTMLFormElement)
 }
+
+// v0.38.1: los tests que arrancan un descanso dejan vivo su setInterval REAL
+// tras el unmount (el store no muere con la card). Con fake timers en un test
+// posterior, Date.now() salta 20 min, ese ticker huérfano vence y publica su
+// `finished` (kind rest) en medio de otra aserción — según la fase del ticker,
+// flaky. Se limpia SIEMPRE el store del pinia activo (el de ese test).
+afterEach(() => {
+  if (getActivePinia()) useRestTimerStore().clear()
+})
 
 describe('WorkoutExerciseCard', () => {
   beforeEach(() => {
@@ -592,7 +601,8 @@ describe('WorkoutExerciseCard', () => {
       const wrapper = mountCardio()
       await flushPromises()
       const actions = wrapper.get('[data-testid="cardio-actions-30"]')
-      expect(actions.classes()).toEqual(expect.arrayContaining(['grid', 'grid-cols-2', 'flex-1']))
+      // v0.38.1: basis-full en vez de flex-1 — la fila entera, y «Completar ejercicio» baja a la siguiente
+      expect(actions.classes()).toEqual(expect.arrayContaining(['grid', 'grid-cols-2', 'basis-full']))
     })
 
     // v0.10.0 (zurdi: "o una entrada con el tiempo hecho y ya, o empezar
@@ -1476,14 +1486,26 @@ describe('v0.5.0 superseries: rest gating and chips', () => {
   })
 })
 
-// ── v0.38.0 (zurdi: "check de marcar ejercicio como completado") ────────────
-describe('v0.38.0: check de "ejercicio hecho"', () => {
-  it('shows the header check when the actions can mark, and marks through setExerciseCompleted', async () => {
+// ── v0.38.0 (zurdi: "check de marcar ejercicio como completado") — v0.38.1:
+// botón «Completar ejercicio» al pie de la card en vez del check de la
+// cabecera; la card no se pliega, solo cambia el borde ──────────────────────
+describe('v0.38.1: botón «Completar ejercicio»', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('shows the footer button when the actions can mark, and marks through setExerciseCompleted', async () => {
     const setExerciseCompleted = vi.fn(async () => {})
     const wrapper = mountCard({ actions: makeActions({ setExerciseCompleted }) })
     await flushPromises()
 
-    await wrapper.get('[data-testid="exercise-done-20"]').trigger('click')
+    const button = wrapper.get('[data-testid="exercise-done-20"]')
+    expect(button.text()).toBe('Completar ejercicio')
+    expect(button.attributes('aria-pressed')).toBe('false')
+    await button.trigger('click')
     await flushPromises()
 
     expect(setExerciseCompleted).toHaveBeenCalledWith(20, true)
@@ -1502,7 +1524,7 @@ describe('v0.38.0: check de "ejercicio hecho"', () => {
     retro.unmount()
   })
 
-  it('a completed exercise collapses to its header (chip "Hecho", no sets, ghosts or footer) and the check un-marks it', async () => {
+  it('a completed exercise keeps its sets and actions, gets the aurora border and no ghosts; the button un-marks it', async () => {
     const setExerciseCompleted = vi.fn(async () => {})
     const wrapper = mountCard({
       workoutExercise: { ...pushExercise, completed: true },
@@ -1513,15 +1535,18 @@ describe('v0.38.0: check de "ejercicio hecho"', () => {
     // la raíz del template lleva comentarios delante de BkCard: para VTU es un
     // fragmento, así que los attrs se leen en la <section> real
     expect(wrapper.find('section').attributes('data-completed')).toBe('true')
-    expect(wrapper.find('section').classes()).toContain('opacity-70')
-    expect(wrapper.find('[data-testid="exercise-done-chip-20"]').text()).toBe('Hecho')
-    expect(wrapper.find('[data-testid="set-row-1"]').exists()).toBe(false)
+    expect(wrapper.find('section').classes()).toContain('border-aurora')
+    // no se pliega: series y «Añadir serie» siguen ahí; las series fantasma
+    // no (hecho = nada pendiente)
+    expect(wrapper.find('[data-testid="set-row-1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="add-set-20"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="add-set-20"]').exists()).toBe(false)
-    // el contador sigue en la cabecera
     expect(wrapper.get('[data-testid="set-count-20"]').text()).toContain('1')
 
-    await wrapper.get('[data-testid="exercise-done-20"]').trigger('click')
+    const button = wrapper.get('[data-testid="exercise-done-20"]')
+    expect(button.text()).toBe('Completado')
+    expect(button.attributes('aria-pressed')).toBe('true')
+    await button.trigger('click')
     await flushPromises()
     expect(setExerciseCompleted).toHaveBeenCalledWith(20, false)
     wrapper.unmount()
@@ -1584,7 +1609,15 @@ function memoryStorage(): Storage {
 }
 
 describe('v0.38.0: el ejercicio actual en el reloj', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
   afterEach(() => {
+    // «+ Serie» desde el reloj arranca un descanso REAL (setInterval): si
+    // sobrevive al test, el de cardio de abajo (fake timers, salta 20 min) lo
+    // ve vencer y su `finished` pisa al del cardio — el store es global
+    useRestTimerStore().clear()
+    document.body.innerHTML = ''
     delete (globalThis as { Capacitor?: CapacitorStub }).Capacitor
   })
 
@@ -1661,6 +1694,7 @@ describe('v0.38.0: el ejercicio actual en el reloj', () => {
 // bloque" + "el fin de cardio no tiene el mismo feedback que el de descanso")
 describe('v0.38.0: fin de cardio — hecho automático y aviso al reloj con gracia', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.useFakeTimers()
     vi.stubGlobal('navigator', { vibrate: vi.fn() })
     vi.stubGlobal('localStorage', memoryStorage())
@@ -1708,7 +1742,7 @@ describe('v0.38.0: fin de cardio — hecho automático y aviso al reloj con grac
 
     vi.advanceTimersByTime(3_000)
     await flushPromises()
-    expect(shell.syncTimer).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'cardio', state: 'stopped', reason: 'finished' }))
+    expect(shell.syncTimer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'cardio', state: 'stopped', reason: 'finished' }))
     wrapper.unmount()
   })
 })

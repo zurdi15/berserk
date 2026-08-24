@@ -276,6 +276,9 @@ const isLast = computed(() => index.value === -1 || index.value === props.exerci
 // item 6: los ejercicios de cardio se leen como un bloque distinto (sin
 // numerar, con acento de borde) en vez de series numeradas de fuerza
 const isCardio = computed(() => props.exercise?.measurement === 'cardio')
+// v0.38.0: dado por hecho (botón «Completar ejercicio» al pie, el reloj, o
+// solo al terminar un countdown de cardio) — ver el bloque v0.38.x más abajo
+const completed = computed(() => props.workoutExercise.completed ?? false)
 // (v0.18.0: el modo kg/nivel vive en CADA SERIE — set.load_mode; el modo
 // por-ejercicio de la v0.17.x murió)
 
@@ -502,7 +505,8 @@ async function submitNewSet(value: SetIn) {
 const targetSets = computed<number | null>(() => routineTargetRow.value?.target_sets ?? null)
 
 const pendingGhostCount = computed(() => {
-  if (isCardio.value || !props.exercise) return 0
+  // v0.38.1: hecho = no queda nada pendiente, aunque falten series objetivo
+  if (isCardio.value || !props.exercise || completed.value) return 0
   if (props.live && targetSets.value != null) {
     return Math.max(0, targetSets.value - effectiveSetCount.value)
   }
@@ -692,14 +696,17 @@ async function onDeleteSet(setId: number) {
   }
 }
 
-// ── v0.38.0 check de "ejercicio hecho" (zurdi: "check de marcar ejercicio
-// como completado") ────────────────────────────────────────────────────────
-// Un check en la cabecera da el ejercicio por hecho aunque falten series (o
-// no haya objetivo): la card se pliega a su cabecera, el bloque lo cuenta
-// como hecho (WorkoutView.stepCounts) y el "ejercicio actual" del reloj pasa
-// al siguiente pendiente. Des-marcar la despliega. Solo en vivo y si el
-// store sabe (el editor retroactivo no lo implementa).
-const completed = computed(() => props.workoutExercise.completed ?? false)
+// ── v0.38.0 "ejercicio hecho" (zurdi: "check de marcar ejercicio como
+// completado") ─────────────────────────────────────────────────────────────
+// Da el ejercicio por hecho aunque falten series (o no haya objetivo): el
+// bloque lo cuenta como hecho (WorkoutView.stepCounts) y el "ejercicio
+// actual" del reloj pasa al siguiente pendiente. v0.38.1 (zurdi: "en vez de
+// un check, pon un botón en la parte baja de la card ... cuando está
+// completado que no colapse, ponle un border"): el gesto es el botón
+// «Completar ejercicio» de la última fila, a la derecha de «Añadir serie»;
+// hecho = borde aurora, botón en «Completado» (tocarlo des-marca) y sin
+// series fantasma — la card no se pliega. Solo en vivo y si el store sabe
+// (el editor retroactivo no lo implementa).
 const canMarkDone = computed(() => props.live && typeof props.actions.setExerciseCompleted === 'function')
 const markingDone = ref(false)
 
@@ -872,10 +879,11 @@ async function moveDown() {
        izquierda"): el acento lateral de cardio (item 6 v0.3.0) muere — con
        el facelift leía como un borde descuadrado, no como acento -->
   <!-- v0.38.0: id estable por WorkoutExercise — WorkoutView hace scroll al
-       ejercicio actual buscándolo por aquí; plegada y tenue cuando está hecho -->
+       ejercicio actual buscándolo por aquí. v0.38.1: hecho = borde aurora
+       (la utilidad gana a la capa de .bk-slab, ver base.css) -->
   <BkCard
     :id="`workout-exercise-${workoutExercise.id}`"
-    :class="completed && 'opacity-70'"
+    :class="completed && 'border-aurora'"
     :data-completed="completed ? 'true' : undefined"
   >
     <!-- v0.7.0 (feedback de zurdi): el chip "Superserie A" y el acento del
@@ -913,36 +921,18 @@ async function moveDown() {
               :data-testid="`superset-next-${workoutExercise.id}`"
               class="text-xs text-aurora bg-aurora/15 border border-aurora rounded-full px-1.5 py-0.5 shrink-0"
             >{{ t('workout.supersetNext') }}</span>
-            <span
-              v-if="completed"
-              :data-testid="`exercise-done-chip-${workoutExercise.id}`"
-              class="text-xs text-aurora border border-aurora/40 rounded-full px-1.5 py-0.5 shrink-0"
-            >{{ t('workout.done') }}</span>
           </p>
         </div>
       </div>
-      <div class="flex items-center gap-1 shrink-0">
-        <!-- v0.38.0: el check de "ejercicio hecho" — mismo gesto que el de
-             serie, a nivel de ejercicio; des-marcar despliega la card -->
-        <BkCheck
-          v-if="canMarkDone"
-          :model-value="completed"
-          size="md"
-          :disabled="markingDone"
-          :aria-label="t('workout.markDone')"
-          :data-testid="`exercise-done-${workoutExercise.id}`"
-          @update:model-value="setCompleted"
-        />
-        <button
-          type="button"
-          :data-testid="`exercise-menu-${workoutExercise.id}`"
-          class="bk-press w-10 h-10 rounded-full text-xl text-ink-muted hover:text-ink hover:bg-slab shrink-0"
-          :aria-label="t('workout.exerciseMenu')"
-          @click="menuOpen = true"
-        >
-          ⋯
-        </button>
-      </div>
+      <button
+        type="button"
+        :data-testid="`exercise-menu-${workoutExercise.id}`"
+        class="bk-press w-10 h-10 rounded-full text-xl text-ink-muted hover:text-ink hover:bg-slab shrink-0"
+        :aria-label="t('workout.exerciseMenu')"
+        @click="menuOpen = true"
+      >
+        ⋯
+      </button>
     </div>
 
     <!-- v0.12.0: nota persistente del ejercicio ("asiento en el 5") — la
@@ -974,10 +964,8 @@ async function moveDown() {
          hagas la imagen más pequeña, acorta las series y hazlas más
          estrechas"): gap-3→gap-6 y la columna de series se acota (max-w-48)
          en vez de estirarse hasta el borde de la card -->
-    <!-- v0.38.0: hecho = la card se pliega a la cabecera (nombre, contador,
-         check); series, historial y acciones vuelven al des-marcar -->
     <div
-      v-if="!completed && (workoutExercise.sets.length || pendingGhostCount)"
+      v-if="workoutExercise.sets.length || pendingGhostCount"
       class="border-b border-line pb-3 mb-3"
       :class="!isCardio && 'flex items-center gap-6'"
     >
@@ -1084,7 +1072,7 @@ async function moveDown() {
          check"): visible SIEMPRE que haya historial — es la referencia
          contra la que se entrena hoy, no solo el arranque -->
     <div
-      v-if="!completed && historyLines.length"
+      v-if="historyLines.length"
       class="text-xs text-ink-faint mb-3 space-y-0.5"
       data-testid="card-history-hint"
     >
@@ -1120,7 +1108,7 @@ async function moveDown() {
          empezar el countdown con el objetivo por defecto (auto-registra al
          llegar a 0, reutilizando la superficie de resume de arriba). -->
     <div
-      v-if="!completed && isCardio && recentCardio.length"
+      v-if="isCardio && recentCardio.length"
       class="mb-3 space-y-0.5"
       :data-testid="`cardio-recent-${workoutExercise.id}`"
     >
@@ -1136,7 +1124,10 @@ async function moveDown() {
          extra (superar el objetivo) o las dos acciones de cardio (v0.10.0
          "no inline controls y formulario"); quitar el ejercicio vive en el
          kebab (acción de gestión, no de banco) -->
-    <div v-if="!completed" class="mt-3 flex items-center gap-2">
+    <!-- v0.38.1: «Completar ejercicio» cierra la fila por la derecha; en
+         cardio las dos acciones ocupan la fila entera (basis-full) y el botón
+         baja a la siguiente -->
+    <div class="mt-3 flex flex-wrap items-center gap-2">
       <BkButton
         v-if="exercise && !isCardio"
         variant="ghost"
@@ -1151,7 +1142,7 @@ async function moveDown() {
            registrar toma la fila entera) -->
       <div
         v-else-if="isCardio && exercise && !resumedActive && historyLoaded"
-        class="grid gap-2 flex-1 min-w-0"
+        class="grid gap-2 basis-full min-w-0"
         :class="live ? 'grid-cols-2' : 'grid-cols-1'"
         :data-testid="`cardio-actions-${workoutExercise.id}`"
       >
@@ -1175,6 +1166,20 @@ async function moveDown() {
           {{ t('workout.cardioStart', { duration: formatDuration(cardioTargetSeconds) }) }}
         </BkButton>
       </div>
+      <!-- con un countdown en marcha no se ofrece: al llegar a cero se marca
+           solo (onResumedDone) -->
+      <BkButton
+        v-if="canMarkDone && !resumedActive"
+        :variant="completed ? 'soft' : 'ghost'"
+        size="sm"
+        class="ml-auto"
+        :loading="markingDone"
+        :aria-pressed="completed ? 'true' : 'false'"
+        :data-testid="`exercise-done-${workoutExercise.id}`"
+        @click="setCompleted(!completed)"
+      >
+        {{ t(completed ? 'workout.completed' : 'workout.completeExercise') }}
+      </BkButton>
     </div>
 
     <!-- v0.11.5 (zurdi): el "cuánto tiempo" que faltaba antes del countdown —
