@@ -16,7 +16,7 @@
 
 ## Screenshots
 
-<table>
+<table align="center">
   <tr>
     <td><img src="docs/screenshots/mobile-today.png" width="240" alt="Today view: routine hero, social activity feed and weekly streak"></td>
     <td><img src="docs/screenshots/mobile-prestart.png" width="240" alt="Pre-workout view: routine hero with its blocks and exercise photos"></td>
