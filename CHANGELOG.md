@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.39.2 - 2026-08-25
+
+### Cambiado
+- Android: la runa del icono de la app es un poco más pequeña (deja aire alrededor en vez de rozar el borde del círculo). Solo cambia el APK del móvil; el del reloj sigue igual.
+
 ## 0.39.1 - 2026-08-25
 
 ### Cambiado
