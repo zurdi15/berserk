@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createI18nInstance } from '../../i18n'
 import BkRing from '../BkRing.vue'
@@ -110,6 +110,27 @@ describe('BkStepper', () => {
     await minus.trigger('pointerdown')
     await minus.trigger('pointerup')
     expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([99])
+  })
+
+  // v0.39.3: un puntero cancelado (el WebView se queda el gesto como scroll)
+  // no manda pointerup, y la repetición de mantener pulsado se quedaba viva
+  // hasta desplomar el valor al mínimo — con su PATCH por tic
+  it('stops the hold-to-repeat when the pointer is cancelled', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mount(BkStepper, {
+        props: { modelValue: 60, step: 5, min: 5, max: 900 },
+        global: { plugins: [createI18nInstance()] },
+      })
+      const [minus] = wrapper.findAll('button')
+      await minus.trigger('pointerdown')
+      await minus.trigger('pointercancel')
+      const emittedAfterCancel = wrapper.emitted('update:modelValue')!.length
+      vi.advanceTimersByTime(2000)
+      expect(wrapper.emitted('update:modelValue')!).toHaveLength(emittedAfterCancel)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('applies a single step on keyboard activation (click with detail 0)', async () => {

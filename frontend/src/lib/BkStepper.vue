@@ -68,6 +68,15 @@ function press(direction: 1 | -1) {
   timer = setInterval(() => apply(direction), 140)
 }
 
+// v0.39.3: el navegador puede CANCELAR el puntero a mitad de pulsación (el
+// WebView decide que el gesto era un scroll, entra una llamada, cambia el
+// foco...). En ese caso NO llega pointerup ni pointerleave, así que sin esto
+// el intervalo seguía vivo para siempre y el valor se desplomaba solo hasta
+// min (un descanso de 60 s acababa en los 5 s del mínimo, y cada tic mandaba
+// su PATCH). pointercancel + lostpointercapture cierran los dos huecos:
+// en táctil el elemento captura el puntero implícitamente, y perder esa
+// captura es la otra forma de que la pulsación muera sin pointerup.
+
 function release() {
   if (timer) clearInterval(timer)
   timer = null
@@ -113,6 +122,8 @@ onBeforeUnmount(release)
       @pointerdown="press(-1)"
       @pointerup="release"
       @pointerleave="release"
+      @pointercancel="release"
+      @lostpointercapture="release"
       @click="onClick(-1, $event)"
     >
       −
@@ -164,6 +175,8 @@ onBeforeUnmount(release)
       @pointerdown="press(1)"
       @pointerup="release"
       @pointerleave="release"
+      @pointercancel="release"
+      @lostpointercapture="release"
       @click="onClick(1, $event)"
     >
       +
