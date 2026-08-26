@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.39.3 - 2026-08-26
+
+### Arreglado
+- Reloj: el OK del aviso de fin de descanso o de cardio ya no cierra la app y te devuelve a la esfera — se queda en Berserk, en el entreno, que es donde sigues. Requiere actualizar el APK del reloj.
+- Terminar un entrenamiento apaga también el descanso que estuviera corriendo: se acabaron la vibración, la notificación y el aviso del reloj llegando con el entreno ya guardado.
+- El descanso ya no se desploma solo hasta el mínimo de 5 s. Al mantener pulsado el −/+ el valor se repite, pero si el móvil se quedaba el gesto a medias (un scroll que arranca sobre el botón) nadie paraba esa repetición y el número caía hasta el tope. Afecta a todos los steppers de la app: peso, reps, descanso, tiempo objetivo.
+- El editor de rutinas enseña el descanso guardado aunque no sea uno de los de la lista (30/60/90/120/180 s): antes el campo salía en blanco, así que un valor raro era invisible y sobrevivía a cada guardado.
+
 ## 0.39.2 - 2026-08-25
 
 ### Cambiado

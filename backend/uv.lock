@@ -225,7 +225,7 @@ wheels = [
 
 [[package]]
 name = "berserk-backend"
-version = "0.39.2"
+version = "0.39.3"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
