@@ -99,7 +99,6 @@ fun TimerApp(
     link: PhoneLink,
     appVersion: String,
     notificationsGranted: Boolean,
-    onAlarmAcknowledged: () -> Unit = {},
 ) {
     val board by engine.board.collectAsState()
     val exerciseSpec by engine.exercise.collectAsState()
@@ -128,12 +127,15 @@ fun TimerApp(
 
     AppScaffold {
         when {
+            // v0.39.3 (zurdi: "cuando le das a ok al finalizar timer o cardio,
+            // que se abra la app, que no se vuelva a la main face"): acusar y
+            // punto. La v0.30.0 mataba además la Activity cuando la había
+            // abierto el full-screen intent de la alarma, así que el OK
+            // devolvía a la esfera; ahora se cae a la pantalla que toque —el
+            // entreno en marcha, normalmente—, que es donde se sigue.
             alarming != null -> AlarmScreen(
                 timer = alarming,
-                onAcknowledge = {
-                    engine.acknowledge(alarming.kind)
-                    onAlarmAcknowledged()
-                },
+                onAcknowledge = { engine.acknowledge(alarming.kind) },
             )
             primary != null -> WorkoutScreens(
                 timer = primary,

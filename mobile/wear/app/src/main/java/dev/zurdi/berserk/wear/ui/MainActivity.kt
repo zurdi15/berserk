@@ -20,8 +20,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var engine: TimerEngine
     private val notificationsGranted = mutableStateOf(true)
 
-    // v0.30.0: lanzada por el full-screen intent de la alarma → el OK devuelve a la esfera
-    private var openedByAlarm = false
     private val requestNotifications =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             notificationsGranted.value = granted
@@ -32,7 +30,6 @@ class MainActivity : ComponentActivity() {
         // la alarma tiene que verse aunque el reloj esté bloqueado y con la pantalla apagada
         setShowWhenLocked(true)
         setTurnScreenOn(true)
-        openedByAlarm = intent?.getBooleanExtra(EXTRA_FROM_ALARM, false) == true
         engine = TimerEngine.get(this)
         val link = PhoneLink(this)
         setContent {
@@ -42,7 +39,6 @@ class MainActivity : ComponentActivity() {
                     link = link,
                     appVersion = BuildConfig.VERSION_NAME,
                     notificationsGranted = notificationsGranted.value,
-                    onAlarmAcknowledged = { if (openedByAlarm) finishAndRemoveTask() },
                 )
             }
         }
@@ -52,7 +48,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.getBooleanExtra(EXTRA_FROM_ALARM, false)) openedByAlarm = true
     }
 
     override fun onResume() {
@@ -71,6 +66,12 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        /**
+         * Marca de "esta Activity la ha abierto la alarma" (full-screen intent
+         * de TimerNotifier). v0.39.3: ya no se lee — el OK deja la app abierta
+         * (ver TimerApp), así que no hay nada que decidir al acusar. Se mantiene
+         * porque es lo que distingue ese arranque en logs y bug reports.
+         */
         const val EXTRA_FROM_ALARM = "dev.zurdi.berserk.wear.FROM_ALARM"
     }
 }
