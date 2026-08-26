@@ -258,6 +258,34 @@ describe('RoutineEditorSheet', () => {
     ])
   })
 
+  // v0.39.3: un descanso fuera de los presets (p.ej. el 5 s que puede colarse
+  // por "guardar como plantilla") dejaba el campo en blanco — invisible e
+  // incorregible desde aquí
+  it('shows a non-preset rest value in the rest select instead of leaving it blank', async () => {
+    const routine = {
+      id: 5,
+      name: 'Test Routine',
+      description: null,
+      rune: null,
+      color: null,
+      exercises: [
+        { id: 10, exercise_id: 1, position: 0, target_sets: 3, target_reps: null, target_weight_kg: null, rest_seconds: 5 },
+      ],
+    }
+
+    const wrapper = build(routine)
+    await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await wrapper.vm.$nextTick()
+
+    const dialogs = document.querySelectorAll('[role="dialog"]')
+    const dialog = dialogs[dialogs.length - 1] as HTMLElement
+    const row = dialog.querySelector('[data-testid="routine-row-0"]') as HTMLElement
+    expect(row.textContent).toContain('5 s')
+
+    wrapper.unmount()
+  })
+
   it('sends replaceRoutineExercises with empty array when exercises removed', async () => {
     const { replaceRoutineExercises } = await import('@/api/domain')
     vi.mocked(replaceRoutineExercises).mockClear()

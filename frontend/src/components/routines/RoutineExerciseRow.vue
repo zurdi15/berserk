@@ -95,13 +95,23 @@ const isCardio = computed(() => exercise.value?.measurement === 'cardio')
 // (v0.18.0: el objetivo de rutina es SIEMPRE kg — el modo nivel se decide
 // al registrar cada serie, en el cajón del entreno)
 
-const restOptions = [
-  { value: '30', label: '30 s' },
-  { value: '60', label: '60 s' },
-  { value: '90', label: '90 s' },
-  { value: '120', label: '120 s' },
-  { value: '180', label: '180 s' },
-]
+const REST_PRESETS = ['30', '60', '90', '120', '180']
+
+// v0.39.3 (zurdi: "en el último ejercicio de la rutina, el descanso por algún
+// motivo me salta de 5 segundos"): un descanso que NO sea uno de los presets
+// (la rutina puede venir de "guardar como plantilla", que copia el descanso
+// efectivo del entreno tal cual) dejaba este campo EN BLANCO —BkSelect pinta
+// la etiqueta de la opción que casa, y si ninguna casa, nada—, así que el
+// valor raro era invisible aquí y sobrevivía a cada guardado. El valor actual
+// entra siempre en la lista, en su sitio por orden numérico: se ve y se puede
+// cambiar.
+const restOptions = computed(() => {
+  const current = props.row.rest_seconds
+  const values = current && !REST_PRESETS.includes(current) ? [...REST_PRESETS, current] : REST_PRESETS
+  return [...values]
+    .sort((a, b) => Number(a) - Number(b))
+    .map((value) => ({ value, label: `${value} s` }))
+})
 </script>
 
 <template>
