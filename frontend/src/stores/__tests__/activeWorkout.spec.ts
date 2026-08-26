@@ -109,6 +109,35 @@ describe('active workout store', () => {
     expect(store.workout).toBeNull()
   })
 
+  // v0.39.3: terminar apaga el descanso en marcha (si no, su aviso sonaba con
+  // el entreno ya guardado) — mismo contrato que discard
+  it('finish stops a running rest timer', async () => {
+    vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+    const store = useActiveWorkoutStore()
+    await store.resume()
+    const restTimer = useRestTimerStore()
+    restTimer.start(60)
+    vi.mocked(domain.finishWorkout).mockResolvedValue({ ...workout, ended_at: 'x' } as never)
+
+    await store.finish()
+
+    expect(restTimer.active).toBe(false)
+  })
+
+  it('finish propagates the API error without stopping the rest timer', async () => {
+    vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
+    const store = useActiveWorkoutStore()
+    await store.resume()
+    const restTimer = useRestTimerStore()
+    restTimer.start(60)
+    vi.mocked(domain.finishWorkout).mockRejectedValue(new Error('boom'))
+
+    await expect(store.finish()).rejects.toThrow('boom')
+
+    expect(store.workout).toEqual(workout)
+    expect(restTimer.active).toBe(true)
+  })
+
   it('discard resets workout and lastRecords and stops the rest timer when the API resolves', async () => {
     vi.mocked(domain.getActiveWorkout).mockResolvedValue(workout as never)
     const store = useActiveWorkoutStore()

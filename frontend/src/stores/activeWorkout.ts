@@ -245,12 +245,25 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     void syncWearExercise({ state: 'none' })
   }
 
+  // v0.39.3 (zurdi: "al finalizar entrenamiento se finalizan todos los timer en
+  // curso y no debería llegar ninguna notificación más"): cerrar el entreno se
+  // lleva por delante TODOS sus temporizadores, no solo el crono — un descanso
+  // vivo seguía corriendo con su alarma exacta ya programada y sonaba con el
+  // resumen en pantalla. 'cancelled' y no 'finished' a propósito: el descanso no
+  // llegó a cero, así que móvil y reloj callan en vez de vibrar hasta el OK.
+  // El countdown de cardio lo apaga WorkoutView (dropCardioCountdown), que es
+  // quien lo persiste.
+  function endSessionTimers() {
+    stopWorkoutChrono()
+    useRestTimerStore().clear()
+  }
+
   async function finish(): Promise<WorkoutOut> {
     if (!offline()) {
       const finished = await domain.finishWorkout(workout.value!.id)
       workout.value = null
       lastRecords.value = []
-      stopWorkoutChrono()
+      endSessionTimers()
       return finished
     }
     // cierre offline: el resumen se construye del estado local; los PRs de
@@ -260,7 +273,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     outbox.enqueue({ id: outbox.newClientId(), kind: 'finishWorkout', workoutId: finished.id })
     workout.value = null
     lastRecords.value = []
-    stopWorkoutChrono()
+    endSessionTimers()
     return finished
   }
 
@@ -568,10 +581,9 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     // registrado sin que el usuario vea qué está tirando
     await domain.deleteWorkout(workout.value!.id)
     workout.value = null
-    stopWorkoutChrono()
     lastRecords.value = []
     // el descarte cierra el entreno, así que un descanso en marcha ya no aplica
-    useRestTimerStore().clear()
+    endSessionTimers()
   }
 
   function reset() {
