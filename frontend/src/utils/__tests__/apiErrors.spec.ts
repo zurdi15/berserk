@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { ApiError } from '@/api/client'
+import { ApiError, OfflineError } from '@/api/client'
 import { i18n } from '@/i18n'
 import { useToastStore } from '@/stores/toast'
 import { toastApiError } from '../apiErrors'
@@ -19,13 +19,40 @@ describe('toastApiError', () => {
     expect(store.toasts[0].message).toBe('Ya compartes con ese usuario.')
   })
 
-  it('falls back to generic for unknown slugs and non-ApiError', () => {
+  // v0.40.2 (zurdi: "mejorar mucho los toast de error"): un slug sin
+  // traducción lleva el detalle técnico; un error que ni es ApiError, el
+  // genérico a secas
+  it('keeps the technical detail for unknown slugs and stays generic for non-ApiError', () => {
     toastApiError(new ApiError(500, 'slug_from_the_future'))
     toastApiError(new TypeError('network down'))
     const store = useToastStore()
     expect(store.toasts.map((t) => t.message)).toEqual([
+      'Algo ha fallado (slug_from_the_future · 500). Inténtalo de nuevo.',
       'Algo ha fallado. Inténtalo de nuevo.',
-      'Algo ha fallado. Inténtalo de nuevo.',
+    ])
+  })
+
+  it('maps HTTP status codes when the server sent no slug (ingress 502/503, 500, 413)', () => {
+    toastApiError(new ApiError(502, 'generic'))
+    toastApiError(new ApiError(503, 'generic'))
+    toastApiError(new ApiError(500, 'generic'))
+    toastApiError(new ApiError(413, 'generic'))
+    const store = useToastStore()
+    // 502 y 503 comparten mensaje: el store no apila duplicados
+    expect(store.toasts.map((t) => t.message)).toEqual([
+      'El servidor no responde ahora mismo (puede estar reiniciándose). Espera un momento y reintenta.',
+      'Error interno del servidor. Si se repite, avisa al administrador.',
+      'El envío es demasiado grande para el servidor.',
+    ])
+  })
+
+  it('tells a timeout apart from a dead network', () => {
+    toastApiError(new OfflineError('timeout'))
+    toastApiError(new OfflineError())
+    const store = useToastStore()
+    expect(store.toasts.map((t) => t.message)).toEqual([
+      'El servidor tarda demasiado en responder. Espera unos segundos y reintenta.',
+      'Sin conexión. Esto necesita internet — inténtalo al recuperarla.',
     ])
   })
 
@@ -44,9 +71,9 @@ describe('toastApiError', () => {
     expect(store.toasts[0].message).toBe('Valor no válido en is_admin.')
   })
 
-  it('falls back to plain generic for a slug with no translation and no field (not the realistic client.ts path, but still safe)', () => {
+  it('falls back to generic WITH the detail for a slug with no translation and no field', () => {
     toastApiError(new ApiError(422, 'some_future_slug_nobody_mapped'))
     const store = useToastStore()
-    expect(store.toasts[0].message).toBe('Algo ha fallado. Inténtalo de nuevo.')
+    expect(store.toasts[0].message).toBe('Algo ha fallado (some_future_slug_nobody_mapped · 422). Inténtalo de nuevo.')
   })
 })

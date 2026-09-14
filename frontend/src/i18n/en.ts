@@ -90,6 +90,14 @@ export const en = {
     restore_failed: 'Could not restore the backup; previous data is kept.',
     routine_has_private_exercises: 'That routine uses private exercises you can\'t see, so it can\'t be copied.',
     generic: 'Something went wrong. Try again.',
+    generic_detail: 'Something went wrong ({detail}). Try again.',
+    timeout: 'The server is taking too long to respond. Wait a few seconds and retry.',
+    server_unavailable: 'The server is not responding right now (it may be restarting). Wait a moment and retry.',
+    server_error: 'Internal server error. If it keeps happening, tell the administrator.',
+    payload_too_large: 'The upload is too large for the server.',
+    too_many_requests: 'Too many requests in a row. Wait a moment.',
+    forbidden: 'You are not allowed to do this.',
+    conflict: 'That change clashes with the current state. Reload and try again.',
     // v0.6.0 offline: only for flows that REQUIRE network (see es.ts)
     offline: 'No connection. This needs internet — try again once it is back.',
     // v0.7.0: see es.ts

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import { ApiError } from '@/api/client'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 import { isPasswordValid, passwordErrorKey } from '@/utils/passwordValidation'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
@@ -12,6 +13,7 @@ import { useAuthStore } from '@/stores/auth'
 // item 6 (post-0.3.0): mismo ajuste que LoginView.vue — ver ese archivo para
 // la aritmética completa y el porqué real del "scroll" (gutter del html, no
 // un desbordamiento de contenido)
+const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
@@ -25,7 +27,8 @@ const loading = ref(false)
 // item (v0.4.0): validación de cliente ANTES de someter — mismo arreglo que
 // BootstrapView.vue/PasswordCard.vue (ver apiErrors.ts para la parte servidor)
 const clientPasswordError = computed(() => passwordErrorKey(password.value))
-const fieldError = computed(() => clientPasswordError.value ?? (error.value || null))
+// clientPasswordError es una CLAVE i18n; error ya viene resuelto (v0.40.2)
+const fieldError = computed(() => (clientPasswordError.value ? t(clientPasswordError.value) : error.value || null))
 
 async function submit() {
   if (!isPasswordValid(password.value)) return
@@ -35,7 +38,7 @@ async function submit() {
     await auth.redeemAccount(token, username.value, password.value)
     router.push({ name: 'today' })
   } catch (e) {
-    error.value = e instanceof ApiError ? `errors.${e.slug}` : 'errors.generic'
+    error.value = resolveApiErrorMessage(e)
   } finally {
     loading.value = false
   }
@@ -61,7 +64,7 @@ async function submit() {
           :label="$t('auth.password')"
           type="password"
           autocomplete="new-password"
-          :error="fieldError ? $t(fieldError) : undefined"
+          :error="fieldError || undefined"
         />
         <BkButton type="submit" variant="primary" :loading="loading" :disabled="!isPasswordValid(password)" block>
           {{ $t('auth.create') }}

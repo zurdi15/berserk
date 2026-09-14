@@ -20,9 +20,17 @@ export class ApiError extends Error {
 // servidor: las mutaciones del entreno lo capturan para encolar en el outbox
 // y los GETs sin cache lo propagan para que la vista muestre su error normal
 export class OfflineError extends Error {
-  constructor() {
+  // v0.40.2: 'timeout' = el servidor no contestó a tiempo (nuestro
+  // AbortSignal), 'network' = fetch murió sin llegar (DNS, sin cobertura,
+  // servidor caído). El outbox trata ambos igual; el toast no (ver
+  // utils/apiErrors.ts)
+  constructor(public reason: 'network' | 'timeout' = 'network') {
     super('offline')
   }
+}
+
+function isTimeout(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
 }
 
 let unauthorizedHandler: (() => void) | null = null
@@ -42,7 +50,9 @@ const BASE = '/api/v1'
 // limbo en OfflineError: las mutaciones del entreno caen al outbox y las
 // lecturas a la cache. Las subidas (apiForm) tienen más margen.
 const REQUEST_TIMEOUT_MS = 8_000
-const UPLOAD_TIMEOUT_MS = 30_000
+// v0.40.2: con el tope de subida en 25 MB, 30 s se quedaban cortos en datos
+// móviles — y una subida lenta no es una red muerta (ver apiForm)
+const UPLOAD_TIMEOUT_MS = 90_000
 
 function timedSignal(ms: number): { signal: AbortSignal; clear: () => void } {
   const controller = new AbortController()
@@ -136,7 +146,11 @@ export async function apiForm<T = unknown>(path: string, form: FormData): Promis
       body: form,
       signal: timed.signal,
     })
-  } catch {
+  } catch (error) {
+    // v0.40.2: una subida que agota su tiempo NO es prueba de red muerta
+    // (el resto de la app puede seguir hablando con el servidor) — no se
+    // marca offline; el toast dice "ha tardado demasiado", no "sin conexión"
+    if (isTimeout(error)) throw new OfflineError('timeout')
     markOffline()
     throw new OfflineError()
   } finally {
@@ -173,7 +187,7 @@ export async function api<T = unknown>(
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: timed.signal,
     })
-  } catch {
+  } catch (error) {
     // v0.6.0 offline: fetch solo LANZA por fallo de red/CORS, nunca por un
     // status HTTP — aquí no hubo servidor. Un GET intenta salvarse con la
     // última lectura buena (readCache); todo lo demás propaga OfflineError.
@@ -182,7 +196,7 @@ export async function api<T = unknown>(
       const cached = readCached<T>(path)
       if (cached.hit) return cached.data
     }
-    throw new OfflineError()
+    throw new OfflineError(isTimeout(error) ? 'timeout' : 'network')
   } finally {
     timed.clear()
   }

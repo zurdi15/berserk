@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { ApiError } from '@/api/client'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 import BkButton from '@/lib/BkButton.vue'
 import BkField from '@/lib/BkField.vue'
 import BkRune from '@/lib/BkRune.vue'
@@ -30,7 +30,9 @@ async function submit() {
     await auth.login(username.value, password.value)
     router.push({ name: 'today' })
   } catch (e) {
-    error.value = e instanceof ApiError ? `errors.${e.slug}` : 'errors.generic'
+    // v0.40.2: mismo resolvedor que los toasts — un 502 con el servidor
+    // reiniciando dice eso, no "algo ha fallado"
+    error.value = resolveApiErrorMessage(e)
   } finally {
     loading.value = false
   }
@@ -58,7 +60,7 @@ async function submit() {
           :label="$t('auth.password')"
           type="password"
           autocomplete="current-password"
-          :error="error ? $t(error) : undefined"
+          :error="error || undefined"
         />
         <BkButton type="submit" :loading="loading" block>{{ $t('auth.login') }}</BkButton>
       </form>

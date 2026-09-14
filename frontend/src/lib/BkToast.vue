@@ -12,6 +12,7 @@ const store = useToastStore()
           v-for="toast in store.toasts"
           :key="toast.id"
           class="bk-slab pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-sm max-w-md w-fit"
+          :role="toast.kind === 'error' ? 'alert' : undefined"
           :class="{
             'border-danger text-danger': toast.kind === 'error',
             'border-ember text-ember': toast.kind === 'ember',

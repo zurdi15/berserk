@@ -90,6 +90,17 @@ export const es = {
     restore_failed: 'No se pudo restaurar la copia; se conservan los datos anteriores.',
     routine_has_private_exercises: 'Esa rutina usa ejercicios privados que no puedes ver, así que no se puede copiar.',
     generic: 'Algo ha fallado. Inténtalo de nuevo.',
+    // v0.40.2 (zurdi: "mejorar mucho los toast de error"): el genérico lleva
+    // el detalle técnico cuando el slug no tiene traducción, y los códigos
+    // HTTP sin slug (ingress con el pod caído, 500, 413…) tienen mensaje propio
+    generic_detail: 'Algo ha fallado ({detail}). Inténtalo de nuevo.',
+    timeout: 'El servidor tarda demasiado en responder. Espera unos segundos y reintenta.',
+    server_unavailable: 'El servidor no responde ahora mismo (puede estar reiniciándose). Espera un momento y reintenta.',
+    server_error: 'Error interno del servidor. Si se repite, avisa al administrador.',
+    payload_too_large: 'El envío es demasiado grande para el servidor.',
+    too_many_requests: 'Demasiadas peticiones seguidas. Espera un momento.',
+    forbidden: 'No tienes permiso para hacer esto.',
+    conflict: 'Ese cambio choca con el estado actual. Recarga e inténtalo de nuevo.',
     // v0.6.0 offline: solo en flujos que EXIGEN red (descartar, arrancar una
     // rutina jamás vista, lecturas sin cache) — el resto encola y sincroniza
     offline: 'Sin conexión. Esto necesita internet — inténtalo al recuperarla.',
