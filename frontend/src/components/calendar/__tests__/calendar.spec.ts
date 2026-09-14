@@ -1457,7 +1457,13 @@ describe('CalendarView item 8: opens today\'s day sheet from a ?day= query', () 
 // stores/athlete.ts), pero este test cierra el hueco de cobertura real que
 // hizo falta abrir para descartar esta capa durante el diagnóstico.
 describe('CalendarView athlete mode (item 4): renders dots from the target athlete\'s data', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    // el calendario abre en el mes ACTUAL: el fixture es de agosto de 2026 y
+    // el test se rompía solo en cuanto pasó ese mes (v0.40.0)
+    vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
+  })
+  afterEach(() => vi.useRealTimers())
 
   it('mounts already viewing an athlete and paints dots from the workouts the API returns for them', async () => {
     vi.mocked(domain.getMonth).mockResolvedValueOnce({
