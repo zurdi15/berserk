@@ -45,6 +45,9 @@ export interface ExerciseOut {
   owner_id: number | null
   // v0.12.0: el ejercicio tiene imagen — pedirla a exerciseImageUrl(id)
   has_image?: boolean
+  // v0.40.0: versión de la imagen (raíz uuid del fichero, nueva por subida)
+  // para la URL ?v= — con ella el backend manda Cache-Control fuerte
+  image_version?: string | null
   // v0.21.4 encuadre WYSIWYG de la foto (posición focal % + zoom) — leer
   // SIEMPRE vía utils/imageFraming.imageFramingStyle (defaults 50/50/1)
   image_pos_x?: number
@@ -217,6 +220,8 @@ export interface RoutineOut {
   owner_username?: string | null
   // v0.20.x: la rutina puede llevar SU imagen (hero) — pedirla a routineImageUrl(id)
   has_image?: boolean
+  // v0.40.0: ver ExerciseOut.image_version
+  image_version?: string | null
   exercises: RoutineExerciseOut[]
 }
 
@@ -728,7 +733,10 @@ export const deleteExerciseImage = (exerciseId: number) =>
 
 // las <img> del DOM piden con cookies same-origin por sí solas: basta la URL.
 // El sufijo ?v= rompe la cache del navegador tras subir una imagen nueva.
-export const exerciseImageUrl = (exerciseId: number, cacheBust?: number) =>
+// v0.40.0: normalmente es image_version (estable entre visitas: el backend
+// cachea fuerte las URL versionadas y la biblioteca deja de rebajar todas
+// las fotos cada vez); sin versión el navegador revalida por ETag.
+export const exerciseImageUrl = (exerciseId: number, cacheBust?: string | number | null) =>
   `/api/v1/exercises/${exerciseId}/image${cacheBust ? `?v=${cacheBust}` : ''}`
 
 // v0.19.x (zurdi: "que se pueda poner foto de perfil") — mismo esquema que
@@ -745,7 +753,7 @@ export const uploadRoutineImage = (routineId: number, file: File) => {
 export const deleteRoutineImage = (routineId: number) =>
   api<void>(`/routines/${routineId}/image`, { method: 'DELETE' })
 
-export const routineImageUrl = (routineId: number, cacheBust?: number) =>
+export const routineImageUrl = (routineId: number, cacheBust?: string | number | null) =>
   `/api/v1/routines/${routineId}/image${cacheBust ? `?v=${cacheBust}` : ''}`
 
 export const uploadAvatar = (file: File) => {

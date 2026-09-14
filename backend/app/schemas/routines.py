@@ -77,5 +77,7 @@ class RoutineOut(BaseModel):
 
     # v0.20.x: imagen de la rutina — el fichero vive en /routines/{id}/image
     has_image: bool = False
+    # v0.40.0: versión para la URL (?v=) — ver models.image_version_of
+    image_version: str | None = None
 
     model_config = {"from_attributes": True}

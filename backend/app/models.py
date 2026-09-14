@@ -20,6 +20,14 @@ def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def image_version_of(image_path: str | None) -> str | None:
+    """v0.40.0: versión de una imagen para la URL del cliente (?v=) — la raíz
+    uuid del fichero, nueva en cada subida. Mismo truco que avatar_version:
+    con la URL versionada el backend puede mandar Cache-Control fuerte y el
+    navegador deja de rebajar la foto entera en cada visita."""
+    return image_path.rsplit(".", 1)[0][:12] if image_path else None
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -236,6 +244,10 @@ class Routine(Base):
     def has_image(self) -> bool:
         # bandera para RoutineOut (from_attributes lee properties)
         return self.image_path is not None
+
+    @property
+    def image_version(self) -> str | None:
+        return image_version_of(self.image_path)
 
 class RoutineExercise(Base):
     __tablename__ = "routine_exercises"

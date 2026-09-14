@@ -76,7 +76,7 @@ const workoutActive = computed(() => activeWorkout.workout !== null)
 // ejercicio"): SOLO la imagen propia de la rutina (subida en su editor);
 // sin ella, manda la runa — nunca la foto de un ejercicio cualquiera
 const heroSrc = computed(() =>
-  displayRoutine.value?.has_image ? routineImageUrl(displayRoutine.value.id) : undefined,
+  displayRoutine.value?.has_image ? routineImageUrl(displayRoutine.value.id, displayRoutine.value.image_version) : undefined,
 )
 
 const heroRune = computed<RuneName | null>(() =>

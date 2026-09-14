@@ -304,3 +304,116 @@ def test_lqip_generated_on_upload_and_served_with_lq_param(client: TestClient, a
     assert client.delete(f"/api/v1/exercises/{bench}/image").status_code == 204
     assert not originals[0].exists()
     assert not lq_file.exists()
+
+
+def _real_png(width: int, height: int) -> bytes:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height), (79, 216, 196)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_avatar_is_downscaled_and_reencoded_as_jpeg(client: TestClient):
+    """v0.40.0 (zurdi: "quitar límite de 5 MB de la foto de perfil"): la foto
+    se guarda ya reducida (lado máximo 1024, JPEG) — un original de móvil
+    de 12 MB no se sirve entero para pintar un círculo de 96 px."""
+    import io
+
+    from PIL import Image
+
+    assert (
+        client.post(
+            "/api/v1/users/me/avatar", files={"file": ("cara.png", _real_png(3000, 2000), "image/png")}
+        ).status_code
+        == 204
+    )
+    me = client.get("/api/v1/auth/me").json()
+    resp = client.get(f"/api/v1/users/{me['id']}/avatar")
+    assert resp.status_code == 200
+    with Image.open(io.BytesIO(resp.content)) as stored:
+        assert stored.format == "JPEG"
+        assert max(stored.size) == 1024
+        assert stored.size == (1024, 683)
+
+
+def test_avatar_accepts_more_than_five_megabytes(client: TestClient):
+    """El tope viejo de 5 MB rechazaba cualquier foto de móvil; ahora hay
+    margen (25 MB). El fixture no es una imagen real: Pillow no la entiende y
+    se guarda el original tal cual — lo que se prueba es el tope."""
+    big = PNG + b"\0" * (6 * 1024 * 1024)
+    resp = client.post("/api/v1/users/me/avatar", files={"file": ("cara.png", big, "image/png")})
+    assert resp.status_code == 204, resp.text
+    me = client.get("/api/v1/auth/me").json()
+    assert len(client.get(f"/api/v1/users/{me['id']}/avatar").content) == len(big)
+
+
+def test_exercise_image_is_versioned_cacheable_and_revalidates(client: TestClient):
+    """v0.40.0 (zurdi: "cualquier cambio a mitad de entreno salta el 'no hay
+    conexión'"): la biblioteca rebajaba TODAS las fotos en cada visita. Ahora el
+    listado trae image_version (nueva por subida), la URL con ?v= se cachea
+    fuerte, y sin versión el navegador revalida por ETag y recibe un 304."""
+    bench = _bench(client)
+    assert (
+        client.post(
+            f"/api/v1/exercises/{bench}/image", files={"file": ("f.png", _real_png(40, 40), "image/png")}
+        ).status_code
+        == 204
+    )
+    listed = next(e for e in client.get("/api/v1/exercises").json() if e["id"] == bench)
+    v1 = listed["image_version"]
+    assert listed["has_image"] is True and v1
+
+    plain = client.get(f"/api/v1/exercises/{bench}/image")
+    assert plain.status_code == 200
+    assert plain.headers["cache-control"] == "private, no-cache"
+    etag = plain.headers["etag"]
+    assert etag
+
+    not_modified = client.get(f"/api/v1/exercises/{bench}/image", headers={"If-None-Match": etag})
+    assert not_modified.status_code == 304
+    assert not_modified.content == b""
+
+    versioned = client.get(f"/api/v1/exercises/{bench}/image?v={v1}")
+    assert versioned.status_code == 200
+    assert "max-age=604800" in versioned.headers["cache-control"]
+    lq = client.get(f"/api/v1/exercises/{bench}/image?v={v1}&lq=1")
+    assert lq.status_code == 200 and "max-age=604800" in lq.headers["cache-control"]
+
+    # re-subir cambia la versión: la URL nueva esquiva la cache vieja
+    assert (
+        client.post(
+            f"/api/v1/exercises/{bench}/image", files={"file": ("g.png", _real_png(50, 50), "image/png")}
+        ).status_code
+        == 204
+    )
+    listed = next(e for e in client.get("/api/v1/exercises").json() if e["id"] == bench)
+    assert listed["image_version"] and listed["image_version"] != v1
+
+
+def test_routine_image_version_and_body_photo_cache(client: TestClient):
+    routine = client.post(
+        "/api/v1/routines", json={"name": "Push", "exercises": []}
+    ).json()
+    assert client.get("/api/v1/routines").json()[0]["image_version"] is None
+    assert (
+        client.post(
+            f"/api/v1/routines/{routine['id']}/image",
+            files={"file": ("r.png", _real_png(40, 40), "image/png")},
+        ).status_code
+        == 204
+    )
+    listed = next(r for r in client.get("/api/v1/routines").json() if r["id"] == routine["id"])
+    assert listed["image_version"]
+    versioned = client.get(f"/api/v1/routines/{routine['id']}/image?v={listed['image_version']}")
+    assert "max-age=604800" in versioned.headers["cache-control"]
+
+    # una foto de cuerpo es inmutable por id: cache fuerte sin versión
+    photo = client.post(
+        "/api/v1/body/photos?photo_date=2026-08-01",
+        files={"file": ("antes.png", _real_png(40, 40), "image/png")},
+    ).json()
+    resp = client.get(f"/api/v1/body/photos/{photo['id']}/file")
+    assert resp.status_code == 200 and "max-age=604800" in resp.headers["cache-control"]

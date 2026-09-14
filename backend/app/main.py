@@ -99,9 +99,12 @@ def create_app(engine: Engine | None = None) -> FastAPI:
     app.include_router(
         body.router, prefix=API_PREFIX, dependencies=[Depends(get_current_user)]
     )
-    app.include_router(
-        media.router, prefix=API_PREFIX, dependencies=[Depends(get_current_user)]
-    )
+    # v0.40.0: media SIN la dependencia de router — todos sus handlers declaran
+    # ya su usuario, y los que sirven ficheros lo resuelven con una sesión de
+    # scope "function" (ver media._file_user): una get_current_user a nivel de
+    # router abriría OTRA sesión, de scope request, que quedaría retenida
+    # mientras la imagen viaja por la red — justo lo que se quiere evitar
+    app.include_router(media.router, prefix=API_PREFIX)
     app.include_router(
         social.router, prefix=API_PREFIX, dependencies=[Depends(get_current_user)]
     )

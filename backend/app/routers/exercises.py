@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser
 from ..db import get_db
-from ..models import Exercise, ExerciseMuscleGroup, MuscleGroup, RoutineExercise, User, WorkoutExercise
+from ..models import Exercise, ExerciseMuscleGroup, MuscleGroup, RoutineExercise, User, WorkoutExercise, image_version_of
 from ..permissions import TargetUser
 from ..schemas.catalog import (
     ExerciseIn,
@@ -28,6 +28,7 @@ def exercise_out(exercise: Exercise) -> ExerciseOut:
         owner_id=exercise.owner_id,
         is_public=exercise.is_public,
         has_image=exercise.image_path is not None,
+        image_version=image_version_of(exercise.image_path),
         image_pos_x=exercise.image_pos_x,
         image_pos_y=exercise.image_pos_y,
         image_zoom=exercise.image_zoom,

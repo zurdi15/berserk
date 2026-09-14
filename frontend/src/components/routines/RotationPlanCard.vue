@@ -166,7 +166,7 @@ function ownerOf(routine: RoutineOut): 'mine' | 'global' | 'user' {
             >
               <span class="bk-metric text-xs text-ink-faint w-5 text-center shrink-0">{{ index + 1 }}</span>
               <BkMedia
-                :src="routine.has_image ? routineImageUrl(routine.id) : undefined"
+                :src="routine.has_image ? routineImageUrl(routine.id, routine.image_version) : undefined"
                 :rune="runeFor(routine)"
                 size="xs"
               />
@@ -221,7 +221,7 @@ function ownerOf(routine: RoutineOut): 'mine' | 'global' | 'user' {
           @click="add(routine.id)"
         >
           <BkMedia
-            :src="routine.has_image ? routineImageUrl(routine.id) : undefined"
+            :src="routine.has_image ? routineImageUrl(routine.id, routine.image_version) : undefined"
             :rune="runeFor(routine)"
             size="xs"
           />

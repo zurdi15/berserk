@@ -19,7 +19,7 @@ const props = withDefaults(
   defineProps<{
     // v0.21.4: el pick incluye el encuadre — los llamadores pasan el
     // ExerciseOut entero y el estilo WYSIWYG sale gratis (ver imageFraming)
-    exercise?: Pick<ExerciseOut, 'id' | 'has_image' | 'image_pos_x' | 'image_pos_y' | 'image_zoom'> | null
+    exercise?: Pick<ExerciseOut, 'id' | 'has_image' | 'image_version' | 'image_pos_x' | 'image_pos_y' | 'image_zoom'> | null
     src?: string
     cacheBust?: string | number
     rune?: RuneName | null
@@ -42,7 +42,8 @@ const lqErrored = ref(false)
 const url = computed(() => {
   if (props.src) return props.src
   if (props.exercise?.has_image) {
-    return exerciseImageUrl(props.exercise.id, typeof props.cacheBust === 'string' ? Number(props.cacheBust) : props.cacheBust)
+    // v0.40.0: sin cacheBust explícito manda la versión del propio ejercicio
+    return exerciseImageUrl(props.exercise.id, props.cacheBust ?? props.exercise.image_version)
   }
   return null
 })

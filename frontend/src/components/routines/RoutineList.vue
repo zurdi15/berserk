@@ -254,7 +254,7 @@ onMounted(() => {
                  foto de la rutina y pozo rúnico de fallback, como el resto
                  de listados del facelift -->
             <BkMedia
-              :src="item.has_image ? routineImageUrl(item.id) : undefined"
+              :src="item.has_image ? routineImageUrl(item.id, item.image_version) : undefined"
               :rune="item.rune && isValidRuneName(item.rune) ? (item.rune as RuneName) : null"
               size="sm"
               :data-testid="`routine-media-${item.id}`"

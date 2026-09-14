@@ -111,6 +111,8 @@ class ExerciseOut(BaseModel):
     # v0.12.0: True si el ejercicio tiene imagen — el fichero real se sirve
     # por GET /exercises/{id}/image, el cliente solo necesita saber si pedirla
     has_image: bool = False
+    # v0.40.0: versión para la URL (?v=) — ver models.image_version_of
+    image_version: str | None = None
     # v0.21.4 encuadre de la foto (ver models.Exercise)
     image_pos_x: float = 50
     image_pos_y: float = 50

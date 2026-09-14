@@ -25,7 +25,7 @@ from ..auth import CurrentUser
 from ..db import get_db
 from ..models import Exercise
 from .exercises import _can_edit
-from .media import MAX_IMAGE_BYTES, _remove_with_lq, _uploads_dir
+from .media import _remove_with_lq, _uploads_dir
 from ..services.images import generate_lq
 
 router = APIRouter(tags=["image-search"])
@@ -36,6 +36,10 @@ ALLOWED_IMAGE_HOSTS = {"raw.githubusercontent.com"}
 INDEX_TTL_SECONDS = 6 * 3600
 FETCH_TIMEOUT_SECONDS = 15
 MAX_RESULTS = 24
+# v0.40.0: el tope de subida (media.MAX_IMAGE_BYTES) subió a 25 MB; lo que se
+# baja de un host externo mantiene el tope de siempre — el catálogo de
+# fuera son fotos pequeñas y no hay motivo para tirar de 100 MB de red
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 # extensión canónica por sufijo de URL — raw.githubusercontent no siempre
 # manda un content-type de imagen, así que el sufijo del path es el criterio

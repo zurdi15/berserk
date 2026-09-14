@@ -12,7 +12,7 @@ import logging
 import threading
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,9 @@ LQ_SUFFIX = ".lq.jpg"
 LQ_WIDTH = 32
 LQ_QUALITY = 40
 UPLOAD_KINDS = ("exercises", "routines", "avatars", "body")
+# v0.40.0 avatar normalizado (ver normalize_avatar): lado mayor y calidad JPEG
+AVATAR_MAX_SIDE = 1024
+AVATAR_QUALITY = 85
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
 
@@ -45,6 +48,27 @@ def generate_lq(original: Path) -> bool:
     except Exception:
         logger.warning("no se pudo generar el LQIP de %s", original, exc_info=True)
         return False
+
+
+def normalize_avatar(data: bytes) -> tuple[bytes, str] | None:
+    """v0.40.0 (zurdi: "quitar límite de 5 MB de la foto de perfil"): la foto
+    de un móvil moderno pesa 8-15 MB y chocaba con el tope; en vez de guardar
+    ese original entero para pintarlo en un círculo de 96 px, el avatar se
+    re-encoda aquí a JPEG con lado máximo AVATAR_MAX_SIDE (orientación EXIF
+    aplicada: sin ella las fotos verticales del móvil salían tumbadas). None
+    si Pillow no la entiende — quien llama guarda el original tal cual (que
+    ya pasó el filtro de content-type)."""
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            img = ImageOps.exif_transpose(img) or img
+            img = img.convert("RGB")
+            img.thumbnail((AVATAR_MAX_SIDE, AVATAR_MAX_SIDE), Image.Resampling.LANCZOS)
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=AVATAR_QUALITY, optimize=True)
+        return buffer.getvalue(), ".jpg"
+    except Exception:
+        logger.warning("no se pudo normalizar el avatar; se guarda el original", exc_info=True)
+        return None
 
 
 def backfill_lq(uploads_root: Path) -> int:

@@ -33,7 +33,7 @@ import type { RuneName } from './runes'
 // `flush`: sin radio propio, para heros a sangre (-mx-4 -mt-4 en la vista).
 const props = withDefaults(
   defineProps<{
-    exercise?: Pick<ExerciseOut, 'id' | 'has_image'> | null
+    exercise?: Pick<ExerciseOut, 'id' | 'has_image' | 'image_version'> | null
     src?: string
     rune?: RuneName | null
     flush?: boolean
@@ -46,7 +46,7 @@ const errored = ref(false)
 
 const url = computed(() => {
   if (props.src) return props.src
-  if (props.exercise?.has_image) return exerciseImageUrl(props.exercise.id)
+  if (props.exercise?.has_image) return exerciseImageUrl(props.exercise.id, props.exercise.image_version)
   return null
 })
 

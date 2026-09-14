@@ -8,21 +8,23 @@ poder editarlo (_can_edit); las fotos de cuerpo son PRIVADAS del dueño —
 no viajan por sharing, a diferencia del resto de datos de Cuerpo.
 """
 
+import os
 import uuid
 from datetime import date as date_type
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..auth import CurrentUser
+from ..auth import CurrentUser, get_current_user
 from ..config import get_settings
 from ..db import get_db
 from ..models import BodyPhoto, Exercise, ExerciseNote, Routine, User
 from ..schemas.media import BodyPhotoOut, ExerciseNoteIn, ExerciseNoteOut
-from ..services.images import generate_lq, lq_path_for
+from ..services.images import generate_lq, lq_path_for, normalize_avatar
 from .exercises import _can_edit, get_visible_exercise
 from .routines import _editable_routine, _visible_template
 
@@ -34,7 +36,37 @@ IMAGE_TYPES = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
+# v0.40.0 (zurdi: "quitar límite de 5 MB de la foto de perfil"): 5 MB se
+# quedaba corto para cualquier foto de móvil actual. El tope sigue existiendo
+# (el fichero entero pasa por memoria y es un servidor de 256 MB), pero con
+# margen de sobra; el avatar además se re-encoda pequeño al guardarlo.
+MAX_IMAGE_BYTES = 25 * 1024 * 1024
+# v0.40.0: las URL de media versionadas (?v=) y las fotos de cuerpo (un id =
+# un fichero, inmutable) se cachean fuerte; sin versión, el navegador
+# revalida por ETag (304, sin cuerpo) — nunca vuelve a bajar la foto entera
+IMAGE_CACHE_CONTROL = "private, max-age=604800"
+IMAGE_REVALIDATE_CONTROL = "private, no-cache"
+
+# v0.40.0 (zurdi: "cualquier cambio a mitad de entreno salta el 'no hay
+# conexión'"): las dependencias yield de FastAPI se cierran DESPUÉS de enviar
+# la respuesta, así que cada imagen mantenía su conexión SQLite ocupada
+# mientras el fichero viajaba por la red del gimnasio — abrir la biblioteca
+# lanzaba ~60 descargas lentas, agotaba el pool (5+10) y el resto de la API
+# esperaba 30 s (visto en los logs del pod: "QueuePool limit ... reached").
+# scope="function" suelta la sesión en cuanto el handler devuelve.
+FileDb = Depends(get_db, scope="function")
+
+
+def _file_user(request: Request, response: Response, db: Session = FileDb) -> User:
+    # mismo resolvedor que CurrentUser, pero sobre la sesión de scope
+    # "function": la cadena entera del handler suelta su conexión antes de
+    # empezar a mandar el fichero (get_current_user con Depends(get_db) a
+    # secas abriría una segunda sesión, de scope request, que sí quedaría
+    # retenida hasta el final del streaming)
+    return get_current_user(request, response, db)
+
+
+FileUser = Depends(_file_user)
 
 
 def _uploads_dir(kind: str) -> Path:
@@ -53,14 +85,29 @@ async def _read_image(file: UploadFile) -> tuple[bytes, str]:
     return data, ext
 
 
-def _serve_image(path: Path, lq: bool, headers: dict | None = None) -> FileResponse:
+def _serve_image(path: Path, lq: bool, request: Request, cacheable: bool = True) -> Response:
     # v0.26.0 LQIP: ?lq=1 sirve la miniatura borrosa si existe (fallback a la
     # original — una imagen sin LQIP aún es mejor que un 404)
+    file = path
     if lq:
         lq_file = lq_path_for(path)
         if lq_file.is_file():
-            return FileResponse(lq_file, headers=headers)
-    return FileResponse(path, headers=headers)
+            file = lq_file
+    # v0.40.0: el stat va por delante para tener el ETag ya en cabeceras y
+    # poder contestar 304 a un If-None-Match sin abrir el fichero
+    response = FileResponse(file, stat_result=os.stat(file))
+    cache_control = IMAGE_CACHE_CONTROL if cacheable else IMAGE_REVALIDATE_CONTROL
+    etag = response.headers.get("etag")
+    if etag and request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": cache_control})
+    response.headers["Cache-Control"] = cache_control
+    return response
+
+
+def _versioned(request: Request) -> bool:
+    # el cliente versiona la URL con image_version (raíz uuid del fichero,
+    # nueva por subida): con ?v= la cache fuerte es segura
+    return bool(request.query_params.get("v"))
 
 
 def _remove_with_lq(path: Path) -> None:
@@ -100,7 +147,7 @@ async def upload_exercise_image(
 
 @router.get("/exercises/{exercise_id}/image")
 def get_exercise_image(
-    exercise_id: int, user: CurrentUser, db: Session = Depends(get_db), lq: bool = False
+    exercise_id: int, request: Request, user: User = FileUser, db: Session = FileDb, lq: bool = False
 ):
     exercise = get_visible_exercise(db, user.id, exercise_id)
     if exercise is None or not exercise.image_path:
@@ -108,7 +155,7 @@ def get_exercise_image(
     path = _uploads_dir("exercises") / exercise.image_path
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not_found")
-    return _serve_image(path, lq)
+    return _serve_image(path, lq, request, cacheable=_versioned(request))
 
 
 @router.delete("/exercises/{exercise_id}/image", status_code=204)
@@ -145,7 +192,7 @@ async def upload_routine_image(
 
 @router.get("/routines/{routine_id}/image")
 def get_routine_image(
-    routine_id: int, user: CurrentUser, db: Session = Depends(get_db), lq: bool = False
+    routine_id: int, request: Request, user: User = FileUser, db: Session = FileDb, lq: bool = False
 ):
     # misma regla de visibilidad que el resto de la rutina (propia, global o
     # plantilla legacy) — _visible_template ya lanza 404 si no aplica.
@@ -165,7 +212,7 @@ def get_routine_image(
     path = _uploads_dir("routines") / routine.image_path
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not_found")
-    return _serve_image(path, lq)
+    return _serve_image(path, lq, request, cacheable=_versioned(request))
 
 
 @router.delete("/routines/{routine_id}/image", status_code=204)
@@ -185,6 +232,11 @@ async def upload_avatar(file: UploadFile, user: CurrentUser, db: Session = Depen
     # v0.19.x (zurdi: "que se pueda poner foto de perfil") — mismo esquema
     # que la imagen de ejercicio: uuid.ext en disco, columna con el nombre
     data, ext = await _read_image(file)
+    # v0.40.0: sin tope práctico para la foto — se guarda ya reducida (ver
+    # normalize_avatar); si Pillow no la lee, el original tal cual
+    normalized = normalize_avatar(data)
+    if normalized is not None:
+        data, ext = normalized
     filename = f"{uuid.uuid4().hex}{ext}"
     target = _uploads_dir("avatars") / filename
     target.write_bytes(data)
@@ -199,7 +251,7 @@ async def upload_avatar(file: UploadFile, user: CurrentUser, db: Session = Depen
 
 @router.get("/users/{user_id}/avatar")
 def get_avatar(
-    user_id: int, user: CurrentUser, db: Session = Depends(get_db), lq: bool = False
+    user_id: int, request: Request, user: User = FileUser, db: Session = FileDb, lq: bool = False
 ):
     # visible para cualquier usuario autenticado de la instancia: el avatar
     # es identidad (perfil hoy; feed/compartidos mañana), no dato de entreno
@@ -211,7 +263,7 @@ def get_avatar(
         raise HTTPException(status_code=404, detail="not_found")
     # v0.25.2: el cliente versiona la URL (?v=avatar_version, uuid nuevo por
     # subida) — cachear fuerte es seguro y evita refetches por visita
-    return _serve_image(path, lq, headers={"Cache-Control": "private, max-age=604800"})
+    return _serve_image(path, lq, request)
 
 
 @router.delete("/users/me/avatar", status_code=204)
@@ -259,9 +311,26 @@ def upsert_exercise_note(
     if note is None:
         note = ExerciseNote(user_id=user.id, exercise_id=exercise_id, note=text)
         db.add(note)
+        try:
+            db.commit()
+        except IntegrityError:
+            # v0.40.0: dos PUT casi simultáneos (blur + botón, o el reintento
+            # tras un timeout del cliente) veían ambos "no hay nota" y el
+            # segundo INSERT reventaba con un 500 (visto en los logs del pod).
+            # El perdedor de la carrera actualiza la fila que ya existe.
+            db.rollback()
+            note = db.scalar(
+                select(ExerciseNote).where(
+                    ExerciseNote.user_id == user.id, ExerciseNote.exercise_id == exercise_id
+                )
+            )
+            if note is None:
+                raise
+            note.note = text
+            db.commit()
     else:
         note.note = text
-    db.commit()
+        db.commit()
     return ExerciseNoteOut(note=text)
 
 
@@ -294,7 +363,7 @@ async def upload_body_photo(
 
 @router.get("/body/photos/{photo_id}/file")
 def get_body_photo(
-    photo_id: int, user: CurrentUser, db: Session = Depends(get_db), lq: bool = False
+    photo_id: int, request: Request, user: User = FileUser, db: Session = FileDb, lq: bool = False
 ):
     photo = db.get(BodyPhoto, photo_id)
     # v0.23.0: mismo bypass admin que exercise/routine image — bajo act-as la
@@ -305,7 +374,8 @@ def get_body_photo(
     path = _uploads_dir("body") / photo.path
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not_found")
-    return _serve_image(path, lq)
+    # un id de foto es siempre el mismo fichero: cache fuerte sin versión
+    return _serve_image(path, lq, request)
 
 
 @router.delete("/body/photos/{photo_id}", status_code=204)

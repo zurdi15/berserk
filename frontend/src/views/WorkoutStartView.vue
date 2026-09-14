@@ -72,7 +72,7 @@ onMounted(async () => {
 
 // facelift v4: SOLO la imagen propia de la rutina; sin ella, la runa
 const heroSrc = computed(() =>
-  routine.value?.has_image ? routineImageUrl(routine.value.id) : undefined,
+  routine.value?.has_image ? routineImageUrl(routine.value.id, routine.value.image_version) : undefined,
 )
 
 const heroRune = computed<RuneName | null>(() =>
