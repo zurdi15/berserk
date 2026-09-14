@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.40.0 - 2026-09-14
+
+### Añadido
+- Las series de calentamiento llevan su etiqueta «Calent.» en lugar de número; las series efectivas se numeran entre sí (1, 2, 3…) y la siguiente serie propuesta continúa esa cuenta.
+- Recolocar un ejercicio (arriba/abajo) funciona también sin cobertura: se aplica al instante y se sincroniza en orden con el resto de cambios pendientes.
+
+### Cambiado
+- La foto de perfil ya no choca con el tope de 5 MB: se aceptan imágenes de hasta 25 MB (también en ejercicios, rutinas y fotos de progreso) y la de perfil se guarda ya reducida (1024 px, orientación corregida), así que pesa poco y carga al instante.
+- Las imágenes de ejercicios y rutinas se guardan en la caché del navegador y de la app: entrar en la biblioteca o en el entreno ya no vuelve a descargar todas las fotos cada vez. Al subir una foto nueva se ve la nueva al momento.
+
+### Arreglado
+- «No hay conexión» a mitad de entreno con cobertura normal, y los cambios tardando en registrarse después. No era el service worker: mientras se descargaban imágenes (biblioteca, tarjetas del entreno) el servidor retenía una conexión a la base de datos por cada foto en vuelo; con decenas de fotos a la vez se agotaban y el resto de peticiones esperaba hasta 30 s, más que el tiempo de espera de la app, que daba la red por muerta y encolaba los cambios. Ahora cada foto suelta la conexión antes de enviarse y el servidor admite más peticiones simultáneas. El reloj se alimenta de lo que el móvil llega a registrar, así que esos bloqueos también lo dejaban desactualizado.
+- Un entreno empezado sin cobertura conservaba su hora de inicio en el móvil, pero al sincronizar el servidor le ponía la hora de la sincronización y el tiempo de entreno se reiniciaba. La hora de inicio viaja ahora con la cola.
+- Si el servidor llegaba a recibir un entreno, un ejercicio o una serie pero la respuesta se perdía por el camino, el reintento podía duplicarlos (y, en el caso del entreno, dejar toda la cola sin sincronizar): cada envío lleva su identificador desde el primer intento.
+- Arriba/abajo en un entreno con bloques: un ejercicio añadido tras quitar otro se movía respecto a la lista del servidor y no a lo que se veía en pantalla, y a veces parecía no hacer nada. Ahora se mueve dentro de su bloque, tal y como se ve.
+- Guardar la nota de un ejercicio dos veces casi a la vez daba un error del servidor.
+
 ## 0.39.3 - 2026-08-26
 
 ### Arreglado
