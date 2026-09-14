@@ -43,7 +43,6 @@ import { displayToKg, formatLoad, kgToDisplay } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
 import BkCheck from '@/lib/BkCheck.vue'
-import BkChip from '@/lib/BkChip.vue'
 import BkMedia from '@/lib/BkMedia.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
@@ -60,6 +59,7 @@ import { resolveNewSetDefaults } from './setDefaults'
 import { LEVEL_UI, LOAD_MIN, WEIGHT_UI } from './loadSteps'
 import { formatHistorySetLines } from './setHistoryFormat'
 import SetForm from './SetForm.vue'
+import WarmupIcon from './WarmupIcon.vue'
 import type { WorkoutActions } from './workoutActions'
 
 const props = withDefaults(
@@ -1101,9 +1101,9 @@ async function moveDown() {
           @click="openEdit(set)"
         >
           <span class="bk-metric text-sm inline-flex items-center gap-1.5">
-            <!-- v0.40.0: calentamiento = chip en vez de número; las
+            <!-- v0.40.0: calentamiento = llama en vez de número; las
                  efectivas se numeran entre sí (ver effectiveNumber) -->
-            <BkChip v-if="set.is_warmup" size="sm" :data-testid="`warmup-tag-${set.id}`">{{ t('workout.warmupShort') }}</BkChip>
+            <WarmupIcon v-if="set.is_warmup" :data-testid="`warmup-tag-${set.id}`" />
             <span>
               <template v-if="!isCardio && !set.is_warmup">{{ effectiveNumber(set) }}. </template>{{ formatSetValue(set) }}
               <span v-if="set.rpe" class="text-ink-faint text-sm"> · RPE {{ set.rpe }}</span>
@@ -1111,7 +1111,7 @@ async function moveDown() {
           </span>
         </button>
         <span v-else class="flex-1 min-w-0 bk-metric text-sm px-2 py-1 inline-flex items-center gap-1.5">
-          <BkChip v-if="set.is_warmup" size="sm" :data-testid="`warmup-tag-${set.id}`">{{ t('workout.warmupShort') }}</BkChip>
+          <WarmupIcon v-if="set.is_warmup" :data-testid="`warmup-tag-${set.id}`" />
           <span><template v-if="!isCardio && !set.is_warmup">{{ effectiveNumber(set) }}. </template>{{ formatSetValue(set) }}</span>
         </span>
         <!-- des-marcar = borrar la serie (facelift v2) — el pie del cajón

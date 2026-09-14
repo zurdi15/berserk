@@ -1273,7 +1273,7 @@ describe('WorkoutExerciseCard', () => {
   // v0.40.0 (zurdi: "tag de calentamiento en la serie de calentamiento, en
   // vez de numeración"): el calentamiento lleva chip; las efectivas se
   // numeran entre sí y el ghost continúa esa cuenta
-  it('tags warmup sets with a chip and numbers only the effective sets', async () => {
+  it('marks warmup sets with the flame icon and numbers only the effective sets', async () => {
     mountCard({
       workoutExercise: {
         ...pushExercise,
@@ -1288,6 +1288,7 @@ describe('WorkoutExerciseCard', () => {
     await flushPromises()
 
     expect(byTestId('warmup-tag-2').exists()).toBe(true)
+    expect(byTestId('warmup-tag-2').attributes('aria-label')).toBe('Calentamiento')
     expect(byTestId('set-row-2').text()).not.toMatch(/\b1\./)
     expect(byTestId('warmup-tag-1').exists()).toBe(false)
     expect(byTestId('set-row-1').text()).toMatch(/^1\./)

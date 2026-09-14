@@ -586,8 +586,6 @@ export const es = {
     durationMinutes: 'Duración (min)',
     distanceOptional: 'Distancia (opcional)',
     warmup: 'Calentamiento',
-    // v0.40.0: chip de la fila de serie de calentamiento (sustituye al número)
-    warmupShort: 'Calent.',
     rpe: 'RPE',
     logSet: 'Registrar serie',
     summary: 'Resumen',

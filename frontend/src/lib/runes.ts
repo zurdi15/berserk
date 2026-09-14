@@ -21,6 +21,12 @@ export const RUNES = {
   // sin él. Compartida por el nav de Progresión y la lista de PRs: el
   // cambio aplica a los dos a la vez a propósito, es el mismo símbolo.
   pr: 'M16 4 L16 28 M8 10 L16 4 L24 10',
+  // v0.40.1 (zurdi: "una llamita... tres pinchos en vez de dos, cada uno de
+  // una altura, como el típico dibujo de llama"): llama de la serie de
+  // calentamiento — silueta cerrada con tres lenguas (baja a la izquierda,
+  // la alta en medio, media a la derecha) y nada dentro. Trazos rectos como
+  // el resto de marcas de la casa; se pinta en ember (WarmupIcon).
+  flame: 'M11 29 L7 22 L10 12 L13 17 L16 3 L20 11 L23 7 L25 15 L24 23 L21 29 Z',
   // item 4 (round 9): ᛋ sowilo (rayo) — para el nav de Hoy
   sowilo: 'M23 3 L9 15 L23 15 L9 27',
   // item 4 (round 9): zurdi lo llamó "Eihwaz" pero enlazó la imagen de

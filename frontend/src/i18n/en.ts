@@ -570,7 +570,6 @@ export const en = {
     durationMinutes: 'Duration (min)',
     distanceOptional: 'Distance (optional)',
     warmup: 'Warmup',
-    warmupShort: 'Warm-up',
     rpe: 'RPE',
     logSet: 'Log set',
     summary: 'Summary',

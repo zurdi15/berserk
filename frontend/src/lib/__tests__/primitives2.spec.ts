@@ -16,6 +16,8 @@ describe('runes catalog', () => {
       [
         'back', 'berserk', 'biceps', 'chest', 'core', 'dagaz', 'legs', 'pr',
         'shoulders', 'sowilo', 'streak', 'triceps',
+        // v0.40.1: llama de la serie de calentamiento (WarmupIcon)
+        'flame',
         // v0.3.0: futhark antiguo completo (menos sowilo/dagaz, ya listadas
         // arriba) para el selector de rutinas — ver FUTHARK_24 más abajo
         'fehu', 'uruz', 'thurisaz', 'ansuz', 'raidho', 'kenaz', 'gebo',
