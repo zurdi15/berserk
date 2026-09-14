@@ -30,6 +30,18 @@ def lq_path_for(original: Path) -> Path:
     return original.with_name(original.name + LQ_SUFFIX)
 
 
+def _open_reduced(source, max_side: int) -> Image.Image:
+    """v0.40.2 (el pod murió por OOM al normalizar un avatar): abrir la imagen
+    pidiéndole al decodificador que la devuelva ya reducida. Para JPEG (lo que
+    sale de cualquier móvil) draft() decodifica a 1/2, 1/4 o 1/8 por DCT sin
+    pasar nunca por el bitmap entero — una foto de 12 MP ocupa 36 MB en RGB y
+    con dos copias (EXIF + convert) superaba el límite de 256 MiB del pod.
+    Para PNG/WebP draft no aplica y se decodifica entero (raro desde el móvil)."""
+    img = Image.open(source)
+    img.draft("RGB", (max_side, max_side))
+    return img
+
+
 def generate_lq(original: Path) -> bool:
     """Genera el LQIP de `original` (idempotente). False si no se pudo (un
     fichero corrupto no debe tumbar ni la subida ni el backfill)."""
@@ -37,7 +49,9 @@ def generate_lq(original: Path) -> bool:
     if target.is_file():
         return True
     try:
-        with Image.open(original) as img:
+        # v0.40.2: el LQIP de una foto de 25 MB tampoco necesita el bitmap
+        # entero — el mismo draft() que el avatar, a un tamaño de sobra
+        with _open_reduced(original, LQ_WIDTH * 8) as img:
             img = img.convert("RGB")
             height = max(1, round(img.height * LQ_WIDTH / max(1, img.width)))
             img = img.resize((LQ_WIDTH, height), Image.Resampling.LANCZOS)
@@ -59,12 +73,12 @@ def normalize_avatar(data: bytes) -> tuple[bytes, str] | None:
     si Pillow no la entiende — quien llama guarda el original tal cual (que
     ya pasó el filtro de content-type)."""
     try:
-        with Image.open(io.BytesIO(data)) as img:
+        with _open_reduced(io.BytesIO(data), AVATAR_MAX_SIDE) as img:
             img = ImageOps.exif_transpose(img) or img
             img = img.convert("RGB")
             img.thumbnail((AVATAR_MAX_SIDE, AVATAR_MAX_SIDE), Image.Resampling.LANCZOS)
             buffer = io.BytesIO()
-            img.save(buffer, format="JPEG", quality=AVATAR_QUALITY, optimize=True)
+            img.save(buffer, format="JPEG", quality=AVATAR_QUALITY)
         return buffer.getvalue(), ".jpg"
     except Exception:
         logger.warning("no se pudo normalizar el avatar; se guarda el original", exc_info=True)

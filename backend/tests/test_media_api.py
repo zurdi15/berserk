@@ -417,3 +417,25 @@ def test_routine_image_version_and_body_photo_cache(client: TestClient):
     ).json()
     resp = client.get(f"/api/v1/body/photos/{photo['id']}/file")
     assert resp.status_code == 200 and "max-age=604800" in resp.headers["cache-control"]
+
+
+def test_avatar_from_a_large_jpeg_is_decoded_reduced(client: TestClient):
+    """v0.40.2 (OOMKilled al subir un avatar): la foto JPEG del móvil se abre
+    con draft(), reducida por el propio decodificador — el resultado sigue
+    siendo el mismo (lado mayor 1024) sin pasar por el bitmap entero."""
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (4000, 3000), (200, 80, 40)).save(buffer, format="JPEG", quality=90)
+    assert (
+        client.post(
+            "/api/v1/users/me/avatar", files={"file": ("cara.jpg", buffer.getvalue(), "image/jpeg")}
+        ).status_code
+        == 204
+    )
+    me = client.get("/api/v1/auth/me").json()
+    with Image.open(io.BytesIO(client.get(f"/api/v1/users/{me['id']}/avatar").content)) as stored:
+        assert stored.format == "JPEG"
+        assert stored.size == (1024, 768)
