@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.40.2 - 2026-09-14
+
+### Arreglado
+- Subir una foto de perfil grande tiraba el servidor (se quedaba sin memoria al abrir la foto entera) y, mientras arrancaba de nuevo, la app enseñaba «Algo ha fallado» y no dejaba entrar. Ahora la foto se decodifica ya reducida, y las miniaturas de cualquier imagen también. El servidor cuenta además con el doble de memoria.
+- Una subida lenta ya no marca la app como «sin conexión»: tiene hasta 90 s y, si se agota, el aviso dice que ha tardado demasiado.
+
+### Cambiado
+- Avisos de error más claros: si el servidor no responde (reiniciándose o caído) lo dice así en vez de «Algo ha fallado»; un error interno, un envío demasiado grande o demasiadas peticiones tienen su propio mensaje; y cuando no hay traducción, el aviso incluye el detalle técnico para poder contarlo. Los errores duran 8 s en pantalla (el doble), no se apilan repetidos y las pantallas de entrar, invitación y primer arranque usan los mismos mensajes.
+
 ## 0.40.1 - 2026-09-14
 
 ### Cambiado
