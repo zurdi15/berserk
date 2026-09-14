@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.40.1 - 2026-09-14
+
+### Cambiado
+- La serie de calentamiento se marca con una llama de tres lenguas en vez del chip «Calent.»: una runa más de la casa (trazo recto, en ember), en la línea de las runas de grupo muscular de la propia tarjeta.
+
 ## 0.40.0 - 2026-09-14
 
 ### Añadido
