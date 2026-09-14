@@ -131,6 +131,59 @@ describe('active workout store — offline branches', () => {
     const queue = loadQueue()
     expect(queue[0]).toMatchObject({ kind: 'startWorkout', body: { routine_id: 9 } })
     expect(queue[0].tempExerciseIds).toHaveLength(2)
+    // v0.40.0 (zurdi: "al conectar se reinicia el timer general"): la hora
+    // de inicio viaja en la cola (naive UTC, como la devuelve el backend) y
+    // es la misma que ve el crono local — el replay no la sustituye
+    expect(queue[0].body.started_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
+    expect(store.workout!.started_at).toBe(queue[0].body.started_at)
+    // y la entrada de la cola lleva el MISMO client_id que llevaría el
+    // intento en vivo: un timeout tras crear en el servidor se resuelve por
+    // dedupe en el replay
+    expect(queue[0].id).toEqual(expect.any(String))
+  })
+
+  // v0.40.0: el intento en vivo lleva client_id — si el servidor crea el
+  // entreno pero la respuesta muere, el replay lo recupera por dedupe
+  it('start online sends a client_id with the request', async () => {
+    online.value = true
+    vi.mocked(domain.startWorkout).mockResolvedValue(baseWorkout() as never)
+    const store = useActiveWorkoutStore()
+
+    await store.start({ routine_id: 9 })
+
+    expect(domain.startWorkout).toHaveBeenCalledWith({ routine_id: 9, client_id: expect.any(String) })
+    expect(loadQueue()).toHaveLength(0)
+  })
+
+  it('logSet online sends the same kind of client_id the replay would use', async () => {
+    online.value = true
+    vi.mocked(domain.logSet).mockResolvedValue({ set: { id: 1 }, new_records: [] } as never)
+    vi.mocked(domain.getWorkout).mockResolvedValue(baseWorkout() as never)
+    const store = useActiveWorkoutStore()
+    store.workout = baseWorkout()
+
+    await store.logSet(7, { reps: 5, weight_kg: 100 })
+
+    expect(domain.logSet).toHaveBeenCalledWith(4, 7, { reps: 5, weight_kg: 100, client_id: expect.any(String) })
+  })
+
+  // v0.40.0: recolocar ya no exige red — con cola pendiente mandaba ids
+  // temporales (422) o pisaba el estado local con el del servidor
+  it('reorder offline: reorders the local copy, renumbers positions and queues the order', async () => {
+    const store = useActiveWorkoutStore()
+    const workout = baseWorkout()
+    workout.exercises = [
+      { id: 7, exercise_id: 1, position: 1, note: null, rest_seconds: 90, superset_group: null, sets: [] },
+      { id: -5, exercise_id: 2, position: 2, note: null, rest_seconds: null, superset_group: null, sets: [] },
+    ]
+    store.workout = workout
+
+    await store.reorder([-5, 7])
+
+    expect(domain.reorderWorkoutExercises).not.toHaveBeenCalled()
+    expect(store.workout!.exercises.map((e) => e.id)).toEqual([-5, 7])
+    expect(store.workout!.exercises.map((e) => e.position)).toEqual([1, 2])
+    expect(loadQueue()[0]).toMatchObject({ kind: 'reorder', workoutId: 4, ids: [-5, 7] })
   })
 
   it('finish offline returns the locally-closed workout and queues the finish', async () => {
@@ -197,7 +250,7 @@ describe('active workout store — offline branches', () => {
     await store.swapSupersetMember(7, 55)
 
     expect(domain.removeWorkoutExercise).toHaveBeenCalledWith(4, 7)
-    expect(domain.addWorkoutExercise).toHaveBeenCalledWith(4, { exercise_id: 55 })
+    expect(domain.addWorkoutExercise).toHaveBeenCalledWith(4, expect.objectContaining({ exercise_id: 55 }))
     // el nuevo (30) se recoloca en el hueco del viejo (posición 0)
     expect(domain.reorderWorkoutExercises).toHaveBeenCalledWith(4, [30, 8])
     // y se reenlaza con el miembro restante

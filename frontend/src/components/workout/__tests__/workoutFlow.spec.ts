@@ -1270,6 +1270,33 @@ describe('WorkoutExerciseCard', () => {
     expect(actions.reorder).toHaveBeenCalledWith([30, 20])
   })
 
+  // v0.40.0 (zurdi: "tag de calentamiento en la serie de calentamiento, en
+  // vez de numeración"): el calentamiento lleva chip; las efectivas se
+  // numeran entre sí y el ghost continúa esa cuenta
+  it('tags warmup sets with a chip and numbers only the effective sets', async () => {
+    mountCard({
+      workoutExercise: {
+        ...pushExercise,
+        sets: [
+          { id: 2, set_number: 1, reps: 5, weight_kg: 40, duration_seconds: null, distance_m: null, is_warmup: true, rpe: null, completed_at: 'x' },
+          { id: 1, set_number: 2, reps: 5, weight_kg: 100, duration_seconds: null, distance_m: null, is_warmup: false, rpe: null, completed_at: 'x' },
+        ],
+      },
+      routineId: 1,
+      routines: [{ id: 1, exercises: [{ exercise_id: 5, target_sets: 3, target_reps: 5, target_weight_kg: 100 }] }],
+    })
+    await flushPromises()
+
+    expect(byTestId('warmup-tag-2').exists()).toBe(true)
+    expect(byTestId('set-row-2').text()).not.toMatch(/\b1\./)
+    expect(byTestId('warmup-tag-1').exists()).toBe(false)
+    expect(byTestId('set-row-1').text()).toMatch(/^1\./)
+    // el ghost sigue la cuenta de las efectivas (2.), no la de todas las filas (3.)
+    expect(byTestId('ghost-set-20-0').text()).toMatch(/^2\./)
+    expect(byTestId('uncheck-set-2').attributes('aria-label')).toBe('Calentamiento')
+    expect(byTestId('uncheck-set-1').attributes('aria-label')).toBe('Serie 1 hecha')
+  })
+
   it('hides the move-up control on the first exercise', async () => {
     mountCard({ exerciseIds: [20, 30] })
     await openMenu(20)

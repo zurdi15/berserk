@@ -93,7 +93,8 @@ const resumedCardioCountdown = ref<PersistedCardioCountdown | null>(null)
 
 const units = computed(() => ((auth.user?.units as 'kg' | 'lb') || 'kg'))
 const exerciseMap = computed(() => new Map(exercises.value.map((e) => [e.id, e])))
-const exerciseIds = computed(() => activeWorkout.workout?.exercises.map((e) => e.id) ?? [])
+// exerciseIds (para el arriba/abajo de la card) vive más abajo, junto a
+// visibleEntries: desde v0.40.0 es el orden de PANTALLA del step visible
 
 // v0.5.0 superseries: el agrupado se computa AQUÍ por contigüidad (la
 // tarjeta no ve a sus hermanas) y baja resuelto como props — ver
@@ -211,6 +212,30 @@ const visibleBlocks = computed<WorkoutBlock[]>(() =>
 // usan el scroll de abajo y la card `current`, que es la que se manda al
 // reloj (ver WorkoutExerciseCard.wearPayload).
 const visibleEntries = computed(() => visibleBlocks.value.flatMap((b) => b.entries))
+
+// v0.40.0 (zurdi: "al quitar ejercicios de un entreno y poner otro, el
+// arriba/abajo no funciona bien"): la card recibía los ids en el orden del
+// SERVIDOR, pero con stepper la vista agrupa por etiqueta de bloque — un
+// ejercicio añadido a mano vive al final de la lista del servidor aunque se
+// pinte dentro de su bloque, así que "arriba" lo intercambiaba con un vecino
+// de OTRO step y en pantalla no pasaba nada. Ahora la card ve solo los ids
+// del step visible, en el orden en que se pintan, y reorderVisible recompone
+// la lista completa en ese mismo orden de pantalla (steps → bloques →
+// filas) — que además deja las posiciones del servidor coherentes con lo
+// que se ve. Sin stepper, orden de pantalla == orden del servidor.
+const displayOrderIds = computed(() =>
+  workoutSteps.value.flatMap((s) => s.blocks.flatMap((b) => b.entries.map((e) => e.we.id))),
+)
+const exerciseIds = computed(() => visibleEntries.value.map((e) => e.we.id))
+
+function reorderVisible(ids: number[]) {
+  const visible = new Set(exerciseIds.value)
+  const full = displayOrderIds.value
+  // los ids del step visible son un tramo contiguo de displayOrderIds
+  const start = full.findIndex((id) => visible.has(id))
+  const next = start === -1 ? ids : [...full.slice(0, start), ...ids, ...full.slice(start + ids.length)]
+  return activeWorkout.reorder(next)
+}
 
 function setLoggedAt(set: SetOut): number {
   if (!set.completed_at) return 0
@@ -365,14 +390,18 @@ async function confirmNewBlock() {
   }
 }
 
-// acciones que ve AddExerciseSheet: mismas del store, pero el alta lleva el
-// bloque visible. Objeto explícito (no spread del store: esparcir un store
-// de pinia congela el estado reactivo leído en ese instante).
-const sheetActions = computed<WorkoutActions>(() => ({
+// acciones que ven AddExerciseSheet y las cards: mismas del store, pero el
+// alta lleva el bloque visible y el reorden (v0.40.0) trabaja sobre el orden
+// de pantalla del step visible (ver reorderVisible). Objeto explícito (no
+// spread del store: esparcir un store de pinia congela el estado reactivo
+// leído en ese instante).
+const stepActions = computed<WorkoutActions>(() => ({
   addExercise: (id: number) => activeWorkout.addExercise(id, currentBlockLabel.value),
   addSupersetPair: (a: number, b: number) => activeWorkout.addSupersetPair(a, b, currentBlockLabel.value),
   removeExercise: (weid: number) => activeWorkout.removeExercise(weid),
-  reorder: (ids: number[]) => activeWorkout.reorder(ids),
+  reorder: (ids: number[]) => reorderVisible(ids),
+  setExerciseBlock: (weid: number, label: string | null) => activeWorkout.setExerciseBlock(weid, label),
+  setExerciseCompleted: (weid: number, completed: boolean) => activeWorkout.setExerciseCompleted(weid, completed),
   logSet: (weid: number, body: Parameters<WorkoutActions['logSet']>[1]) => activeWorkout.logSet(weid, body),
   updateSet: (weid: number, sid: number, body: Parameters<WorkoutActions['updateSet']>[2]) =>
     activeWorkout.updateSet(weid, sid, body),
@@ -516,7 +545,7 @@ function openPrestart(routineId: number) {
 // facelift v4: la media de la card es la imagen PROPIA de la rutina (o su
 // runa) — nunca la foto de un ejercicio
 function routineHeroSrc(routine: RoutineOut): string | undefined {
-  return routine.has_image ? routineImageUrl(routine.id) : undefined
+  return routine.has_image ? routineImageUrl(routine.id, routine.image_version) : undefined
 }
 
 function routineMeta(routine: RoutineOut): string {
@@ -1022,7 +1051,7 @@ onBeforeUnmount(() => {
               :exercise-ids="exerciseIds"
               :units="units"
               :locale="locale"
-              :actions="activeWorkout"
+              :actions="stepActions"
               :rest-enabled="restAutoEnabled"
               :workout-id="activeWorkout.workout.id"
               :resumed-countdown="resumedCardioCountdown"
@@ -1049,7 +1078,7 @@ onBeforeUnmount(() => {
           :exercise-ids="exerciseIds"
           :units="units"
           :locale="locale"
-          :actions="activeWorkout"
+          :actions="stepActions"
           :rest-enabled="restAutoEnabled"
           :workout-id="activeWorkout.workout.id"
           :resumed-countdown="resumedCardioCountdown"
@@ -1120,7 +1149,7 @@ onBeforeUnmount(() => {
         {{ t('workout.addExercise') }}
       </BkButton>
 
-      <AddExerciseSheet :open="addSheetOpen" :actions="sheetActions" @close="addSheetOpen = false" />
+      <AddExerciseSheet :open="addSheetOpen" :actions="stepActions" @close="addSheetOpen = false" />
 
       <SupersetEditSheet
         :open="editingBlock !== null"

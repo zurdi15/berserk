@@ -65,7 +65,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
           let imageUrl: string | undefined
           try {
             const routine = routineId != null ? (await domain.listRoutines()).find((r) => r.id === routineId) : undefined
-            if (routine?.has_image) imageUrl = routineImageUrl(routine.id)
+            if (routine?.has_image) imageUrl = routineImageUrl(routine.id, routine.image_version)
             else imageUrl = await runeDataUrl(routine?.rune && isValidRuneName(routine.rune) ? routine.rune : 'berserk')
           } catch {
             imageUrl = undefined
@@ -144,9 +144,14 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
 
   async function start(body: Parameters<typeof domain.startWorkout>[0]) {
     historyCache.value.clear()
+    // v0.40.0: el client_id nace ANTES del primer intento y viaja también en
+    // él — si el servidor creó el entreno pero la respuesta murió por el
+    // camino (timeout de client.ts), el replay de la cola lo recupera por
+    // dedupe en vez de chocar con un 409 y perder toda la cadena encolada
+    const clientId = outbox.newClientId()
     if (!offline()) {
       try {
-        workout.value = await domain.startWorkout(body)
+        workout.value = await domain.startWorkout({ ...body, client_id: clientId })
         return
       } catch (error) {
         if (!(error instanceof OfflineError)) throw error
@@ -179,10 +184,18 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
       })
     }
     const tempWorkoutId = outbox.nextTempId()
+    // v0.40.0 (zurdi: "empiezo un entreno y al conectar se reinicia el timer
+    // general"): la hora de inicio se fija AQUÍ y viaja en la entrada de la
+    // cola — el backend la honra, así que el replay no la sustituye por la
+    // hora de la sincronización. Naive UTC sin milisegundos, el mismo
+    // formato en que el backend la devuelve (parseUtc / el crono nativo lo
+    // esperan así)
+    const startedAt = body.started_at ?? new Date().toISOString().slice(0, 19)
+    const queuedBody = { ...body, started_at: startedAt }
     workout.value = {
       id: tempWorkoutId,
       date: body.date ?? todayIso(),
-      started_at: new Date().toISOString(),
+      started_at: startedAt,
       ended_at: null,
       routine_id: body.routine_id ?? null,
       note: null,
@@ -191,7 +204,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
       exercises,
       muscle_tag_ids: [],
     }
-    outbox.enqueue({ id: outbox.newClientId(), kind: 'startWorkout', tempWorkoutId, body, tempExerciseIds })
+    outbox.enqueue({ id: clientId, kind: 'startWorkout', tempWorkoutId, body: queuedBody, tempExerciseIds })
   }
 
 
@@ -280,11 +293,14 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   // v0.17.0 bloques: blockLabel opcional — el stepper del entreno añade al
   // bloque que se está mirando (null/omitido = sin bloque, como siempre)
   async function addExercise(exercise_id: number, blockLabel: string | null = null) {
+    // v0.40.0: mismo client_id en el intento en vivo y en la cola (ver start)
+    const clientId = outbox.newClientId()
     if (!offline()) {
       try {
         await domain.addWorkoutExercise(workout.value!.id, {
           exercise_id,
           block_label: blockLabel ?? undefined,
+          client_id: clientId,
         })
         await refresh()
         return
@@ -312,7 +328,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
       },
     ]
     outbox.enqueue({
-      id: outbox.newClientId(),
+      id: clientId,
       kind: 'addExercise',
       workoutId: workout.value!.id,
       tempExerciseId: tempId,
@@ -339,10 +355,25 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   }
 
   async function reorder(ids: number[]) {
-    // reordenar exige red (fuera del alcance offline v1: es raro mid-gym y
-    // su endpoint reescribe posiciones en bloque — encolarlo entre altas
-    // temporales complica el replay sin caso de uso real)
-    workout.value = await domain.reorderWorkoutExercises(workout.value!.id, ids)
+    if (!offline()) {
+      try {
+        workout.value = await domain.reorderWorkoutExercises(workout.value!.id, ids)
+        return
+      } catch (error) {
+        if (!(error instanceof OfflineError)) throw error
+      }
+    }
+    // v0.40.0: recolocar también funciona sin red y con cola pendiente —
+    // antes exigía red y, con cola pendiente, mandaba ids temporales (422) o
+    // pisaba el estado local optimista con el del servidor (que aún no tenía
+    // las series encoladas). Los ids que no estén (no debería pasar) van al
+    // final para no perder nunca un ejercicio de la vista.
+    const exercises = workout.value!.exercises
+    const known = new Set(exercises.map((e) => e.id))
+    const order = [...ids.filter((id) => known.has(id)), ...exercises.map((e) => e.id).filter((id) => !ids.includes(id))]
+    const byId = new Map(exercises.map((e) => [e.id, e]))
+    workout.value!.exercises = order.map((id, index) => ({ ...byId.get(id)!, position: index + 1 }))
+    outbox.enqueue({ id: outbox.newClientId(), kind: 'reorder', workoutId: workout.value!.id, ids: order })
   }
 
   // v0.8.0 (zurdi rediseña la creación): añade DOS ejercicios ya enlazados —
@@ -365,9 +396,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   // dos ejercicios"): sustituye un miembro del grupo por otro ejercicio —
   // quitar el viejo (SUS SERIES SE VAN CON ÉL, el sheet lo avisa) + añadir
   // el nuevo + recolocarlo en el hueco + reenlazar el grupo. El paso de
-  // recolocar usa reorder, que EXIGE red (v1): un cambio de miembro offline
-  // falla con OfflineError y el toast estándar — es una edición excepcional,
-  // no un gesto de gimnasio en túnel.
+  // recolocar usa reorder, que desde v0.40.0 también pasa por la cola sin red.
   async function swapSupersetMember(oldWeid: number, newExerciseId: number) {
     const exercises = workout.value!.exercises
     const oldIndex = exercises.findIndex((e) => e.id === oldWeid)
@@ -382,7 +411,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     const ids = current.map((e) => e.id)
     ids.pop()
     ids.splice(oldIndex, 0, newWeid)
-    workout.value = await domain.reorderWorkoutExercises(workout.value!.id, ids)
+    await reorder(ids)
 
     const values = workout.value!.exercises.map((e) => e.superset_group ?? null)
     values[oldIndex] = group
@@ -419,19 +448,21 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
   }
 
   async function logSet(weid: number, body: SetIn): Promise<SetLogOut> {
+    // v0.40.0: mismo client_id en el intento en vivo y en la cola — si el
+    // servidor registró la serie pero la respuesta se perdió (timeout), el
+    // replay la encuentra por dedupe y no la duplica (ver start)
+    const clientId = outbox.newClientId()
     if (!offline()) {
       try {
-        const result = await domain.logSet(workout.value!.id, weid, body)
+        const result = await domain.logSet(workout.value!.id, weid, { ...body, client_id: clientId })
         if (result.new_records.length) lastRecords.value = result.new_records
         await refresh()
         return result
       } catch (error) {
         if (!(error instanceof OfflineError)) throw error
         // la red murió al registrar: cae a la rama offline — la serie no se
-        // pierde (el dedupe por client_id del replay evita duplicarla si el
-        // servidor sí la recibió antes de morir la conexión... solo cuando
-        // fue el outbox quien la mandó; este primer intento iba SIN
-        // client_id, así que aquí el fallo fue antes de llegar al servidor)
+        // pierde, y si el servidor sí llegó a recibirla el dedupe por
+        // client_id del replay evita duplicarla
       }
     }
     const wex = localExercise(weid)
@@ -450,7 +481,7 @@ export const useActiveWorkoutStore = defineStore('activeWorkout', () => {
     }
     wex.sets = [...wex.sets, newSet]
     outbox.enqueue({
-      id: outbox.newClientId(),
+      id: clientId,
       kind: 'logSet',
       workoutId: workout.value!.id,
       exerciseId: weid,

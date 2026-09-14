@@ -130,6 +130,32 @@ describe('WorkoutView', () => {
       expect(wrapper.find('[data-testid="block-prev"]').exists()).toBe(true)
     })
 
+    // v0.40.0 (zurdi: "al quitar ejercicios de un entreno y poner otro, el
+    // arriba/abajo no funciona bien"): un ejercicio añadido a mano al bloque
+    // Empuje vive al FINAL de la lista del servidor (tras el de Tirón) — subirlo
+    // debe intercambiarlo con su vecino EN PANTALLA y mandar la lista completa
+    // en orden de pantalla (steps → filas), no el orden crudo del servidor
+    it('moves exercises within the visible block, in on-screen order', async () => {
+      const activeWorkout = useActiveWorkoutStore()
+      vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)
+      const reorder = vi.spyOn(activeWorkout, 'reorder').mockResolvedValue(undefined)
+      const workout = workoutWithBlocks()
+      // el 4 se añadió a Empuje tras quitar otro: servidor = [1, 2, 3, 4]
+      workout.exercises.push({ ...workout.exercises[0], id: 4, exercise_id: 4, position: 4 })
+      activeWorkout.workout = workout
+
+      const wrapper = build()
+      await flushPromises()
+      const cards = wrapper.findAllComponents(WorkoutExerciseCard)
+      expect(cards.map((c) => c.props('workoutExercise').id)).toEqual([1, 2, 4])
+      // la card solo conoce los ids de su step, en orden de pantalla
+      expect(cards[2].props('exerciseIds')).toEqual([1, 2, 4])
+
+      await cards[2].props('actions').reorder([1, 4, 2])
+
+      expect(reorder).toHaveBeenCalledWith([1, 4, 2, 3])
+    })
+
     it('renders the flat list (no stepper) when no exercise has a block label', async () => {
       const activeWorkout = useActiveWorkoutStore()
       vi.spyOn(activeWorkout, 'resume').mockResolvedValue(undefined)

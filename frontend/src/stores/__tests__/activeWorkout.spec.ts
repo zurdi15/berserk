@@ -58,15 +58,18 @@ describe('active workout store', () => {
     vi.mocked(domain.getWorkout).mockResolvedValue(workout as never)
 
     await store.addExercise(9, 'Empuje')
+    // v0.40.0: el alta en vivo viaja ya con client_id (dedupe del replay)
     expect(domain.addWorkoutExercise).toHaveBeenCalledWith(4, {
       exercise_id: 9,
       block_label: 'Empuje',
+      client_id: expect.any(String),
     })
 
     await store.addExercise(10)
     expect(domain.addWorkoutExercise).toHaveBeenLastCalledWith(4, {
       exercise_id: 10,
       block_label: undefined,
+      client_id: expect.any(String),
     })
   })
 

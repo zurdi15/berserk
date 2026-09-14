@@ -37,6 +37,8 @@ export type OutboxEntry =
   | { id: string; kind: 'setExerciseBlock'; workoutId: number; exerciseId: number; blockLabel: string | null }
   | { id: string; kind: 'setExerciseCompleted'; workoutId: number; exerciseId: number; completed: boolean }
   | { id: string; kind: 'removeExercise'; workoutId: number; exerciseId: number }
+  // v0.40.0: recolocar también pasa por la cola (ver activeWorkout.reorder)
+  | { id: string; kind: 'reorder'; workoutId: number; ids: number[] }
   | { id: string; kind: 'setSupersetGroups'; workoutId: number; groups: { exerciseId: number; group: number | null }[] }
   | { id: string; kind: 'finishWorkout'; workoutId: number }
 
@@ -230,6 +232,17 @@ async function replayEntry(entry: OutboxEntry, idMap: Map<number, number>): Prom
       } catch (error) {
         if (!(error instanceof ApiError && error.status === 404)) throw error
       }
+      return
+    }
+    case 'reorder': {
+      const workoutId = resolveId(entry.workoutId, idMap)
+      if (workoutId === null) throw new ApiError(410, 'offline_dependency_lost')
+      // ids cuya alta se descartó por conflicto se filtran (mismo criterio
+      // que setSupersetGroups); si el conjunto no cuadra con el servidor, su
+      // 422 descarta esta entrada como conflicto en vez de bloquear la cola
+      const ids = entry.ids.map((id) => resolveId(id, idMap)).filter((id): id is number => id !== null)
+      if (ids.length === 0) return
+      await domain.reorderWorkoutExercises(workoutId, ids)
       return
     }
     case 'setSupersetGroups': {

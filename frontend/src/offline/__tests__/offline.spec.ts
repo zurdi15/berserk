@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/api/domain', () => ({
   startWorkout: vi.fn(),
+  reorderWorkoutExercises: vi.fn(),
   addWorkoutExercise: vi.fn(),
   logSet: vi.fn(),
   updateSet: vi.fn(),
@@ -181,5 +182,25 @@ describe('offline/outbox replay', () => {
     expect(outbox.pendingCount.value).toBe(0)
     expect(drained).toHaveBeenCalledWith({ synced: 1, conflicts: 0 })
     dispose()
+  })
+})
+
+// v0.40.0: el reorden encolado resuelve los ids temporales antes de mandarlo
+describe('outbox replay of queued reorders', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', mockStorage())
+    vi.clearAllMocks()
+  })
+
+  it('maps temp exercise ids to real ones and drops the ones lost to conflicts', async () => {
+    outbox.enqueue({ id: 'uuid-add', kind: 'addExercise', workoutId: 4, tempExerciseId: -2, exerciseId: 3 })
+    outbox.enqueue({ id: 'uuid-order', kind: 'reorder', workoutId: 4, ids: [-2, 7, -9] })
+    vi.mocked(domain.addWorkoutExercise).mockResolvedValue({ id: 30 } as never)
+    vi.mocked(domain.reorderWorkoutExercises).mockResolvedValue({} as never)
+
+    await outbox.syncNow()
+
+    expect(domain.reorderWorkoutExercises).toHaveBeenCalledWith(4, [30, 7])
+    expect(JSON.parse(localStorage.getItem('bk:outbox') ?? '[]')).toHaveLength(0)
   })
 })

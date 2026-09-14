@@ -43,6 +43,7 @@ import { displayToKg, formatLoad, kgToDisplay } from '@/utils/units'
 import BkButton from '@/lib/BkButton.vue'
 import BkCard from '@/lib/BkCard.vue'
 import BkCheck from '@/lib/BkCheck.vue'
+import BkChip from '@/lib/BkChip.vue'
 import BkMedia from '@/lib/BkMedia.vue'
 import BkRune from '@/lib/BkRune.vue'
 import BkSheet from '@/lib/BkSheet.vue'
@@ -270,7 +271,7 @@ watch(
   },
   { immediate: true },
 )
-const exerciseImage = computed(() => (props.exercise?.has_image ? exerciseImageUrl(props.exercise.id) : runeArt.value))
+const exerciseImage = computed(() => (props.exercise?.has_image ? exerciseImageUrl(props.exercise.id, props.exercise.image_version) : runeArt.value))
 
 const index = computed(() => props.exerciseIds.indexOf(props.workoutExercise.id))
 const isFirst = computed(() => index.value <= 0)
@@ -291,6 +292,19 @@ const completed = computed(() => props.workoutExercise.completed ?? false)
 const effectiveSetCount = computed(
   () => props.workoutExercise.sets.filter((s) => !s.is_warmup).length,
 )
+
+// v0.40.0 (zurdi: "poner tag de calentamiento en la serie de calentamiento,
+// en vez de numeración"): el calentamiento lleva chip y NO cuenta — las
+// efectivas se numeran entre sí (1, 2, 3…), no con el set_number crudo del
+// backend, que cuenta todas las filas y dejaba la primera efectiva como "2."
+function effectiveNumber(set: SetOut): number {
+  let n = 0
+  for (const s of props.workoutExercise.sets) {
+    if (!s.is_warmup) n++
+    if (s.id === set.id) break
+  }
+  return n
+}
 
 // item 11: descanso efectivo (override del entreno > target de rutina > default)
 const effectiveRestSeconds = computed(() =>
@@ -1086,20 +1100,26 @@ async function moveDown() {
           :aria-label="t('common.edit')"
           @click="openEdit(set)"
         >
-          <span class="bk-metric text-sm">
-            <template v-if="!isCardio">{{ set.set_number }}. </template>{{ formatSetValue(set) }}
-            <span v-if="set.rpe" class="text-ink-faint text-sm"> · RPE {{ set.rpe }}</span>
+          <span class="bk-metric text-sm inline-flex items-center gap-1.5">
+            <!-- v0.40.0: calentamiento = chip en vez de número; las
+                 efectivas se numeran entre sí (ver effectiveNumber) -->
+            <BkChip v-if="set.is_warmup" size="sm" :data-testid="`warmup-tag-${set.id}`">{{ t('workout.warmupShort') }}</BkChip>
+            <span>
+              <template v-if="!isCardio && !set.is_warmup">{{ effectiveNumber(set) }}. </template>{{ formatSetValue(set) }}
+              <span v-if="set.rpe" class="text-ink-faint text-sm"> · RPE {{ set.rpe }}</span>
+            </span>
           </span>
         </button>
-        <span v-else class="flex-1 min-w-0 bk-metric text-sm px-2 py-1">
-          <template v-if="!isCardio">{{ set.set_number }}. </template>{{ formatSetValue(set) }}
+        <span v-else class="flex-1 min-w-0 bk-metric text-sm px-2 py-1 inline-flex items-center gap-1.5">
+          <BkChip v-if="set.is_warmup" size="sm" :data-testid="`warmup-tag-${set.id}`">{{ t('workout.warmupShort') }}</BkChip>
+          <span><template v-if="!isCardio && !set.is_warmup">{{ effectiveNumber(set) }}. </template>{{ formatSetValue(set) }}</span>
         </span>
         <!-- des-marcar = borrar la serie (facelift v2) — el pie del cajón
              de edición sigue existiendo como camino explícito -->
         <BkCheck
           :model-value="true"
           size="md"
-          :aria-label="t('workout.setDone', { n: set.set_number })"
+          :aria-label="set.is_warmup ? t('workout.warmup') : t('workout.setDone', { n: effectiveNumber(set) })"
           :data-testid="`uncheck-set-${set.id}`"
           @update:model-value="uncheckSet(set.id)"
         />
@@ -1124,10 +1144,10 @@ async function moveDown() {
           :aria-label="t('workout.nextSet')"
           @click="openNew"
         >
-          <!-- numeración continua con set_number (que cuenta TODAS las
-               series, calentamientos incluidos), no con las efectivas -->
+          <!-- v0.40.0: numeración continua con las EFECTIVAS (el
+               calentamiento lleva chip y no cuenta) -->
           <span class="bk-metric text-sm" :class="g === 1 ? 'text-ink-muted' : 'text-ink-faint'">
-            <template v-if="!isCardio">{{ workoutExercise.sets.length + g }}. </template>{{ ghostLabel }}
+            <template v-if="!isCardio">{{ effectiveSetCount + g }}. </template>{{ ghostLabel }}
           </span>
         </button>
         <BkCheck

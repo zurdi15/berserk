@@ -37,7 +37,7 @@ export const es = {
     rotation_not_in_plan: 'Esa rutina no está en el plan',
     rotation_duplicate_routine: 'Una rutina no puede repetirse en el plan',
     unsupported_image_type: 'Formato de imagen no soportado (JPG, PNG o WebP)',
-    image_too_large: 'La imagen supera los 5 MB',
+    image_too_large: 'La imagen supera los 25 MB',
     image_search_unavailable: 'La búsqueda de imágenes no está disponible ahora mismo',
     image_url_not_allowed: 'Esa URL de imagen no está permitida',
     image_download_failed: 'No se pudo descargar la imagen',
@@ -586,6 +586,8 @@ export const es = {
     durationMinutes: 'Duración (min)',
     distanceOptional: 'Distancia (opcional)',
     warmup: 'Calentamiento',
+    // v0.40.0: chip de la fila de serie de calentamiento (sustituye al número)
+    warmupShort: 'Calent.',
     rpe: 'RPE',
     logSet: 'Registrar serie',
     summary: 'Resumen',
