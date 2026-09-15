@@ -14,8 +14,10 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'berserk'
   const options = {
     body: payload.body || '',
-    // misma tag que el aviso local de restTimer.ts: si la pestaña seguía viva
-    // y ya lo mostró, el push lo reemplaza en vez de duplicarlo
+    // misma tag que el aviso local: en los navegadores que agrupan por tag,
+    // el push reemplaza en vez de duplicar. OJO: iOS/WebKit NO agrupa — el
+    // dedup real es que la página calla su aviso local cuando el push quedó
+    // programado (Vikunja #7, ver restTimer.ts / WorkoutExerciseCard.vue)
     tag: payload.tag || 'berserk-push',
     renotify: true,
     icon: '/icons/pwa-192.png',

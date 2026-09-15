@@ -30,6 +30,15 @@ export const useRestTimerStore = defineStore('restTimer', () => {
   // se pide UNA vez por sesión de página, nunca en cada start(): repetir el
   // prompt del navegador en cada serie sería spam de permisos
   let permissionRequested = false
+  // Vikunja #7 (zurdi: "en iphone, la notificacion de descanso terminado
+  // aparece dos veces"): con el push del backend programado DE VERDAD (el PUT
+  // llegó), el aviso local sobra — en iOS la tag no agrupa y salían los dos.
+  // El flag y no isWebPushOn() a secas: un descanso arrancado sin red (gym
+  // mode) no programa nada y el local sigue siendo su único aviso. La
+  // generación evita que el PUT lento de un descanso YA sustituido resuelva
+  // tarde y pise el flag del vigente.
+  let webPushArmed = false
+  let webPushGeneration = 0
 
   // v0.28.0 reloj (zurdi: "vamos directamente a por la C"): cancelar el
   // descanso desde la muñeca. El móvil obedece con clear() — que además
@@ -83,7 +92,7 @@ export const useRestTimerStore = defineStore('restTimer', () => {
       if (!vibrated) {
         vibrated = true
         navigator.vibrate?.([200, 100, 200])
-        void notifyRestOver()
+        if (!webPushArmed) void notifyRestOver()
         // el timeout de gracia sobrevivía a un restart y borraba el timer nuevo
         // v0.29.0: el reloj distingue este clear (terminó solo → sigue
         // avisando hasta el OK) del de cancelar (calla)
@@ -130,6 +139,8 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     else {
       // v0.36.0 Web Push (PWA, iPhone incluido): el backend avisa a la hora
       // exacta aunque la PWA esté cerrada — no-op si no está activado en Ajustes
+      webPushArmed = false
+      const generation = ++webPushGeneration
       void scheduleWebPushTimer(
         'rest',
         endsAt.value,
@@ -137,7 +148,9 @@ export const useRestTimerStore = defineStore('restTimer', () => {
         exerciseName
           ? i18n.global.t('timer.notifyBodyWithExercise', { exercise: exerciseName })
           : i18n.global.t('timer.notifyBody'),
-      )
+      ).then((armed) => {
+        if (generation === webPushGeneration) webPushArmed = armed
+      })
     }
     now.value = Date.now()
     vibrated = false
@@ -165,6 +178,8 @@ export const useRestTimerStore = defineStore('restTimer', () => {
     total.value = 0
     vibrated = false
     restExerciseName = null
+    webPushArmed = false
+    webPushGeneration += 1
     if (ticker) clearInterval(ticker)
     ticker = null
     graceTimeout = null

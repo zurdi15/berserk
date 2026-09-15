@@ -1,6 +1,17 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 
+// Vikunja #7 (doble aviso en iPhone): el mock por defecto devuelve false
+// ("no se programó push"), que es lo que el módulo real hace en happy-dom
+// (Push API ausente) — los tests históricos no cambian de comportamiento
+const { scheduleWebPushTimerMock } = vi.hoisted(() => ({
+  scheduleWebPushTimerMock: vi.fn(async (..._args: unknown[]) => false),
+}))
+vi.mock('@/utils/webPush', () => ({
+  scheduleWebPushTimer: (...args: unknown[]) => scheduleWebPushTimerMock(...args),
+  cancelWebPushTimer: vi.fn(async () => {}),
+}))
+
 import { useRestTimerStore } from '../restTimer'
 
 describe('rest timer store', () => {
@@ -83,6 +94,7 @@ describe('rest timer store — mobile notification on rest-over', () => {
     setActivePinia(createPinia())
     vi.useFakeTimers()
     vi.setSystemTime(1_000_000)
+    scheduleWebPushTimerMock.mockClear()
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -94,9 +106,11 @@ describe('rest timer store — mobile notification on rest-over', () => {
   // *Async* (advanceTimersByTimeAsync, no advanceTimersByTime): notifyRestOver
   // puede tener un await real de por medio (getRegistration del SW) y esta
   // variante sí drena esas promesas antes de devolver el control al test.
+  // relativa al reloj simulado ACTUAL (no al 1_000_000 base): así se puede
+  // encadenar más de un descanso en el mismo test sin retroceder el tiempo
   async function expireAfter(timer: ReturnType<typeof useRestTimerStore>, seconds: number, name?: string) {
     timer.start(seconds, name)
-    vi.setSystemTime(1_000_000 + seconds * 1000 + 500)
+    vi.setSystemTime(Date.now() + seconds * 1000 + 500)
     await vi.advanceTimersByTimeAsync(600)
   }
 
@@ -195,6 +209,60 @@ describe('rest timer store — mobile notification on rest-over', () => {
     const timer = useRestTimerStore()
     await expireAfter(timer, 10)
     expect(vibrate).toHaveBeenCalledTimes(1)
+  })
+
+  // Vikunja #7 (zurdi: "en iphone, la notificacion de descanso terminado
+  // aparece dos veces"): con Web Push activo el backend YA avisa a la hora
+  // exacta, y en iOS la tag no agrupa — el aviso local duplicaba. Solo se
+  // suprime si el PUT llegó de verdad: arrancado sin red (gym mode), el
+  // local sigue siendo el único aviso y no debe callarse.
+  it('skips the local notification when the backend push got scheduled (iPhone showed both)', async () => {
+    scheduleWebPushTimerMock.mockResolvedValueOnce(true)
+    const NotificationMock = vi.fn()
+    Object.assign(NotificationMock, { permission: 'granted', requestPermission: vi.fn() })
+    vi.stubGlobal('Notification', NotificationMock)
+    const vibrate = vi.fn()
+    vi.stubGlobal('navigator', { vibrate })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    const timer = useRestTimerStore()
+    await expireAfter(timer, 10)
+
+    expect(scheduleWebPushTimerMock).toHaveBeenCalledTimes(1)
+    expect(NotificationMock).not.toHaveBeenCalled()
+    expect(vibrate).toHaveBeenCalledTimes(1) // la vibración es in-app, no duplica nada
+  })
+
+  it('still notifies locally when the push could not be scheduled (offline start or push off)', async () => {
+    scheduleWebPushTimerMock.mockResolvedValueOnce(false)
+    const NotificationMock = vi.fn()
+    Object.assign(NotificationMock, { permission: 'granted', requestPermission: vi.fn() })
+    vi.stubGlobal('Notification', NotificationMock)
+    vi.stubGlobal('navigator', { vibrate: vi.fn() })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    const timer = useRestTimerStore()
+    await expireAfter(timer, 10)
+
+    expect(NotificationMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('each rest decides with its own scheduling result (armed flag does not leak across rests)', async () => {
+    const NotificationMock = vi.fn()
+    Object.assign(NotificationMock, { permission: 'granted', requestPermission: vi.fn() })
+    vi.stubGlobal('Notification', NotificationMock)
+    vi.stubGlobal('navigator', { vibrate: vi.fn() })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    const timer = useRestTimerStore()
+    scheduleWebPushTimerMock.mockResolvedValueOnce(true)
+    await expireAfter(timer, 10)
+    expect(NotificationMock).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(3_100) // gracia → clear('finished')
+
+    scheduleWebPushTimerMock.mockResolvedValueOnce(false)
+    await expireAfter(timer, 10)
+    expect(NotificationMock).toHaveBeenCalledTimes(1)
   })
 
   it('prefers the active service worker registration (showNotification) over the bare constructor when one exists', async () => {

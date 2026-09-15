@@ -2,6 +2,22 @@ import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, getActivePinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// Vikunja #7 (doble aviso en iPhone): mocks para poder asertar si la card
+// muestra el aviso local del fin de cardio. Los defaults calcan el entorno
+// de test real (sin Push API → false; visibilidad 'visible' → el aviso real
+// no salía): ningún test histórico cambia de comportamiento.
+const { scheduleWebPushTimerMock, showTimerNotificationMock } = vi.hoisted(() => ({
+  scheduleWebPushTimerMock: vi.fn(async (..._args: unknown[]) => false),
+  showTimerNotificationMock: vi.fn(async (..._args: unknown[]) => {}),
+}))
+vi.mock('@/utils/webPush', () => ({
+  scheduleWebPushTimer: (...args: unknown[]) => scheduleWebPushTimerMock(...args),
+  cancelWebPushTimer: vi.fn(async () => {}),
+}))
+vi.mock('@/utils/timerNotification', () => ({
+  showTimerNotification: (...args: unknown[]) => showTimerNotificationMock(...args),
+}))
+
 import { createI18nInstance } from '@/i18n'
 import { useRestTimerStore } from '@/stores/restTimer'
 import { useToastStore } from '@/stores/toast'
@@ -961,6 +977,42 @@ describe('WorkoutExerciseCard', () => {
         expect(localStorage.getItem('berserk:cardio-countdown')).toBeNull()
         expect(wrapper.find('[data-testid="cardio-countdown"]').exists()).toBe(false)
         expect(wrapper.find('[data-testid="cardio-actions-30"]').exists()).toBe(true)
+      })
+
+      // Vikunja #7: con el push del backend programado de verdad, el aviso
+      // local del fin de cardio sobraba (en iPhone salían los dos); sin push
+      // (apagado u offline), el local sigue siendo el único y no se calla
+      // el prop llega DESPUÉS del mount, como en producción (WorkoutView lo
+      // asigna al cargar el entreno): así el watch de resumedActive dispara y
+      // programa push/nativo — pasado en el mount, el immediate del primer
+      // watcher lo asienta antes de que el segundo exista y nada se programa
+      it('reaching zero with the backend push armed skips the local notification', async () => {
+        scheduleWebPushTimerMock.mockClear()
+        showTimerNotificationMock.mockClear()
+        scheduleWebPushTimerMock.mockResolvedValueOnce(true)
+        const wrapper = mountCardio()
+        await flushPromises()
+        await wrapper.setProps({ resumedCountdown: { ...resumed, endsAt: Date.now() + 5_000 } })
+        await flushPromises()
+        vi.advanceTimersByTime(5_000)
+        await flushPromises()
+
+        expect(scheduleWebPushTimerMock).toHaveBeenCalled()
+        expect(showTimerNotificationMock).not.toHaveBeenCalled()
+      })
+
+      it('reaching zero without a scheduled push still shows the local notification', async () => {
+        scheduleWebPushTimerMock.mockClear()
+        showTimerNotificationMock.mockClear()
+        scheduleWebPushTimerMock.mockResolvedValueOnce(false)
+        const wrapper = mountCardio()
+        await flushPromises()
+        await wrapper.setProps({ resumedCountdown: { ...resumed, endsAt: Date.now() + 5_000 } })
+        await flushPromises()
+        vi.advanceTimersByTime(5_000)
+        await flushPromises()
+
+        expect(showTimerNotificationMock).toHaveBeenCalledTimes(1)
       })
 
       it('cancelling the resumed countdown clears storage WITHOUT logging', async () => {

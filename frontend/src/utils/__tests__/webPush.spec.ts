@@ -58,7 +58,9 @@ describe('webPush', () => {
   it('does not schedule timers while off, and schedules/cancels once enabled', async () => {
     fakePushEnv()
     expect(getWebPushState()).toBe('off')
-    await scheduleWebPushTimer('rest', Date.now() + 60_000, 'Descanso terminado', 'Press banca')
+    // Vikunja #7: el false le dice al que llama que el aviso local sigue
+    // siendo suyo — solo un PUT que llegó de verdad lo suprime
+    await expect(scheduleWebPushTimer('rest', Date.now() + 60_000, 'Descanso terminado', 'Press banca')).resolves.toBe(false)
     expect(apiMock).not.toHaveBeenCalled()
 
     apiMock.mockResolvedValueOnce({ enabled: true, public_key: 'BAAA' }).mockResolvedValue(undefined)
@@ -66,7 +68,7 @@ describe('webPush', () => {
     expect(apiMock).toHaveBeenCalledWith('/push/subscriptions', expect.objectContaining({ method: 'PUT' }))
 
     apiMock.mockClear()
-    await scheduleWebPushTimer('rest', 1_700_000_000_000, 'Descanso terminado', 'Press banca')
+    await expect(scheduleWebPushTimer('rest', 1_700_000_000_000, 'Descanso terminado', 'Press banca')).resolves.toBe(true)
     const [path, options] = apiMock.mock.calls[0] as [string, { method: string; body: { fire_at: string; kind: string } }]
     expect(path).toMatch(/^\/push\/timers\/.+-rest$/)
     expect(options.method).toBe('PUT')
@@ -82,6 +84,7 @@ describe('webPush', () => {
     fakePushEnv()
     localStorage.setItem('berserk:web-push-enabled', 'true')
     apiMock.mockRejectedValue(new Error('offline'))
-    await expect(scheduleWebPushTimer('cardio', Date.now(), 'Cardio terminado', '')).resolves.toBeUndefined()
+    // false: sin red no hay push programado y el aviso local NO debe callarse
+    await expect(scheduleWebPushTimer('cardio', Date.now(), 'Cardio terminado', '')).resolves.toBe(false)
   })
 })

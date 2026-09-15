@@ -204,6 +204,10 @@ let cardioStopReason: WearStopReason = 'cancelled'
 // Layer. Misma gracia aquí; un arranque nuevo la cancela.
 const WEAR_FINISHED_GRACE_MS = 3000
 let wearFinishedTimeout: ReturnType<typeof setTimeout> | null = null
+// Vikunja #7: true solo si el PUT del push web de ESTE countdown llegó al
+// backend — decide si onCountdownFinished muestra el aviso local o lo deja
+// en manos del push (ver el watch de abajo)
+let cardioWebPushArmed = false
 function scheduleWearCardioFinished() {
   if (wearFinishedTimeout) clearTimeout(wearFinishedTimeout)
   wearFinishedTimeout = setTimeout(() => {
@@ -231,8 +235,14 @@ watch(resumedActive, (timer, previous) => {
       totalMs: timer.targetSeconds * 1000,
       title,
     })
-    // v0.36.0 Web Push (PWA): no-op en la shell y si no está activado en Ajustes
-    void scheduleWebPushTimer('cardio', timer.endsAt, t('timer.cardioOver'), name.value)
+    // v0.36.0 Web Push (PWA): no-op en la shell y si no está activado en Ajustes.
+    // Vikunja #7: como en restTimer.ts, el flag recuerda si el PUT llegó — con
+    // push programado el aviso local de onCountdownFinished se calla (en iPhone
+    // salían los dos); sin él (apagado o sin red), el local sigue avisando
+    cardioWebPushArmed = false
+    void scheduleWebPushTimer('cardio', timer.endsAt, t('timer.cardioOver'), name.value).then((armed) => {
+      cardioWebPushArmed = armed
+    })
   } else if (previous) {
     void stopNativeCardioCountdown()
     void cancelNativeCardioEndAlarm(cardioStopReason)
@@ -243,14 +253,16 @@ watch(resumedActive, (timer, previous) => {
       void cancelWebPushTimer('cardio')
     }
     cardioStopReason = 'cancelled'
+    cardioWebPushArmed = false
   }
 })
 
 // v0.38.0: el mismo aviso del sistema que el fin de descanso (solo con la
 // página oculta, ver utils/timerNotification.ts) — antes el cardio solo
-// vibraba y ponía "¡Tiempo!" en la card
+// vibraba y ponía "¡Tiempo!" en la card. Vikunja #7: con el push del backend
+// programado, el local se calla (duplicaba en iPhone)
 function onCountdownFinished() {
-  void showTimerNotification(t('timer.cardioOver'), name.value, 'berserk-cardio-timer')
+  if (!cardioWebPushArmed) void showTimerNotification(t('timer.cardioOver'), name.value, 'berserk-cardio-timer')
 }
 // cancelado desde la muñeca: misma salida que el botón cancelar de la tarjeta
 const stopWearCancel = onWearTimerCancelled((kind) => {

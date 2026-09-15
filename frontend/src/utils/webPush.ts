@@ -174,15 +174,21 @@ function clientId(kind: WebPushKind): string {
 
 // Programa el aviso de fin en el backend. No-op si el push está apagado; los
 // fallos se tragan (sin red, el descanso local sigue avisando con vibración).
-export async function scheduleWebPushTimer(kind: WebPushKind, endsAtMs: number, title: string, body: string): Promise<void> {
-  if (!isWebPushOn()) return
+// Vikunja #7: devuelve si el PUT LLEGÓ — con push programado, el aviso local
+// de la página debe callarse (en iPhone salían los dos: la tag no agrupa en
+// WebKit); si no llegó (apagado, o gym mode sin red), el local sigue siendo
+// el único aviso y no puede suprimirse a ciegas por isWebPushOn().
+export async function scheduleWebPushTimer(kind: WebPushKind, endsAtMs: number, title: string, body: string): Promise<boolean> {
+  if (!isWebPushOn()) return false
   try {
     await api(`/push/timers/${clientId(kind)}`, {
       method: 'PUT',
       body: { kind, fire_at: new Date(endsAtMs).toISOString(), title, body },
     })
+    return true
   } catch {
     // sin red no hay push que programar; la vibración in-app sigue
+    return false
   }
 }
 
