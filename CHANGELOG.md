@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.40.3 - 2026-09-16
+
+### Arreglado
+- Completar un ejercicio ahora lo deja bloqueado de verdad: desaparecen la siguiente serie propuesta, el botón «Añadir serie» y las acciones de cardio (antes solo se ponían en gris), y las series ya registradas no se pueden editar ni des-marcar. Al quitar el «Completado» todo vuelve a estar disponible, como antes.
+- En la edición de un entreno pasado, un ejercicio que quedó completado ya no aparece con controles apagados: ahí siempre se puede corregir todo.
+
 ## 0.40.2 - 2026-09-14
 
 ### Arreglado
