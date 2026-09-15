@@ -1552,7 +1552,7 @@ describe('v0.38.1: botón «Completar ejercicio»', () => {
     retro.unmount()
   })
 
-  it('a completed exercise keeps its sets, ghosts, image and actions, and gets the aurora border; the button un-marks it', async () => {
+  it('a completed exercise locks the card: add paths vanish, editing is disabled, sets/image stay; the button un-marks it', async () => {
     const setExerciseCompleted = vi.fn(async () => {})
     const wrapper = mountCard({
       workoutExercise: { ...pushExercise, completed: true },
@@ -1564,18 +1564,20 @@ describe('v0.38.1: botón «Completar ejercicio»', () => {
     // fragmento, así que los attrs se leen en la <section> real
     expect(wrapper.find('section').attributes('data-completed')).toBe('true')
     expect(wrapper.find('section').classes()).toContain('bk-done')
-    // no se pliega ni cambia de contenido: series, fantasma, foto y «Añadir
-    // serie» siguen ahí (v0.39.0, zurdi: al completar sin series se iba la foto)
+    // lo YA registrado no se pliega: series, foto y contador siguen ahí
+    // (v0.39.0, zurdi: al completar sin series se iba la foto)
     expect(wrapper.find('[data-testid="set-row-1"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="exercise-image-20"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="add-set-20"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="set-count-20"]').text()).toContain('1')
-    // v0.39.1: pero registrar MÁS queda apagado — añadir serie y el check de
-    // ghost; editar lo ya registrado sigue vivo
-    expect(wrapper.get('[data-testid="add-set-20"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('[data-testid="ghost-check-20"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('[data-testid="edit-set-1"]').attributes('disabled')).toBeUndefined()
+    // Vikunja #3 (zurdi: "quitarse el añadir mas series, tanto inline como el
+    // botón"): los caminos de añadir DESAPARECEN — fila ghost, su check y
+    // «Añadir serie»
+    expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ghost-check-20"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="add-set-20"]').exists()).toBe(false)
+    // y editar/borrar lo registrado queda bloqueado hasta des-completar
+    expect(wrapper.get('[data-testid="edit-set-1"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="uncheck-set-1"]').attributes('disabled')).toBeDefined()
 
     const button = wrapper.get('[data-testid="exercise-done-20"]')
     expect(button.text()).toBe('Completado')
@@ -1583,6 +1585,57 @@ describe('v0.38.1: botón «Completar ejercicio»', () => {
     await button.trigger('click')
     await flushPromises()
     expect(setExerciseCompleted).toHaveBeenCalledWith(20, false)
+    wrapper.unmount()
+  })
+
+  it('un-completing restores the card to its previous state (add paths back, editing enabled)', async () => {
+    const wrapper = mountCard({
+      workoutExercise: { ...pushExercise, completed: true },
+      actions: makeActions({ setExerciseCompleted: vi.fn(async () => {}) }),
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="add-set-20"]').exists()).toBe(false)
+
+    // el store confirma el des-marcado (el mock no muta): se simula el prop
+    await wrapper.setProps({ workoutExercise: { ...pushExercise, completed: false } })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="add-set-20"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="edit-set-1"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-testid="uncheck-set-1"]').attributes('disabled')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('the lock is live-only: the retro editor keeps a completed exercise fully editable', async () => {
+    // el editor retroactivo no implementa setExerciseCompleted (no hay botón
+    // que des-marque): bloquear ahí dejaría el ejercicio atrapado
+    const wrapper = mountCard({
+      workoutExercise: { ...pushExercise, completed: true },
+      live: false,
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="add-set-20"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="add-set-20"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="ghost-check-20"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-testid="edit-set-1"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-testid="uncheck-set-1"]').attributes('disabled')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('a completed cardio exercise hides both log and start actions', async () => {
+    const wrapper = mountCard({
+      workoutExercise: { ...cardioWorkoutExercise, completed: true },
+      exercise: cardioExercise,
+      exerciseIds: [30],
+      actions: makeActions({ setExerciseCompleted: vi.fn(async () => {}) }),
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="cardio-log-30"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cardio-start-30"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="exercise-done-30"]').text()).toBe('Completado')
     wrapper.unmount()
   })
 
@@ -1600,8 +1653,10 @@ describe('v0.38.1: botón «Completar ejercicio»', () => {
     await flushPromises()
     expect(section().classes()).toContain('bk-done-pulse')
     expect(section().classes()).toContain('bk-done')
+    // Vikunja #3: los ghosts se van al completar, pero la FOTO se queda —
+    // la sección imagen+series sigue montada aunque no haya filas visibles
     expect(wrapper.find('[data-testid="exercise-image-20"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ghost-set-20-0"]').exists()).toBe(false)
 
     // otra animación de dentro no lo apaga; la del latido sí
     section().element.dispatchEvent(new Event('animationend'))

@@ -523,9 +523,9 @@ const targetSets = computed<number | null>(() => routineTargetRow.value?.target_
 
 const pendingGhostCount = computed(() => {
   // v0.39.0 (zurdi: "cuando le das a completado y no hay ninguna serie, la
-  // imagen desaparece"): hecho NO quita las series pendientes — la sección
+  // imagen desaparece"): este cómputo IGNORA el lock a propósito — la sección
   // imagen+series se pinta solo con series o ghosts, y sin ellos se iba la
-  // foto. La card queda idéntica al completarla: solo borde y botón.
+  // foto. Lo que se PINTA al completar es visibleGhostCount (cero, ver abajo).
   if (isCardio.value || !props.exercise) return 0
   if (props.live && targetSets.value != null) {
     return Math.max(0, targetSets.value - effectiveSetCount.value)
@@ -731,12 +731,21 @@ async function onDeleteSet(setId: number) {
 // completado que no colapse, ponle un border"): el gesto es el botón
 // «Completar ejercicio» de la última fila, a la derecha de «Añadir serie»;
 // hecho = halo aurora (.bk-done) y botón en «Completado» (tocarlo des-marca)
-// — la card no se pliega ni cambia de contenido. v0.39.1 (zurdi: "que se
-// deshabilite el poder añadir serie, etc."): hecha, se apagan los caminos
-// para registrar MÁS (añadir serie, check y fila de ghost, registrar/empezar
-// cardio, chip de progresión); editar o borrar lo ya registrado sigue vivo.
+// — la card no se pliega ni cambia de contenido. v0.39.1 apagaba (disabled)
+// los caminos de registrar MÁS pero dejaba editar vivo; Vikunja #3 (zurdi:
+// "quitarse el añadir mas series... locked sin poder añadir o editar"): los
+// caminos de añadir (fila ghost y su check, «Añadir serie», registrar/empezar
+// cardio, chip de progresión) DESAPARECEN, y editar/des-marcar lo registrado
+// se deshabilita — des-completar lo restaura todo.
 // Solo en vivo y si el store sabe (el editor retroactivo no lo implementa).
 const canMarkDone = computed(() => props.live && typeof props.actions.setExerciseCompleted === 'function')
+// el lock cuelga de canMarkDone y no de completed a secas: sin botón que
+// des-marque (editor retro) un ejercicio hecho quedaría atrapado sin salida
+const locked = computed(() => completed.value && canMarkDone.value)
+// separado de pendingGhostCount a propósito: la sección imagen+series se
+// monta con los ghosts POTENCIALES (que la foto no se vaya al completar sin
+// series, v0.39.0) pero pinta solo los visibles
+const visibleGhostCount = computed(() => (locked.value ? 0 : pendingGhostCount.value))
 const markingDone = ref(false)
 // v0.39.0 (zurdi: "una animación pequeñita de feedback al completar"): un
 // latido de la card (.bk-done-pulse) al pasar a hecho — venga del botón, del
@@ -1072,10 +1081,9 @@ async function moveDown() {
            última sesión, la chip propone subir; tocarla abre el cajón con el
            peso sugerido ya puesto -->
       <button
-        v-if="progressionSuggestion != null"
+        v-if="progressionSuggestion != null && !locked"
         type="button"
-        class="bk-press w-full flex items-center gap-1.5 rounded-lg border border-aurora/40 bg-aurora/5 px-2 py-1 text-left disabled:opacity-50"
-        :disabled="completed"
+        class="bk-press w-full flex items-center gap-1.5 rounded-lg border border-aurora/40 bg-aurora/5 px-2 py-1 text-left"
         :title="t('workout.progressionTitle')"
         :data-testid="`progression-hint-${workoutExercise.id}`"
         @click="openSuggested"
@@ -1096,7 +1104,8 @@ async function moveDown() {
           v-if="exercise"
           type="button"
           :data-testid="`edit-set-${set.id}`"
-          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1 hover:bg-slab"
+          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1 hover:bg-slab disabled:hover:bg-transparent"
+          :disabled="locked"
           :aria-label="t('common.edit')"
           @click="openEdit(set)"
         >
@@ -1119,6 +1128,7 @@ async function moveDown() {
         <BkCheck
           :model-value="true"
           size="md"
+          :disabled="locked"
           :aria-label="set.is_warmup ? t('workout.warmup') : t('workout.setDone', { n: effectiveNumber(set) })"
           :data-testid="`uncheck-set-${set.id}`"
           @update:model-value="uncheckSet(set.id)"
@@ -1130,7 +1140,7 @@ async function moveDown() {
            registra de un toque, la fila abre el cajón para ajustar. La
            primera es la "serie activa" (resaltada, como en la referencia). -->
       <div
-        v-for="g in pendingGhostCount"
+        v-for="g in visibleGhostCount"
         :key="`ghost-${g}`"
         :data-testid="`ghost-set-${workoutExercise.id}-${g - 1}`"
         class="flex items-center gap-2 rounded-lg"
@@ -1139,8 +1149,7 @@ async function moveDown() {
         <button
           v-if="exercise"
           type="button"
-          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1 disabled:opacity-50"
-          :disabled="completed"
+          class="bk-press flex-1 min-w-0 text-left rounded-md px-2 py-1"
           :aria-label="t('workout.nextSet')"
           @click="openNew"
         >
@@ -1154,7 +1163,7 @@ async function moveDown() {
           v-if="g === 1"
           :model-value="false"
           size="md"
-          :disabled="quickLogging || !exercise || completed"
+          :disabled="quickLogging || !exercise"
           :data-testid="`ghost-check-${workoutExercise.id}`"
           :aria-label="t('workout.logSet')"
           @update:model-value="quickLog"
@@ -1227,10 +1236,9 @@ async function moveDown() {
          baja a la siguiente -->
     <div class="mt-3 flex flex-wrap items-center gap-2">
       <BkButton
-        v-if="exercise && !isCardio"
+        v-if="exercise && !isCardio && !locked"
         variant="ghost"
         size="sm"
-        :disabled="completed"
         :data-testid="`add-set-${workoutExercise.id}`"
         @click="openNew"
       >
@@ -1240,7 +1248,7 @@ async function moveDown() {
            iguales (grid de 2 columnas; en el editor retro, sin "Empezar",
            registrar toma la fila entera) -->
       <div
-        v-else-if="isCardio && exercise && !resumedActive && historyLoaded"
+        v-else-if="isCardio && exercise && !resumedActive && historyLoaded && !locked"
         class="grid gap-2 basis-full min-w-0"
         :class="live ? 'grid-cols-2' : 'grid-cols-1'"
         :data-testid="`cardio-actions-${workoutExercise.id}`"
@@ -1249,7 +1257,6 @@ async function moveDown() {
           variant="ghost"
           size="sm"
           block
-          :disabled="completed"
           :data-testid="`cardio-log-${workoutExercise.id}`"
           @click="openNew"
         >
@@ -1260,7 +1267,6 @@ async function moveDown() {
           variant="primary"
           size="sm"
           block
-          :disabled="completed"
           :data-testid="`cardio-start-${workoutExercise.id}`"
           @click="cardioStartOpen = true"
         >
