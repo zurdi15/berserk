@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.40.4 - 2026-09-16
+
+### Arreglado
+- En iPhone, el aviso de descanso terminado (y el de fin de cardio) llegaba dos veces: una del propio móvil y otra del servidor. Ahora, cuando el aviso del servidor queda programado, el del móvil se calla — y si no hay cobertura al empezar el descanso, el del móvil sigue sonando como único aviso.
+
 ## 0.40.3 - 2026-09-16
 
 ### Arreglado
