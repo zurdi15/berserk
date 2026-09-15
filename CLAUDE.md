@@ -79,12 +79,12 @@ Thin Capacitor Android shell: a WebView pointed at the production server URL in 
    ```
 
    If the APK run already failed for this reason, create the Release and re-dispatch it against the tag — that is what the `workflow_dispatch` input exists for: `gh workflow run android.yml --ref vX.Y.Z -f tag=vX.Y.Z`. Confirm the `berserk-vX.Y.Z.apk` asset actually landed on the Release afterwards.
-4. **Bump the service in ginnugagap.** The homelab is a single-node K3s cluster driven by ArgoCD GitOps from the `zurdi15/ginnugagap` repo (`master`, auto-sync + self-heal). Berserk's manifests live in `k8s/apps/berserk/`; the deploy is one line — `image:` in `deployment.yaml`. Work on the server checkout over SSH (host `ginnugagap`, user `ymir`, key `~/.ssh/ginnugagap`):
+4. **Bump the service in ginnugagap.** The homelab is a single-node K3s cluster driven by ArgoCD GitOps from the `zurdi15/ginnugagap` repo (`main`, auto-sync + self-heal). Berserk's manifests live in `k8s/apps/berserk/`; the deploy is one line — `image:` in `deployment.yaml`. The repo is cloned next to this one on the dev machine (`~/valhalla/ginnugagap`): edit, commit and push from there, never on the server checkout.
 
    ```bash
-   ssh ginnugagap 'cd ~/valhalla/ginnugagap \
+   cd ~/valhalla/ginnugagap && git pull -q --ff-only \
      && sed -i "s|berserk:.*|berserk:X.Y.Z|" k8s/apps/berserk/deployment.yaml \
-     && git commit -am "berserk: X.Y.Z" && git push'
+     && git commit -am "berserk: X.Y.Z" && git push
    ```
 
    The commit message convention in that repo is bare `berserk: X.Y.Z` (not Conventional Commits — match the neighbours).
@@ -103,14 +103,14 @@ Thin Capacitor Android shell: a WebView pointed at the production server URL in 
    ```
 
    For a real end-to-end check, the version is baked into the served bundle — pull the `/assets/index-*.js` referenced by `https://berserk.ginnugagap.net/` and grep it for `X.Y.Z`. A tag that fails to pull leaves the old pod serving happily, so silence is not success.
-6. **Notify over Telegram.** Use the `telegram-notify` skill, which lives in the ginnugagap repo (`telegram_bot/claude-skill/SKILL.md`, symlinked into `~/.claude/skills/` **on the server**, not on the dev machine). From here it is reachable over SSH by absolute path — the wrapper is not on `PATH` in a non-interactive shell:
+6. **Notify over Telegram.** Use the `telegram-notify` MCP tool (`notify`) or the CLI of the same name — both are installed on the dev machine, with the credentials, so nothing goes over SSH. The message rules (Spanish, one message per release, `proyecto versión verbo` headline, what changed for the user) are in the skill and in [zurdi15/telegram-notify](https://github.com/zurdi15/telegram-notify)'s `GUIDELINES.md`:
 
    ```bash
-   ssh ginnugagap '~/valhalla/ginnugagap/telegram_bot/notify.py -s ok -p berserk \
-     -t "berserk vX.Y.Z en el cluster" "<qué trae la versión, en español>"'
+   telegram-notify -s ok -p berserk -H ginnugagap \
+     -t "berserk X.Y.Z desplegado" "<imagen y estado de Argo, y qué trae la versión, en español>"
    ```
 
-   Pass `-p berserk` or the context line reports the server's cwd instead of the project. One message per release, in Spanish, once the version is really live. Read that SKILL.md for the flags and the message rules before writing the first one.
+   Send it once the version is really live (step 5 verified), not before.
 
 ## Repo notes
 
