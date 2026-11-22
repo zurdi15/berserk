@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.40.5 - 2026-11-22
+
+### Añadido
+- Las notas de un ejercicio se guardan por usuario y ejercicio, de modo que
+  vuelven a aparecer en ese ejercicio en los entrenamientos posteriores.
+
 ## 0.40.4 - 2026-09-16
 
 ### Arreglado
