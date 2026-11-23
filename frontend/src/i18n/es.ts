@@ -314,6 +314,8 @@ export const es = {
     supersetLabel: 'Superserie {label}',
   },
   library: {
+    viewExerciseNote: 'Ver nota de {name}',
+    exerciseNoteTitle: 'Nota de {name}',
     image: 'Imagen',
     imageAdd: 'Añadir imagen',
     imageFrameHint: 'Arrastra para encuadrar y ajusta el zoom — así exactamente se verá en la app.',

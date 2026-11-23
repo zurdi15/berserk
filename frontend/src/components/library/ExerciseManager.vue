@@ -29,6 +29,8 @@ import BkEmpty from '@/lib/BkEmpty.vue'
 import BkUser from '@/lib/BkUser.vue'
 import { groupRune, primaryMuscleGroup } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
+import ExerciseNoteButton from './ExerciseNoteButton.vue'
+import { useExerciseNotes } from '@/composables/useExerciseNotes'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -36,6 +38,7 @@ const toast = useToastStore()
 
 const exercises = ref<ExerciseOut[]>([])
 const muscleGroups = ref<MuscleGroupOut[]>([])
+const { load: loadNotes, noteFor } = useExerciseNotes()
 
 // UNIFIED-LISTINGS: zurdi no quiere "una sección de ejercicios y otra de
 // catálogo" — UNA lista, con una label de quién la creó cuando no es mía.
@@ -182,6 +185,7 @@ async function loadAll() {
     const [exercisesData, groupsData] = await Promise.all([listExercises(), listMuscleGroups()])
     exercises.value = exercisesData
     muscleGroups.value = groupsData
+    await loadNotes(exercisesData)
     setViewCache<Snapshot>('library:all', { exercises: exercisesData, groups: groupsData })
   } catch (error) {
     if (!cached) toastApiError(error)
@@ -607,6 +611,11 @@ async function confirmDelete() {
               </div>
             </div>
             </component>
+            <ExerciseNoteButton
+              :exercise-id="exercise.id"
+              :exercise-name="exerciseName(exercise, auth.user?.locale || 'es')"
+              :note="noteFor(exercise.id)"
+            />
             <!-- item 1: icon-only, como en RoutineList/AdminCard. item 5: un
                  admin puede editar/borrar filas predefinidas (owner_id
                  null), mismo sheet/flow que los ejercicios propios. W2

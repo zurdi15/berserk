@@ -17,6 +17,8 @@ import BkRune from '@/lib/BkRune.vue'
 import GroupFilterSelect from '@/lib/GroupFilterSelect.vue'
 import { isValidRuneName, primaryMuscleGroup } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
+import ExerciseNoteButton from '@/components/library/ExerciseNoteButton.vue'
+import { useExerciseNotes } from '@/composables/useExerciseNotes'
 
 // v0.24.1 (zurdi: "las cards están un poco vacías"): los récords llegan del
 // padre (ProgressView ya los tiene cargados) — cada fila enseña su máximo
@@ -39,6 +41,7 @@ const ready = ref(false)
 // ids de ejercicios con al menos una serie registrada (item 5): el punto
 // aurora junto al nombre — mismo Set para lookup O(1) en el template
 const trainedIds = ref<Set<number>>(new Set())
+const { load: loadNotes, noteFor } = useExerciseNotes()
 
 async function load() {
   // v0.26.0 (zurdi: "Entrenos no se aprovecha del prefetch"): hidratar de
@@ -67,6 +70,7 @@ async function load() {
     allExercises.value = list
     trainedIds.value = new Set(trained.exercise_ids)
     muscleGroups.value = groups
+    await loadNotes(list, athlete.userId ?? 'me')
     if (own) {
       setViewCache('progress:catalog:me', list)
       setViewCache('progress:trained:me', trained.exercise_ids)
@@ -165,27 +169,30 @@ watch(() => athlete.userId, load)
       class="space-y-1"
       data-testid="exercise-picker-list"
     >
-      <button
+      <div
         v-for="exercise in filtered"
         :key="exercise.id"
-        type="button"
-        :data-testid="`exercise-option-${exercise.id}`"
-        class="w-full text-left p-2 rounded-md hover:bg-stone transition-colors text-sm border border-transparent hover:border-line flex items-center gap-2.5"
-        :class="modelValue === exercise.id ? 'text-aurora' : 'text-ink'"
-        @click="select(exercise.id)"
+        class="w-full p-2 rounded-md hover:bg-stone transition-colors text-sm border border-transparent hover:border-line flex items-center gap-2.5"
       >
         <!-- facelift ("fotos protagonistas"): la biblioteca por fin enseña
              sus fotos aquí — thumb con pozo rúnico de fallback -->
-        <BkMedia
-          :exercise="exercise"
-          :rune="primaryGroup(exercise) && isValidRuneName(primaryGroup(exercise)!.slug) ? (primaryGroup(exercise)!.slug as RuneName) : null"
-          size="tallSm"
-        />
+        <button
+          type="button"
+          :data-testid="`exercise-option-${exercise.id}`"
+          class="flex flex-1 min-w-0 items-center gap-2.5 text-left"
+          :class="modelValue === exercise.id ? 'text-aurora' : 'text-ink'"
+          @click="select(exercise.id)"
+        >
+          <BkMedia
+            :exercise="exercise"
+            :rune="primaryGroup(exercise) && isValidRuneName(primaryGroup(exercise)!.slug) ? (primaryGroup(exercise)!.slug as RuneName) : null"
+            size="tallSm"
+          />
         <!-- v0.23.0 (zurdi: "igual que en otros sitios, debajo del nombre el
              chip de grupo muscular"): misma anatomía que AddExerciseSheet y
              la biblioteca — nombre arriba, chip runa+grupo debajo (antes el
              tag vivía a la derecha y escondía el nombre en pantallas sm) -->
-        <span class="flex-1 min-w-0">
+          <span class="flex-1 min-w-0">
           <span class="block break-words text-base">{{ exerciseName(exercise, locale) }}</span>
           <span v-if="primaryGroup(exercise)" class="mt-1 block">
             <span
@@ -198,7 +205,7 @@ watch(() => athlete.userId, load)
                 :size="12"
               />
               <span>{{ groupLabel(primaryGroup(exercise)!) }}</span>
-            </span>
+              </span>
           </span>
           <!-- v0.24.1 (zurdi): el chip del TIPO en SU propia fila — salvo
                cuando duplicaría al de grupo (grupo "Cardio" en una cinta) -->
@@ -216,22 +223,28 @@ watch(() => athlete.userId, load)
         </span>
         <!-- v0.24.1: el máximo del ejercicio a la derecha — la card deja de
              estar vacía y de paso ahorra un viaje a Récords -->
-        <span v-if="bestLabel(exercise.id)" class="shrink-0 text-right" :data-testid="`picker-max-${exercise.id}`">
-          <span class="block bk-metric text-sm text-ember">{{ bestLabel(exercise.id) }}</span>
-          <span class="block text-2xs text-ink-faint">{{ t('progress.maxShort') }}</span>
-        </span>
+          <span v-if="bestLabel(exercise.id)" class="shrink-0 text-right" :data-testid="`picker-max-${exercise.id}`">
+            <span class="block bk-metric text-sm text-ember">{{ bestLabel(exercise.id) }}</span>
+            <span class="block text-2xs text-ink-faint">{{ t('progress.maxShort') }}</span>
+          </span>
         <!-- punto aurora (item 5): mismo visual que los dots "done" del
              calendario (w-1.5 h-1.5 rounded-full bg-aurora, ver MonthGrid.vue)
              — señal de que este ejercicio ya tiene series registradas -->
-        <span
-          v-if="trainedIds.has(exercise.id)"
-          class="w-1.5 h-1.5 rounded-full bg-aurora shrink-0"
-          data-testid="trained-dot"
-          :title="t('progress.hasData')"
-        >
-          <span class="sr-only">{{ t('progress.hasData') }}</span>
-        </span>
-      </button>
+          <span
+            v-if="trainedIds.has(exercise.id)"
+            class="w-1.5 h-1.5 rounded-full bg-aurora shrink-0"
+            data-testid="trained-dot"
+            :title="t('progress.hasData')"
+          >
+            <span class="sr-only">{{ t('progress.hasData') }}</span>
+          </span>
+        </button>
+        <ExerciseNoteButton
+          :exercise-id="exercise.id"
+          :exercise-name="exerciseName(exercise, locale)"
+          :note="noteFor(exercise.id)"
+        />
+      </div>
     </div>
   </div>
 </template>

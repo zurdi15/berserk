@@ -16,6 +16,8 @@ import GroupFilterSelect from '@/lib/GroupFilterSelect.vue'
 import { groupRune, primaryMuscleGroup, primaryRune } from '@/lib/runeResolve'
 import type { RuneName } from '@/lib/runes'
 import type { WorkoutActions } from './workoutActions'
+import ExerciseNoteButton from '@/components/library/ExerciseNoteButton.vue'
+import { useExerciseNotes } from '@/composables/useExerciseNotes'
 
 // store-agnóstico (round 8): se tipa contra el mismo contrato que
 // WorkoutExerciseCard para no inventar otra interfaz. addSupersetPair es
@@ -45,6 +47,7 @@ const catalogReady = ref(false)
 // item 6: catálogo de grupos, cargado una vez, para resolver el tag de
 // runa+nombre de cada resultado de búsqueda
 const muscleGroups = ref<MuscleGroupOut[]>([])
+const { load: loadNotes, noteFor } = useExerciseNotes()
 
 function groupLabel(group: MuscleGroupOut): string {
   return auth.user?.locale === 'en' ? group.name_en : group.name_es
@@ -89,6 +92,9 @@ async function loadCatalog() {
     ])
     exercises.value = exercisesList
     muscleGroups.value = muscleGroupsList
+    // The sheet is mounted by the workout views even while closed. Defer the
+    // per-exercise note requests until the catalog is actually visible.
+    if (props.open) await loadNotes(exercisesList)
   } catch (error) {
     toastApiError(error)
   } finally {
@@ -238,6 +244,11 @@ watch(
               </span>
             </div>
           </div>
+          <ExerciseNoteButton
+            :exercise-id="exercise.id"
+            :exercise-name="labelFor(exercise)"
+            :note="noteFor(exercise.id)"
+          />
         </div>
       </template>
     </BkSearchList>

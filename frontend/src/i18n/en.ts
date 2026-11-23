@@ -307,6 +307,8 @@ export const en = {
     supersetLabel: 'Superset {label}',
   },
   library: {
+    viewExerciseNote: 'View note for {name}',
+    exerciseNoteTitle: 'Note for {name}',
     image: 'Image',
     imageAdd: 'Add image',
     imageFrameHint: 'Drag to frame and adjust the zoom — this is exactly how it will look in the app.',
