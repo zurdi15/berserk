@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.40.6 - 2026-11-23
+
+### Añadido
+- Las notas de los ejercicios ahora se pueden consultar desde el selector de
+  ejercicios, la biblioteca y otras vistas sin añadir primero el ejercicio a
+  un entrenamiento.
+
+### Arreglado
+- El selector de añadir ejercicios ya no carga notas mientras permanece
+  cerrado, evitando peticiones innecesarias y avisos de error al abrir una
+  pantalla de entrenamiento.
+
 ## 0.40.5 - 2026-11-22
 
 ### Añadido
