@@ -62,8 +62,10 @@ export const useAuthStore = defineStore('auth', () => {
     // se importan aquí para evitar problemas con el orden de inicialización
     const { useAthleteStore } = await import('./athlete')
     const { useActiveWorkoutStore } = await import('./activeWorkout')
+    const { useWorkoutEditorStore } = await import('./workoutEditor')
     useAthleteStore().clear()
     useActiveWorkoutStore().reset()
+    useWorkoutEditorStore().reset()
     // v0.6.0 offline: TODO lo persistido offline es del usuario saliente —
     // la cache de lecturas no puede filtrarse al siguiente, y una cola
     // pendiente jamás debe reproducirse con la sesión de otro (las series

@@ -108,6 +108,7 @@ export const useWorkoutEditorStore = defineStore('workoutEditor', () => {
   function reset() {
     workout.value = null
     historyCache.value.clear()
+    noteCache.clear()
   }
 
   return {

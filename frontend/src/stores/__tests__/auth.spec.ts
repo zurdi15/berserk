@@ -67,23 +67,27 @@ describe('auth store', () => {
     expect(store.ready).toBe(true)
   })
 
-  it('logout clears athlete and activeWorkout stores to prevent cross-user state bleed', async () => {
+  it('logout clears user-scoped stores to prevent cross-user state bleed', async () => {
     vi.mocked(authApi.logout).mockResolvedValue(undefined)
     const authStore = useAuthStore()
     authStore.user = user
     // Set up other stores with stale data
     const { useAthleteStore } = await import('../athlete')
     const { useActiveWorkoutStore } = await import('../activeWorkout')
+    const { useWorkoutEditorStore } = await import('../workoutEditor')
     const athleteStore = useAthleteStore()
     const workoutStore = useActiveWorkoutStore()
+    const editorStore = useWorkoutEditorStore()
     athleteStore.view({ id: 77, username: 'other', is_admin: false, locale: 'es', units: 'kg', timezone: 'UTC' })
     workoutStore.workout = { id: 4, date: '2026-08-06', ended_at: null, exercises: [], muscle_tag_ids: [] } as any
     workoutStore.lastRecords = [{ id: 9, kind: 'max_weight', value: 100 }] as any
+    editorStore.workout = { id: 8, date: '2026-08-05', ended_at: '2026-08-05T12:00:00', exercises: [], muscle_tag_ids: [] } as any
     // Logout should clear all stores
     await authStore.logout()
     expect(authStore.user).toBeNull()
     expect(athleteStore.viewing).toBeNull()
     expect(workoutStore.workout).toBeNull()
     expect(workoutStore.lastRecords).toHaveLength(0)
+    expect(editorStore.workout).toBeNull()
   })
 })

@@ -183,4 +183,20 @@ describe('workout editor store', () => {
     store.reset()
     expect(store.workout).toBeNull()
   })
+
+  it('reset clears cached history so the next user cannot reuse another user’s prefill', async () => {
+    vi.mocked(domain.getExerciseHistory).mockClear()
+    vi.mocked(domain.getWorkout).mockResolvedValue(workout as never)
+    const store = useWorkoutEditorStore()
+    await store.load(4)
+    vi.mocked(domain.getExerciseHistory).mockResolvedValue({
+      workout_id: 1, date: '2026-07-01', sets: [],
+    } as never)
+    await store.exerciseHistory(9)
+
+    store.reset()
+    await store.exerciseHistory(9)
+
+    expect(domain.getExerciseHistory).toHaveBeenCalledTimes(2)
+  })
 })

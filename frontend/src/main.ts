@@ -16,6 +16,7 @@ import { router } from './router'
 import { useAuthStore } from './stores/auth'
 import { useAthleteStore } from './stores/athlete'
 import { useActiveWorkoutStore } from './stores/activeWorkout'
+import { useWorkoutEditorStore } from './stores/workoutEditor'
 import { initTheme } from './utils/theme'
 import { initAppUpdate } from './utils/appUpdate'
 
@@ -36,6 +37,7 @@ setUnauthorizedHandler(() => {
   // cerrar sesión no puede dejar el "viendo a X" ni el entreno cacheado del usuario anterior
   useAthleteStore().clear()
   useActiveWorkoutStore().reset()
+  useWorkoutEditorStore().reset()
   const current = router.currentRoute.value.name
   // durante el arranque (ready aún false) el guard resuelve el destino él
   // mismo; y si ya estamos en una ruta pública no hay nada que redirigir.

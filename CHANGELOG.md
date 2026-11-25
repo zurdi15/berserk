@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.40.7 - 2026-11-25
+
+### Arreglado
+- Los placeholders y las sugerencias rápidas de peso y repeticiones ya no
+  pueden reutilizar datos del usuario anterior al cerrar sesión o perder la
+  sesión.
+
 ## 0.40.6 - 2026-11-23
 
 ### Añadido
